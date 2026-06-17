@@ -1,0 +1,1317 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2685.6">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000; min-height: 14.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">const firebaseConfig = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>apiKey: "AIzaSyAhhr-z9D8jbQj4un5iOfvo4rJds539dlU",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>authDomain: "scvianense-sad-2627.firebaseapp.com",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>projectId: "scvianense-sad-2627",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>storageBucket: "scvianense-sad-2627.firebasestorage.app",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>messagingSenderId: "394145643095",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>appId: "1:394145643095:web:52bd79aa9bb862e20f4112",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>measurementId: "G-R0B243VLLB"</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="pt"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;meta charset="UTF-8"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;title&gt;SC Vianense SAD — Gestão Desportiva&lt;/title&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Firebase SDK (compat) — necessário para upload de ficheiros --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"&gt;&lt;/script&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;style&gt;</span></p>
+<p class="p1"><span class="s1">*{box-sizing:border-box;margin:0;padding:0}</span></p>
+<p class="p1"><span class="s1">:root{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>--green:#1a3d6e;--green-l:#2557a7;--green-d:#0e2444;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>--gold:#e8b84b;--bg:#f2f4f7;--sw:240px;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>--text:#1a1a1a;--muted:#666;--border:#d8dde8;--card:#fff;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>--red:#c0392b;--blue:#2980b9;--ok:#27ae60;</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* SIDEBAR */</span></p>
+<p class="p1"><span class="s1">#sb{width:var(--sw);background:var(--green-d);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}</span></p>
+<p class="p1"><span class="s1">#sb-logo{padding:22px 18px;border-bottom:1px solid rgba(255,255,255,.1)}</span></p>
+<p class="p1"><span class="s1">#sb-logo .cn{font-size:15px;font-weight:700;letter-spacing:.3px}</span></p>
+<p class="p1"><span class="s1">#sb-logo .sn{font-size:11px;opacity:.5;margin-top:2px}</span></p>
+<p class="p1"><span class="s1">#sb nav{flex:1;padding:14px 0;overflow-y:auto}</span></p>
+<p class="p1"><span class="s1">.nsl{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.4;padding:12px 18px 5px}</span></p>
+<p class="p1"><span class="s1">.nl{display:flex;align-items:center;gap:10px;padding:10px 18px;color:rgba(255,255,255,.75);cursor:pointer;border-left:3px solid transparent;font-size:13.5px;transition:all .15s;user-select:none}</span></p>
+<p class="p1"><span class="s1">.nl:hover{background:rgba(255,255,255,.07);color:#fff}</span></p>
+<p class="p1"><span class="s1">.nl.active{background:rgba(255,255,255,.1);border-left-color:var(--gold);color:#fff}</span></p>
+<p class="p1"><span class="s1">.nl .ic{font-size:15px;width:20px;text-align:center}</span></p>
+<p class="p1"><span class="s1">hr.nd{border:none;border-top:1px solid rgba(255,255,255,.1);margin:8px 0}</span></p>
+<p class="p1"><span class="s1">#sb-foot{padding:16px 18px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;opacity:.4}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* MAIN */</span></p>
+<p class="p1"><span class="s1">#main{margin-left:var(--sw);flex:1;min-height:100vh}</span></p>
+<p class="p1"><span class="s1">.view{display:none;padding:30px 32px;max-width:1200px}</span></p>
+<p class="p1"><span class="s1">.view.active{display:block}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* TOP BAR */</span></p>
+<p class="p1"><span class="s1">.tb{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:26px;gap:16px}</span></p>
+<p class="p1"><span class="s1">.tb h1{font-size:22px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.tb .sub{font-size:13px;color:var(--muted);margin-top:2px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* BUTTONS */</span></p>
+<p class="p1"><span class="s1">.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 15px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}</span></p>
+<p class="p1"><span class="s1">.btn-p{background:var(--green);color:#fff}.btn-p:hover{background:var(--green-l)}</span></p>
+<p class="p1"><span class="s1">.btn-p:disabled{opacity:.6;cursor:not-allowed}</span></p>
+<p class="p1"><span class="s1">.btn-d{background:var(--red);color:#fff}.btn-d:hover{opacity:.9}</span></p>
+<p class="p1"><span class="s1">.btn-o{background:transparent;color:var(--green);border:1.5px solid var(--green)}.btn-o:hover{background:var(--green);color:#fff}</span></p>
+<p class="p1"><span class="s1">.btn-g{background:#e8ecec;color:var(--text)}.btn-g:hover{background:#dde3dd}</span></p>
+<p class="p1"><span class="s1">.btn-sm{padding:5px 10px;font-size:12px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* CARDS */</span></p>
+<p class="p1"><span class="s1">.card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:20px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* STATS */</span></p>
+<p class="p1"><span class="s1">.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:26px}</span></p>
+<p class="p1"><span class="s1">.sc{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:18px 20px}</span></p>
+<p class="p1"><span class="s1">.sc .sl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}</span></p>
+<p class="p1"><span class="s1">.sc .sv{font-size:30px;font-weight:700;margin-top:3px;color:var(--green)}</span></p>
+<p class="p1"><span class="s1">.sc .ss{font-size:12px;color:var(--muted);margin-top:2px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* SEARCH / FILTER */</span></p>
+<p class="p1"><span class="s1">.sf{display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap}</span></p>
+<p class="p1"><span class="s1">.si{flex:1;min-width:180px;max-width:280px;padding:8px 11px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit}</span></p>
+<p class="p1"><span class="s1">.si:focus{border-color:var(--green)}</span></p>
+<p class="p1"><span class="s1">select.si{cursor:pointer}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* PLAYER GRID */</span></p>
+<p class="p1"><span class="s1">.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px}</span></p>
+<p class="p1"><span class="s1">.pc{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:18px;text-align:center;cursor:pointer;transition:all .15s;position:relative}</span></p>
+<p class="p1"><span class="s1">.pc:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:0 4px 14px rgba(26,61,110,.12)}</span></p>
+<p class="p1"><span class="s1">.av{width:60px;height:60px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin:0 auto 11px;overflow:hidden;flex-shrink:0}</span></p>
+<p class="p1"><span class="s1">.av img{width:100%;height:100%;object-fit:cover}</span></p>
+<p class="p1"><span class="s1">.pn{font-size:13.5px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.pp{font-size:12px;color:var(--muted);margin-top:3px}</span></p>
+<p class="p1"><span class="s1">.pa{font-size:11px;color:var(--muted);margin-top:2px}</span></p>
+<p class="p1"><span class="s1">.pnb{position:absolute;top:8px;right:8px;background:var(--gold);color:#1a1a1a;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* PLAYER DETAIL */</span></p>
+<p class="p1"><span class="s1">.pdh{display:flex;gap:22px;align-items:flex-start;margin-bottom:26px;flex-wrap:wrap}</span></p>
+<p class="p1"><span class="s1">.pda{width:100px;height:100px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;flex-shrink:0;overflow:hidden;border:3px solid #e8eef8}</span></p>
+<p class="p1"><span class="s1">.pda img{width:100%;height:100%;object-fit:cover}</span></p>
+<p class="p1"><span class="s1">.pdh h2{font-size:22px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.bgs{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}</span></p>
+<p class="p1"><span class="s1">.bg{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}</span></p>
+<p class="p1"><span class="s1">.bg-g{background:var(--green);color:#fff}</span></p>
+<p class="p1"><span class="s1">.bg-pos{background:var(--gold);color:#1a1a1a}</span></p>
+<p class="p1"><span class="s1">.bg-n{background:#e0e7f0;color:var(--green-d)}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">.ds{display:grid;grid-template-columns:1fr 1fr;gap:18px}</span></p>
+<p class="p1"><span class="s1">.ds .card h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:13px;padding-bottom:8px;border-bottom:1px solid var(--border)}</span></p>
+<p class="p1"><span class="s1">.dr{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid #f2f2f2}</span></p>
+<p class="p1"><span class="s1">.dr:last-child{border-bottom:none}</span></p>
+<p class="p1"><span class="s1">.dr .dl{color:var(--muted)}</span></p>
+<p class="p1"><span class="s1">.dr .dv{font-weight:600;text-align:right;max-width:60%;word-break:break-word}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* DOC LINK (player detail) */</span></p>
+<p class="p1"><span class="s1">.doc-link{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:7px;margin-bottom:9px;border:1px solid var(--border)}</span></p>
+<p class="p1"><span class="s1">.doc-link .doc-icon{font-size:20px}</span></p>
+<p class="p1"><span class="s1">.doc-link .doc-info{flex:1;min-width:0}</span></p>
+<p class="p1"><span class="s1">.doc-link .doc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</span></p>
+<p class="p1"><span class="s1">.doc-link .doc-status{font-size:11px;color:var(--muted);margin-top:1px}</span></p>
+<p class="p1"><span class="s1">.doc-link a.btn{font-size:11px;padding:4px 9px;flex-shrink:0}</span></p>
+<p class="p1"><span class="s1">.doc-missing{color:var(--muted);font-size:13px;font-style:italic}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* CALENDAR */</span></p>
+<p class="p1"><span class="s1">.cc{display:flex;align-items:center;gap:14px;margin-bottom:18px}</span></p>
+<p class="p1"><span class="s1">.cc h2{font-size:18px;font-weight:700;flex:1;text-align:center}</span></p>
+<p class="p1"><span class="s1">.cg{background:var(--card);border-radius:10px;border:1px solid var(--border);overflow:hidden}</span></p>
+<p class="p1"><span class="s1">.chr{display:grid;grid-template-columns:repeat(7,1fr);background:var(--green-d);color:#fff}</span></p>
+<p class="p1"><span class="s1">.chc{padding:9px;text-align:center;font-size:11.5px;font-weight:600;letter-spacing:.3px}</span></p>
+<p class="p1"><span class="s1">.cb{display:grid;grid-template-columns:repeat(7,1fr)}</span></p>
+<p class="p1"><span class="s1">.cd{min-height:88px;padding:5px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}</span></p>
+<p class="p1"><span class="s1">.cd:hover{background:#f5f7fb}</span></p>
+<p class="p1"><span class="s1">.cd:nth-child(7n){border-right:none}</span></p>
+<p class="p1"><span class="s1">.cd.om{opacity:.35}</span></p>
+<p class="p1"><span class="s1">.cd.td{background:#eef2fa}</span></p>
+<p class="p1"><span class="s1">.cdn{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}</span></p>
+<p class="p1"><span class="s1">.cdn.tdn{background:var(--green);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}</span></p>
+<p class="p1"><span class="s1">.ce{font-size:11px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</span></p>
+<p class="p1"><span class="s1">.ce.tr{background:#d4edda;color:#155724}</span></p>
+<p class="p1"><span class="s1">.ce.gm{background:#cce5ff;color:#004085}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* EVENT LIST */</span></p>
+<p class="p1"><span class="s1">.el{margin-top:26px}</span></p>
+<p class="p1"><span class="s1">.el h3{font-size:15px;font-weight:700;margin-bottom:14px}</span></p>
+<p class="p1"><span class="s1">.ei{display:flex;align-items:center;gap:14px;padding:13px;background:var(--card);border-radius:8px;border:1px solid var(--border);margin-bottom:9px}</span></p>
+<p class="p1"><span class="s1">.etd{width:11px;height:11px;border-radius:50%;flex-shrink:0}</span></p>
+<p class="p1"><span class="s1">.etd.tr{background:#27ae60}.etd.gm{background:var(--blue)}</span></p>
+<p class="p1"><span class="s1">.einfo{flex:1}</span></p>
+<p class="p1"><span class="s1">.etitle{font-size:13.5px;font-weight:600}</span></p>
+<p class="p1"><span class="s1">.emeta{font-size:12px;color:var(--muted);margin-top:2px}</span></p>
+<p class="p1"><span class="s1">.esb{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}</span></p>
+<p class="p1"><span class="s1">.esb.sub19{background:#ffeeba;color:#856404}</span></p>
+<p class="p1"><span class="s1">.esb.sub23{background:#d1ecf1;color:#0c5460}</span></p>
+<p class="p1"><span class="s1">.esb.both{background:#d4edda;color:#155724}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* FILTER TABS */</span></p>
+<p class="p1"><span class="s1">.ft{display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap}</span></p>
+<p class="p1"><span class="s1">.ftb{padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);transition:all .15s;user-select:none}</span></p>
+<p class="p1"><span class="s1">.ftb.active{background:var(--green);color:#fff;border-color:var(--green)}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* MODAL */</span></p>
+<p class="p1"><span class="s1">.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:16px}</span></p>
+<p class="p1"><span class="s1">.mo.open{display:flex}</span></p>
+<p class="p1"><span class="s1">.md{background:#fff;border-radius:12px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:26px}</span></p>
+<p class="p1"><span class="s1">.mh{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}</span></p>
+<p class="p1"><span class="s1">.mh h2{font-size:17px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.mc{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:3px 8px;border-radius:4px;line-height:1}</span></p>
+<p class="p1"><span class="s1">.mc:hover{background:#f0f0f0}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* FORM */</span></p>
+<p class="p1"><span class="s1">.fst{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin:18px 0 11px;padding-bottom:6px;border-bottom:1px solid var(--border)}</span></p>
+<p class="p1"><span class="s1">.fst:first-child{margin-top:0}</span></p>
+<p class="p1"><span class="s1">.fr{display:grid;grid-template-columns:1fr 1fr;gap:13px}</span></p>
+<p class="p1"><span class="s1">.fg{margin-bottom:13px}</span></p>
+<p class="p1"><span class="s1">.fg label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:4px}</span></p>
+<p class="p1"><span class="s1">.fg input,.fg select,.fg textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit;transition:border-color .15s}</span></p>
+<p class="p1"><span class="s1">.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--green)}</span></p>
+<p class="p1"><span class="s1">.fg textarea{resize:vertical;min-height:68px}</span></p>
+<p class="p1"><span class="s1">.fa{display:flex;gap:9px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* ── PHOTO UPLOAD ── */</span></p>
+<p class="p1"><span class="s1">.photo-upload-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:6px}</span></p>
+<p class="p1"><span class="s1">.photo-circle{width:88px;height:88px;border-radius:50%;background:var(--green);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;border:2.5px dashed rgba(26,61,110,.3);transition:all .15s;position:relative;font-size:22px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.photo-circle:hover{border-color:var(--green);opacity:.85}</span></p>
+<p class="p1"><span class="s1">.photo-circle img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}</span></p>
+<p class="p1"><span class="s1">.photo-circle .cam-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;font-size:20px}</span></p>
+<p class="p1"><span class="s1">.photo-circle:hover .cam-overlay{display:flex}</span></p>
+<p class="p1"><span class="s1">.photo-hint{font-size:11px;color:var(--muted);margin-top:7px;text-align:center;cursor:pointer}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* ── DOC UPLOAD ZONE ── */</span></p>
+<p class="p1"><span class="s1">.doc-zone{border:1.5px dashed var(--border);border-radius:7px;padding:11px 13px;cursor:pointer;transition:all .15s;font-size:12.5px;min-height:52px;display:flex;align-items:center;gap:10px}</span></p>
+<p class="p1"><span class="s1">.doc-zone:hover{border-color:var(--green);background:#f5f8ff}</span></p>
+<p class="p1"><span class="s1">.doc-zone.has-file{border-style:solid;border-color:var(--ok);background:#f4faf6}</span></p>
+<p class="p1"><span class="s1">.doc-zone .dz-icon{font-size:20px;flex-shrink:0}</span></p>
+<p class="p1"><span class="s1">.doc-zone .dz-info{flex:1;min-width:0}</span></p>
+<p class="p1"><span class="s1">.doc-zone .dz-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</span></p>
+<p class="p1"><span class="s1">.doc-zone .dz-sub{font-size:11px;color:var(--muted);margin-top:1px}</span></p>
+<p class="p1"><span class="s1">.doc-zone .dz-change{font-size:11px;color:var(--green);text-decoration:underline;cursor:pointer;margin-top:2px;display:inline-block}</span></p>
+<p class="p1"><span class="s1">.doc-zone.empty{color:var(--muted);justify-content:center;text-align:center;flex-direction:column;gap:4px}</span></p>
+<p class="p1"><span class="s1">.doc-zone.empty .dz-icon{font-size:24px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* FIREBASE CONFIG BANNER */</span></p>
+<p class="p1"><span class="s1">.fb-banner{background:#fff8e1;border:1px solid #f0c040;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12.5px;display:none}</span></p>
+<p class="p1"><span class="s1">.fb-banner.show{display:block}</span></p>
+<p class="p1"><span class="s1">.fb-banner strong{color:#7a5f00}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* PUBLIC FORM */</span></p>
+<p class="p1"><span class="s1">#v-pf{max-width:720px;margin:0 auto}</span></p>
+<p class="p1"><span class="s1">.pfh{text-align:center;padding:30px 20px;background:var(--green-d);color:#fff;border-radius:12px;margin-bottom:26px}</span></p>
+<p class="p1"><span class="s1">.pfh h1{font-size:20px;font-weight:700}</span></p>
+<p class="p1"><span class="s1">.pfh p{opacity:.75;margin-top:6px;font-size:13px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* TOAST */</span></p>
+<p class="p1"><span class="s1">.toast{position:fixed;bottom:22px;right:22px;background:var(--green-d);color:#fff;padding:11px 18px;border-radius:8px;font-size:13.5px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .28s;pointer-events:none;max-width:320px}</span></p>
+<p class="p1"><span class="s1">.toast.show{opacity:1;transform:translateY(0)}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* EMPTY STATE */</span></p>
+<p class="p1"><span class="s1">.es{text-align:center;padding:56px 20px;color:var(--muted)}</span></p>
+<p class="p1"><span class="s1">.es .ei2{font-size:44px;margin-bottom:14px}</span></p>
+<p class="p1"><span class="s1">.es h3{font-size:15px;font-weight:600;color:var(--text)}</span></p>
+<p class="p1"><span class="s1">.es p{font-size:13px;margin-top:5px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* UPCOMING */</span></p>
+<p class="p1"><span class="s1">.ui{display:flex;gap:13px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}</span></p>
+<p class="p1"><span class="s1">.ui:last-child{border-bottom:none}</span></p>
+<p class="p1"><span class="s1">.ud{text-align:center;min-width:42px;background:var(--bg);border-radius:7px;padding:5px 7px;flex-shrink:0}</span></p>
+<p class="p1"><span class="s1">.ud .day{font-size:17px;font-weight:700;line-height:1}</span></p>
+<p class="p1"><span class="s1">.ud .mon{font-size:10px;text-transform:uppercase;color:var(--muted)}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* Public mode */</span></p>
+<p class="p1"><span class="s1">body.pm #sb{display:none}</span></p>
+<p class="p1"><span class="s1">body.pm #main{margin-left:0}</span></p>
+<p class="p1"><span class="s1">body.pm #v-pf{padding:30px}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* Spinner */</span></p>
+<p class="p1"><span class="s1">@keyframes spin{to{transform:rotate(360deg)}}</span></p>
+<p class="p1"><span class="s1">.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">/* ── PITCH VIEW ────────────────────────────────────── */</span></p>
+<p class="p1"><span class="s1">.pitch-wrap{background:#2a7d31;border-radius:10px;overflow:hidden;border:1px solid rgba(0,0,0,.1)}</span></p>
+<p class="p1"><span class="s1">.pitch-field{position:relative;width:100%;padding-bottom:43%;min-height:260px}</span></p>
+<p class="p1"><span class="s1">.pitch-svg{position:absolute;inset:0;width:100%;height:100%}</span></p>
+<p class="p1"><span class="s1">.pzone{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px;transform:translate(-50%,-50%);z-index:2}</span></p>
+<p class="p1"><span class="s1">.pzone-lbl{font-size:9px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.6px;text-align:center;margin-bottom:1px;white-space:nowrap}</span></p>
+<p class="p1"><span class="s1">.ppill{font-size:10.5px;font-weight:600;color:#fff;background:rgba(20,50,100,.88);border:1.5px solid rgba(255,255,255,.35);border-radius:14px;padding:3px 9px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;cursor:default;line-height:1.4}</span></p>
+<p class="p1"><span class="s1">.ppill.gk{background:rgba(170,120,5,.93);border-color:rgba(255,255,255,.55)}</span></p>
+<p class="p1"><span class="s1">.ppill.trinco{background:rgba(20,55,115,.9);border:2px solid #e8b84b}</span></p>
+<p class="p1"><span class="s1">.ppill.empty{background:rgba(255,255,255,.07);color:rgba(255,255,255,.28);border:1.5px dashed rgba(255,255,255,.22);font-weight:400;font-size:9px;font-style:italic}</span></p>
+<p class="p1"><span class="s1">.mc-cols{display:flex;gap:8px;align-items:flex-start}</span></p>
+<p class="p1"><span class="s1">.mc-col{display:flex;flex-direction:column;gap:4px;align-items:center}</span></p>
+<p class="p1"><span class="s1">#p-pitch{display:none}</span></p>
+<p class="p1"><span class="s1">&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- SIDEBAR --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;aside id="sb"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="sb-logo"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="cn"&gt;SC Vianense SAD&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sn"&gt;Coordenação Técnica&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;nav&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nsl"&gt;Geral&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nl active" data-view="dashboard"&gt;&lt;span class="ic"&gt;📊&lt;/span&gt; Dashboard&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;hr class="nd"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nsl"&gt;Plantéis&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nl" data-view="squad" data-squad="sub19"&gt;&lt;span class="ic"&gt;🟡&lt;/span&gt; Sub-19&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nl" data-view="squad" data-squad="sub23"&gt;&lt;span class="ic"&gt;🔵&lt;/span&gt; Sub-23&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;hr class="nd"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nsl"&gt;Agenda&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nl" data-view="calendar"&gt;&lt;span class="ic"&gt;📅&lt;/span&gt; Calendário&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;hr class="nd"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nsl"&gt;Atletas&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="nl" id="nl-publink"&gt;&lt;span class="ic"&gt;🔗&lt;/span&gt; Link do Formulário&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/nav&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="sb-foot"&gt;SC Vianense SAD © 2025&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/aside&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- MAIN --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;main id="main"&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- DASHBOARD --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="view active" id="v-dash"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="tb"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div&gt;&lt;h1&gt;Dashboard&lt;/h1&gt;&lt;div class="sub" id="d-date"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="fb-banner" id="fb-banner"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;strong&gt;⚠️ Firebase não configurado.&lt;/strong&gt; Os ficheiros (foto, documentos) estão a ser guardados como base64 no browser. Para produção com Vercel, preenche &lt;code&gt;FB_CONFIG&lt;/code&gt; no início do script com as tuas credenciais Firebase.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sg" id="d-stats"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div style="display:grid;grid-template-columns:1fr 1fr;gap:18px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="font-size:14px;font-weight:700;margin-bottom:14px"&gt;📅 Próximos Eventos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="d-upcoming"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="font-size:14px;font-weight:700;margin-bottom:14px"&gt;👤 Últimos Atletas&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="d-recent"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- SQUAD --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="view" id="v-squad"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="tb"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div&gt;&lt;h1 id="sq-title"&gt;&lt;/h1&gt;&lt;div class="sub" id="sq-sub"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div style="display:flex;gap:8px;align-items:center"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="display:flex;gap:3px;background:#e8ecec;border-radius:7px;padding:3px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button class="btn btn-p btn-sm" id="sq-btn-grid" style="border-radius:5px"&gt;⊞ Grelha&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button class="btn btn-g btn-sm" id="sq-btn-pitch" style="border-radius:5px;background:transparent;color:var(--muted)"&gt;⬛ Campo&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button class="btn btn-p" id="btn-add-player"&gt;+ Adicionar Atleta&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sf" id="sq-sf"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;input type="text" class="si" placeholder="🔍 Pesquisar atleta..." id="p-search"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;select class="si" id="p-pos-filter" style="max-width:190px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value=""&gt;Todas as posições&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="GR"&gt;Guarda-Redes&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="DC"&gt;Defesa Central&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="LD"&gt;Lateral Direito&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="LE"&gt;Lateral Esquerdo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="MC"&gt;Médio Centro&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="MD"&gt;Médio Defensivo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="MO"&gt;Médio Ofensivo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="ED"&gt;Extremo Direito&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="EE"&gt;Extremo Esquerdo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;option value="PL"&gt;Ponta-de-Lança&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pg" id="p-grid"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="p-pitch"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- PLAYER DETAIL --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="view" id="v-player"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="tb"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div style="display:flex;align-items:center;gap:10px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button class="btn btn-o btn-sm" id="btn-back"&gt;← Voltar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h1 id="pd-name"&gt;&lt;/h1&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div style="display:flex;gap:8px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button class="btn btn-o btn-sm" id="btn-edit-player"&gt;✏️ Editar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button class="btn btn-d btn-sm" id="btn-del-player"&gt;🗑️ Eliminar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="pd-content"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- CALENDAR --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="view" id="v-cal"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="tb"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div&gt;&lt;h1&gt;Calendário&lt;/h1&gt;&lt;div class="sub"&gt;Treinos e jogos&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;button class="btn btn-p" id="btn-add-event"&gt;+ Adicionar Evento&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="ft" id="cal-filters"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="ftb active" data-filter="all"&gt;Todos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="ftb" data-filter="sub19"&gt;Sub-19&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="ftb" data-filter="sub23"&gt;Sub-23&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="cc"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;button class="btn btn-o btn-sm" id="cal-prev"&gt;← Anterior&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;h2 id="cal-label"&gt;&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;button class="btn btn-o btn-sm" id="cal-next"&gt;Seguinte →&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="cg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="chr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="chc"&gt;SEG&lt;/div&gt;&lt;div class="chc"&gt;TER&lt;/div&gt;&lt;div class="chc"&gt;QUA&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="chc"&gt;QUI&lt;/div&gt;&lt;div class="chc"&gt;SEX&lt;/div&gt;&lt;div class="chc"&gt;SÁB&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="chc"&gt;DOM&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="cb" id="cal-body"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="el"&gt;&lt;h3&gt;Eventos do Mês&lt;/h3&gt;&lt;div id="cal-list"&gt;&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- PUBLIC FORM --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="view" id="v-pf"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pfh"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div style="font-size:36px;margin-bottom:10px"&gt;⚽&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;h1&gt;SC Vianense SAD&lt;/h1&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p&gt;Formulário de Registo do Atleta — preenche os teus dados pessoais&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="card"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div id="pf-success" style="display:none;background:#d4edda;color:#155724;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>✅ Os teus dados foram submetidos com sucesso! Obrigado.</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;form id="pf-form"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fst"&gt;Dados Pessoais&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Nome Completo *&lt;/label&gt;&lt;input type="text" name="name" required&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Data de Nascimento *&lt;/label&gt;&lt;input type="date" name="dob" required&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Nacionalidade&lt;/label&gt;&lt;input type="text" name="nationality" value="Portuguesa"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;NIF&lt;/label&gt;&lt;input type="text" name="nif" placeholder="000 000 000"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Nº Cartão de Cidadão&lt;/label&gt;&lt;input type="text" name="cc"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Telefone *&lt;/label&gt;&lt;input type="tel" name="phone" required&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;E-mail&lt;/label&gt;&lt;input type="email" name="email"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Morada&lt;/label&gt;&lt;input type="text" name="address"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fst"&gt;Dados Desportivos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Escalão *&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;select name="squad" required&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value=""&gt;Selecionar...&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="sub19"&gt;Sub-19&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="sub23"&gt;Sub-23&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Posição *&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;select name="position" required&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value=""&gt;Selecionar...&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="GR"&gt;Guarda-Redes&lt;/option&gt;&lt;option value="DC"&gt;Defesa Central&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="LD"&gt;Lateral Direito&lt;/option&gt;&lt;option value="LE"&gt;Lateral Esquerdo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="MC"&gt;Médio Centro&lt;/option&gt;&lt;option value="MD"&gt;Médio Defensivo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="MO"&gt;Médio Ofensivo&lt;/option&gt;&lt;option value="ED"&gt;Extremo Direito&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="EE"&gt;Extremo Esquerdo&lt;/option&gt;&lt;option value="PL"&gt;Ponta-de-Lança&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Nº Camisola&lt;/label&gt;&lt;input type="number" name="number" min="1" max="99"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Pé Dominante&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;select name="dominantFoot"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="right"&gt;Direito&lt;/option&gt;&lt;option value="left"&gt;Esquerdo&lt;/option&gt;&lt;option value="both"&gt;Ambos&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Clube Anterior&lt;/label&gt;&lt;input type="text" name="previousClub"&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fst"&gt;Dados Médicos / Físicos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Altura (cm)&lt;/label&gt;&lt;input type="number" name="height" min="140" max="220"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Peso (kg)&lt;/label&gt;&lt;input type="number" name="weight" min="40" max="120"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Grupo Sanguíneo&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;select name="bloodType"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value=""&gt;Desconhecido&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="A+"&gt;A+&lt;/option&gt;&lt;option value="A-"&gt;A-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="B+"&gt;B+&lt;/option&gt;&lt;option value="B-"&gt;B-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="AB+"&gt;AB+&lt;/option&gt;&lt;option value="AB-"&gt;AB-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;option value="O+"&gt;O+&lt;/option&gt;&lt;option value="O-"&gt;O-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;&lt;label&gt;Seguro Desportivo&lt;/label&gt;&lt;input type="text" name="insurance" placeholder="Apólice / Entidade"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Lesões / Obs. Médicas&lt;/label&gt;&lt;textarea name="injuries" placeholder="Lesões anteriores, alergias, medicação, etc."&gt;&lt;/textarea&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fst"&gt;Documentos e Foto&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- Photo --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg" style="text-align:center;margin-bottom:18px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;label style="display:block;margin-bottom:8px"&gt;Fotografia&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="photo-upload-wrap"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="photo-circle" id="pf-photo-circle" onclick="document.getElementById('pf-photo-input').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span id="pf-photo-initials"&gt;?&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;div class="cam-overlay"&gt;📷&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="photo-hint" onclick="document.getElementById('pf-photo-input').click()"&gt;Clica para adicionar foto&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;input type="file" id="pf-photo-input" accept="image/*" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;label&gt;Cópia do Cartão de Cidadão&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="doc-zone empty" id="pf-cc-zone" onclick="document.getElementById('pf-cc-input').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="dz-icon"&gt;🪪&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span&gt;PDF, JPG ou PNG&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="file" id="pf-cc-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="fg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;label&gt;Exame Médico Desportivo&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="doc-zone empty" id="pf-med-zone" onclick="document.getElementById('pf-med-input').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span class="dz-icon"&gt;🏥&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">              </span>&lt;span&gt;PDF, JPG ou PNG&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="file" id="pf-med-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fa"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;button type="submit" class="btn btn-p" id="pf-submit-btn"&gt;✓ Submeter Dados&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/form&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;/main&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- MODAL: PLAYER --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="mo" id="mo-player"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="md"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="mh"&gt;&lt;h2 id="mo-p-title"&gt;Adicionar Atleta&lt;/h2&gt;&lt;button class="mc" id="mo-p-close"&gt;✕&lt;/button&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;form id="mo-p-form"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;input type="hidden" id="p-id"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fst"&gt;Dados Pessoais&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Nome Completo *&lt;/label&gt;&lt;input type="text" id="f-name" required&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Data de Nascimento&lt;/label&gt;&lt;input type="date" id="f-dob"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Nacionalidade&lt;/label&gt;&lt;input type="text" id="f-nat" value="Portuguesa"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;NIF&lt;/label&gt;&lt;input type="text" id="f-nif"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Nº Cartão de Cidadão&lt;/label&gt;&lt;input type="text" id="f-cc"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Telefone&lt;/label&gt;&lt;input type="tel" id="f-phone"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;E-mail&lt;/label&gt;&lt;input type="email" id="f-email"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Morada&lt;/label&gt;&lt;input type="text" id="f-addr"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fst"&gt;Dados Desportivos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Escalão *&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="f-squad" required&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="sub19"&gt;Sub-19&lt;/option&gt;&lt;option value="sub23"&gt;Sub-23&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Posição&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="f-pos"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value=""&gt;—&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="GR"&gt;Guarda-Redes&lt;/option&gt;&lt;option value="DC"&gt;Defesa Central&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="LD"&gt;Lateral Direito&lt;/option&gt;&lt;option value="LE"&gt;Lateral Esquerdo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="MC"&gt;Médio Centro&lt;/option&gt;&lt;option value="MD"&gt;Médio Defensivo&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="MO"&gt;Médio Ofensivo&lt;/option&gt;&lt;option value="ED"&gt;Extremo Direito&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="EE"&gt;Extremo Esquerdo&lt;/option&gt;&lt;option value="PL"&gt;Ponta-de-Lança&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Nº Camisola&lt;/label&gt;&lt;input type="number" id="f-num" min="1" max="99"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Pé Dominante&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="f-foot"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="right"&gt;Direito&lt;/option&gt;&lt;option value="left"&gt;Esquerdo&lt;/option&gt;&lt;option value="both"&gt;Ambos&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg"&gt;&lt;label&gt;Clube Anterior&lt;/label&gt;&lt;input type="text" id="f-prevclub"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fst"&gt;Dados Médicos / Físicos&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Altura (cm)&lt;/label&gt;&lt;input type="number" id="f-h" min="140" max="220"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Peso (kg)&lt;/label&gt;&lt;input type="number" id="f-w" min="40" max="120"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Grupo Sanguíneo&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="f-blood"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value=""&gt;—&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="A+"&gt;A+&lt;/option&gt;&lt;option value="A-"&gt;A-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="B+"&gt;B+&lt;/option&gt;&lt;option value="B-"&gt;B-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="AB+"&gt;AB+&lt;/option&gt;&lt;option value="AB-"&gt;AB-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="O+"&gt;O+&lt;/option&gt;&lt;option value="O-"&gt;O-&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Seguro Desportivo&lt;/label&gt;&lt;input type="text" id="f-ins"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg"&gt;&lt;label&gt;Lesões / Observações&lt;/label&gt;&lt;textarea id="f-inj"&gt;&lt;/textarea&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fst"&gt;Documentos e Foto&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Photo upload (coordinator modal) --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg" style="text-align:center;margin-bottom:18px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;label style="display:block;margin-bottom:8px"&gt;Fotografia do Atleta&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="photo-upload-wrap"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="photo-circle" id="f-photo-circle" onclick="document.getElementById('f-photo-input').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span id="f-photo-initials"&gt;?&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="cam-overlay"&gt;📷&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="photo-hint" onclick="document.getElementById('f-photo-input').click()" id="f-photo-hint"&gt;Clica para adicionar foto&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;input type="file" id="f-photo-input" accept="image/*" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;!-- Documents --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;label&gt;Cópia do Cartão de Cidadão&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="doc-zone empty" id="f-cc-zone" onclick="document.getElementById('f-cc-file').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="dz-icon"&gt;🪪&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span&gt;PDF, JPG ou PNG&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;input type="file" id="f-cc-file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;label&gt;Exame Médico Desportivo&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;div class="doc-zone empty" id="f-med-zone" onclick="document.getElementById('f-med-file').click()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="dz-icon"&gt;🏥&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span&gt;PDF, JPG ou PNG&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;input type="file" id="f-med-file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fa"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button type="button" class="btn btn-g" id="mo-p-cancel"&gt;Cancelar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button type="submit" class="btn btn-p" id="mo-p-submit"&gt;Guardar Atleta&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/form&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- MODAL: EVENT --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="mo" id="mo-event"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="md" style="max-width:460px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="mh"&gt;&lt;h2 id="mo-e-title"&gt;Adicionar Evento&lt;/h2&gt;&lt;button class="mc" id="mo-e-close"&gt;✕&lt;/button&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;form id="mo-e-form"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;input type="hidden" id="e-id"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Tipo *&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="e-type" required&gt;&lt;option value="training"&gt;Treino&lt;/option&gt;&lt;option value="game"&gt;Jogo&lt;/option&gt;&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Escalão *&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;select id="e-squad" required&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;option value="sub19"&gt;Sub-19&lt;/option&gt;&lt;option value="sub23"&gt;Sub-23&lt;/option&gt;&lt;option value="both"&gt;Ambos&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg" id="opp-grp" style="display:none"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;label&gt;Adversário&lt;/label&gt;&lt;input type="text" id="e-opp" placeholder="Nome do clube adversário"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Data *&lt;/label&gt;&lt;input type="date" id="e-date" required&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="fg"&gt;&lt;label&gt;Hora&lt;/label&gt;&lt;input type="time" id="e-time"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg"&gt;&lt;label&gt;Local&lt;/label&gt;&lt;input type="text" id="e-loc" placeholder="Estádio / Campo"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fg"&gt;&lt;label&gt;Notas&lt;/label&gt;&lt;textarea id="e-notes" placeholder="Informações adicionais..."&gt;&lt;/textarea&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="fa"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button type="button" class="btn btn-g" id="mo-e-cancel"&gt;Cancelar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button type="submit" class="btn btn-p"&gt;Guardar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/form&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- MODAL: EVENT DETAIL --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="mo" id="mo-edet"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="md" style="max-width:420px"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="mh"&gt;&lt;h2 id="edet-title"&gt;&lt;/h2&gt;&lt;button class="mc" id="mo-edet-close"&gt;✕&lt;/button&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="edet-content"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="fa"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;button class="btn btn-d btn-sm" id="btn-del-event"&gt;🗑️ Eliminar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;button class="btn btn-g" id="mo-edet-cancel"&gt;Fechar&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;div class="toast" id="toast"&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;script&gt;</span></p>
+<p class="p1"><span class="s1">// ════════════════════════════════════════════════════════</span></p>
+<p class="p1"><span class="s1">// ██<span class="Apple-converted-space">  </span>CONFIGURAÇÃO FIREBASE<span class="Apple-converted-space">  </span>██</span></p>
+<p class="p1"><span class="s1">// Preenche com os dados do teu projeto em:</span></p>
+<p class="p1"><span class="s1">// https://console.firebase.google.com → Project Settings → Your apps</span></p>
+<p class="p1"><span class="s1">// ════════════════════════════════════════════════════════</span></p>
+<p class="p1"><span class="s1">const FB_CONFIG = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>apiKey:<span class="Apple-converted-space">            </span>"", <span class="Apple-converted-space">  </span>// ← preencher</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>authDomain:<span class="Apple-converted-space">        </span>"", <span class="Apple-converted-space">  </span>// ← preencher</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>projectId: <span class="Apple-converted-space">        </span>"", <span class="Apple-converted-space">  </span>// ← preencher</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>storageBucket: <span class="Apple-converted-space">    </span>"", <span class="Apple-converted-space">  </span>// ← preencher<span class="Apple-converted-space">  </span>ex: "scvianense.appspot.com"</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>messagingSenderId: "", <span class="Apple-converted-space">  </span>// ← preencher</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>appId: <span class="Apple-converted-space">            </span>""<span class="Apple-converted-space">    </span>// ← preencher</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p1"><span class="s1">// ════════════════════════════════════════════════════════</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── FIREBASE INIT ─────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">const FB_READY = Object.values(FB_CONFIG).every(v =&gt; v.trim() !== '');</span></p>
+<p class="p1"><span class="s1">let storage = null;</span></p>
+<p class="p1"><span class="s1">if (FB_READY) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>try {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>firebase.initializeApp(FB_CONFIG);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>storage = firebase.storage();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>console.log('✅ Firebase Storage pronto');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} catch(e) { console.warn('Firebase init failed:', e); }</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── FILE UPLOAD ───────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function fileToBase64(file) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>return new Promise((res, rej) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const r = new FileReader();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>r.onload = e =&gt; res(e.target.result);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>r.onerror = rej;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>r.readAsDataURL(file);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function uploadFile(file, playerId, type) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (storage) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const ext = file.name.split('.').pop();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const path = `players/${playerId}/${type}_${Date.now()}.${ext}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const ref = storage.ref(path);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>await ref.put(file);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>return await ref.getDownloadURL();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Fallback: base64 (funciona local mas não é ideal para produção)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>return await fileToBase64(file);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── DATA LAYER (localStorage) ─────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">const DB = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>_d(){ return {players:JSON.parse(localStorage.getItem('scv_p')||'[]'),events:JSON.parse(localStorage.getItem('scv_e')||'[]')} },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>_s(d){ localStorage.setItem('scv_p',JSON.stringify(d.players)); localStorage.setItem('scv_e',JSON.stringify(d.events)) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>players(squad){ const p=this._d().players; return squad?p.filter(x=&gt;x.squad===squad):p },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>events(squad){ const e=this._d().events; if(!squad||squad==='all')return e; return e.filter(x=&gt;x.squad===squad||x.squad==='both') },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>addPlayer(p){ const d=this._d(); p.ca=new Date().toISOString(); d.players.push(p); this._s(d); return p },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>updatePlayer(id,u){ const d=this._d(); const i=d.players.findIndex(x=&gt;x.id===id); if(i&gt;-1)d.players[i]={...d.players[i],...u,id}; this._s(d) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>deletePlayer(id){ const d=this._d(); d.players=d.players.filter(x=&gt;x.id!==id); this._s(d) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>addEvent(e){ const d=this._d(); e.id=uid(); d.events.push(e); this._s(d); return e },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>updateEvent(id,u){ const d=this._d(); const i=d.events.findIndex(x=&gt;x.id===id); if(i&gt;-1)d.events[i]={...d.events[i],...u,id}; this._s(d) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>deleteEvent(id){ const d=this._d(); d.events=d.events.filter(x=&gt;x.id!==id); this._s(d) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>getEvent(id){ return this._d().events.find(x=&gt;x.id===id) },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>getPlayer(id){ return this._d().players.find(x=&gt;x.id===id) }</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function uid(){ return crypto.randomUUID() }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── CONSTANTS ─────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];</span></p>
+<p class="p1"><span class="s1">const MONTHS_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];</span></p>
+<p class="p1"><span class="s1">const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança'};</span></p>
+<p class="p1"><span class="s1">const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};</span></p>
+<p class="p1"><span class="s1">const SQUADS={sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── HELPERS ───────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function age(dob){ if(!dob)return null; const d=new Date(dob),t=new Date(); let a=t.getFullYear()-d.getFullYear(); if(t.getMonth()-d.getMonth()&lt;0||(t.getMonth()-d.getMonth()===0&amp;&amp;t.getDate()&lt;d.getDate()))a--; return a }</span></p>
+<p class="p1"><span class="s1">function ini(n){ if(!n)return '?'; return n.split(' ').filter(Boolean).map(w=&gt;w[0]).join('').slice(0,2).toUpperCase() }</span></p>
+<p class="p1"><span class="s1">function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }</span></p>
+<p class="p1"><span class="s1">function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=&gt;t.classList.remove('show'),2800) }</span></p>
+<p class="p1"><span class="s1">function row(l,v){ if(!v||v==='—'||v===''||v===undefined||v===null)return ''; return `&lt;div class="dr"&gt;&lt;span class="dl"&gt;${l}&lt;/span&gt;&lt;span class="dv"&gt;${v}&lt;/span&gt;&lt;/div&gt;` }</span></p>
+<p class="p1"><span class="s1">function shortName(name){ if(!name)return name; const p=name.split('.'); return p[p.length-1] }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── DOC ZONE UI ───────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function setupDocZone(zoneId, inputId, onFile) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const zone = document.getElementById(zoneId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const input = document.getElementById(inputId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (!zone || !input) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>input.addEventListener('change', () =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const f = input.files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!f) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const name = f.name.length &gt; 28 ? f.name.slice(0,25)+'...' : f.name;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.className = 'doc-zone has-file';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.innerHTML = `&lt;span class="dz-icon"&gt;✅&lt;/span&gt;&lt;div class="dz-info"&gt;&lt;div class="dz-name"&gt;${name}&lt;/div&gt;&lt;div class="dz-sub"&gt;Pronto para enviar&lt;/div&gt;&lt;span class="dz-change" onclick="event.stopPropagation();document.getElementById('${inputId}').click()"&gt;Substituir&lt;/span&gt;&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.onclick = null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (onFile) onFile(f);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function setDocZoneExisting(zoneId, inputId, url, fileName) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const zone = document.getElementById(zoneId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (!zone) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (url) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const name = fileName || 'Ficheiro carregado';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.className = 'doc-zone has-file';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.innerHTML = `&lt;span class="dz-icon"&gt;📄&lt;/span&gt;&lt;div class="dz-info"&gt;&lt;div class="dz-name"&gt;${name}&lt;/div&gt;&lt;div class="dz-sub"&gt;Já carregado&lt;/div&gt;&lt;span class="dz-change" onclick="event.stopPropagation();document.getElementById('${inputId}').click()"&gt;Substituir&lt;/span&gt;&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>zone.onclick = null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>resetDocZone(zoneId, inputId, zone.querySelector('.dz-icon')?.textContent || '📄');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function resetDocZone(zoneId, inputId, icon='📄') {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const zone = document.getElementById(zoneId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (!zone) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>zone.className = 'doc-zone empty';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>zone.innerHTML = `&lt;span class="dz-icon"&gt;${icon}&lt;/span&gt;&lt;span&gt;PDF, JPG ou PNG&lt;/span&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>zone.onclick = () =&gt; document.getElementById(inputId).click();</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── PHOTO ZONE UI ─────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function setupPhotoZone(circleId, inputId, initialsId, hintId) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const input = document.getElementById(inputId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (!input) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>input.addEventListener('change', () =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const f = input.files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!f) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const reader = new FileReader();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>reader.onload = e =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const circle = document.getElementById(circleId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const initSpan = document.getElementById(initialsId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (initSpan) initSpan.style.display = 'none';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>// remove existing preview img</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>circle.querySelectorAll('img').forEach(i=&gt;i.remove());</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const img = document.createElement('img');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>img.src = e.target.result;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>circle.appendChild(img);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (hintId) document.getElementById(hintId).textContent = 'Clica para alterar a foto';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>reader.readAsDataURL(f);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const circle = document.getElementById(circleId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (!circle) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>circle.querySelectorAll('img').forEach(i=&gt;i.remove());</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const initSpan = document.getElementById(initialsId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if (photoUrl) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (initSpan) initSpan.style.display = 'none';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const img = document.createElement('img');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>img.src = photoUrl;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>circle.appendChild(img);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (hintId) document.getElementById(hintId).textContent = 'Clica para alterar a foto';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (initSpan) { initSpan.style.display = ''; initSpan.textContent = ini(name); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (hintId) document.getElementById(hintId).textContent = 'Clica para adicionar foto';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── ROUTING ───────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function nav(v,opts={}){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.querySelectorAll('.view').forEach(x=&gt;x.classList.remove('active'));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.querySelectorAll('.nl').forEach(x=&gt;x.classList.remove('active'));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>view=v;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(v==='dashboard'){ show('v-dash'); setActive('[data-view="dashboard"]'); renderDash() }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>else if(v==='squad'){ squad=opts.squad||squad; show('v-squad'); setActive(`[data-view="squad"][data-squad="${squad}"]`); renderSquad() }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>else if(v==='player'){ if(opts.id)player=DB.getPlayer(opts.id)||player; show('v-player'); renderPlayer() }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>else if(v==='calendar'){ show('v-cal'); setActive('[data-view="calendar"]'); renderCal() }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>else if(v==='public-form'){ show('v-pf') }</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function show(id){ document.getElementById(id).classList.add('active') }</span></p>
+<p class="p1"><span class="s1">function setActive(sel){ const el=document.querySelector('.nl'+sel); if(el)el.classList.add('active') }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── DASHBOARD ─────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function renderDash(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const now=new Date();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('d-date').textContent=`${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(!FB_READY) document.getElementById('fb-banner').classList.add('show');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const ps=DB.players(), es=DB.events();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const s19=ps.filter(p=&gt;p.squad==='sub19').length, s23=ps.filter(p=&gt;p.squad==='sub23').length;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const today=now.toISOString().split('T')[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const upcoming=es.filter(e=&gt;e.date&gt;=today).sort((a,b)=&gt;a.date.localeCompare(b.date));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('d-stats').innerHTML=`</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sc"&gt;&lt;div class="sl"&gt;Total Atletas&lt;/div&gt;&lt;div class="sv"&gt;${ps.length}&lt;/div&gt;&lt;div class="ss"&gt;ambos os escalões&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sc"&gt;&lt;div class="sl"&gt;Sub-19&lt;/div&gt;&lt;div class="sv" style="color:#b8860b"&gt;${s19}&lt;/div&gt;&lt;div class="ss"&gt;atletas&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sc"&gt;&lt;div class="sl"&gt;Sub-23&lt;/div&gt;&lt;div class="sv" style="color:var(--blue)"&gt;${s23}&lt;/div&gt;&lt;div class="ss"&gt;atletas&lt;/div&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="sc"&gt;&lt;div class="sl"&gt;Jogos Agendados&lt;/div&gt;&lt;div class="sv"&gt;${es.filter(e=&gt;e.type==='game').length}&lt;/div&gt;&lt;div class="ss"&gt;no calendário&lt;/div&gt;&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const uEl=document.getElementById('d-upcoming');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>uEl.innerHTML=upcoming.length===0?'&lt;p style="color:var(--muted);font-size:13px"&gt;Sem eventos próximos.&lt;/p&gt;':</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>upcoming.slice(0,5).map(e=&gt;{const d=new Date(e.date+'T00:00:00');return `&lt;div class="ui"&gt;&lt;div class="ud"&gt;&lt;div class="day"&gt;${d.getDate()}&lt;/div&gt;&lt;div class="mon"&gt;${MONTHS_S[d.getMonth()]}&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;div style="font-size:13px;font-weight:600"&gt;${e.type==='game'?`⚽ Jogo${e.opponent?' vs '+e.opponent:''}`:'🏃 Treino'}&lt;/div&gt;&lt;div style="font-size:12px;color:var(--muted)"&gt;${SQUADS[e.squad]}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;`}).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const rEl=document.getElementById('d-recent');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const rec=[...ps].sort((a,b)=&gt;(b.ca||'').localeCompare(a.ca||'')).slice(0,5);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>rEl.innerHTML=rec.length===0?'&lt;p style="color:var(--muted);font-size:13px"&gt;Nenhum atleta adicionado ainda.&lt;/p&gt;':</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>rec.map(p=&gt;`&lt;div class="ui" style="cursor:pointer" data-nav-player="${p.id}"&gt;&lt;div class="av" style="width:34px;height:34px;font-size:13px;margin:0"&gt;${p.photoUrl?`&lt;img src="${p.photoUrl}"&gt;`:ini(p.name)}&lt;/div&gt;&lt;div&gt;&lt;div style="font-size:13px;font-weight:600"&gt;${p.name}&lt;/div&gt;&lt;div style="font-size:12px;color:var(--muted)"&gt;${SQUADS[p.squad]}${p.position?' · '+POS[p.position]:''}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>rEl.querySelectorAll('[data-nav-player]').forEach(el=&gt;el.addEventListener('click',()=&gt;nav('player',{id:el.dataset.navPlayer})));</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── SQUAD ─────────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function setSqView(mode){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>sqViewMode=mode;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const gBtn=document.getElementById('sq-btn-grid');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const pBtn=document.getElementById('sq-btn-pitch');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(!gBtn||!pBtn)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(mode==='grid'){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>gBtn.className='btn btn-p btn-sm'; gBtn.style.cssText='border-radius:5px';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>pBtn.className='btn btn-g btn-sm'; pBtn.style.cssText='border-radius:5px;background:transparent;color:var(--muted)';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>pBtn.className='btn btn-p btn-sm'; pBtn.style.cssText='border-radius:5px';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>gBtn.className='btn btn-g btn-sm'; gBtn.style.cssText='border-radius:5px;background:transparent;color:var(--muted)';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>renderSquad();</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function renderSquad(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const allPs=DB.players(squad);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const search=document.getElementById('p-search')?.value?.toLowerCase()||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const posF=document.getElementById('p-pos-filter')?.value||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>let ps=[...allPs];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(search)ps=ps.filter(p=&gt;p.name.toLowerCase().includes(search));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(posF)ps=ps.filter(p=&gt;p.position===posF);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('sq-title').textContent=SQUADS[squad]||'Plantel';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('sq-sub').textContent=`${allPs.length} atleta${allPs.length!==1?'s':''}`;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const grid=document.getElementById('p-grid');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const pitchEl=document.getElementById('p-pitch');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const sf=document.getElementById('sq-sf');</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(sqViewMode==='pitch'){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>grid.style.display='none'; pitchEl.style.display='block'; sf.style.display='none';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderPitch(allPs); return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>grid.style.display=''; pitchEl.style.display='none'; sf.style.display='';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(ps.length===0){ grid.innerHTML=`&lt;div class="es" style="grid-column:1/-1"&gt;&lt;div class="ei2"&gt;👥&lt;/div&gt;&lt;h3&gt;Nenhum atleta&lt;/h3&gt;&lt;p&gt;Clica em "+ Adicionar Atleta" para começar.&lt;/p&gt;&lt;/div&gt;`; return }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>grid.innerHTML=ps.map(p=&gt;`&lt;div class="pc" data-pid="${p.id}"&gt;${p.number?`&lt;span class="pnb"&gt;#${p.number}&lt;/span&gt;`:''}&lt;div class="av"&gt;${p.photoUrl?`&lt;img src="${p.photoUrl}"&gt;`:ini(p.name)}&lt;/div&gt;&lt;div class="pn"&gt;${p.name}&lt;/div&gt;&lt;div class="pp"&gt;${POS[p.position]||'—'}&lt;/div&gt;${age(p.dob)!==null?`&lt;div class="pa"&gt;${age(p.dob)} anos&lt;/div&gt;`:''}&lt;/div&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>grid.querySelectorAll('.pc').forEach(c=&gt;c.addEventListener('click',()=&gt;nav('player',{id:c.dataset.pid})));</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── PITCH VIEW ────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function renderPitch(allPs){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const byPos={};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>allPs.forEach(p=&gt;{ const pos=p.position; if(!pos)return; if(!byPos[pos])byPos[pos]=[]; byPos[pos].push(p) });</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>function sn(name){ if(!name)return '—'; const p=name.trim().split(/\s+/); return p.length===1?p[0]:p[0]+' '+p[p.length-1]; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>function pills(pos,cls=''){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const pls=byPos[pos]||[];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(pls.length===0) return `&lt;div class="ppill empty"&gt;${POS[pos]||pos}&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>return pls.map(p=&gt;`&lt;div class="ppill ${cls}" title="${p.name}"&gt;${sn(p.name)}&lt;/div&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// MC zone: MC + MO — split evenly into 2 columns</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const mcAll=[...(byPos['MC']||[]),...(byPos['MO']||[])];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const mcSplit=Math.ceil(mcAll.length/2);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const mcL=mcAll.slice(0,mcSplit);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const mcR=mcAll.slice(mcSplit);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>function mcColPills(arr){ if(arr.length===0) return `&lt;div class="ppill empty"&gt;MC&lt;/div&gt;`; return arr.map(p=&gt;`&lt;div class="ppill" title="${p.name}"&gt;${sn(p.name)}&lt;/div&gt;`).join(''); }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const formPos=['GR','LE','DC','LD','MD','MC','MO','EE','PL','ED'];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const outsiders=allPs.filter(p=&gt;!p.position||!formPos.includes(p.position));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const outsiderNote=outsiders.length?`&lt;div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:rgba(255,255,255,.32)"&gt;Sem posição: ${outsiders.map(p=&gt;sn(p.name)).join(' · ')}&lt;/div&gt;`:'';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('p-pitch').innerHTML=`</span></p>
+<p class="p1"><span class="s1">&lt;div class="pitch-wrap"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="pitch-field"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;svg class="pitch-svg" viewBox="0 0 100 43" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>${Array.from({length:7},(_,i)=&gt;`&lt;rect x="${(i*14.3).toFixed(1)}" y="0" width="7.15" height="43" fill="${i%2?'rgba(0,0,0,.04)':'none'}"/&gt;`).join('')}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;rect x="1" y="1" width="98" height="41" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".4"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;line x1="50" y1="1" x2="50" y2="42" stroke="rgba(255,255,255,.6)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;circle cx="50" cy="21.5" r="8.5" fill="none" stroke="rgba(255,255,255,.6)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;circle cx="50" cy="21.5" r=".55" fill="rgba(255,255,255,.7)"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;rect x="1" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;rect x="1" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;circle cx="11" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;rect x="85" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;rect x="93.5" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;circle cx="89" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;path d="M1,2 Q2.5,1 2.5,2.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;path d="M99,2 Q97.5,1 97.5,2.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;path d="M1,41 Q2.5,42 2.5,40.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;path d="M99,41 Q97.5,42 97.5,40.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;text x="97" y="22.3" text-anchor="end" font-family="sans-serif" font-size="1.7" fill="rgba(255,255,255,.2)"&gt;&amp;#9654; ATAQUE&lt;/text&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/svg&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:5%;top:50%"&gt;&lt;div class="pzone-lbl"&gt;GR&lt;/div&gt;${pills('GR','gk')}&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:20%;top:13%"&gt;&lt;div class="pzone-lbl"&gt;LE&lt;/div&gt;${pills('LE')}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:20%;top:50%"&gt;&lt;div class="pzone-lbl"&gt;DC&lt;/div&gt;${pills('DC')}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:20%;top:87%"&gt;&lt;div class="pzone-lbl"&gt;LD&lt;/div&gt;${pills('LD')}&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:37%;top:50%"&gt;&lt;div class="pzone-lbl"&gt;MD &amp;middot; Trinco&lt;/div&gt;${pills('MD','trinco')}&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:55%;top:50%"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="pzone-lbl"&gt;MC&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="mc-cols"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="mc-col"&gt;${mcColPills(mcL)}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="mc-col"&gt;${mcColPills(mcR)}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:78%;top:13%"&gt;&lt;div class="pzone-lbl"&gt;EE&lt;/div&gt;${pills('EE')}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:78%;top:50%"&gt;&lt;div class="pzone-lbl"&gt;PL&lt;/div&gt;${pills('PL')}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pzone" style="left:78%;top:87%"&gt;&lt;div class="pzone-lbl"&gt;ED&lt;/div&gt;${pills('ED')}&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>${outsiderNote}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── PLAYER DETAIL ─────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function renderPlayer(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const p=player; if(!p)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('pd-name').textContent=p.name;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const a=age(p.dob);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Docs section</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const docCC = p.ccUrl</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>? `&lt;div class="doc-link"&gt;&lt;span class="doc-icon"&gt;🪪&lt;/span&gt;&lt;div class="doc-info"&gt;&lt;div class="doc-name"&gt;${p.ccFileName||'Cartão de Cidadão'}&lt;/div&gt;&lt;div class="doc-status"&gt;Cartão de Cidadão&lt;/div&gt;&lt;/div&gt;&lt;a href="${p.ccUrl}" target="_blank" class="btn btn-o btn-sm"&gt;Ver ↗&lt;/a&gt;&lt;/div&gt;`</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>: `&lt;div class="doc-link"&gt;&lt;span class="doc-icon"&gt;🪪&lt;/span&gt;&lt;div class="doc-info"&gt;&lt;div class="doc-name" style="color:var(--muted)"&gt;Sem ficheiro&lt;/div&gt;&lt;div class="doc-status"&gt;Cartão de Cidadão&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;`;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const docMed = p.medUrl</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>? `&lt;div class="doc-link"&gt;&lt;span class="doc-icon"&gt;🏥&lt;/span&gt;&lt;div class="doc-info"&gt;&lt;div class="doc-name"&gt;${p.medFileName||'Exame Médico'}&lt;/div&gt;&lt;div class="doc-status"&gt;Exame Médico Desportivo&lt;/div&gt;&lt;/div&gt;&lt;a href="${p.medUrl}" target="_blank" class="btn btn-o btn-sm"&gt;Ver ↗&lt;/a&gt;&lt;/div&gt;`</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>: `&lt;div class="doc-link"&gt;&lt;span class="doc-icon"&gt;🏥&lt;/span&gt;&lt;div class="doc-info"&gt;&lt;div class="doc-name" style="color:var(--muted)"&gt;Sem ficheiro&lt;/div&gt;&lt;div class="doc-status"&gt;Exame Médico Desportivo&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;`;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('pd-content').innerHTML=`</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="pdh"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="pda"&gt;${p.photoUrl?`&lt;img src="${p.photoUrl}"&gt;`:ini(p.name)}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;${p.name}&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bgs"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;span class="bg bg-g"&gt;${SQUADS[p.squad]||'—'}&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${p.position?`&lt;span class="bg bg-pos"&gt;${POS[p.position]}&lt;/span&gt;`:''}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${p.number?`&lt;span class="bg bg-n"&gt;#${p.number}&lt;/span&gt;`:''}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${a!==null?`&lt;span class="bg bg-n"&gt;${a} anos&lt;/span&gt;`:''}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="ds"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;&lt;h3&gt;Dados Pessoais&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Data de Nascimento',fmtDate(p.dob))}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Nacionalidade',p.nationality)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Telefone',p.phone)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('E-mail',p.email)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Morada',p.address)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('NIF',p.nif)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Nº Cartão de Cidadão',p.cc)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;&lt;h3&gt;Dados Desportivos&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Posição',POS[p.position])}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Nº Camisola',p.number?`#${p.number}`:null)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Pé Dominante',FEET[p.dominantFoot])}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Clube Anterior',p.previousClub)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${row('Escalão',SQUADS[p.squad])}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;&lt;h3&gt;Dados Médicos / Físicos&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="display:grid;grid-template-columns:1fr 1fr"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${row('Altura',p.height?p.height+' cm':null)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${row('Peso',p.weight?p.weight+' kg':null)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${row('Grupo Sanguíneo',p.bloodType)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>${row('Seguro Desportivo',p.insurance)}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${p.injuries?`&lt;div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"&gt;&lt;div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px"&gt;Lesões / Observações&lt;/div&gt;&lt;div style="font-size:13px"&gt;${p.injuries}&lt;/div&gt;&lt;/div&gt;`:''}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;&lt;h3&gt;Documentos&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${docCC}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>${docMed}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── PLAYER MODAL ──────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function openPlayerModal(p=null){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('mo-p-title').textContent=p?'Editar Atleta':'Adicionar Atleta';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const f=id=&gt;document.getElementById(id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('p-id').value=p?.id||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-name').value=p?.name||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-dob').value=p?.dob||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-nat').value=p?.nationality||'Portuguesa';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-nif').value=p?.nif||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-cc').value=p?.cc||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-phone').value=p?.phone||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-email').value=p?.email||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-addr').value=p?.address||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-squad').value=p?.squad||squad||'sub19';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-pos').value=p?.position||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-num').value=p?.number||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-foot').value=p?.dominantFoot||'right';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-prevclub').value=p?.previousClub||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-h').value=p?.height||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-w').value=p?.weight||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-blood').value=p?.bloodType||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-ins').value=p?.insurance||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-inj').value=p?.injuries||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Reset file inputs</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-photo-input').value='';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-cc-file').value='';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>f('f-med-file').value='';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Photo</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setPhotoZoneExisting('f-photo-circle','f-photo-initials','f-photo-hint',p?.photoUrl,p?.name);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Docs</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setDocZoneExisting('f-cc-zone','f-cc-file',p?.ccUrl,p?.ccFileName);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setDocZoneExisting('f-med-zone','f-med-file',p?.medUrl,p?.medFileName);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('mo-player').classList.add('open');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setTimeout(()=&gt;f('f-name').focus(),50);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function closePlayerModal(){ document.getElementById('mo-player').classList.remove('open') }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">document.getElementById('mo-p-form').addEventListener('submit', async e=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>e.preventDefault();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const f=id=&gt;document.getElementById(id).value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const pid=f('p-id') || uid();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const submitBtn=document.getElementById('mo-p-submit');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>submitBtn.disabled=true;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>submitBtn.innerHTML='&lt;span class="spin"&gt;&lt;/span&gt; A guardar...';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>try {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const existing = pid ? DB.getPlayer(pid) : null;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const data={</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>id:pid,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>name:f('f-name'),dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>cc:f('f-cc'),phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>squad:f('f-squad'),position:f('f-pos'),number:f('f-num'),dominantFoot:f('f-foot'),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>previousClub:f('f-prevclub'),height:f('f-h'),weight:f('f-w'),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>bloodType:f('f-blood'),insurance:f('f-ins'),injuries:f('f-inj'),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>// preserve existing URLs</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>photoUrl:existing?.photoUrl||null,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>medUrl:existing?.medUrl||null, medFileName:existing?.medFileName||null,</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const photoFile=document.getElementById('f-photo-input').files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const ccFile=document.getElementById('f-cc-file').files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const medFile=document.getElementById('f-med-file').files[0];</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(photoFile) data.photoUrl = await uploadFile(photoFile, pid, 'photo');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(ccFile){ data.ccUrl = await uploadFile(ccFile, pid, 'cc'); data.ccFileName = ccFile.name; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(medFile){ data.medUrl = await uploadFile(medFile, pid, 'med'); data.medFileName = medFile.name; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(existing){ DB.updatePlayer(pid,data); toast('✅ Atleta atualizado!') }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else { DB.addPlayer(data); toast('✅ Atleta adicionado!') }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>closePlayerModal();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(view==='squad')renderSquad();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else if(view==='player'){ player=DB.getPlayer(pid); renderPlayer() }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else if(view==='dashboard')renderDash();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} catch(err) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>console.error(err);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>toast('❌ Erro ao guardar. Verifica a consola.');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} finally {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>submitBtn.disabled=false;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>submitBtn.innerHTML='Guardar Atleta';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">document.getElementById('btn-del-player').addEventListener('click',()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(!player||!confirm(`Eliminar ${player.name}?`))return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>DB.deletePlayer(player.id); toast('Atleta eliminado.'); nav('squad',{squad:player.squad});</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p1"><span class="s1">document.getElementById('btn-edit-player').addEventListener('click',()=&gt;openPlayerModal(player));</span></p>
+<p class="p1"><span class="s1">document.getElementById('btn-back').addEventListener('click',()=&gt;nav('squad',{squad:player?.squad}));</span></p>
+<p class="p1"><span class="s1">document.getElementById('btn-add-player').addEventListener('click',()=&gt;openPlayerModal());</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-p-close').addEventListener('click',closePlayerModal);</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-p-cancel').addEventListener('click',closePlayerModal);</span></p>
+<p class="p1"><span class="s1">document.getElementById('sq-btn-grid').addEventListener('click',()=&gt;setSqView('grid'));</span></p>
+<p class="p1"><span class="s1">document.getElementById('sq-btn-pitch').addEventListener('click',()=&gt;setSqView('pitch'));</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── PUBLIC FORM ───────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">document.getElementById('pf-form').addEventListener('submit', async e=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>e.preventDefault();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const btn=document.getElementById('pf-submit-btn');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>btn.disabled=true; btn.innerHTML='&lt;span class="spin"&gt;&lt;/span&gt; A enviar...';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>try {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const fd=new FormData(e.target), p={};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>for(const[k,v]of fd.entries())p[k]=v;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>p.id=uid(); p.submittedBy='athlete';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const photoFile=document.getElementById('pf-photo-input').files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const ccFile=document.getElementById('pf-cc-input').files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const medFile=document.getElementById('pf-med-input').files[0];</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(photoFile) p.photoUrl = await uploadFile(photoFile, p.id, 'photo');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(ccFile){ p.ccUrl = await uploadFile(ccFile, p.id, 'cc'); p.ccFileName = ccFile.name; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(medFile){ p.medUrl = await uploadFile(medFile, p.id, 'med'); p.medFileName = medFile.name; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>DB.addPlayer(p);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>e.target.reset();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Reset zones</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>resetDocZone('pf-cc-zone','pf-cc-input','🪪');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>resetDocZone('pf-med-zone','pf-med-input','🏥');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setPhotoZoneExisting('pf-photo-circle','pf-photo-initials',null,null,null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById('pf-photo-initials').textContent='?';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById('pf-success').style.display='block';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setTimeout(()=&gt;document.getElementById('pf-success').style.display='none',7000);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>toast('✅ Dados submetidos com sucesso!');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} catch(err) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>console.error(err); toast('❌ Erro ao submeter. Tenta novamente.');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>} finally {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>btn.disabled=false; btn.innerHTML='✓ Submeter Dados';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── CALENDAR ──────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function renderCal(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('cal-label').textContent=`${MONTHS[calMonth]} ${calYear}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const allEvents=calFilter==='all'?DB.events():DB.events(calFilter);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const first=new Date(calYear,calMonth,1);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>let dow=first.getDay()-1; if(dow&lt;0)dow=6;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const dim=new Date(calYear,calMonth+1,0).getDate();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const pmd=new Date(calYear,calMonth,0).getDate();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const today=new Date().toISOString().split('T')[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>let cells=''; const total=Math.ceil((dow+dim)/7)*7;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>for(let i=0;i&lt;total;i++){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let day,ds,other=false;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(i&lt;dow){ day=pmd-dow+i+1; const m2=calMonth===0?11:calMonth-1,y2=calMonth===0?calYear-1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else if(i&gt;=dow+dim){ day=i-dow-dim+1; const m2=calMonth===11?0:calMonth+1,y2=calMonth===11?calYear+1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else{ day=i-dow+1; ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}` }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const dayEvs=allEvents.filter(e=&gt;e.date===ds);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const isT=ds===today;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const numEl=isT?`&lt;div class="cdn tdn"&gt;${day}&lt;/div&gt;`:`&lt;div class="cdn"&gt;${day}&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>cells+=`&lt;div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}"&gt;${numEl}${dayEvs.map(ev=&gt;`&lt;div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"&gt;${ev.type==='game'?'⚽':'🏃'} ${ev.type==='game'&amp;&amp;ev.opponent?'vs '+ev.opponent:'Treino'}&lt;/div&gt;`).join('')}&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('cal-body').innerHTML=cells;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('cal-body').querySelectorAll('.cd').forEach(c=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>c.addEventListener('click',()=&gt;openEventModal(null,c.dataset.date));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>c.querySelectorAll('.ce').forEach(ev=&gt;ev.addEventListener('click',e=&gt;{e.stopPropagation();showEventDetail(ev.dataset.eid)}));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const monthEvs=allEvents.filter(e=&gt;{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&amp;&amp;d.getMonth()===calMonth }).sort((a,b)=&gt;a.date.localeCompare(b.date));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const lEl=document.getElementById('cal-list');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>lEl.innerHTML=monthEvs.length===0?'&lt;p style="color:var(--muted);font-size:13px"&gt;Sem eventos neste mês.&lt;/p&gt;':</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>monthEvs.map(ev=&gt;`&lt;div class="ei"&gt;&lt;div class="etd ${ev.type==='game'?'gm':'tr'}"&gt;&lt;/div&gt;&lt;div class="einfo"&gt;&lt;div class="etitle"&gt;${ev.type==='game'?`⚽ Jogo${ev.opponent?' vs '+ev.opponent:''}`:'🏃 Treino'}&lt;/div&gt;&lt;div class="emeta"&gt;${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}&lt;/div&gt;${ev.notes?`&lt;div class="emeta"&gt;${ev.notes}&lt;/div&gt;`:''}&lt;/div&gt;&lt;span class="esb ${ev.squad}"&gt;${SQUADS[ev.squad]}&lt;/span&gt;&lt;button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0"&gt;🗑️&lt;/button&gt;&lt;/div&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>lEl.querySelectorAll('[data-del-event]').forEach(b=&gt;b.addEventListener('click',()=&gt;deleteEvent(b.dataset.delEvent)));</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function showEventDetail(id){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const ev=DB.getEvent(id); if(!ev)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>calEvent=ev;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('edet-title').textContent=ev.type==='game'?`⚽ Jogo${ev.opponent?' vs '+ev.opponent:''}`:'🏃 Treino';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('edet-content').innerHTML=`&lt;div style="font-size:13px"&gt;${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${row('Notas',ev.notes)}&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('mo-edet').classList.add('open');</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function deleteEvent(id){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(!confirm('Eliminar este evento?'))return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>DB.deleteEvent(id); document.getElementById('mo-edet').classList.remove('open'); toast('Evento eliminado.'); renderCal(); if(view==='dashboard')renderDash();</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">document.getElementById('btn-del-event').addEventListener('click',()=&gt;calEvent&amp;&amp;deleteEvent(calEvent.id));</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-edet-close').addEventListener('click',()=&gt;document.getElementById('mo-edet').classList.remove('open'));</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-edet-cancel').addEventListener('click',()=&gt;document.getElementById('mo-edet').classList.remove('open'));</span></p>
+<p class="p1"><span class="s1">document.getElementById('cal-prev').addEventListener('click',()=&gt;{ calMonth--; if(calMonth&lt;0){calMonth=11;calYear--} renderCal() });</span></p>
+<p class="p1"><span class="s1">document.getElementById('cal-next').addEventListener('click',()=&gt;{ calMonth++; if(calMonth&gt;11){calMonth=0;calYear++} renderCal() });</span></p>
+<p class="p1"><span class="s1">document.getElementById('cal-filters').querySelectorAll('.ftb').forEach(b=&gt;b.addEventListener('click',()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.querySelectorAll('.ftb').forEach(x=&gt;x.classList.remove('active')); b.classList.add('active'); calFilter=b.dataset.filter; renderCal();</span></p>
+<p class="p1"><span class="s1">}));</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── EVENT MODAL ───────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function openEventModal(ev=null,date=null){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('mo-e-title').textContent=ev?'Editar Evento':'Adicionar Evento';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-id').value=ev?.id||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-type').value=ev?.type||'training';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-squad').value=ev?.squad||squad||'sub19';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-date').value=ev?.date||date||new Date().toISOString().split('T')[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-time').value=ev?.time||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-loc').value=ev?.location||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-notes').value=ev?.notes||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('e-opp').value=ev?.opponent||'';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>toggleOpp();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>document.getElementById('mo-event').classList.add('open');</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function closeEventModal(){ document.getElementById('mo-event').classList.remove('open') }</span></p>
+<p class="p1"><span class="s1">function toggleOpp(){ document.getElementById('opp-grp').style.display=document.getElementById('e-type').value==='game'?'block':'none' }</span></p>
+<p class="p1"><span class="s1">document.getElementById('e-type').addEventListener('change',toggleOpp);</span></p>
+<p class="p1"><span class="s1">document.getElementById('btn-add-event').addEventListener('click',()=&gt;openEventModal());</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-e-close').addEventListener('click',closeEventModal);</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-e-cancel').addEventListener('click',closeEventModal);</span></p>
+<p class="p1"><span class="s1">document.getElementById('mo-e-form').addEventListener('submit',e=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>e.preventDefault();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const f=id=&gt;document.getElementById(id).value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const id=f('e-id');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp')};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(id)DB.updateEvent(id,data); else DB.addEvent(data);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>closeEventModal(); toast('✅ Evento guardado!'); renderCal();</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── SIDEBAR NAV ───────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">document.querySelectorAll('.nl[data-view]').forEach(el=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>el.addEventListener('click',()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const v=el.dataset.view, sq=el.dataset.squad;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(v==='squad')nav('squad',{squad:sq}); else nav(v);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p1"><span class="s1">document.getElementById('nl-publink').addEventListener('click',()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const url=location.href.split('?')[0]+'?mode=public';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>navigator.clipboard.writeText(url).then(()=&gt;toast('🔗 Link copiado! Partilha com os atletas.')).catch(()=&gt;prompt('Copia e partilha este link:',url));</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// Close modals on overlay click</span></p>
+<p class="p1"><span class="s1">document.querySelectorAll('.mo').forEach(m=&gt;m.addEventListener('click',e=&gt;{ if(e.target===m)m.classList.remove('open') }));</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// Search / filter</span></p>
+<p class="p1"><span class="s1">document.getElementById('p-search').addEventListener('input',renderSquad);</span></p>
+<p class="p1"><span class="s1">document.getElementById('p-pos-filter').addEventListener('change',renderSquad);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── SEED DATA ─────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">function seedIfEmpty(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(DB.players().length&gt;0||DB.events().length&gt;0)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const now=new Date();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const d=(days)=&gt;{ const x=new Date(now); x.setDate(x.getDate()+days); return x.toISOString().split('T')[0] };</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>[{name:'Rodrigo Ferreira',dob:'2006-03-14',squad:'sub19',position:'GR',number:1,dominantFoot:'right',nationality:'Portuguesa',previousClub:'SC Vianense (Juniores)'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'Diogo Martins',dob:'2005-07-22',squad:'sub19',position:'DC',number:4,dominantFoot:'right',nationality:'Portuguesa',height:182,weight:74},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'Tiago Sousa',dob:'2007-01-08',squad:'sub19',position:'MC',number:8,dominantFoot:'right',nationality:'Portuguesa',previousClub:'Atlético Viana'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'Lucas Oliveira',dob:'2006-11-30',squad:'sub19',position:'PL',number:9,dominantFoot:'left',nationality:'Portuguesa'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'André Silva',dob:'2003-05-19',squad:'sub23',position:'GR',number:1,dominantFoot:'right',nationality:'Portuguesa',previousClub:'FC Viana'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'Gonçalo Pinto',dob:'2002-09-03',squad:'sub23',position:'DC',number:5,dominantFoot:'right',nationality:'Portuguesa',height:187,weight:80},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'João Matos',dob:'2004-04-15',squad:'sub23',position:'MC',number:6,dominantFoot:'right',nationality:'Portuguesa'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{name:'Bruno Costa',dob:'2003-12-27',squad:'sub23',position:'ED',number:11,dominantFoot:'right',nationality:'Portuguesa',previousClub:'Juventude Viana'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>].forEach(p=&gt;{ p.id=uid(); DB.addPlayer(p) });</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>[{type:'training',squad:'sub19',date:d(1),time:'18:00',location:'Campo de Treinos — Viana do Castelo'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'training',squad:'sub23',date:d(2),time:'19:30',location:'Campo de Treinos — Viana do Castelo'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'training',squad:'both',date:d(3),time:'18:00',location:'Campo de Treinos — Viana do Castelo'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'game',squad:'sub19',date:d(5),time:'15:00',location:'Estádio 1º de Maio',opponent:'FC Viana'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'training',squad:'sub19',date:d(6),time:'18:00',location:'Campo de Treinos'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'game',squad:'sub23',date:d(7),time:'16:00',location:'Estádio 1º de Maio',opponent:'Vianense B'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'training',squad:'both',date:d(8),time:'18:30',location:'Campo de Treinos'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">   </span>{type:'game',squad:'sub19',date:d(12),time:'11:00',location:'Campo Desportivo — Ponte de Lima',opponent:'GD Ponte de Lima'},</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>].forEach(e=&gt;DB.addEvent(e));</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ── INIT ──────────────────────────────────────────────────────────────────────</span></p>
+<p class="p1"><span class="s1">document.addEventListener('DOMContentLoaded',()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>const params=new URLSearchParams(location.search);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>if(params.get('mode')==='public'){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.body.classList.add('pm'); nav('public-form');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// Setup public form file zones</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setupDocZone('pf-cc-zone','pf-cc-input');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setupDocZone('pf-med-zone','pf-med-input');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>seedIfEmpty();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Setup coordinator modal file zones</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupDocZone('f-cc-zone','f-cc-file');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupDocZone('f-med-zone','f-med-file');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>// Setup public form zones (in case viewed from coordinator side)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupDocZone('pf-cc-zone','pf-cc-input');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupDocZone('pf-med-zone','pf-med-input');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>nav('dashboard');</span></p>
+<p class="p1"><span class="s1">});</span></p>
+<p class="p1"><span class="s1">&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+</body>
+</html>
