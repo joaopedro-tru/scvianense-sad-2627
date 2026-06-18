@@ -243,6 +243,18 @@ body.pm #v-pf{padding:30px}
 .att-btn.present{background:var(--ok);color:#fff;border-color:var(--ok)}
 .att-btn:not(.present):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
 .att-summary{font-size:15px;font-weight:700;color:var(--ok)}
+
+/* TABS */
+.tab-btn{padding:10px 22px;font-size:13.5px;font-weight:600;cursor:pointer;background:transparent;border:none;color:var(--muted);border-bottom:2.5px solid transparent;margin-bottom:-2px;font-family:inherit;transition:all .15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.tab-active{color:var(--green);border-bottom-color:var(--green)}
+
+/* MATCH EVENTS */
+.mev{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.mev:last-child{border-bottom:none}
+.mev-min{font-size:12px;font-weight:700;color:var(--muted);min-width:32px;text-align:right;flex-shrink:0}
+.mev-icon{font-size:16px;flex-shrink:0;line-height:1}
+.mev-desc{flex:1;font-size:13px}
 </style>
 </head>
 <body>
@@ -250,8 +262,13 @@ body.pm #v-pf{padding:30px}
 <!-- SIDEBAR -->
 <aside id="sb">
   <div id="sb-logo">
-    <div class="cn">SC Vianense SAD</div>
-    <div class="sn">Coordenação Técnica</div>
+    <div style="display:flex;align-items:center;gap:11px">
+      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:42px;height:42px;object-fit:contain;flex-shrink:0;mix-blend-mode:screen">
+      <div>
+        <div class="cn">SC Vianense SAD</div>
+        <div class="sn">Coordenação Técnica</div>
+      </div>
+    </div>
   </div>
   <nav>
     <div class="nsl">Geral</div>
@@ -375,7 +392,7 @@ body.pm #v-pf{padding:30px}
   <!-- PUBLIC FORM -->
   <div class="view" id="v-pf">
     <div class="pfh">
-      <div style="font-size:36px;margin-bottom:10px">⚽</div>
+      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
       <h1>SC Vianense SAD</h1>
       <p>Formulário de Registo do Atleta — preenche os teus dados pessoais</p>
     </div>
@@ -429,25 +446,20 @@ body.pm #v-pf{padding:30px}
             </select>
           </div>
         </div>
-        <div class="fg"><label>Clube Anterior</label><input type="text" name="previousClub"></div>
+        <div class="fg"><label>Clube Anterior</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+            <input type="checkbox" name="renewal" id="pf-renewal" style="accent-color:var(--green);width:15px;height:15px;flex-shrink:0">
+            <label for="pf-renewal" style="display:inline;font-size:13px;font-weight:600;color:var(--text);margin:0;cursor:pointer">Renovação</label>
+          </div>
+          <input type="text" name="previousClub" id="pf-prevclub" placeholder="Nome do clube anterior">
+        </div>
 
         <div class="fst">Dados Médicos / Físicos</div>
         <div class="fr">
           <div class="fg"><label>Altura (cm)</label><input type="number" name="height" min="140" max="220"></div>
           <div class="fg"><label>Peso (kg)</label><input type="number" name="weight" min="40" max="120"></div>
         </div>
-        <div class="fr">
-          <div class="fg"><label>Grupo Sanguíneo</label>
-            <select name="bloodType">
-              <option value="">Desconhecido</option>
-              <option value="A+">A+</option><option value="A-">A-</option>
-              <option value="B+">B+</option><option value="B-">B-</option>
-              <option value="AB+">AB+</option><option value="AB-">AB-</option>
-              <option value="O+">O+</option><option value="O-">O-</option>
-            </select>
-          </div>
-          <div class="fg"><label>Seguro Desportivo</label><input type="text" name="insurance" placeholder="Apólice / Entidade"></div>
-        </div>
+        <div class="fg"><label>Seguro Desportivo</label><input type="text" name="insurance" placeholder="Apólice / Entidade"></div>
         <div class="fg"><label>Lesões / Obs. Médicas</label><textarea name="injuries" placeholder="Lesões anteriores, alergias, medicação, etc."></textarea></div>
 
         <div class="fst">Documentos e Foto</div>
@@ -512,6 +524,7 @@ body.pm #v-pf{padding:30px}
         <button class="btn btn-o btn-sm" id="btn-back-game">← Voltar</button>
         <div><h1 id="gm-title">Jogo</h1><div class="sub" id="gm-sub"></div></div>
       </div>
+      <button class="btn btn-o btn-sm" id="btn-edit-game">✏️ Editar</button>
     </div>
     <div id="gm-content"></div>
   </div>
@@ -523,6 +536,7 @@ body.pm #v-pf{padding:30px}
         <button class="btn btn-o btn-sm" id="btn-back-training">← Voltar</button>
         <div><h1 id="tr-title">Treino</h1><div class="sub" id="tr-sub"></div></div>
       </div>
+      <button class="btn btn-o btn-sm" id="btn-edit-training">✏️ Editar</button>
     </div>
     <div id="tr-content"></div>
   </div>
@@ -577,24 +591,22 @@ body.pm #v-pf{padding:30px}
           </select>
         </div>
       </div>
-      <div class="fg"><label>Clube Anterior</label><input type="text" id="f-prevclub"></div>
+      <div class="fr">
+        <div class="fg"><label>Data de Inscrição na Equipa</label><input type="date" id="f-enrolled"></div>
+        <div class="fg"><label>Clube Anterior</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+            <input type="checkbox" id="f-renewal" style="accent-color:var(--green);width:15px;height:15px;flex-shrink:0">
+            <label for="f-renewal" style="display:inline;font-size:13px;font-weight:600;color:var(--text);margin:0;cursor:pointer">Renovação</label>
+          </div>
+          <input type="text" id="f-prevclub" placeholder="Nome do clube anterior">
+        </div>
+      </div>
       <div class="fst">Dados Médicos / Físicos</div>
       <div class="fr">
         <div class="fg"><label>Altura (cm)</label><input type="number" id="f-h" min="140" max="220"></div>
         <div class="fg"><label>Peso (kg)</label><input type="number" id="f-w" min="40" max="120"></div>
       </div>
-      <div class="fr">
-        <div class="fg"><label>Grupo Sanguíneo</label>
-          <select id="f-blood">
-            <option value="">—</option>
-            <option value="A+">A+</option><option value="A-">A-</option>
-            <option value="B+">B+</option><option value="B-">B-</option>
-            <option value="AB+">AB+</option><option value="AB-">AB-</option>
-            <option value="O+">O+</option><option value="O-">O-</option>
-          </select>
-        </div>
-        <div class="fg"><label>Seguro Desportivo</label><input type="text" id="f-ins"></div>
-      </div>
+      <div class="fg"><label>Seguro Desportivo</label><input type="text" id="f-ins" placeholder="Apólice / Entidade"></div>
       <div class="fg"><label>Lesões / Observações</label><textarea id="f-inj"></textarea></div>
 
       <div class="fst">Documentos e Foto</div>
@@ -657,6 +669,19 @@ body.pm #v-pf{padding:30px}
       <div class="fg" id="opp-grp" style="display:none">
         <label>Adversário</label><input type="text" id="e-opp" placeholder="Nome do clube adversário">
       </div>
+      <div class="fg" id="ha-grp" style="display:none">
+        <label>Local do Jogo</label>
+        <div style="display:flex;gap:20px;margin-top:6px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <input type="radio" name="e-ha" id="e-ha-home" value="home" style="accent-color:var(--green);width:16px;height:16px;flex-shrink:0" checked>
+            <label for="e-ha-home" style="display:inline;font-size:13px;font-weight:600;color:var(--text);margin:0;cursor:pointer">🏠 Em casa</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <input type="radio" name="e-ha" id="e-ha-away" value="away" style="accent-color:var(--green);width:16px;height:16px;flex-shrink:0">
+            <label for="e-ha-away" style="display:inline;font-size:13px;font-weight:600;color:var(--text);margin:0;cursor:pointer">✈️ Fora</label>
+          </div>
+        </div>
+      </div>
       <div class="fr">
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
@@ -687,6 +712,7 @@ body.pm #v-pf{padding:30px}
     <div id="edet-content"></div>
     <div class="fa">
       <button class="btn btn-d btn-sm" id="btn-del-event">🗑️ Eliminar</button>
+      <button class="btn btn-o btn-sm" id="btn-edit-event">✏️ Editar</button>
       <button class="btn btn-g" id="mo-edet-cancel">Fechar</button>
     </div>
   </div>
@@ -854,9 +880,9 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null;
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre';
 
-function evLabel(ev){ return ev.type==='game'?`⚽ ${SQUADS[ev.squad]||'Jogo'}${ev.opponent?' vs '+ev.opponent:''}`:ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`; }
+function evLabel(ev){ return ev.type==='game'?`${ev.homeAway==='away'?'✈️':'🏠'} ${SQUADS[ev.squad]||'Jogo'}${ev.opponent?' vs '+ev.opponent:''}`:ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`; }
 
 function nav(v,opts={}){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -1053,14 +1079,14 @@ function renderPlayer(){
         ${row('Posição',POS[p.position])}
         ${row('Nº Camisola',p.number?`#${p.number}`:null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
-        ${row('Clube Anterior',p.previousClub)}
         ${row('Escalão',SQUADS[p.squad])}
+        ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
+        ${row('Clube Anterior',p.previousClub)}
       </div>
       <div class="card"><h3>Dados Médicos / Físicos</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr">
           ${row('Altura',p.height?p.height+' cm':null)}
           ${row('Peso',p.weight?p.weight+' kg':null)}
-          ${row('Grupo Sanguíneo',p.bloodType)}
           ${row('Seguro Desportivo',p.insurance)}
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
@@ -1089,10 +1115,13 @@ function openPlayerModal(p=null){
   f('f-pos').value=p?.position||'';
   f('f-num').value=p?.number||'';
   f('f-foot').value=p?.dominantFoot||'right';
-  f('f-prevclub').value=p?.previousClub||'';
+  f('f-enrolled').value=p?.enrolledAt||new Date().toISOString().split('T')[0];
+  const isRenewal=p?.previousClub==='Renovação';
+  document.getElementById('f-renewal').checked=isRenewal;
+  f('f-prevclub').value=isRenewal?'':(p?.previousClub||'');
+  document.getElementById('f-prevclub').style.display=isRenewal?'none':'';
   f('f-h').value=p?.height||'';
   f('f-w').value=p?.weight||'';
-  f('f-blood').value=p?.bloodType||'';
   f('f-ins').value=p?.insurance||'';
   f('f-inj').value=p?.injuries||'';
   // Reset file inputs
@@ -1108,6 +1137,8 @@ function openPlayerModal(p=null){
   setTimeout(()=>f('f-name').focus(),50);
 }
 function closePlayerModal(){ document.getElementById('mo-player').classList.remove('open') }
+document.getElementById('f-renewal').addEventListener('change',function(){ document.getElementById('f-prevclub').style.display=this.checked?'none':''; });
+document.getElementById('pf-renewal').addEventListener('change',function(){ document.getElementById('pf-prevclub').style.display=this.checked?'none':''; });
 
 document.getElementById('mo-p-form').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -1124,8 +1155,8 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       name:f('f-name'),dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
       cc:f('f-cc'),phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
       squad:f('f-squad'),position:f('f-pos'),number:f('f-num'),dominantFoot:f('f-foot'),
-      previousClub:f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
-      bloodType:f('f-blood'),insurance:f('f-ins'),injuries:f('f-inj'),
+      enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
+      insurance:f('f-ins'),injuries:f('f-inj'),
       // preserve existing URLs
       photoUrl:existing?.photoUrl||null,
       ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,
@@ -1177,6 +1208,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     const fd=new FormData(e.target), p={};
     for(const[k,v]of fd.entries())p[k]=v;
     p.id=uid(); p.submittedBy='athlete';
+    if(p.renewal==='on'){p.previousClub='Renovação'; delete p.renewal;} else delete p.renewal;
 
     const photoFile=document.getElementById('pf-photo-input').files[0];
     const ccFile=document.getElementById('pf-cc-input').files[0];
@@ -1259,6 +1291,7 @@ function deleteEvent(id){
   DB.deleteEvent(id); document.getElementById('mo-edet').classList.remove('open'); toast('Evento eliminado.'); renderCal(); if(view==='dashboard')renderDash();
 }
 document.getElementById('btn-del-event').addEventListener('click',()=>calEvent&&deleteEvent(calEvent.id));
+document.getElementById('btn-edit-event').addEventListener('click',()=>{ document.getElementById('mo-edet').classList.remove('open'); openEventModal(calEvent); });
 document.getElementById('mo-edet-close').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 document.getElementById('mo-edet-cancel').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 document.getElementById('cal-prev').addEventListener('click',()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--} renderCal() });
@@ -1278,6 +1311,8 @@ function openEventModal(ev=null,date=null){
   document.getElementById('e-loc').value=ev?.location||'';
   document.getElementById('e-notes').value=ev?.notes||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
+  document.getElementById('e-ha-home').checked=ev?.homeAway!=='away';
+  document.getElementById('e-ha-away').checked=ev?.homeAway==='away';
   document.getElementById('e-repeat').checked=false;
   document.getElementById('e-repeat-until').value='';
   document.getElementById('e-repeat-until-grp').style.display='none';
@@ -1288,6 +1323,7 @@ function closeEventModal(){ document.getElementById('mo-event').classList.remove
 function toggleOpp(){
   const t=document.getElementById('e-type').value;
   document.getElementById('opp-grp').style.display=t==='game'?'block':'none';
+  document.getElementById('ha-grp').style.display=t==='game'?'block':'none';
   document.getElementById('e-repeat-grp').style.display=t==='training'?'block':'none';
   if(t!=='training'){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
 }
@@ -1300,7 +1336,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   e.preventDefault();
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp')};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home'};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -1317,12 +1353,16 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
 
   if(id)DB.updateEvent(id,data); else DB.addEvent(data);
   closeEventModal(); toast('✅ Evento guardado!'); renderCal();
+  if(view==='training')renderTraining();
+  if(view==='game')renderGame();
+  if(view==='sq-trainings')renderSqTrainings();
+  if(view==='sq-games')renderSqGames();
 });
 
 // ── TRAINING VIEW ─────────────────────────────────────────────────────────────
 function renderTraining(){
   const ev=DB.getEvent(trainingEventId); if(!ev){ nav('calendar'); return; }
-  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
+  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
   const otherSquad=ev.squad==='sub19'?'sub23':ev.squad==='sub23'?'sub19':null;
   const otherAvailAll=otherSquad?DB.players(otherSquad):[];
   const extras=ev.extraPlayers||[];
@@ -1427,11 +1467,11 @@ function renderSqTrainings(){
   document.getElementById('sqtr-sub').textContent=`${evs.length} treino${evs.length!==1?'s':''}`;
   const lEl=document.getElementById('sqtr-list');
   if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">📋</div><h3>Sem treinos registados</h3><p>Adiciona treinos no Calendário.</p></div>'; return; }
-  const sqPls=DB.players(squad);
   lEl.innerHTML=evs.map(ev=>{
+    const eligiblePls=DB.players(squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
     const hasFicha=!!ev.fichaTreinoUrl;
     const att=ev.attendance||{};
-    const allPl=[...sqPls,...(ev.extraPlayers||[]).map(id=>DB.getPlayer(id)).filter(Boolean)];
+    const allPl=[...eligiblePls,...(ev.extraPlayers||[]).map(id=>DB.getPlayer(id)).filter(Boolean)];
     const presCount=allPl.filter(p=>att[p.id]===true).length;
     const hasPresencas=Object.keys(att).length>0;
     return `<div class="ei" style="cursor:pointer" data-tr-id="${ev.id}">
@@ -1458,80 +1498,357 @@ function renderSqGames(){
   if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">⚽</div><h3>Sem jogos registados</h3><p>Adiciona jogos no Calendário.</p></div>'; return; }
   lEl.innerHTML=evs.map(ev=>{
     const conv=ev.convocatoria;
-    const titCount=conv?Object.values(conv.players||{}).filter(r=>r==='titular').length:0;
-    const supCount=conv?Object.values(conv.players||{}).filter(r=>r==='suplente').length:0;
-    const hasConv=conv&&Object.keys(conv.players||{}).length>0;
+    const convCount=conv?Object.values(conv.players||{}).filter(v=>!!v).length:0;
+    const hasConv=conv&&convCount>0;
+    const haLabel=ev.homeAway==='away'?'✈️':'🏠';
     return `<div class="ei" style="cursor:pointer" data-gm-id="${ev.id}">
       <div class="etd gm"></div>
       <div class="einfo">
-        <div class="etitle">${fmtDate(ev.date)} · vs ${ev.opponent||'—'}</div>
+        <div class="etitle">${haLabel} ${fmtDate(ev.date)} · vs ${ev.opponent||'—'}</div>
         <div class="emeta">${ev.time?ev.time+' · ':''}${ev.location||'—'}</div>
       </div>
       <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;${hasConv?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">
-        ${hasConv?`📋 ${titCount}T+${supCount}S`:'📋 ✗'}
+        ${hasConv?`📋 ${convCount}`:'📋 ✗'}
       </span>
     </div>`;
   }).join('');
   lEl.querySelectorAll('[data-gm-id]').forEach(el=>el.addEventListener('click',()=>nav('game',{id:el.dataset.gmId})));
 }
 
-// ── GAME DETAIL / CONVOCATÓRIA ────────────────────────────────────────────────
+// ── GAME DETAIL (TABS: PRÉ-JOGO / PÓS-JOGO) ──────────────────────────────────
 function renderGame(){
   const ev=DB.getEvent(gameEventId); if(!ev){ nav('sq-games',{squad}); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
-  const conv=ev.convocatoria||{players:{},formation:'',notes:''};
+  const conv=ev.convocatoria||{players:{},formation:'',notes:'',concentrationTime:'',concentrationPlace:''};
+  const mr=ev.matchReport||{events:[]};
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
-  const titCount=Object.values(conv.players||{}).filter(r=>r==='titular').length;
-  const supCount=Object.values(conv.players||{}).filter(r=>r==='suplente').length;
+  document.getElementById('gm-content').innerHTML=`
+    <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border)">
+      <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
+      <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">📊 Pós-Jogo</button>
+    </div>
+    <div id="gm-tab-content"></div>`;
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
+  if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
+  else renderGamePos(ev,sqPlayers,conv,mr);
+}
+
+function renderGamePre(ev,sqPlayers,conv){
+  const convCount=Object.values(conv.players||{}).filter(v=>!!v).length;
   const pRows=sqPlayers.map(p=>{
-    const role=conv.players[p.id];
+    const isConv=!!conv.players[p.id];
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${p.name}</div>
         <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
       </div>
-      <div style="display:flex;gap:4px">
-        <button class="att-btn${role==='titular'?' present':''}" data-grole="titular" data-gpid="${p.id}">Titular</button>
-        <button class="att-btn${role==='suplente'?' present':''}" style="${role==='suplente'?'background:var(--blue);color:#fff;border-color:var(--blue)':''}" data-grole="suplente" data-gpid="${p.id}">Suplente</button>
-      </div>
+      <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
     </div>`;
   }).join('');
-  document.getElementById('gm-content').innerHTML=`
+  const haLabel=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
+  document.getElementById('gm-tab-content').innerHTML=`
   <div style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
-    <div class="card">
-      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
-      ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Adversário',ev.opponent)}${row('Escalão',SQUADS[ev.squad])}
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <div class="fg"><label>Formação</label><input type="text" id="gm-formation" value="${conv.formation||''}" placeholder="Ex: 4-3-3"></div>
-        <div class="fg"><label>Observações</label><textarea id="gm-notes" style="min-height:70px">${conv.notes||''}</textarea></div>
-        <button class="btn btn-p" id="btn-save-conv" style="width:100%">💾 Guardar</button>
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
+        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
+      </div>
+      <div class="card">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🎯 Concentração</h3>
+        <div class="fg"><label>Hora de Concentração</label><input type="time" id="gm-conc-time" value="${conv.concentrationTime||''}"></div>
+        <div class="fg"><label>Local de Concentração</label><input type="text" id="gm-conc-place" value="${conv.concentrationPlace||''}" placeholder="Ex: Balneários principais"></div>
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 11px;padding-top:12px;border-top:1px solid var(--border)">⏱️ Programa do Dia</h3>
+        <div class="fg"><label>Chegada ao local de jogo</label><input type="time" id="gm-sch-arrival" value="${conv.scheduleArrival||''}"></div>
+        <div class="fg"><label>Palestra pré-jogo</label><input type="time" id="gm-sch-palestra" value="${conv.schedulePalestra||''}"></div>
+        <div class="fg"><label>Aquecimento GR</label><input type="time" id="gm-sch-gk" value="${conv.scheduleGkWarmup||''}"></div>
+        <div class="fg"><label>Aquecimento dos restantes</label><input type="time" id="gm-sch-warmup" value="${conv.scheduleWarmup||''}"></div>
+        <div class="fg"><label>Recolha ao balneário</label><input type="time" id="gm-sch-dressing" value="${conv.scheduleDressing||''}"></div>
+        <div class="fg"><label>Observações</label><textarea id="gm-notes" style="min-height:50px">${conv.notes||''}</textarea></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-p" id="btn-save-conv" style="flex:1">💾 Guardar</button>
+          <button class="btn btn-o" id="btn-gen-pdf">📄 PDF</button>
+        </div>
       </div>
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">📋 Convocatória</h3>
-        <span style="font-size:13px;color:var(--muted)"><strong style="color:var(--ok)">${titCount}</strong> titulares · <strong style="color:var(--blue)">${supCount}</strong> suplentes</span>
+        <span style="font-size:13px;color:var(--muted)"><strong style="color:var(--ok)">${convCount}</strong> convocado${convCount!==1?'s':''}</span>
       </div>
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
     </div>
   </div>`;
-  document.querySelectorAll('[data-gpid]').forEach(btn=>btn.addEventListener('click',()=>{
-    const pid=btn.dataset.gpid, role=btn.dataset.grole;
-    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{},formation:'',notes:''}));
-    if(c.players[pid]===role) delete c.players[pid]; else c.players[pid]=role;
-    DB.updateEvent(gameEventId,{convocatoria:c});
-    renderGame();
+  document.querySelectorAll('[data-gconv]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.gconv;
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    if(c.players[pid]) delete c.players[pid]; else c.players[pid]=true;
+    DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   }));
   document.getElementById('btn-save-conv').addEventListener('click',()=>{
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
-    c.formation=document.getElementById('gm-formation').value;
+    c.concentrationTime=document.getElementById('gm-conc-time').value;
+    c.concentrationPlace=document.getElementById('gm-conc-place').value;
+    c.scheduleArrival=document.getElementById('gm-sch-arrival').value;
+    c.schedulePalestra=document.getElementById('gm-sch-palestra').value;
+    c.scheduleGkWarmup=document.getElementById('gm-sch-gk').value;
+    c.scheduleWarmup=document.getElementById('gm-sch-warmup').value;
+    c.scheduleDressing=document.getElementById('gm-sch-dressing').value;
     c.notes=document.getElementById('gm-notes').value;
-    DB.updateEvent(gameEventId,{convocatoria:c});
-    toast('✅ Convocatória guardada!');
+    DB.updateEvent(gameEventId,{convocatoria:c}); toast('✅ Guardado!');
   });
+  document.getElementById('btn-gen-pdf').addEventListener('click',()=>generateConvocatoriaPDF(gameEventId));
 }
+
+function renderGamePos(ev,sqPlayers,conv,mr){
+  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>(a.number||99)-(b.number||99));
+  const lineup=mr.lineup||[];
+  const titulares=convocados.filter(p=>lineup.includes(p.id));
+  const suplentes=convocados.filter(p=>!lineup.includes(p.id));
+  const evs=(mr.events||[]).sort((a,b)=>a.minute-b.minute);
+  const goals=evs.filter(e=>e.type==='goal').length;
+  const goalsConceded=evs.filter(e=>e.type==='goal_conceded').length;
+  function pName(id){ const p=DB.getPlayer(id); return p?p.name:'—'; }
+  const iStyle='width:100%;padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit';
+  function pOpt(arr,label){ return `<option value="">${label}</option>`+arr.map(p=>`<option value="${p.id}">${p.number?'#'+p.number+' ':''}${p.name}</option>`).join(''); }
+  const evTimeline=evs.map(e=>{
+    let icon='', desc='';
+    if(e.type==='goal'){ icon='⚽'; desc=`Golo — ${pName(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(assist: ${pName(e.assistId)})</span>`:''}` }
+    else if(e.type==='goal_conceded'){ icon='🥅'; desc='Golo Sofrido' }
+    else if(e.type==='yellow'){ icon='🟡'; desc=`Cartão Amarelo — ${pName(e.playerId)}` }
+    else if(e.type==='red'){ icon='🔴'; desc=`Cartão Vermelho — ${pName(e.playerId)} <span style="color:var(--muted);font-size:11px">(${e.redType==='double_yellow'?'duplo amarelo':'direto'})</span>` }
+    else if(e.type==='sub'){ icon='🔄'; desc=`Substituição — ${pName(e.playerOutId)} ↔ ${pName(e.playerInId)}` }
+    return `<div class="mev"><span class="mev-min">${e.minute}'</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
+  }).join('');
+  // Ratings: players who were on the field (lineup + subs in); fallback to all convocados
+  const subsIn=(mr.events||[]).filter(e=>e.type==='sub').map(e=>e.playerInId);
+  const playedIds=new Set([...lineup,...subsIn]);
+  const toRate=convocados.filter(p=>playedIds.size>0?playedIds.has(p.id):true);
+  const ratings=mr.ratings||{};
+  const ratingRows=toRate.map(p=>{
+    const r=ratings[p.id]||{};
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      ${p.number?`<span style="font-weight:700;color:var(--green);min-width:22px;text-align:right;font-size:13px;flex-shrink:0">${p.number}</span>`:''}
+      <span style="flex:0 0 150px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <input type="number" min="0" max="10" step="0.5" value="${r.rating!==undefined?r.rating:''}" placeholder="—" data-rating-pid="${p.id}" style="width:62px;padding:5px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;text-align:center;outline:none;font-family:inherit;flex-shrink:0">
+      <input type="text" value="${r.comment||''}" placeholder="Observação..." data-comment-pid="${p.id}" style="flex:1;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit">
+    </div>`;
+  }).join('');
+  document.getElementById('gm-tab-content').innerHTML=`
+  <div style="display:grid;grid-template-columns:290px 1fr;gap:18px;align-items:start">
+    <div>
+      <div class="card" style="text-align:center;margin-bottom:18px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Resultado</div>
+        ${ev.homeAway==='away'
+          ?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">${ev.opponent||'Adversário'}</div><div style="font-size:44px;font-weight:800;letter-spacing:10px;color:var(--green);line-height:1">${goalsConceded} — ${goals}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">SC Vianense SAD</div>`
+          :`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">SC Vianense SAD</div><div style="font-size:44px;font-weight:800;letter-spacing:10px;color:var(--green);line-height:1">${goals} — ${goalsConceded}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${ev.opponent||'Adversário'}</div>`}
+      </div>
+      <div class="card">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid var(--border)">Linha de Equipa</h3>
+        ${convocados.length===0?'<p style="color:var(--muted);font-size:12px">Sem convocados definidos.</p>':
+          [...titulares,...suplentes].map(p=>{
+            const isTit=lineup.includes(p.id);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+              ${p.number?`<span style="font-weight:700;color:${isTit?'var(--green)':'var(--muted)'};min-width:22px;text-align:right;font-size:13px">${p.number}</span>`:''}
+              <span style="flex:1;font-size:13px;${!isTit?'color:var(--muted)':''}">${p.name}</span>
+              <button class="att-btn${isTit?' present':''}" data-lineup-pid="${p.id}" style="${!isTit?'font-size:11px':''}">${isTit?'Titular':'Suplente'}</button>
+            </div>`;
+          }).join('')
+        }
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Eventos da Partida</h3>
+        <div style="background:#f5f8ff;border-radius:8px;padding:13px;margin-bottom:16px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="120" placeholder="45" style="${iStyle}"></div>
+            <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
+              <select id="me-type" style="${iStyle};cursor:pointer">
+                <option value="goal">⚽ Golo</option>
+                <option value="goal_conceded">🥅 Golo Sofrido</option>
+                <option value="yellow">🟡 Cartão Amarelo</option>
+                <option value="red">🔴 Cartão Vermelho</option>
+                <option value="sub">🔄 Substituição</option>
+              </select>
+            </div>
+            <div id="me-extra" style="display:flex;gap:8px;flex:2;min-width:200px;flex-wrap:wrap;align-items:flex-end"></div>
+            <button class="btn btn-p btn-sm" id="btn-add-me" style="height:34px">+ Adicionar</button>
+          </div>
+        </div>
+        <div id="me-list">${evTimeline||'<p style="color:var(--muted);font-size:13px;text-align:center;padding:18px 0">Sem eventos registados.</p>'}</div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">⭐ Avaliação${playedIds.size===0&&convocados.length>0?' <span style="font-weight:400;font-size:10px;text-transform:none">(define titulares para filtrar)</span>':''}</h3>
+        ${toRate.length===0?'<p style="color:var(--muted);font-size:13px">Sem atletas convocados.</p>':ratingRows}
+      </div>
+    </div>
+  </div>`;
+
+  // Lineup toggle
+  document.querySelectorAll('[data-lineup-pid]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.lineupPid;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[],lineup:[]}));
+    curMr.lineup=curMr.lineup||[];
+    if(curMr.lineup.includes(pid)) curMr.lineup=curMr.lineup.filter(id=>id!==pid);
+    else curMr.lineup.push(pid);
+    DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+  }));
+
+  const meType=document.getElementById('me-type');
+  const meExtra=document.getElementById('me-extra');
+  const subOut=titulares.length>0?titulares:convocados;
+  const subIn=suplentes.length>0?suplentes:convocados;
+  function updExtra(){
+    const t=meType.value;
+    const sel=`style="${iStyle};cursor:pointer"`;
+    if(t==='goal') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Marcador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Assistência (opc.)</label><select id="me-p2" ${sel}>${pOpt(convocados,'Nenhuma')}</select></div>`;
+    else if(t==='yellow') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
+    else if(t==='red') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label><select id="me-red-type" ${sel}><option value="direct">Direto</option><option value="double_yellow">Duplo Amarelo</option></select></div>`;
+    else if(t==='sub') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Sai</label><select id="me-p-out" ${sel}>${pOpt(subOut,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Entra</label><select id="me-p-in" ${sel}>${pOpt(subIn,'Jogador...')}</select></div>`;
+    else meExtra.innerHTML='';
+  }
+  updExtra(); meType.addEventListener('change',updExtra);
+
+  document.getElementById('btn-add-me').addEventListener('click',()=>{
+    const min=parseInt(document.getElementById('me-min').value);
+    if(isNaN(min)||min<0||min>120){ toast('❌ Minuto inválido (0–120)'); return; }
+    const t=meType.value;
+    const ne={id:uid(),minute:min,type:t};
+    if(t==='goal'){
+      const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o marcador'); return; }
+      ne.playerId=p1; const p2=document.getElementById('me-p2')?.value; if(p2)ne.assistId=p2;
+    } else if(t==='yellow'){
+      const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o jogador'); return; }
+      ne.playerId=p1;
+    } else if(t==='red'){
+      const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o jogador'); return; }
+      ne.playerId=p1; ne.redType=document.getElementById('me-red-type').value;
+    } else if(t==='sub'){
+      const pOut=document.getElementById('me-p-out')?.value, pIn=document.getElementById('me-p-in')?.value;
+      if(!pOut||!pIn){ toast('❌ Seleciona os jogadores'); return; }
+      ne.playerOutId=pOut; ne.playerInId=pIn;
+    }
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
+    curMr.events.push(ne); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+  });
+  document.querySelectorAll('[data-del-me]').forEach(btn=>btn.addEventListener('click',()=>{
+    const eid=btn.dataset.delMe;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
+    curMr.events=curMr.events.filter(e=>e.id!==eid); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+  }));
+  // Ratings
+  document.querySelectorAll('[data-rating-pid]').forEach(input=>input.addEventListener('change',()=>{
+    const pid=input.dataset.ratingPid;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
+    curMr.ratings=curMr.ratings||{}; curMr.ratings[pid]=curMr.ratings[pid]||{};
+    const val=parseFloat(input.value); curMr.ratings[pid].rating=isNaN(val)?null:Math.min(10,Math.max(0,val));
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+  }));
+  document.querySelectorAll('[data-comment-pid]').forEach(input=>input.addEventListener('change',()=>{
+    const pid=input.dataset.commentPid;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
+    curMr.ratings=curMr.ratings||{}; curMr.ratings[pid]=curMr.ratings[pid]||{};
+    curMr.ratings[pid].comment=input.value;
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+  }));
+}
+
+// ── CONVOCATÓRIA PDF ──────────────────────────────────────────────────────────
+function generateConvocatoriaPDF(evId){
+  const ev=DB.getEvent(evId); if(!ev)return;
+  const conv=ev.convocatoria||{players:{},notes:'',concentrationTime:'',concentrationPlace:'',scheduleArrival:'',schedulePalestra:'',scheduleGkWarmup:'',scheduleWarmup:'',scheduleDressing:''};
+  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
+  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>(a.number||99)-(b.number||99));
+  if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
+  const isHome=ev.homeAway!=='away';
+  const ourTeam='SC Vianense SAD';
+  const opponent=ev.opponent||'Adversário';
+  const leftTeam=isHome?ourTeam:opponent;
+  const rightTeam=isHome?opponent:ourTeam;
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Convocatória — SC Vianense SAD</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:28px 24px;color:#111;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.no-print{text-align:right;margin-bottom:18px}
+.no-print button{background:#1a3d6e;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700}
+.header{display:flex;align-items:center;gap:14px;padding-bottom:16px;margin-bottom:6px;border-bottom:3px solid #1a3d6e}
+.header img{width:60px;height:60px;object-fit:contain;flex-shrink:0}
+.header-text .club{font-size:18px;font-weight:800;color:#1a3d6e}
+.header-text .squad{font-size:11px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:2px 10px;border-radius:10px;margin-top:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header-text .doc-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:4px}
+.game-box{border:2px solid #1a3d6e;border-radius:10px;padding:16px 20px;margin:18px 0;text-align:center;background:#f0f4fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.game-vs{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
+.game-team{font-size:15px;font-weight:800;color:#1a3d6e;flex:1}
+.game-team.left{text-align:right}
+.game-team.right{text-align:left}
+.game-vs-badge{background:#1a3d6e;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.game-meta{font-size:11px;color:#555;display:flex;justify-content:center;gap:0;flex-wrap:wrap}
+.game-meta span{padding:0 8px;border-right:1px solid #ccc}
+.game-meta span:last-child{border-right:none}
+.conc-box{background:#fff8e1;border-left:4px solid #e8b84b;padding:11px 15px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.conc-item .cl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#7a5f00;font-weight:700;margin-bottom:2px}
+.conc-item .cv{font-size:13px;font-weight:800;color:#333}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+.pt th{background:#1a3d6e;color:#fff;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pt td{padding:9px 12px;border-bottom:1px solid #e8e8e8;font-size:13px}
+.pt tr:nth-child(even) td{background:#f5f8ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pt td:first-child{font-weight:800;color:#1a3d6e;font-size:15px;width:48px}
+.sch-box{border:1px solid #c8dcc8;border-radius:8px;padding:14px 16px;margin-bottom:16px}
+.sch-title{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:10px}
+.sch-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #e0ece0;font-size:12px}
+.sch-row:last-child{border-bottom:none}
+.sch-time{font-weight:800;color:#1a5028;font-size:14px;min-width:52px;text-align:right}
+.obs-box{background:#f5f8ff;border-radius:8px;padding:12px 15px;margin-bottom:14px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.obs-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:6px}
+.footer{text-align:center;font-size:10px;color:#bbb;margin-top:12px;padding-top:10px;border-top:1px solid #eee}
+@media print{.no-print{display:none!important}body{padding:10px;max-width:100%}}
+</style></head><body>
+<div class="no-print"><button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
+<div class="header">
+  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
+  <div class="header-text">
+    <div class="club">SC Vianense SAD</div>
+    <div><span class="squad">${SQUADS[ev.squad]||ev.squad}</span></div>
+    <div class="doc-label">Convocatória</div>
+  </div>
+</div>
+<div class="game-box">
+  <div class="game-vs">
+    <div class="game-team left">${leftTeam}</div>
+    <div class="game-vs-badge">VS</div>
+    <div class="game-team right">${rightTeam}</div>
+  </div>
+  <div class="game-meta">
+    <span>${fmtDate(ev.date)}</span>
+    ${ev.time?`<span>${ev.time}</span>`:''}
+    ${ev.location?`<span>${ev.location}</span>`:''}
+    <span>${isHome?'🏠 Em Casa':'✈️ Fora'}</span>
+  </div>
+</div>
+${(conv.concentrationTime||conv.concentrationPlace)?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
+<table class="pt"><thead><tr><th>#</th><th>Nome</th></tr></thead><tbody>
+${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td></tr>`).join('')}
+</tbody></table>
+<div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
+<div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
+<div class="sch-row"><span>🗣️ Palestra pré-jogo</span><span class="sch-time">${conv.schedulePalestra||'—'}</span></div>
+<div class="sch-row"><span>🥅 Aquecimento GR</span><span class="sch-time">${conv.scheduleGkWarmup||'—'}</span></div>
+<div class="sch-row"><span>🏃 Aquecimento dos restantes</span><span class="sch-time">${conv.scheduleWarmup||'—'}</span></div>
+<div class="sch-row"><span>🔒 Recolha ao balneário</span><span class="sch-time">${conv.scheduleDressing||'—'}</span></div>
+</div>
+${conv.notes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:13px">${conv.notes}</div></div>`:''}
+<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})}</div>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ toast('⚠️ Popup bloqueado. Permite popups para este site nas definições do browser.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
+document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
 document.getElementById('btn-back-game').addEventListener('click',()=>nav('sq-games',{squad}));
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
