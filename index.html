@@ -234,6 +234,14 @@ body.pm #v-pf{padding:30px}
 .mc-cols{display:flex;gap:8px;align-items:flex-start}
 .mc-col{display:flex;flex-direction:column;gap:4px;align-items:center}
 #p-pitch{display:none}
+
+/* ── TRAINING VIEW ──────────────────────────────── */
+.att-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.att-row:last-child{border-bottom:none}
+.att-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:#eef0f3;color:var(--muted);transition:all .15s;font-family:inherit;white-space:nowrap}
+.att-btn.present{background:var(--ok);color:#fff;border-color:var(--ok)}
+.att-btn:not(.present):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
+.att-summary{font-size:15px;font-weight:700;color:var(--ok)}
 </style>
 </head>
 <body>
@@ -476,6 +484,16 @@ body.pm #v-pf{padding:30px}
     </div>
   </div>
 
+  <!-- TRAINING SESSION -->
+  <div class="view" id="v-training">
+    <div class="tb">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-o btn-sm" id="btn-back-training">← Voltar</button>
+        <div><h1 id="tr-title">Treino</h1><div class="sub" id="tr-sub"></div></div>
+      </div>
+    </div>
+    <div id="tr-content"></div>
+  </div>
 </main>
 
 <!-- MODAL: PLAYER -->
@@ -804,7 +822,9 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid';
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null;
+
+function evLabel(ev){ return ev.type==='game'?`⚽ Jogo${ev.opponent?' vs '+ev.opponent:''}`:ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`; }
 
 function nav(v,opts={}){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -814,6 +834,7 @@ function nav(v,opts={}){
   else if(v==='squad'){ squad=opts.squad||squad; show('v-squad'); setActive(`[data-view="squad"][data-squad="${squad}"]`); renderSquad() }
   else if(v==='player'){ if(opts.id)player=DB.getPlayer(opts.id)||player; show('v-player'); renderPlayer() }
   else if(v==='calendar'){ show('v-cal'); setActive('[data-view="calendar"]'); renderCal() }
+  else if(v==='training'){ if(opts.id)trainingEventId=opts.id; show('v-training'); renderTraining() }
   else if(v==='public-form'){ show('v-pf') }
 }
 function show(id){ document.getElementById(id).classList.add('active') }
@@ -835,7 +856,7 @@ function renderDash(){
     <div class="sc"><div class="sl">Jogos Agendados</div><div class="sv">${es.filter(e=>e.type==='game').length}</div><div class="ss">no calendário</div></div>`;
   const uEl=document.getElementById('d-upcoming');
   uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
-    upcoming.slice(0,5).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='game'?`⚽ Jogo${e.opponent?' vs '+e.opponent:''}`:'🏃 Treino'}</div><div style="font-size:12px;color:var(--muted)">${SQUADS[e.squad]}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
+    upcoming.slice(0,5).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${SQUADS[e.squad]}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
   const rEl=document.getElementById('d-recent');
   const rec=[...ps].sort((a,b)=>(b.ca||'').localeCompare(a.ca||'')).slice(0,5);
   rEl.innerHTML=rec.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum atleta adicionado ainda.</p>':
@@ -1165,7 +1186,7 @@ function renderCal(){
     const dayEvs=allEvents.filter(e=>e.date===ds);
     const isT=ds===today;
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
-    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>`<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}">${ev.type==='game'?'⚽':'🏃'} ${ev.type==='game'&&ev.opponent?'vs '+ev.opponent:'Treino'}</div>`).join('')}</div>`;
+    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>`<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}">${evLabel(ev)}</div>`).join('')}</div>`;
   }
   document.getElementById('cal-body').innerHTML=cells;
   document.getElementById('cal-body').querySelectorAll('.cd').forEach(c=>{
@@ -1175,16 +1196,22 @@ function renderCal(){
   const monthEvs=allEvents.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&&d.getMonth()===calMonth }).sort((a,b)=>a.date.localeCompare(b.date));
   const lEl=document.getElementById('cal-list');
   lEl.innerHTML=monthEvs.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos neste mês.</p>':
-    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':'tr'}"></div><div class="einfo"><div class="etitle">${ev.type==='game'?`⚽ Jogo${ev.opponent?' vs '+ev.opponent:''}`:'🏃 Treino'}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join('');
+    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join('');
   lEl.querySelectorAll('[data-del-event]').forEach(b=>b.addEventListener('click',()=>deleteEvent(b.dataset.delEvent)));
 }
 
 function showEventDetail(id){
   const ev=DB.getEvent(id); if(!ev)return;
   calEvent=ev;
-  document.getElementById('edet-title').textContent=ev.type==='game'?`⚽ Jogo${ev.opponent?' vs '+ev.opponent:''}`:'🏃 Treino';
-  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${row('Notas',ev.notes)}</div>`;
+  document.getElementById('edet-title').textContent=evLabel(ev);
+  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}`;
   document.getElementById('mo-edet').classList.add('open');
+  if(ev.type==='training'){
+    document.getElementById('btn-open-training').addEventListener('click',()=>{
+      document.getElementById('mo-edet').classList.remove('open');
+      nav('training',{id:ev.id});
+    });
+  }
 }
 function deleteEvent(id){
   if(!confirm('Eliminar este evento?'))return;
@@ -1250,6 +1277,107 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   if(id)DB.updateEvent(id,data); else DB.addEvent(data);
   closeEventModal(); toast('✅ Evento guardado!'); renderCal();
 });
+
+// ── TRAINING VIEW ─────────────────────────────────────────────────────────────
+function renderTraining(){
+  const ev=DB.getEvent(trainingEventId); if(!ev){ nav('calendar'); return; }
+  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
+  const otherSquad=ev.squad==='sub19'?'sub23':ev.squad==='sub23'?'sub19':null;
+  const otherAvailAll=otherSquad?DB.players(otherSquad):[];
+  const extras=ev.extraPlayers||[];
+  const extraObjs=extras.map(id=>DB.getPlayer(id)).filter(Boolean);
+  const allPl=[...sqPlayers,...extraObjs];
+  const att=ev.attendance||{};
+  const presCount=allPl.filter(p=>att[p.id]===true).length;
+
+  document.getElementById('tr-title').textContent=evLabel(ev);
+  document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
+
+  const pRows=allPl.map(p=>{
+    const isExtra=extras.includes(p.id);
+    const present=att[p.id]===true;
+    return `<div class="att-row">
+      <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${p.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}</div>
+      </div>
+      <button class="att-btn${present?' present':''}" data-att-pid="${p.id}">${present?'✓ Presente':'— Ausente'}</button>
+    </div>`;
+  }).join('');
+
+  const otherAvail=otherAvailAll.filter(p=>!extras.includes(p.id));
+  const extraSection=otherAvail.length?`
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <button class="btn btn-o btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">+ Convocar atletas do ${SQUADS[otherSquad]}</button>
+      <div style="display:none;margin-top:10px">
+        ${otherAvail.map(p=>`<div class="att-row">
+          <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div>
+          <div style="flex:1;font-size:13px">${p.name} <span style="font-size:11px;color:var(--muted)">${POS[p.position]||''}</span></div>
+          <button class="btn btn-o btn-sm" data-conv-pid="${p.id}">+ Convocar</button>
+        </div>`).join('')}
+      </div>
+    </div>`:'';
+
+  const fichaZone=ev.fichaTreinoUrl
+    ?`<div class="doc-zone has-file" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">✅</span><div class="dz-info"><div class="dz-name">${ev.fichaTreinoFileName||'Ficha de Treino'}</div><div class="dz-sub">Clica para substituir</div></div></div>`
+    :`<div class="doc-zone empty" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">📋</span><span>PDF, JPG ou PNG</span></div>`;
+
+  document.getElementById('tr-content').innerHTML=`
+  <div style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info</h3>
+        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time||'—')}${row('Local',ev.location||'—')}${row('Escalão',SQUADS[ev.squad])}
+      </div>
+      <div class="card">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Ficha de Treino</h3>
+        ${fichaZone}
+        <input type="file" id="tr-ficha-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
+        ${ev.fichaTreinoUrl?`<a href="${ev.fichaTreinoUrl}" target="_blank" class="btn btn-o btn-sm" style="margin-top:9px;width:100%;justify-content:center">Ver Ficha ↗</a>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">👥 Presenças</h3>
+        <span class="att-summary">${presCount} / ${allPl.length} presentes</span>
+      </div>
+      ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
+      ${extraSection}
+    </div>
+  </div>`;
+
+  // Toggle attendance
+  document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.attPid;
+    const a=DB.getEvent(trainingEventId).attendance||{};
+    a[pid]=a[pid]!==true;
+    DB.updateEvent(trainingEventId,{attendance:a});
+    renderTraining();
+  }));
+
+  // Convocar extra player
+  document.querySelectorAll('[data-conv-pid]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.convPid;
+    const ex=[...(DB.getEvent(trainingEventId).extraPlayers||[])];
+    if(!ex.includes(pid))ex.push(pid);
+    DB.updateEvent(trainingEventId,{extraPlayers:ex});
+    renderTraining();
+  }));
+
+  // Ficha upload
+  const fichaInput=document.getElementById('tr-ficha-input');
+  fichaInput.addEventListener('change',async()=>{
+    const f=fichaInput.files[0]; if(!f)return;
+    const zone=document.getElementById('tr-ficha-zone');
+    zone.innerHTML='<span class="dz-icon"><span class="spin" style="border-color:rgba(26,61,110,.3);border-top-color:var(--green)"></span></span><span>A carregar...</span>';
+    const url=await uploadFile(f,trainingEventId,'ficha');
+    DB.updateEvent(trainingEventId,{fichaTreinoUrl:url,fichaTreinoFileName:f.name});
+    toast('✅ Ficha carregada!'); renderTraining();
+  });
+}
+
+document.getElementById('btn-back-training').addEventListener('click',()=>nav('calendar'));
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.nl[data-view]').forEach(el=>{
