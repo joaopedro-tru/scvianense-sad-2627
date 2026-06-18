@@ -611,6 +611,15 @@ body.pm #v-pf{padding:30px}
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
       </div>
+      <div id="e-repeat-grp" style="display:none;background:#f5f8ff;border-radius:8px;padding:12px 14px;margin-bottom:13px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0">
+          <input type="checkbox" id="e-repeat" style="width:15px;height:15px;cursor:pointer;accent-color:var(--green)">
+          <label for="e-repeat" style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text)">🔁 Repetir semanalmente</label>
+        </div>
+        <div id="e-repeat-until-grp" style="display:none;margin-top:11px">
+          <div class="fg" style="margin:0"><label>Repetir até à data</label><input type="date" id="e-repeat-until"></div>
+        </div>
+      </div>
       <div class="fg"><label>Local</label><input type="text" id="e-loc" placeholder="Estádio / Campo"></div>
       <div class="fg"><label>Notas</label><textarea id="e-notes" placeholder="Informações adicionais..."></textarea></div>
       <div class="fa">
@@ -1201,11 +1210,20 @@ function openEventModal(ev=null,date=null){
   document.getElementById('e-loc').value=ev?.location||'';
   document.getElementById('e-notes').value=ev?.notes||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
+  document.getElementById('e-repeat').checked=false;
+  document.getElementById('e-repeat-until').value='';
+  document.getElementById('e-repeat-until-grp').style.display='none';
   toggleOpp();
   document.getElementById('mo-event').classList.add('open');
 }
 function closeEventModal(){ document.getElementById('mo-event').classList.remove('open') }
-function toggleOpp(){ document.getElementById('opp-grp').style.display=document.getElementById('e-type').value==='game'?'block':'none' }
+function toggleOpp(){
+  const t=document.getElementById('e-type').value;
+  document.getElementById('opp-grp').style.display=t==='game'?'block':'none';
+  document.getElementById('e-repeat-grp').style.display=t==='training'?'block':'none';
+  if(t!=='training'){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
+}
+document.getElementById('e-repeat').addEventListener('change',function(){ document.getElementById('e-repeat-until-grp').style.display=this.checked?'block':'none'; });
 document.getElementById('e-type').addEventListener('change',toggleOpp);
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
 document.getElementById('mo-e-close').addEventListener('click',closeEventModal);
@@ -1215,6 +1233,20 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
   const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp')};
+
+  const isRepeat=!id && document.getElementById('e-repeat').checked;
+  const repeatUntil=f('e-repeat-until');
+
+  if(isRepeat && repeatUntil && data.date){
+    const dates=[];
+    let cur=new Date(data.date+'T00:00:00');
+    const end=new Date(repeatUntil+'T00:00:00');
+    while(cur<=end){ dates.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate()+7); }
+    dates.forEach(date=>DB.addEvent({...data,date}));
+    closeEventModal(); renderCal(); if(view==='dashboard')renderDash();
+    toast(`✅ ${dates.length} treino${dates.length!==1?'s':''} criados!`); return;
+  }
+
   if(id)DB.updateEvent(id,data); else DB.addEvent(data);
   closeEventModal(); toast('✅ Evento guardado!'); renderCal();
 });
