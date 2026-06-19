@@ -1176,7 +1176,8 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 
     const photoFile=document.getElementById('pf-photo-input').files[0];
 
-    if(photoFile) p.photoUrl = await uploadFile(photoFile, p.id, 'photo');
+    // Formulário público: converte para base64 localmente (sem Firebase auth)
+    if(photoFile) p.photoUrl = await fileToBase64(photoFile);
 
     DB.addPlayer(p);
     e.target.reset();
