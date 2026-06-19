@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SC Vianense SAD — Gestão Desportiva</title>
 
-<!-- Firebase SDK (compat) — necessário para upload de ficheiros -->
+<!-- Firebase SDK (compat) — necessário para upload de ficheiros e Firestore -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -313,6 +314,7 @@ body.pm #v-pf{padding:30px}
     <hr class="nd">
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
+    <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
   </nav>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
   <div id="sb-foot">SC Vianense SAD © 2026</div>
@@ -724,11 +726,13 @@ const AUTH_KEY = 'scv_auth';
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
 let storage = null;
+let firestoreDb = null;
 if (FB_READY) {
   try {
     firebase.initializeApp(FB_CONFIG);
     storage = firebase.storage();
-    console.log('✅ Firebase Storage pronto');
+    firestoreDb = firebase.firestore();
+    console.log('✅ Firebase pronto (Storage + Firestore)');
   } catch(e) { console.warn('Firebase init failed:', e); }
 }
 
@@ -1176,10 +1180,15 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 
     const photoFile=document.getElementById('pf-photo-input').files[0];
 
-    // Formulário público: converte para base64 localmente (sem Firebase auth)
+    // Foto: base64 local (sem Firebase auth no formulário público)
     if(photoFile) p.photoUrl = await fileToBase64(photoFile);
 
-    DB.addPlayer(p);
+    // Guardar no Firestore para o coordenador sincronizar; fallback: localStorage local
+    if(firestoreDb){
+      await firestoreDb.collection('pending_athletes').doc(p.id).set(p);
+    } else {
+      DB.addPlayer(p);
+    }
     e.target.reset();
     setPhotoZoneExisting('pf-photo-circle','pf-photo-initials',null,null,null);
     document.getElementById('pf-photo-initials').textContent='?';
@@ -1856,6 +1865,44 @@ function seedIfEmpty(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+async function syncPendingAthletes(silent=false){
+  if(!firestoreDb){ if(!silent)toast('⚠️ Firestore não disponível.'); return 0; }
+  try {
+    const snap=await firestoreDb.collection('pending_athletes').get();
+    if(snap.empty){ if(!silent)toast('Sem submissões pendentes.'); return 0; }
+    let added=0;
+    const batch=firestoreDb.batch();
+    snap.forEach(doc=>{
+      const p=doc.data();
+      if(!DB.getPlayer(p.id)){ DB.addPlayer(p); added++; }
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    if(added>0){
+      toast(`✅ ${added} atleta${added!==1?'s':''} importado${added!==1?'s':''}!`);
+      renderDash();
+    } else if(!silent){
+      toast('Sem submissões novas.');
+    }
+    document.getElementById('sync-badge').style.display='none';
+    return added;
+  } catch(e){
+    console.error('Sync error:',e);
+    if(!silent)toast('❌ Erro ao sincronizar.');
+    return 0;
+  }
+}
+
+async function checkPendingBadge(){
+  if(!firestoreDb) return;
+  try {
+    const snap=await firestoreDb.collection('pending_athletes').get();
+    const badge=document.getElementById('sync-badge');
+    if(!snap.empty){ badge.textContent=snap.size; badge.style.display='inline'; }
+    else { badge.style.display='none'; }
+  } catch(e){}
+}
+
 function initCoordApp(){
   document.getElementById('login-overlay').classList.add('hidden');
   seedIfEmpty();
@@ -1864,6 +1911,8 @@ function initCoordApp(){
   setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
   nav('dashboard');
+  // Auto-sync e verificar badge ao abrir
+  syncPendingAthletes(true).then(()=>checkPendingBadge());
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -1902,6 +1951,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 document.getElementById('btn-logout').addEventListener('click',()=>{
   if(confirm('Terminar sessão?')){ sessionStorage.removeItem(AUTH_KEY); location.reload(); }
 });
+document.getElementById('btn-sync-athletes').addEventListener('click',()=>syncPendingAthletes(false));
 </script>
 </body>
 </html>
