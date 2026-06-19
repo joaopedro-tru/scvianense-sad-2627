@@ -411,13 +411,10 @@ body.pm #v-pf{padding:30px}
           <div class="fg"><label>NIF</label><input type="text" name="nif" placeholder="000 000 000"></div>
         </div>
         <div class="fr">
-          <div class="fg"><label>Nº Cartão de Cidadão</label><input type="text" name="cc"></div>
           <div class="fg"><label>Telefone *</label><input type="tel" name="phone" required></div>
-        </div>
-        <div class="fr">
           <div class="fg"><label>E-mail</label><input type="email" name="email"></div>
-          <div class="fg"><label>Morada</label><input type="text" name="address"></div>
         </div>
+        <div class="fg"><label>Morada</label><input type="text" name="address"></div>
         <div class="fst">Dados Desportivos</div>
         <div class="fr">
           <div class="fg"><label>Escalão *</label>
@@ -475,25 +472,6 @@ body.pm #v-pf{padding:30px}
           </div>
           <input type="file" id="pf-photo-input" accept="image/*" style="display:none">
         </div>
-        <div class="fr">
-          <div class="fg">
-            <label>Cópia do Cartão de Cidadão</label>
-            <div class="doc-zone empty" id="pf-cc-zone" onclick="document.getElementById('pf-cc-input').click()">
-              <span class="dz-icon">🪪</span>
-              <span>PDF, JPG ou PNG</span>
-            </div>
-            <input type="file" id="pf-cc-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
-          </div>
-          <div class="fg">
-            <label>Exame Médico Desportivo</label>
-            <div class="doc-zone empty" id="pf-med-zone" onclick="document.getElementById('pf-med-input').click()">
-              <span class="dz-icon">🏥</span>
-              <span>PDF, JPG ou PNG</span>
-            </div>
-            <input type="file" id="pf-med-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
-          </div>
-        </div>
-
         <div class="fa">
           <button type="submit" class="btn btn-p" id="pf-submit-btn">✓ Submeter Dados</button>
         </div>
@@ -558,13 +536,10 @@ body.pm #v-pf{padding:30px}
         <div class="fg"><label>NIF</label><input type="text" id="f-nif"></div>
       </div>
       <div class="fr">
-        <div class="fg"><label>Nº Cartão de Cidadão</label><input type="text" id="f-cc"></div>
         <div class="fg"><label>Telefone</label><input type="tel" id="f-phone"></div>
-      </div>
-      <div class="fr">
         <div class="fg"><label>E-mail</label><input type="email" id="f-email"></div>
-        <div class="fg"><label>Morada</label><input type="text" id="f-addr"></div>
       </div>
+      <div class="fg"><label>Morada</label><input type="text" id="f-addr"></div>
       <div class="fst">Dados Desportivos</div>
       <div class="fr">
         <div class="fg"><label>Escalão *</label>
@@ -622,26 +597,6 @@ body.pm #v-pf{padding:30px}
         </div>
         <input type="file" id="f-photo-input" accept="image/*" style="display:none">
       </div>
-      <!-- Documents -->
-      <div class="fr">
-        <div class="fg">
-          <label>Cópia do Cartão de Cidadão</label>
-          <div class="doc-zone empty" id="f-cc-zone" onclick="document.getElementById('f-cc-file').click()">
-            <span class="dz-icon">🪪</span>
-            <span>PDF, JPG ou PNG</span>
-          </div>
-          <input type="file" id="f-cc-file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
-        </div>
-        <div class="fg">
-          <label>Exame Médico Desportivo</label>
-          <div class="doc-zone empty" id="f-med-zone" onclick="document.getElementById('f-med-file').click()">
-            <span class="dz-icon">🏥</span>
-            <span>PDF, JPG ou PNG</span>
-          </div>
-          <input type="file" id="f-med-file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
-        </div>
-      </div>
-
       <div class="fa">
         <button type="button" class="btn btn-g" id="mo-p-cancel">Cancelar</button>
         <button type="submit" class="btn btn-p" id="mo-p-submit">Guardar Atleta</button>
@@ -1043,14 +998,6 @@ function renderPlayer(){
   document.getElementById('pd-name').textContent=p.name;
   const a=age(p.dob);
 
-  // Docs section
-  const docCC = p.ccUrl
-    ? `<div class="doc-link"><span class="doc-icon">🪪</span><div class="doc-info"><div class="doc-name">${p.ccFileName||'Cartão de Cidadão'}</div><div class="doc-status">Cartão de Cidadão</div></div><a href="${p.ccUrl}" target="_blank" class="btn btn-o btn-sm">Ver ↗</a></div>`
-    : `<div class="doc-link"><span class="doc-icon">🪪</span><div class="doc-info"><div class="doc-name" style="color:var(--muted)">Sem ficheiro</div><div class="doc-status">Cartão de Cidadão</div></div></div>`;
-
-  const docMed = p.medUrl
-    ? `<div class="doc-link"><span class="doc-icon">🏥</span><div class="doc-info"><div class="doc-name">${p.medFileName||'Exame Médico'}</div><div class="doc-status">Exame Médico Desportivo</div></div><a href="${p.medUrl}" target="_blank" class="btn btn-o btn-sm">Ver ↗</a></div>`
-    : `<div class="doc-link"><span class="doc-icon">🏥</span><div class="doc-info"><div class="doc-name" style="color:var(--muted)">Sem ficheiro</div><div class="doc-status">Exame Médico Desportivo</div></div></div>`;
 
   document.getElementById('pd-content').innerHTML=`
     <div class="pdh">
@@ -1073,7 +1020,6 @@ function renderPlayer(){
         ${row('E-mail',p.email)}
         ${row('Morada',p.address)}
         ${row('NIF',p.nif)}
-        ${row('Nº Cartão de Cidadão',p.cc)}
       </div>
       <div class="card"><h3>Dados Desportivos</h3>
         ${row('Posição',POS[p.position])}
@@ -1091,10 +1037,6 @@ function renderPlayer(){
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
-      <div class="card"><h3>Documentos</h3>
-        ${docCC}
-        ${docMed}
-      </div>
     </div>`;
 }
 
@@ -1107,7 +1049,6 @@ function openPlayerModal(p=null){
   f('f-dob').value=p?.dob||'';
   f('f-nat').value=p?.nationality||'Portuguesa';
   f('f-nif').value=p?.nif||'';
-  f('f-cc').value=p?.cc||'';
   f('f-phone').value=p?.phone||'';
   f('f-email').value=p?.email||'';
   f('f-addr').value=p?.address||'';
@@ -1126,13 +1067,8 @@ function openPlayerModal(p=null){
   f('f-inj').value=p?.injuries||'';
   // Reset file inputs
   f('f-photo-input').value='';
-  f('f-cc-file').value='';
-  f('f-med-file').value='';
   // Photo
   setPhotoZoneExisting('f-photo-circle','f-photo-initials','f-photo-hint',p?.photoUrl,p?.name);
-  // Docs
-  setDocZoneExisting('f-cc-zone','f-cc-file',p?.ccUrl,p?.ccFileName);
-  setDocZoneExisting('f-med-zone','f-med-file',p?.medUrl,p?.medFileName);
   document.getElementById('mo-player').classList.add('open');
   setTimeout(()=>f('f-name').focus(),50);
 }
@@ -1153,7 +1089,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
     const data={
       id:pid,
       name:f('f-name'),dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
-      cc:f('f-cc'),phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
+      phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
       squad:f('f-squad'),position:f('f-pos'),number:f('f-num'),dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
       insurance:f('f-ins'),injuries:f('f-inj'),
@@ -1211,18 +1147,11 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     if(p.renewal==='on'){p.previousClub='Renovação'; delete p.renewal;} else delete p.renewal;
 
     const photoFile=document.getElementById('pf-photo-input').files[0];
-    const ccFile=document.getElementById('pf-cc-input').files[0];
-    const medFile=document.getElementById('pf-med-input').files[0];
 
     if(photoFile) p.photoUrl = await uploadFile(photoFile, p.id, 'photo');
-    if(ccFile){ p.ccUrl = await uploadFile(ccFile, p.id, 'cc'); p.ccFileName = ccFile.name; }
-    if(medFile){ p.medUrl = await uploadFile(medFile, p.id, 'med'); p.medFileName = medFile.name; }
 
     DB.addPlayer(p);
     e.target.reset();
-    // Reset zones
-    resetDocZone('pf-cc-zone','pf-cc-input','🪪');
-    resetDocZone('pf-med-zone','pf-med-input','🏥');
     setPhotoZoneExisting('pf-photo-circle','pf-photo-initials',null,null,null);
     document.getElementById('pf-photo-initials').textContent='?';
     document.getElementById('pf-success').style.display='block';
@@ -1902,9 +1831,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const params=new URLSearchParams(location.search);
   if(params.get('mode')==='public'){
     document.body.classList.add('pm'); nav('public-form');
-    // Setup public form file zones
-    setupDocZone('pf-cc-zone','pf-cc-input');
-    setupDocZone('pf-med-zone','pf-med-input');
     setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
     return;
   }
@@ -1913,9 +1839,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupDocZone('f-cc-zone','f-cc-file');
   setupDocZone('f-med-zone','f-med-file');
   setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');
-  // Setup public form zones (in case viewed from coordinator side)
-  setupDocZone('pf-cc-zone','pf-cc-input');
-  setupDocZone('pf-med-zone','pf-med-input');
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
   nav('dashboard');
 });
