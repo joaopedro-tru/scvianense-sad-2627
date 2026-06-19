@@ -483,7 +483,6 @@ body.pm #v-pf{padding:30px}
           <div class="fg"><label>Altura (cm)</label><input type="number" name="height" min="140" max="220"></div>
           <div class="fg"><label>Peso (kg)</label><input type="number" name="weight" min="40" max="120"></div>
         </div>
-        <div class="fg"><label>Seguro Desportivo</label><input type="text" name="insurance" placeholder="Apólice / Entidade"></div>
         <div class="fg"><label>Lesões / Obs. Médicas</label><textarea name="injuries" placeholder="Lesões anteriores, alergias, medicação, etc."></textarea></div>
 
         <div class="fst">Documentos e Foto</div>
@@ -608,7 +607,6 @@ body.pm #v-pf{padding:30px}
         <div class="fg"><label>Altura (cm)</label><input type="number" id="f-h" min="140" max="220"></div>
         <div class="fg"><label>Peso (kg)</label><input type="number" id="f-w" min="40" max="120"></div>
       </div>
-      <div class="fg"><label>Seguro Desportivo</label><input type="text" id="f-ins" placeholder="Apólice / Entidade"></div>
       <div class="fg"><label>Lesões / Observações</label><textarea id="f-inj"></textarea></div>
 
       <div class="fst">Documentos e Foto</div>
@@ -1065,7 +1063,6 @@ function renderPlayer(){
         <div style="display:grid;grid-template-columns:1fr 1fr">
           ${row('Altura',p.height?p.height+' cm':null)}
           ${row('Peso',p.weight?p.weight+' kg':null)}
-          ${row('Seguro Desportivo',p.insurance)}
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
@@ -1095,7 +1092,6 @@ function openPlayerModal(p=null){
   document.getElementById('f-prevclub').style.display=isRenewal?'none':'';
   f('f-h').value=p?.height||'';
   f('f-w').value=p?.weight||'';
-  f('f-ins').value=p?.insurance||'';
   f('f-inj').value=p?.injuries||'';
   // Reset file inputs
   f('f-photo-input').value='';
@@ -1124,7 +1120,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
       squad:f('f-squad'),position:f('f-pos'),number:f('f-num'),dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
-      insurance:f('f-ins'),injuries:f('f-inj'),
+      injuries:f('f-inj'),
       // preserve existing URLs
       photoUrl:existing?.photoUrl||null,
       ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,
