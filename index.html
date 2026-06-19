@@ -196,6 +196,20 @@ select.si{cursor:pointer}
 .pfh h1{font-size:20px;font-weight:700}
 .pfh p{opacity:.75;margin-top:6px;font-size:13px}
 
+/* LOGIN */
+#login-overlay{position:fixed;inset:0;background:var(--green-d);display:flex;align-items:center;justify-content:center;z-index:10000}
+#login-overlay.hidden{display:none}
+.login-box{background:#fff;border-radius:14px;padding:40px 36px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.login-logo{width:72px;height:72px;object-fit:contain;margin-bottom:14px}
+.login-club{font-size:18px;font-weight:800;color:var(--green);margin-bottom:3px}
+.login-sub{font-size:12px;color:var(--muted);margin-bottom:28px;letter-spacing:.3px}
+.login-box input[type=password]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;text-align:center;letter-spacing:4px;outline:none;font-family:inherit;transition:border-color .15s}
+.login-box input[type=password]:focus{border-color:var(--green)}
+.login-box input[type=password]::placeholder{letter-spacing:0;font-size:13px;color:#bbb}
+.login-btn{width:100%;margin-top:14px;padding:12px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}
+.login-btn:hover{background:var(--green-l)}
+.login-err{color:#c0392b;font-size:12px;margin-top:10px;min-height:18px;font-weight:600}
+
 /* TOAST */
 .toast{position:fixed;bottom:22px;right:22px;background:var(--green-d);color:#fff;padding:11px 18px;border-radius:8px;font-size:13.5px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .28s;pointer-events:none;max-width:320px}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -259,6 +273,18 @@ body.pm #v-pf{padding:30px}
 </head>
 <body>
 
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-box">
+    <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" class="login-logo" onerror="this.style.display='none'">
+    <div class="login-club">SC Vianense SAD</div>
+    <div class="login-sub">Coordenação Técnica · Acesso Restrito</div>
+    <input type="password" id="login-pw" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="login-btn">Entrar</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <aside id="sb">
   <div id="sb-logo">
@@ -288,7 +314,8 @@ body.pm #v-pf{padding:30px}
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
   </nav>
-  <div id="sb-foot">SC Vianense SAD © 2025</div>
+  <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
+  <div id="sb-foot">SC Vianense SAD © 2026</div>
 </aside>
 
 <!-- MAIN -->
@@ -690,6 +717,11 @@ const FB_CONFIG = {
   appId:             "1:394145643095:web:52bd79aa9bb862e20f4112"
 };
 // ════════════════════════════════════════════════════════
+
+// ── ACESSO / PASSWORD ─────────────────────────────────────────────────────────
+// Altera aqui a password da plataforma (coordenação)
+const PLATFORM_PASSWORD = 'scv2025';
+const AUTH_KEY = 'scv_auth';
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -1827,20 +1859,51 @@ function seedIfEmpty(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded',()=>{
-  const params=new URLSearchParams(location.search);
-  if(params.get('mode')==='public'){
-    document.body.classList.add('pm'); nav('public-form');
-    setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
-    return;
-  }
+function initCoordApp(){
+  document.getElementById('login-overlay').classList.add('hidden');
   seedIfEmpty();
-  // Setup coordinator modal file zones
   setupDocZone('f-cc-zone','f-cc-file');
   setupDocZone('f-med-zone','f-med-file');
   setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
   nav('dashboard');
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const params=new URLSearchParams(location.search);
+
+  // Formulário público — sem login
+  if(params.get('mode')==='public'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm'); nav('public-form');
+    setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
+    return;
+  }
+
+  // Sessão já autenticada
+  if(sessionStorage.getItem(AUTH_KEY)==='1'){ initCoordApp(); return; }
+
+  // Mostrar login
+  const pwIn=document.getElementById('login-pw');
+  const errEl=document.getElementById('login-err');
+  setTimeout(()=>pwIn.focus(),120);
+
+  function tryLogin(){
+    if(pwIn.value===PLATFORM_PASSWORD){
+      sessionStorage.setItem(AUTH_KEY,'1');
+      initCoordApp();
+    } else {
+      errEl.textContent='Password incorreta.';
+      pwIn.value=''; pwIn.focus();
+      setTimeout(()=>errEl.textContent='',3000);
+    }
+  }
+  document.getElementById('login-btn').addEventListener('click',tryLogin);
+  pwIn.addEventListener('keydown',e=>{ if(e.key==='Enter')tryLogin(); });
+});
+
+document.getElementById('btn-logout').addEventListener('click',()=>{
+  if(confirm('Terminar sessão?')){ sessionStorage.removeItem(AUTH_KEY); location.reload(); }
 });
 </script>
 </body>
