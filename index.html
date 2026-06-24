@@ -1277,9 +1277,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function renderCal(){
   document.getElementById('cal-label').textContent=`${MONTHS[calMonth]} ${calYear}`;
-  // Treinadores só vêem o seu escalão no calendário
-  const _calSq = coachSquad() || calFilter;
-  const allEvents=_calSq==='all'?DB.events():DB.events(_calSq);
+  const allEvents=calFilter==='all'?DB.events():DB.events(calFilter);
   const first=new Date(calYear,calMonth,1);
   let dow=first.getDay()-1; if(dow<0)dow=6;
   const dim=new Date(calYear,calMonth+1,0).getDate();
