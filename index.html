@@ -344,7 +344,7 @@ body.pm #v-pf{padding:30px}
       <strong>⚠️ Firebase não configurado.</strong> Os ficheiros (foto, documentos) estão a ser guardados como base64 no browser. Para produção com Vercel, preenche <code>FB_CONFIG</code> no início do script com as tuas credenciais Firebase.
     </div>
     <div class="sg" id="d-stats"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
       <div class="card">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">📅 Próximos Eventos</div>
         <div id="d-upcoming"></div>
@@ -353,6 +353,10 @@ body.pm #v-pf{padding:30px}
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">👤 Últimos Atletas</div>
         <div id="d-recent"></div>
       </div>
+    </div>
+    <div class="card">
+      <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
+      <div id="d-birthdays"></div>
     </div>
   </div>
 
@@ -677,6 +681,10 @@ body.pm #v-pf{padding:30px}
           </div>
         </div>
       </div>
+      <div class="fg" id="comp-grp" style="display:none">
+        <label>Competição</label>
+        <select id="e-comp"></select>
+      </div>
       <div class="fr">
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
@@ -846,6 +854,12 @@ const MONTHS_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov
 const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança'};
 const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
 const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
+const COMPETITIONS={
+  eqa:  ['Liga 3 Placard | 1ª Fase','Taça de Portugal','Jogo de Preparação'],
+  sub23:['Camp. Dist 2ª Div AFVC','Jogo de Preparação'],
+  sub19:['Camp. Dist Juniores "A" AFVC','Taça Juniores "A" AFVC','Jogo de Preparação'],
+  both: ['Jogo de Preparação'],
+};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function age(dob){ if(!dob)return null; const d=new Date(dob),t=new Date(); let a=t.getFullYear()-d.getFullYear(); if(t.getMonth()-d.getMonth()<0||(t.getMonth()-d.getMonth()===0&&t.getDate()<d.getDate()))a--; return a }
@@ -935,7 +949,15 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 // ── ROUTING ───────────────────────────────────────────────────────────────────
 let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre';
 
-function evLabel(ev){ return ev.type==='game'?`${ev.homeAway==='away'?'✈️':'🏠'} ${SQUADS[ev.squad]||'Jogo'}${ev.opponent?' vs '+ev.opponent:''}`:ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`; }
+function evLabel(ev){
+  if(ev.type==='game'){
+    const icon=ev.homeAway==='away'?'✈️':'🏠';
+    const opp=ev.opponent?` vs ${ev.opponent}`:'';
+    const comp=ev.competition?` · ${ev.competition}`:'';
+    return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${comp}`;
+  }
+  return ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`;
+}
 
 function nav(v,opts={}){
   // Treinadores não acedem ao dashboard nem a escalões de outros
@@ -981,6 +1003,32 @@ function renderDash(){
   rEl.innerHTML=rec.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum atleta adicionado ainda.</p>':
     rec.map(p=>`<div class="ui" style="cursor:pointer" data-nav-player="${p.id}"><div class="av" style="width:34px;height:34px;font-size:13px;margin:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div><div><div style="font-size:13px;font-weight:600">${p.name}</div><div style="font-size:12px;color:var(--muted)">${SQUADS[p.squad]}${p.position?' · '+POS[p.position]:''}</div></div></div>`).join('');
   rEl.querySelectorAll('[data-nav-player]').forEach(el=>el.addEventListener('click',()=>nav('player',{id:el.dataset.navPlayer})));
+
+  // Aniversários
+  const todayD=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const bdays=ps.filter(p=>p.dob).map(p=>{
+    const[y,m,d]=p.dob.split('-').map(Number);
+    let bday=new Date(todayD.getFullYear(),m-1,d);
+    if(bday<todayD) bday=new Date(todayD.getFullYear()+1,m-1,d);
+    const days=Math.round((bday-todayD)/(86400000));
+    const age=bday.getFullYear()-y;
+    return {p,bday,days,age};
+  }).sort((a,b)=>a.days-b.days).slice(0,8);
+  const bEl=document.getElementById('d-birthdays');
+  bEl.style.display='grid';bEl.style.gridTemplateColumns='repeat(auto-fill,minmax(220px,1fr))';bEl.style.gap='10px';
+  bEl.innerHTML=bdays.length===0?'<p style="color:var(--muted);font-size:13px">Sem atletas com data de nascimento.</p>':
+    bdays.map(({p,bday,days,age})=>{
+      const isToday=days===0;
+      const label=isToday?'🎉 Hoje!':`em ${days} dia${days!==1?'s':''}`;
+      const dateStr=`${String(bday.getDate()).padStart(2,'0')}/${String(bday.getMonth()+1).padStart(2,'0')}`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:${isToday?'#fff8e1':'var(--bg)'};border:1px solid ${isToday?'#ffd54f':'var(--border)'}">
+        <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${SQUADS[p.squad]} · ${dateStr} · ${age} anos · <span style="color:${isToday?'#e67e22':'var(--green)'};font-weight:600">${label}</span></div>
+        </div>
+      </div>`;
+    }).join('');
 }
 
 // ── SQUAD ─────────────────────────────────────────────────────────────────────
@@ -1358,6 +1406,7 @@ function openEventModal(ev=null,date=null){
   document.getElementById('e-opp').value=ev?.opponent||'';
   document.getElementById('e-ha-home').checked=ev?.homeAway!=='away';
   document.getElementById('e-ha-away').checked=ev?.homeAway==='away';
+  updateCompetitionOptions(ev?.squad||squad||'sub19', ev?.competition||'');
   document.getElementById('e-repeat').checked=false;
   document.getElementById('e-repeat-until').value='';
   document.getElementById('e-repeat-until-grp').style.display='none';
@@ -1365,13 +1414,24 @@ function openEventModal(ev=null,date=null){
   document.getElementById('mo-event').classList.add('open');
 }
 function closeEventModal(){ document.getElementById('mo-event').classList.remove('open') }
+function updateCompetitionOptions(sq, currentVal=''){
+  const comps = COMPETITIONS[sq] || ['Jogo de Preparação'];
+  const sel = document.getElementById('e-comp');
+  sel.innerHTML = comps.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
+}
 function toggleOpp(){
   const t=document.getElementById('e-type').value;
-  document.getElementById('opp-grp').style.display=t==='game'?'block':'none';
-  document.getElementById('ha-grp').style.display=t==='game'?'block':'none';
-  document.getElementById('e-repeat-grp').style.display=t==='training'?'block':'none';
-  if(t!=='training'){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
+  const isGame=t==='game';
+  document.getElementById('opp-grp').style.display=isGame?'block':'none';
+  document.getElementById('ha-grp').style.display=isGame?'block':'none';
+  document.getElementById('comp-grp').style.display=isGame?'block':'none';
+  document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
+  if(isGame){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
+  if(isGame) updateCompetitionOptions(document.getElementById('e-squad').value);
 }
+document.getElementById('e-squad').addEventListener('change',function(){
+  if(document.getElementById('e-type').value==='game') updateCompetitionOptions(this.value);
+});
 document.getElementById('e-repeat').addEventListener('change',function(){ document.getElementById('e-repeat-until-grp').style.display=this.checked?'block':'none'; });
 document.getElementById('e-type').addEventListener('change',toggleOpp);
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
@@ -1381,7 +1441,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   e.preventDefault();
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home'};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
