@@ -311,6 +311,9 @@ body.pm #v-pf{padding:30px}
     <div class="nl active" data-view="dashboard"><span class="ic">📊</span> Dashboard</div>
     <hr class="nd">
     <div class="nsl">Plantéis</div>
+    <div class="nl" data-view="squad" data-squad="eqa"><span class="ic">⚫</span> Equipa A</div>
+    <div class="nl nl-sub" data-view="sq-trainings" data-squad="eqa"><span class="ic">📋</span> Treinos</div>
+    <div class="nl nl-sub" data-view="sq-games" data-squad="eqa"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub19"><span class="ic">🟡</span> Sub-19</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub19"><span class="ic">📋</span> Treinos</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub19"><span class="ic">⚽</span> Jogos</div>
@@ -458,6 +461,7 @@ body.pm #v-pf{padding:30px}
           <div class="fg"><label>Escalão *</label>
             <select name="squad" required>
               <option value="">Selecionar...</option>
+              <option value="eqa">Equipa A</option>
               <option value="sub19">Sub-19</option>
               <option value="sub23">Sub-23</option>
             </select>
@@ -581,7 +585,7 @@ body.pm #v-pf{padding:30px}
       <div class="fr">
         <div class="fg"><label>Escalão *</label>
           <select id="f-squad" required>
-            <option value="sub19">Sub-19</option><option value="sub23">Sub-23</option>
+            <option value="eqa">Equipa A</option><option value="sub19">Sub-19</option><option value="sub23">Sub-23</option>
           </select>
         </div>
         <div class="fg"><label>Posição</label>
@@ -653,7 +657,7 @@ body.pm #v-pf{padding:30px}
         </div>
         <div class="fg"><label>Escalão *</label>
           <select id="e-squad" required>
-            <option value="sub19">Sub-19</option><option value="sub23">Sub-23</option><option value="both">Ambos</option>
+            <option value="eqa">Equipa A</option><option value="sub19">Sub-19</option><option value="sub23">Sub-23</option><option value="both">Ambos</option>
           </select>
         </div>
       </div>
@@ -730,9 +734,10 @@ const FB_CONFIG = {
 // ── ACESSO / UTILIZADORES ─────────────────────────────────────────────────────
 // role: 'admin' → acesso total | 'coach' → acesso ao seu escalão apenas
 const USERS = [
-  { user:'admin',  pass:'scv2025*',  role:'admin' },
-  { user:'sub19',  pass:'SCV2627*#19',  role:'coach', squad:'sub19' },
-  { user:'sub23',  pass:'SCV2627#23*',  role:'coach', squad:'sub23' },
+  { user:'admin',  pass:'scv2025*',       role:'admin' },
+  { user:'sub19',  pass:'SCV2627*#19',    role:'coach', squad:'sub19' },
+  { user:'sub23',  pass:'SCV2627#23*',    role:'coach', squad:'sub23' },
+  { user:'eqa',    pass:'SCV2627*#EQA',   role:'coach', squad:'eqa'   },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
@@ -840,7 +845,7 @@ const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Ago
 const MONTHS_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança'};
 const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
-const SQUADS={sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
+const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function age(dob){ if(!dob)return null; const d=new Date(dob),t=new Date(); let a=t.getFullYear()-d.getFullYear(); if(t.getMonth()-d.getMonth()<0||(t.getMonth()-d.getMonth()===0&&t.getDate()<d.getDate()))a--; return a }
@@ -959,11 +964,12 @@ function renderDash(){
   document.getElementById('d-date').textContent=`${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
   if(!FB_READY) document.getElementById('fb-banner').classList.add('show');
   const ps=DB.players(), es=DB.events();
-  const s19=ps.filter(p=>p.squad==='sub19').length, s23=ps.filter(p=>p.squad==='sub23').length;
+  const seqa=ps.filter(p=>p.squad==='eqa').length, s19=ps.filter(p=>p.squad==='sub19').length, s23=ps.filter(p=>p.squad==='sub23').length;
   const today=now.toISOString().split('T')[0];
   const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('d-stats').innerHTML=`
-    <div class="sc"><div class="sl">Total Atletas</div><div class="sv">${ps.length}</div><div class="ss">ambos os escalões</div></div>
+    <div class="sc"><div class="sl">Total Atletas</div><div class="sv">${ps.length}</div><div class="ss">todos os escalões</div></div>
+    <div class="sc"><div class="sl">Equipa A</div><div class="sv" style="color:#333">${seqa}</div><div class="ss">atletas</div></div>
     <div class="sc"><div class="sl">Sub-19</div><div class="sv" style="color:#b8860b">${s19}</div><div class="ss">atletas</div></div>
     <div class="sc"><div class="sl">Sub-23</div><div class="sv" style="color:var(--blue)">${s23}</div><div class="ss">atletas</div></div>
     <div class="sc"><div class="sl">Jogos Agendados</div><div class="sv">${es.filter(e=>e.type==='game').length}</div><div class="ss">no calendário</div></div>`;
@@ -2031,9 +2037,11 @@ function applyRoleUI(){
     if(dash) dash.closest('.nl')?.style.setProperty('display','none');
     document.querySelector('.nl[data-view="dashboard"]')?.style.setProperty('display','none');
     document.getElementById('btn-sync-athletes').style.display='none';
-    // Esconder o escalão do outro treinador
-    const other=u.squad==='sub19'?'sub23':'sub19';
-    document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+    // Esconder os escalões de outros treinadores
+    const allSquads=['eqa','sub19','sub23'];
+    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+      document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+    });
     // Indicar na sidebar o nome do utilizador
     const foot=document.getElementById('sb-foot');
     if(foot) foot.textContent=`Treinador ${u.squad.toUpperCase()} · SC Vianense`;
