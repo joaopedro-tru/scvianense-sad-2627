@@ -204,9 +204,10 @@ select.si{cursor:pointer}
 .login-logo{width:72px;height:72px;object-fit:contain;margin-bottom:14px}
 .login-club{font-size:18px;font-weight:800;color:var(--green);margin-bottom:3px}
 .login-sub{font-size:12px;color:var(--muted);margin-bottom:28px;letter-spacing:.3px}
-.login-box input[type=password]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;text-align:center;letter-spacing:4px;outline:none;font-family:inherit;transition:border-color .15s}
-.login-box input[type=password]:focus{border-color:var(--green)}
-.login-box input[type=password]::placeholder{letter-spacing:0;font-size:13px;color:#bbb}
+.login-box input[type=text],.login-box input[type=password]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;text-align:center;outline:none;font-family:inherit;transition:border-color .15s;box-sizing:border-box;margin-bottom:10px}
+.login-box input[type=password]{letter-spacing:4px}
+.login-box input[type=text]:focus,.login-box input[type=password]:focus{border-color:var(--green)}
+.login-box input[type=text]::placeholder,.login-box input[type=password]::placeholder{letter-spacing:0;font-size:13px;color:#bbb}
 .login-btn{width:100%;margin-top:14px;padding:12px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}
 .login-btn:hover{background:var(--green-l)}
 .login-err{color:#c0392b;font-size:12px;margin-top:10px;min-height:18px;font-weight:600}
@@ -287,6 +288,7 @@ body.pm #v-pf{padding:30px}
     <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" class="login-logo" onerror="this.style.display='none'">
     <div class="login-club">SC Vianense SAD</div>
     <div class="login-sub">Coordenação Técnica · Acesso Restrito</div>
+    <input type="text" id="login-user" placeholder="Utilizador" autocomplete="username" autocapitalize="none" spellcheck="false">
     <input type="password" id="login-pw" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" id="login-btn">Entrar</button>
     <div class="login-err" id="login-err"></div>
@@ -725,10 +727,17 @@ const FB_CONFIG = {
 };
 // ════════════════════════════════════════════════════════
 
-// ── ACESSO / PASSWORD ─────────────────────────────────────────────────────────
-// Altera aqui a password da plataforma (coordenação)
-const PLATFORM_PASSWORD = 'scv2025';
+// ── ACESSO / UTILIZADORES ─────────────────────────────────────────────────────
+// role: 'admin' → acesso total | 'coach' → acesso ao seu escalão apenas
+const USERS = [
+  { user:'admin',  pass:'scv2025*',  role:'admin' },
+  { user:'sub19',  pass:'SCV2627*#19',  role:'coach', squad:'sub19' },
+  { user:'sub23',  pass:'SCV2627#23*',  role:'coach', squad:'sub23' },
+];
 const AUTH_KEY = 'scv_auth';
+function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
+function isAdmin(){ return currentUser()?.role==='admin'; }
+function coachSquad(){ return currentUser()?.squad||null; }
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -924,6 +933,10 @@ let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Dat
 function evLabel(ev){ return ev.type==='game'?`${ev.homeAway==='away'?'✈️':'🏠'} ${SQUADS[ev.squad]||'Jogo'}${ev.opponent?' vs '+ev.opponent:''}`:ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`; }
 
 function nav(v,opts={}){
+  // Treinadores não acedem ao dashboard nem a escalões de outros
+  if(v==='dashboard' && !isAdmin()){ v='calendar'; }
+  const cs=coachSquad();
+  if(cs && opts.squad && opts.squad!==cs && opts.squad!=='both'){ return; }
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nl').forEach(x=>x.classList.remove('active'));
   view=v;
@@ -1135,7 +1148,9 @@ function openPlayerModal(p=null){
   f('f-phone').value=p?.phone||'';
   f('f-email').value=p?.email||'';
   f('f-addr').value=p?.address||'';
-  f('f-squad').value=p?.squad||squad||'sub19';
+  const _sq = coachSquad();
+  f('f-squad').value=p?.squad||_sq||squad||'sub19';
+  document.getElementById('f-squad').disabled = !!_sq; // treinadores não mudam escalão
   f('f-pos').value=p?.position||'';
   f('f-num').value=p?.number||'';
   f('f-foot').value=p?.dominantFoot||'right';
@@ -1262,7 +1277,9 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function renderCal(){
   document.getElementById('cal-label').textContent=`${MONTHS[calMonth]} ${calYear}`;
-  const allEvents=calFilter==='all'?DB.events():DB.events(calFilter);
+  // Treinadores só vêem o seu escalão no calendário
+  const _calSq = coachSquad() || calFilter;
+  const allEvents=_calSq==='all'?DB.events():DB.events(_calSq);
   const first=new Date(calYear,calMonth,1);
   let dow=first.getDay()-1; if(dow<0)dow=6;
   const dim=new Date(calYear,calMonth+1,0).getDate();
@@ -1932,8 +1949,12 @@ async function syncFromFirestore(showToast=false){
     ]);
     const players=[]; pSnap.forEach(d=>players.push(d.data()));
     const events=[];  eSnap.forEach(d=>events.push(d.data()));
-    localStorage.setItem('scv_p',JSON.stringify(players));
-    localStorage.setItem('scv_e',JSON.stringify(events));
+    // Só sobrescreve o localStorage se o Firestore tiver dados
+    // (evita apagar dados locais caso a cloud esteja vazia por erro)
+    if(players.length>0 || events.length>0){
+      localStorage.setItem('scv_p',JSON.stringify(players));
+      localStorage.setItem('scv_e',JSON.stringify(events));
+    }
     if(showToast) toast(`✅ Sincronizado — ${players.length} atletas, ${events.length} eventos`);
   } catch(e){ console.error('syncFromFirestore:',e); if(showToast) toast('❌ Erro ao sincronizar.'); }
 }
@@ -2004,6 +2025,24 @@ async function checkPendingBadge(){
   } catch(e){}
 }
 
+function applyRoleUI(){
+  const u=currentUser(); if(!u) return;
+  if(u.role==='coach'){
+    // Esconder dashboard, sincronizar, link formulário
+    const dash=document.querySelector('[data-view="dashboard"]');
+    if(dash) dash.closest('.nl')?.style.setProperty('display','none');
+    document.querySelector('.nl[data-view="dashboard"]')?.style.setProperty('display','none');
+    document.getElementById('btn-sync-athletes').style.display='none';
+    document.getElementById('nl-publink').style.display='none';
+    // Esconder o escalão do outro treinador
+    const other=u.squad==='sub19'?'sub23':'sub19';
+    document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+    // Indicar na sidebar o nome do utilizador
+    const foot=document.getElementById('sb-foot');
+    if(foot) foot.textContent=`Treinador ${u.squad.toUpperCase()} · SC Vianense`;
+  }
+}
+
 function initCoordApp(){
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('sync-overlay').style.display='flex';
@@ -2011,17 +2050,20 @@ function initCoordApp(){
   setupDocZone('f-med-zone','f-med-file');
   setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
+  applyRoleUI();
   (async()=>{
     if(firestoreDb){
-      await migrateLocalToFirestore();  // migração única de dados existentes
-      await syncFromFirestore();         // carrega cloud → localStorage
-      await syncPendingAthletes(true);  // importa submissões pendentes
-      checkPendingBadge();
+      await migrateLocalToFirestore();
+      await syncFromFirestore();
+      if(isAdmin()) await syncPendingAthletes(true);
+      if(isAdmin()) checkPendingBadge();
     } else {
       seedIfEmpty();
     }
     document.getElementById('sync-overlay').style.display='none';
-    nav('dashboard');
+    // Admin → dashboard | Treinador → calendário do seu escalão
+    if(isAdmin()) nav('dashboard');
+    else { const cs=coachSquad(); nav('calendar'); }
   })();
 }
 
@@ -2036,25 +2078,29 @@ document.addEventListener('DOMContentLoaded',()=>{
     return;
   }
 
-  // Sessão já autenticada
-  if(sessionStorage.getItem(AUTH_KEY)==='1'){ initCoordApp(); return; }
+  // Sessão já autenticada (verificar JSON válido com role)
+  const existing=currentUser();
+  if(existing?.role){ initCoordApp(); return; }
 
   // Mostrar login
+  const userIn=document.getElementById('login-user');
   const pwIn=document.getElementById('login-pw');
   const errEl=document.getElementById('login-err');
-  setTimeout(()=>pwIn.focus(),120);
+  setTimeout(()=>userIn.focus(),120);
 
   function tryLogin(){
-    if(pwIn.value===PLATFORM_PASSWORD){
-      sessionStorage.setItem(AUTH_KEY,'1');
+    const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase() && x.pass===pwIn.value);
+    if(u){
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify({role:u.role, squad:u.squad||null}));
       initCoordApp();
     } else {
-      errEl.textContent='Password incorreta.';
+      errEl.textContent='Credenciais incorretas.';
       pwIn.value=''; pwIn.focus();
       setTimeout(()=>errEl.textContent='',3000);
     }
   }
   document.getElementById('login-btn').addEventListener('click',tryLogin);
+  userIn.addEventListener('keydown',e=>{ if(e.key==='Enter')pwIn.focus(); });
   pwIn.addEventListener('keydown',e=>{ if(e.key==='Enter')tryLogin(); });
 });
 
