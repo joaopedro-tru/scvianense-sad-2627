@@ -2031,7 +2031,6 @@ function applyRoleUI(){
     if(dash) dash.closest('.nl')?.style.setProperty('display','none');
     document.querySelector('.nl[data-view="dashboard"]')?.style.setProperty('display','none');
     document.getElementById('btn-sync-athletes').style.display='none';
-    document.getElementById('nl-publink').style.display='none';
     // Esconder o escalão do outro treinador
     const other=u.squad==='sub19'?'sub23':'sub19';
     document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
