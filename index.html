@@ -122,7 +122,8 @@ select.si{cursor:pointer}
 .cd.td{background:#eef2fa}
 .cdn{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}
 .cdn.tdn{background:var(--green);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
-.ce{font-size:11px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ce{font-size:11px;padding:3px 5px;border-radius:3px;margin-bottom:2px;overflow:hidden;line-height:1.3}
+.ce-meta{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ce.tr{background:#d4edda;color:#155724}
 .ce.gm{background:#cce5ff;color:#004085}
 
@@ -1346,7 +1347,10 @@ function renderCal(){
     const dayEvs=allEvents.filter(e=>e.date===ds);
     const isT=ds===today;
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
-    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>`<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}">${evLabel(ev)}</div>`).join('')}</div>`;
+    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>{
+      const meta=[ev.time,ev.location].filter(Boolean).join(' · ');
+      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}">${evLabel(ev)}${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
+    }).join('')}</div>`;
   }
   document.getElementById('cal-body').innerHTML=cells;
   document.getElementById('cal-body').querySelectorAll('.cd').forEach(c=>{
