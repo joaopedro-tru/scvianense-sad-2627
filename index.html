@@ -112,17 +112,18 @@ select.si{cursor:pointer}
 .cc{display:flex;align-items:center;gap:14px;margin-bottom:18px}
 .cc h2{font-size:18px;font-weight:700;flex:1;text-align:center}
 .cg{background:var(--card);border-radius:10px;border:1px solid var(--border);overflow:hidden}
-.chr{display:grid;grid-template-columns:repeat(7,1fr);background:var(--green-d);color:#fff}
+.chr{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--green-d);color:#fff}
 .chc{padding:9px;text-align:center;font-size:11.5px;font-weight:600;letter-spacing:.3px}
-.cb{display:grid;grid-template-columns:repeat(7,1fr)}
-.cd{min-height:88px;padding:5px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.cb{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:auto}
+.cd{min-height:90px;padding:5px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;min-width:0;overflow:hidden}
 .cd:hover{background:#f5f7fb}
 .cd:nth-child(7n){border-right:none}
 .cd.om{opacity:.35}
 .cd.td{background:#eef2fa}
 .cdn{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}
 .cdn.tdn{background:var(--green);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
-.ce{font-size:11px;padding:3px 5px;border-radius:3px;margin-bottom:2px;overflow:hidden;line-height:1.3}
+.ce{font-size:11px;padding:3px 5px;border-radius:3px;margin-bottom:2px;overflow:hidden;line-height:1.3;min-width:0}
+.ce-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ce-meta{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ce.tr{background:#d4edda;color:#155724}
 .ce.gm{background:#cce5ff;color:#004085}
@@ -1349,7 +1350,7 @@ function renderCal(){
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
     cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>{
       const meta=[ev.time,ev.location].filter(Boolean).join(' · ');
-      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}">${evLabel(ev)}${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
+      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"><div class="ce-title">${evLabel(ev)}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
     }).join('')}</div>`;
   }
   document.getElementById('cal-body').innerHTML=cells;
@@ -1513,6 +1514,14 @@ function renderTraining(){
     ?`<div class="doc-zone has-file" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">✅</span><div class="dz-info"><div class="dz-name">${ev.fichaTreinoFileName||'Ficha de Treino'}</div><div class="dz-sub">Clica para substituir</div></div></div>`
     :`<div class="doc-zone empty" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">📋</span><span>PDF, JPG ou PNG</span></div>`;
 
+  const _fname=(ev.fichaTreinoFileName||ev.fichaTreinoUrl||'').toLowerCase();
+  const _isPdf=_fname.includes('.pdf')||_fname.startsWith('data:application/pdf');
+  const _isImg=/\.(jpg|jpeg|png|webp)/.test(_fname)||/^data:image\//.test(ev.fichaTreinoUrl||'');
+  const fichaPreview=ev.fichaTreinoUrl?(_isPdf
+    ?`<div style="margin-top:18px" class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">👁️ Preview</h3><iframe src="${ev.fichaTreinoUrl}" style="width:100%;height:600px;border:none;border-radius:6px"></iframe></div>`
+    :_isImg?`<div style="margin-top:18px" class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">👁️ Preview</h3><img src="${ev.fichaTreinoUrl}" style="width:100%;border-radius:6px;display:block"></div>`
+    :''):'';
+
   document.getElementById('tr-content').innerHTML=`
   <div style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
     <div>
@@ -1535,7 +1544,8 @@ function renderTraining(){
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
       ${extraSection}
     </div>
-  </div>`;
+  </div>
+  ${fichaPreview}`;
 
   // Toggle attendance
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -2007,6 +2017,30 @@ function seedIfEmpty(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+// Upload de ficheiro para Firebase Storage (ou base64 se Storage indisponível)
+async function uploadFile(file, refId, type){
+  // Firebase Storage disponível → upload real
+  if(storage){
+    try{
+      const ref=storage.ref(`${type}/${refId}_${Date.now()}_${file.name}`);
+      await ref.put(file);
+      return await ref.getDownloadURL();
+    } catch(e){
+      console.error('Storage upload error:',e);
+      toast('❌ Erro no upload. Verifica as regras do Firebase Storage.');
+      throw e;
+    }
+  }
+  // Fallback: base64 (funciona offline mas limitado a ~500KB)
+  return new Promise((resolve,reject)=>{
+    if(file.size>500*1024){ toast('⚠️ Ficheiro demasiado grande sem Firebase Storage (máx 500KB).'); reject(new Error('too large')); return; }
+    const r=new FileReader();
+    r.onload=e=>resolve(e.target.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+
 // Sincroniza da cloud para o localStorage local
 async function syncFromFirestore(showToast=false){
   if(!firestoreDb) return;
