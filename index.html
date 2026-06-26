@@ -116,6 +116,13 @@ select.si{cursor:pointer}
 .chc{padding:9px;text-align:center;font-size:11.5px;font-weight:600;letter-spacing:.3px}
 .cb{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:auto}
 .cd{min-height:90px;padding:5px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;min-width:0;overflow:hidden}
+.cd-conflict{background:#fff5f5!important;border-bottom:2px solid var(--red)!important}
+.cd-conflict .cdn{color:var(--red)!important;font-weight:700}
+.conflict-banner{background:#fdecea;border:1px solid #f5c6c2;border-radius:8px;padding:12px 15px;margin-bottom:14px;font-size:13px;display:flex;gap:10px;align-items:flex-start}
+.conflict-banner .cb-icon{font-size:18px;flex-shrink:0}
+.conflict-banner .cb-body{flex:1}
+.conflict-banner .cb-title{font-weight:700;color:var(--red);margin-bottom:4px}
+.conflict-banner .cb-row{color:#7a1a1a;margin-top:3px;line-height:1.4}
 .cd:hover{background:#f5f7fb}
 .cd:nth-child(7n){border-right:none}
 .cd.om{opacity:.35}
@@ -1331,6 +1338,23 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 });
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
+function getGameOverlaps(events){
+  const toMin=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;};
+  const games=events.filter(e=>e.type==='game'&&e.time&&e.location&&e.location.trim());
+  const overlaps=[];
+  for(let i=0;i<games.length;i++){
+    for(let j=i+1;j<games.length;j++){
+      const a=games[i],b=games[j];
+      if(a.date!==b.date)continue;
+      if(a.location.trim().toLowerCase()!==b.location.trim().toLowerCase())continue;
+      const aS=toMin(a.time),bS=toMin(b.time);
+      if(aS===null||bS===null)continue;
+      if(aS<bS+120&&bS<aS+120) overlaps.push([a,b]);
+    }
+  }
+  return overlaps;
+}
+
 function renderCal(){
   document.getElementById('cal-label').textContent=`${MONTHS[calMonth]} ${calYear}`;
   const allEvents=calFilter==='all'?DB.events():DB.events(calFilter);
@@ -1339,16 +1363,22 @@ function renderCal(){
   const dim=new Date(calYear,calMonth+1,0).getDate();
   const pmd=new Date(calYear,calMonth,0).getDate();
   const today=new Date().toISOString().split('T')[0];
+  // Pre-compute conflict dates for visual indicator
+  const _monthEventsAll=allEvents.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&&d.getMonth()===calMonth; });
+  const _overlaps=getGameOverlaps(_monthEventsAll);
+  const _conflictDates=new Set(_overlaps.flatMap(([a,b])=>[a.date,b.date]));
   let cells=''; const total=Math.ceil((dow+dim)/7)*7;
   for(let i=0;i<total;i++){
     let day,ds,other=false;
     if(i<dow){ day=pmd-dow+i+1; const m2=calMonth===0?11:calMonth-1,y2=calMonth===0?calYear-1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true }
     else if(i>=dow+dim){ day=i-dow-dim+1; const m2=calMonth===11?0:calMonth+1,y2=calMonth===11?calYear+1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true }
     else{ day=i-dow+1; ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}` }
-    const dayEvs=allEvents.filter(e=>e.date===ds);
+    // Sort events by time (no time goes last)
+    const dayEvs=allEvents.filter(e=>e.date===ds).sort((a,b)=>{if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});
     const isT=ds===today;
+    const isConflict=_conflictDates.has(ds);
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
-    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>{
+    cells+=`<div class="cd${other?' om':''}${isT?' td':''}${isConflict?' cd-conflict':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>{
       const meta=[ev.time,ev.location].filter(Boolean).join(' · ');
       return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"><div class="ce-title">${evLabel(ev)}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
     }).join('')}</div>`;
@@ -1358,10 +1388,12 @@ function renderCal(){
     c.addEventListener('click',()=>openEventModal(null,c.dataset.date));
     c.querySelectorAll('.ce').forEach(ev=>ev.addEventListener('click',e=>{e.stopPropagation();showEventDetail(ev.dataset.eid)}));
   });
-  const monthEvs=allEvents.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&&d.getMonth()===calMonth }).sort((a,b)=>a.date.localeCompare(b.date));
+  const monthEvs=allEvents.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&&d.getMonth()===calMonth }).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
   const lEl=document.getElementById('cal-list');
-  lEl.innerHTML=monthEvs.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos neste mês.</p>':
-    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join('');
+  // Build conflict banners
+  const conflictHTML=_overlaps.map(([a,b])=>`<div class="conflict-banner"><div class="cb-icon">⚠️</div><div class="cb-body"><div class="cb-title">Conflito de estádio — ${fmtDate(a.date)}</div><div class="cb-row">🏠 ${evLabel(a)} · ${a.time||'hora?'} (até ~${(()=>{const[h,m]=a.time.split(':').map(Number);const e=new Date(0,0,0,h,m+120);return String(e.getHours()).padStart(2,'0')+':'+String(e.getMinutes()).padStart(2,'0')})()})</div><div class="cb-row">🏠 ${evLabel(b)} · ${b.time||'hora?'}</div><div class="cb-row" style="margin-top:4px;font-size:11px;opacity:.8">📍 ${a.location}</div></div></div>`).join('');
+  lEl.innerHTML=(conflictHTML?conflictHTML:'')+(monthEvs.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos neste mês.</p>':
+    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join(''));
   lEl.querySelectorAll('[data-del-event]').forEach(b=>b.addEventListener('click',()=>deleteEvent(b.dataset.delEvent)));
 }
 
