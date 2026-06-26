@@ -650,6 +650,22 @@ body.pm #v-pf{padding:30px}
         </div>
         <input type="file" id="f-photo-input" accept="image/*" style="display:none">
       </div>
+      <!-- Cartão de Cidadão -->
+      <div class="fg">
+        <label>Cartão de Cidadão (PDF ou imagem)</label>
+        <div class="doc-zone empty" id="f-cc-zone" onclick="document.getElementById('f-cc-file').click()">
+          <span class="dz-icon">🪪</span><span>Clica para carregar</span>
+        </div>
+        <input type="file" id="f-cc-file" accept=".pdf,image/*" style="display:none">
+      </div>
+      <!-- Documento Médico -->
+      <div class="fg">
+        <label>Documento Médico (PDF ou imagem)</label>
+        <div class="doc-zone empty" id="f-med-zone" onclick="document.getElementById('f-med-file').click()">
+          <span class="dz-icon">🏥</span><span>Clica para carregar</span>
+        </div>
+        <input type="file" id="f-med-file" accept=".pdf,image/*" style="display:none">
+      </div>
       <div class="fa">
         <button type="button" class="btn btn-g" id="mo-p-cancel">Cancelar</button>
         <button type="submit" class="btn btn-p" id="mo-p-submit">Guardar Atleta</button>
@@ -1227,8 +1243,13 @@ function openPlayerModal(p=null){
   f('f-inj').value=p?.injuries||'';
   // Reset file inputs
   f('f-photo-input').value='';
+  if(f('f-cc-file')) document.getElementById('f-cc-file').value='';
+  if(f('f-med-file')) document.getElementById('f-med-file').value='';
   // Photo
   setPhotoZoneExisting('f-photo-circle','f-photo-initials','f-photo-hint',p?.photoUrl,p?.name);
+  // Doc zones
+  setDocZoneExisting('f-cc-zone','f-cc-file',p?.ccUrl,p?.ccFileName);
+  setDocZoneExisting('f-med-zone','f-med-file',p?.medUrl,p?.medFileName);
   document.getElementById('mo-player').classList.add('open');
   setTimeout(()=>f('f-name').focus(),50);
 }
@@ -1259,9 +1280,9 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       medUrl:existing?.medUrl||null, medFileName:existing?.medFileName||null,
     };
 
-    const photoFile=document.getElementById('f-photo-input').files[0];
-    const ccFile=document.getElementById('f-cc-file').files[0];
-    const medFile=document.getElementById('f-med-file').files[0];
+    const photoFile=document.getElementById('f-photo-input')?.files[0];
+    const ccFile=document.getElementById('f-cc-file')?.files[0];
+    const medFile=document.getElementById('f-med-file')?.files[0];
 
     if(photoFile) data.photoUrl = await uploadFile(photoFile, pid, 'photo');
     if(ccFile){ data.ccUrl = await uploadFile(ccFile, pid, 'cc'); data.ccFileName = ccFile.name; }
