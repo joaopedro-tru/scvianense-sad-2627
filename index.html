@@ -543,7 +543,19 @@ body.pm #v-pf{padding:30px}
     <div class="tb">
       <div><h1 id="sqtr-title">Treinos</h1><div class="sub" id="sqtr-sub"></div></div>
     </div>
-    <div id="sqtr-list"></div>
+    <div class="cc">
+      <button class="btn btn-o btn-sm" id="sqtr-prev">← Anterior</button>
+      <h2 id="sqtr-label"></h2>
+      <button class="btn btn-o btn-sm" id="sqtr-next">Seguinte →</button>
+    </div>
+    <div class="cg">
+      <div class="chr">
+        <div class="chc">SEG</div><div class="chc">TER</div><div class="chc">QUA</div>
+        <div class="chc">QUI</div><div class="chc">SEX</div><div class="chc">SÁB</div>
+        <div class="chc">DOM</div>
+      </div>
+      <div class="cb" id="sqtr-body"></div>
+    </div>
   </div>
 
   <!-- SQUAD GAMES LIST -->
@@ -977,7 +989,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre';
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth();
 
 function evLabel(ev){
   if(ev.type==='game'){
@@ -987,6 +999,24 @@ function evLabel(ev){
     return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${comp}`;
   }
   return ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`;
+}
+
+function trainingLabel(ev){
+  // Determina o escalão de referência (usa variável global squad se treino for 'both')
+  const sq=ev.squad==='both'?squad:ev.squad;
+  // Número do treino na época (todos os treinos deste escalão ordenados por data)
+  const allTr=DB.events(sq).filter(e=>e.type==='training').sort((a,b)=>a.date.localeCompare(b.date));
+  const idx=allTr.findIndex(e=>e.id===ev.id);
+  const num=idx>=0?idx+1:'?';
+  // Próximo jogo após este treino (mesmo escalão ou 'both')
+  const nextGame=DB.events(sq)
+    .filter(e=>e.type==='game'&&e.date>ev.date)
+    .sort((a,b)=>a.date.localeCompare(b.date))[0];
+  if(!nextGame) return `UT${num}`;
+  const t1=new Date(ev.date+'T00:00:00');
+  const t2=new Date(nextGame.date+'T00:00:00');
+  const diff=Math.round((t2-t1)/(1000*60*60*24));
+  return diff<=6?`UT${num} | Dia -${diff}`:`UT${num}`;
 }
 
 function nav(v,opts={}){
@@ -1539,7 +1569,7 @@ function renderTraining(){
   const att=ev.attendance||{};
   const presCount=allPl.filter(p=>att[p.id]===true).length;
 
-  document.getElementById('tr-title').textContent=evLabel(ev);
+  document.getElementById('tr-title').textContent=trainingLabel(ev);
   document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
 
   const pRows=allPl.map(p=>{
@@ -1642,42 +1672,56 @@ function renderTraining(){
   });
 }
 
-document.getElementById('btn-back-training').addEventListener('click',()=>nav('calendar'));
+document.getElementById('btn-back-training').addEventListener('click',()=>nav('sq-trainings',{squad}));
 
-// ── SQUAD TRAININGS LIST ──────────────────────────────────────────────────────
+// ── SQUAD TRAININGS CALENDAR ──────────────────────────────────────────────────
 function renderSqTrainings(){
   const today=new Date().toISOString().split('T')[0];
-  const evs=DB.events(squad).filter(e=>e.type==='training').sort((a,b)=>a.date.localeCompare(b.date));
+  const allEvs=DB.events(squad).filter(e=>e.type==='training');
   document.getElementById('sqtr-title').textContent=`Treinos ${SQUADS[squad]}`;
-  document.getElementById('sqtr-sub').textContent=`${evs.length} treino${evs.length!==1?'s':''}`;
-  const lEl=document.getElementById('sqtr-list');
-  if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">📋</div><h3>Sem treinos registados</h3><p>Adiciona treinos no Calendário.</p></div>'; return; }
-  let sepInserted=false;
-  lEl.innerHTML=evs.map(ev=>{
-    const isPast=ev.date<today;
-    const isNext=!isPast&&!sepInserted;
-    let sep='';
-    if(isNext){ sepInserted=true; sep='<div class="ev-sep">Próximos</div>'; }
-    const eligiblePls=DB.players(squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
-    const hasFicha=!!ev.fichaTreinoUrl;
-    const att=ev.attendance||{};
-    const allPl=[...eligiblePls,...(ev.extraPlayers||[]).map(id=>DB.getPlayer(id)).filter(Boolean)];
-    const presCount=allPl.filter(p=>att[p.id]===true).length;
-    const hasPresencas=Object.keys(att).length>0;
-    return sep+`<div class="ei${isPast?' past':''}" style="cursor:pointer" data-tr-id="${ev.id}">
-      <div class="etd tr"></div>
-      <div class="einfo">
-        <div class="etitle">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}</div>
-        <div class="emeta">${ev.location||'—'}${ev.squad==='both'?' · <em>Ambos escalões</em>':''}</div>
-      </div>
-      <div style="display:flex;gap:7px;align-items:center;flex-shrink:0">
-        <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;${hasFicha?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">📋 ${hasFicha?'✓':'✗'}</span>
-        <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;${hasPresencas?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">👥 ${hasPresencas?presCount+'/'+allPl.length:'✗'}</span>
-      </div>
-    </div>`;
-  }).join('');
-  lEl.querySelectorAll('[data-tr-id]').forEach(el=>el.addEventListener('click',()=>nav('training',{id:el.dataset.trId})));
+  document.getElementById('sqtr-sub').textContent=`${allEvs.length} treino${allEvs.length!==1?'s':''}`;
+  document.getElementById('sqtr-label').textContent=`${MONTHS[sqtrMonth]} ${sqtrYear}`;
+
+  const first=new Date(sqtrYear,sqtrMonth,1);
+  let dow=first.getDay()-1; if(dow<0)dow=6;
+  const dim=new Date(sqtrYear,sqtrMonth+1,0).getDate();
+  const pmd=new Date(sqtrYear,sqtrMonth,0).getDate();
+  const total=Math.ceil((dow+dim)/7)*7;
+
+  // index trainings by date for this month
+  const byDate={};
+  allEvs.forEach(ev=>{ if(!byDate[ev.date])byDate[ev.date]=[]; byDate[ev.date].push(ev); });
+
+  let cells='';
+  for(let i=0;i<total;i++){
+    let day,ds,other=false;
+    if(i<dow){ day=pmd-dow+i+1; const m2=sqtrMonth===0?11:sqtrMonth-1,y2=sqtrMonth===0?sqtrYear-1:sqtrYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
+    else if(i>=dow+dim){ day=i-dow-dim+1; const m2=sqtrMonth===11?0:sqtrMonth+1,y2=sqtrMonth===11?sqtrYear+1:sqtrYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
+    else{ day=i-dow+1; ds=`${sqtrYear}-${String(sqtrMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
+    const isT=ds===today;
+    const dayTrs=byDate[ds]||[];
+    const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
+    const dots=dayTrs.map(ev=>{
+      const isPast=ev.date<today;
+      const hasFicha=!!ev.fichaTreinoUrl;
+      const att=ev.attendance||{};
+      const hasAtt=Object.keys(att).length>0;
+      const dot=hasFicha&&hasAtt?'✅':hasFicha||hasAtt?'🟡':'🔵';
+      return `<div class="ce tr" data-tr-id="${ev.id}" style="${isPast?'opacity:.55':''}">
+        <div class="ce-title">${dot} ${trainingLabel(ev)}</div>
+        ${ev.time?`<div class="ce-meta">${ev.time}${ev.location?' · '+ev.location:''}</div>`:(ev.location?`<div class="ce-meta">${ev.location}</div>`:'')}
+      </div>`;
+    }).join('');
+    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dots}</div>`;
+  }
+  const body=document.getElementById('sqtr-body');
+  body.innerHTML=cells;
+  body.querySelectorAll('[data-tr-id]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation(); nav('training',{id:el.dataset.trId});
+  }));
 }
+document.getElementById('sqtr-prev').addEventListener('click',()=>{ sqtrMonth--; if(sqtrMonth<0){sqtrMonth=11;sqtrYear--;} renderSqTrainings(); });
+document.getElementById('sqtr-next').addEventListener('click',()=>{ sqtrMonth++; if(sqtrMonth>11){sqtrMonth=0;sqtrYear++;} renderSqTrainings(); });
 
 // ── SQUAD GAMES LIST ──────────────────────────────────────────────────────────
 function renderSqGames(){
