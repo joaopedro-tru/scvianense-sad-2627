@@ -139,6 +139,10 @@ select.si{cursor:pointer}
 .el{margin-top:26px}
 .el h3{font-size:15px;font-weight:700;margin-bottom:14px}
 .ei{display:flex;align-items:center;gap:14px;padding:13px;background:var(--card);border-radius:8px;border:1px solid var(--border);margin-bottom:9px}
+.ei.past{opacity:.55;background:#f8f9fa}
+.ei.past .etitle{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25)}
+.ev-sep{display:flex;align-items:center;gap:10px;margin:16px 0 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.ev-sep::before,.ev-sep::after{content:'';flex:1;height:1px;background:var(--border)}
 .etd{width:11px;height:11px;border-radius:50%;flex-shrink:0}
 .etd.tr{background:#27ae60}.etd.gm{background:var(--blue)}
 .einfo{flex:1}
@@ -1625,9 +1629,16 @@ function renderTraining(){
     const f=fichaInput.files[0]; if(!f)return;
     const zone=document.getElementById('tr-ficha-zone');
     zone.innerHTML='<span class="dz-icon"><span class="spin" style="border-color:rgba(26,61,110,.3);border-top-color:var(--green)"></span></span><span>A carregar...</span>';
-    const url=await uploadFile(f,trainingEventId,'ficha');
-    DB.updateEvent(trainingEventId,{fichaTreinoUrl:url,fichaTreinoFileName:f.name});
-    toast('✅ Ficha carregada!'); renderTraining();
+    try{
+      const url=await uploadFile(f,trainingEventId,'ficha');
+      if(!url) throw new Error('URL vazia');
+      DB.updateEvent(trainingEventId,{fichaTreinoUrl:url,fichaTreinoFileName:f.name});
+      toast('✅ Ficha carregada!'); renderTraining();
+    } catch(err){
+      console.error('Ficha upload failed:',err);
+      toast('❌ Erro ao carregar ficha: '+err.message);
+      renderTraining(); // repõe a zona
+    }
   });
 }
 
@@ -1635,19 +1646,25 @@ document.getElementById('btn-back-training').addEventListener('click',()=>nav('c
 
 // ── SQUAD TRAININGS LIST ──────────────────────────────────────────────────────
 function renderSqTrainings(){
-  const evs=DB.events(squad).filter(e=>e.type==='training').sort((a,b)=>b.date.localeCompare(a.date));
+  const today=new Date().toISOString().split('T')[0];
+  const evs=DB.events(squad).filter(e=>e.type==='training').sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('sqtr-title').textContent=`Treinos ${SQUADS[squad]}`;
   document.getElementById('sqtr-sub').textContent=`${evs.length} treino${evs.length!==1?'s':''}`;
   const lEl=document.getElementById('sqtr-list');
   if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">📋</div><h3>Sem treinos registados</h3><p>Adiciona treinos no Calendário.</p></div>'; return; }
+  let sepInserted=false;
   lEl.innerHTML=evs.map(ev=>{
+    const isPast=ev.date<today;
+    const isNext=!isPast&&!sepInserted;
+    let sep='';
+    if(isNext){ sepInserted=true; sep='<div class="ev-sep">Próximos</div>'; }
     const eligiblePls=DB.players(squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
     const hasFicha=!!ev.fichaTreinoUrl;
     const att=ev.attendance||{};
     const allPl=[...eligiblePls,...(ev.extraPlayers||[]).map(id=>DB.getPlayer(id)).filter(Boolean)];
     const presCount=allPl.filter(p=>att[p.id]===true).length;
     const hasPresencas=Object.keys(att).length>0;
-    return `<div class="ei" style="cursor:pointer" data-tr-id="${ev.id}">
+    return sep+`<div class="ei${isPast?' past':''}" style="cursor:pointer" data-tr-id="${ev.id}">
       <div class="etd tr"></div>
       <div class="einfo">
         <div class="etitle">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}</div>
@@ -1664,25 +1681,35 @@ function renderSqTrainings(){
 
 // ── SQUAD GAMES LIST ──────────────────────────────────────────────────────────
 function renderSqGames(){
-  const evs=DB.events(squad).filter(e=>e.type==='game'&&e.squad===squad).sort((a,b)=>b.date.localeCompare(a.date));
+  const today=new Date().toISOString().split('T')[0];
+  const evs=DB.events(squad).filter(e=>e.type==='game'&&e.squad===squad).sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('sqgm-title').textContent=`Jogos ${SQUADS[squad]}`;
   document.getElementById('sqgm-sub').textContent=`${evs.length} jogo${evs.length!==1?'s':''}`;
   const lEl=document.getElementById('sqgm-list');
   if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">⚽</div><h3>Sem jogos registados</h3><p>Adiciona jogos no Calendário.</p></div>'; return; }
+  let sepInserted=false;
   lEl.innerHTML=evs.map(ev=>{
+    const isPast=ev.date<today;
+    const isNext=!isPast&&!sepInserted;
+    let sep='';
+    if(isNext){ sepInserted=true; sep='<div class="ev-sep">Próximos</div>'; }
     const conv=ev.convocatoria;
     const convCount=conv?Object.values(conv.players||{}).filter(v=>!!v).length:0;
     const hasConv=conv&&convCount>0;
     const haLabel=ev.homeAway==='away'?'✈️':'🏠';
-    return `<div class="ei" style="cursor:pointer" data-gm-id="${ev.id}">
+    const compMeta=ev.competition?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#e8eef7;color:var(--green-d);font-weight:600;flex-shrink:0">${ev.competition}</span>`:'';
+    return sep+`<div class="ei${isPast?' past':''}" style="cursor:pointer" data-gm-id="${ev.id}">
       <div class="etd gm"></div>
-      <div class="einfo">
+      <div class="einfo" style="min-width:0">
         <div class="etitle">${haLabel} ${fmtDate(ev.date)} · vs ${ev.opponent||'—'}</div>
         <div class="emeta">${ev.time?ev.time+' · ':''}${ev.location||'—'}</div>
       </div>
-      <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;${hasConv?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">
-        ${hasConv?`📋 ${convCount}`:'📋 ✗'}
-      </span>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        ${compMeta}
+        <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;${hasConv?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">
+          ${hasConv?`📋 ${convCount}`:'📋 ✗'}
+        </span>
+      </div>
     </div>`;
   }).join('');
   lEl.querySelectorAll('[data-gm-id]').forEach(el=>el.addEventListener('click',()=>nav('game',{id:el.dataset.gmId})));
