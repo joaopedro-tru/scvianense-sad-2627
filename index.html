@@ -308,6 +308,17 @@ body.pm #v-pf{padding:30px}
 .lv-min-input{background:transparent;border:none;color:#fff;font-size:30px;font-weight:800;width:60px;text-align:center;font-family:inherit;outline:none;-moz-appearance:textfield}
 .lv-min-input::-webkit-inner-spin-button,.lv-min-input::-webkit-outer-spin-button{-webkit-appearance:none}
 
+.lv-setup-parts{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px 12px;background:var(--card);border:2px solid var(--border);border-radius:14px;cursor:pointer;font-family:inherit;color:var(--text);transition:all .15s;-webkit-tap-highlight-color:transparent}
+.lv-setup-parts:hover{border-color:var(--green-l);background:#eef2f8}
+.lv-setup-parts:active{transform:scale(.95)}
+.lv-setup-parts .sp-n{font-size:36px;font-weight:800;line-height:1;color:var(--green)}
+.lv-setup-parts .sp-l{font-size:12px;color:var(--muted);font-weight:500}
+
+.lv-period-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.lv-period-chip{background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.lv-period-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+.lv-period-chip:active{opacity:.75}
+
 .lv-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
 .lv-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;cursor:pointer;font-size:12px;font-weight:700;color:var(--text);transition:all .12s;-webkit-tap-highlight-color:transparent;user-select:none}
 .lv-btn:hover{background:#eef2f8;border-color:var(--green-l);transform:translateY(-1px)}
@@ -1098,6 +1109,31 @@ const COMPETITIONS={
   sub19:['Camp. Dist Juniores "A" AFVC','Taça Juniores "A" AFVC','Jogo de Preparação'],
   both: ['Jogo de Preparação'],
 };
+// Periods per game type: id, label, start, end (null=open), boundary minute for acréscimos
+const GAME_PERIODS={
+  league:[
+    {id:'p1',label:'1ª Parte',start:1,end:45},
+    {id:'p2',label:'2ª Parte',start:46,end:90}
+  ],
+  cup:[
+    {id:'p1',label:'1ª Parte',start:1,end:45},
+    {id:'p2',label:'2ª Parte',start:46,end:90},
+    {id:'et1',label:'Prol. 1',start:91,end:105},
+    {id:'et2',label:'Prol. 2',start:106,end:120},
+    {id:'pen',label:'Penáltis',start:null,end:null,isPenalty:true}
+  ],
+  friendly:[
+    {id:'p1',label:'1ª Parte',start:1,end:null},
+    {id:'p2',label:'2ª Parte',start:null,end:null},
+    {id:'p3',label:'3ª Parte',start:null,end:null}
+  ]
+};
+function getGameType(ev){
+  const c=(ev.competition||'').toLowerCase();
+  if(c.includes('taça')) return 'cup';
+  if(c.includes('prepara')||c.includes('amig')) return 'friendly';
+  return 'league';
+}
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function age(dob){ if(!dob)return null; const d=new Date(dob),t=new Date(); let a=t.getFullYear()-d.getFullYear(); if(t.getMonth()-d.getMonth()<0||(t.getMonth()-d.getMonth()===0&&t.getDate()<d.getDate()))a--; return a }
@@ -1233,13 +1269,17 @@ function nav(v,opts={}){
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='live'){
-    if(opts.id){ liveGameId=opts.id; initLiveMinute(); }
+    if(opts.id){ liveGameId=opts.id; }
     if(opts.step){ liveStep=opts.step; }
     else {
       const _mr=(DB.getEvent(liveGameId)||{}).matchReport||{};
       const hasLineup=(_mr.lineup||[]).length>0;
       const hasEvents=(_mr.events||[]).length>0;
-      liveStep=(hasLineup||hasEvents)?'recording':'lineup';
+      if(hasLineup||hasEvents) liveStep='recording';
+      else {
+        const _gev=DB.getEvent(liveGameId)||{};
+        liveStep=(getGameType(_gev)==='friendly'&&_mr.periods==null)?'setup':'lineup';
+      }
     }
     if(liveStep==='lineup'){
       const _mr=(DB.getEvent(liveGameId)||{}).matchReport||{};
@@ -2035,6 +2075,9 @@ function initLiveMinute(){
   } else { liveMinute=1; }
 }
 
+function fmtMin(e){ if(e.period==='pen') return 'GP'; return e.extra?`${e.minute}+${e.extra}`:`${e.minute}`; }
+function sortMin(e){ return (e.minute||0)+(e.extra||0)*0.01; }
+
 function liveEvLabel(e){
   function pn(id){ const p=DB.getPlayer(id); return p?p.name.split(' ')[0]+' '+p.name.split(' ').slice(-1)[0][0]+'.':'—'; }
   if(e.type==='goal') return `⚽ <strong>Golo</strong> — ${pn(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
@@ -2043,14 +2086,47 @@ function liveEvLabel(e){
   if(e.type==='red') return `🔴 <strong>Vermelho</strong> — ${pn(e.playerId)}`;
   if(e.type==='sub') return `🔄 <strong>Sub</strong> — ${pn(e.playerOutId)} ↔ ${pn(e.playerInId)}`;
   if(e.type==='injury') return `🩺 <strong>Lesão</strong>${e.playerId?' — '+pn(e.playerId):''}`;
+  if(e.type==='medical'){
+    let s=`🏥 <strong>Assist. Médica</strong>${e.playerId?' — '+pn(e.playerId):''}`;
+    if(e.playerInId) s+=` <span style="color:var(--muted);font-size:11px">→ entra ${pn(e.playerInId)}</span>`;
+    return s;
+  }
   if(e.type==='note') return `📝 ${e.text||'Nota'}`;
   return `• ${e.type}`;
 }
 
 function renderLive(){
   const ev=DB.getEvent(liveGameId); if(!ev){ nav('matchday'); return; }
-  if(liveStep==='lineup') renderLiveLineup(ev);
+  if(liveStep==='setup') renderLiveSetup(ev);
+  else if(liveStep==='lineup') renderLiveLineup(ev);
   else renderLiveRecording(ev);
+}
+
+// ── FRIENDLY SETUP ────────────────────────────────────────────────────────────
+function renderLiveSetup(ev){
+  document.getElementById('v-live-content').innerHTML=`
+    <div style="max-width:480px;margin:0 auto">
+      <div class="card" style="text-align:center;margin-bottom:20px;padding:24px">
+        <div style="font-size:32px;margin-bottom:10px">⚙️</div>
+        <h2 style="margin-bottom:6px;font-size:18px">Jogo de Preparação</h2>
+        <p style="color:var(--muted);font-size:13px">Quantas partes tem este jogo?</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+        <button class="lv-setup-parts" data-parts="1"><span class="sp-n">1</span><span class="sp-l">parte</span></button>
+        <button class="lv-setup-parts" data-parts="2"><span class="sp-n">2</span><span class="sp-l">partes</span></button>
+        <button class="lv-setup-parts" data-parts="3"><span class="sp-n">3</span><span class="sp-l">partes</span></button>
+      </div>
+    </div>`;
+  document.querySelectorAll('.lv-setup-parts').forEach(btn=>btn.addEventListener('click',()=>{
+    const n=parseInt(btn.dataset.parts);
+    const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+    cur.periods=n;
+    DB.updateEvent(liveGameId,{matchReport:cur});
+    const _mr=DB.getEvent(liveGameId).matchReport||{};
+    liveTempLineup=new Set(_mr.lineup||[]);
+    liveStep='lineup';
+    renderLive();
+  }));
 }
 
 // ── LINEUP SELECTION ──────────────────────────────────────────────────────────
@@ -2112,7 +2188,7 @@ function renderLiveLineup(ev){
 function renderLiveRecording(ev){
   const mr=ev.matchReport||{events:[]};
   const lineup=mr.lineup||[];
-  const evs=(mr.events||[]).sort((a,b)=>b.minute-a.minute);
+  const evs=(mr.events||[]).sort((a,b)=>sortMin(b)-sortMin(a));
   const goals=(mr.events||[]).filter(e=>e.type==='goal').length;
   const conc=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
   const isHome=ev.homeAway!=='away';
@@ -2122,19 +2198,12 @@ function renderLiveRecording(ev){
   const lineupStr=lineup.length>0?`${lineup.length} titular${lineup.length!==1?'es':''}`:' 11 não def.';
   const timeline=evs.length===0
     ?'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Sem eventos registados</div>'
-    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${e.minute}'</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
+    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
   document.getElementById('v-live-content').innerHTML=`
     <div class="lv-header">
       <div class="lv-teams"><span>${teamA}</span><span>${teamB}</span></div>
       <div class="lv-score">${scoreA}<span style="font-size:28px;letter-spacing:0;opacity:.45"> — </span>${scoreB}</div>
       <div class="lv-meta">${SQUADS[ev.squad]||''}${ev.competition?' · '+ev.competition:''}${ev.opponent?' · vs '+ev.opponent:''}</div>
-      <div class="lv-minute">
-        <span class="lv-min-lbl">Min.</span>
-        <button class="lv-min-btn" id="lv-m-minus">−</button>
-        <input class="lv-min-input" type="number" id="lv-min" min="0" max="130" value="${liveMinute}">
-        <button class="lv-min-btn" id="lv-m-plus">+</button>
-        <button class="lv-min-btn" id="lv-m-plus5" style="font-size:12px;width:auto;padding:0 10px">+5</button>
-      </div>
       <div style="margin-top:10px">
         <button id="btn-edit-lineup" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">✏️ ${lineupStr}</button>
       </div>
@@ -2146,6 +2215,7 @@ function renderLiveRecording(ev){
       <div class="lv-btn" data-lv-type="red"><span class="lv-icon">🔴</span>Vermelho</div>
       <div class="lv-btn" data-lv-type="sub"><span class="lv-icon">🔄</span>Substituição</div>
       <div class="lv-btn" data-lv-type="injury"><span class="lv-icon">🩺</span>Lesão</div>
+      <div class="lv-btn" data-lv-type="medical" style="grid-column:1/-1;flex-direction:row;gap:10px;justify-content:center;padding:12px 16px"><span class="lv-icon" style="font-size:20px">🏥</span>Assistência Médica</div>
     </div>
     <div class="lv-tl">
       <div class="lv-tl-head">
@@ -2162,16 +2232,8 @@ function renderLiveRecording(ev){
     renderLive();
   });
 
-  // Minute controls
-  const minInp=document.getElementById('lv-min');
-  minInp.addEventListener('change',()=>{ liveMinute=Math.max(0,Math.min(130,parseInt(minInp.value)||0)); minInp.value=liveMinute; });
-  document.getElementById('lv-m-minus').addEventListener('click',()=>{ liveMinute=Math.max(0,liveMinute-1); minInp.value=liveMinute; });
-  document.getElementById('lv-m-plus').addEventListener('click',()=>{ liveMinute=Math.min(130,liveMinute+1); minInp.value=liveMinute; });
-  document.getElementById('lv-m-plus5').addEventListener('click',()=>{ liveMinute=Math.min(130,liveMinute+5); minInp.value=liveMinute; });
-
   // Event buttons
   document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>{
-    liveMinute=parseInt(document.getElementById('lv-min').value)||liveMinute;
     openLivePicker(btn.dataset.lvType);
   }));
 
@@ -2209,7 +2271,7 @@ function getSuplentes(){
 }
 
 function openLivePicker(type){
-  livePending={type,step:'init',data:{}};
+  livePending={type,step:'minute',data:{}};
   const mo=document.getElementById('mo-live');
   document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
 
@@ -2217,6 +2279,87 @@ function openLivePicker(type){
     const {type,step,data}=livePending;
     const titleEl=document.getElementById('mo-live-title');
     const bodyEl=document.getElementById('mo-live-body');
+
+    // ── MINUTE INPUT ────────────────────────────────────────────────────────
+    if(step==='minute'){
+      const gev=DB.getEvent(liveGameId)||{};
+      const gtype=getGameType(gev);
+      let periods;
+      if(gtype==='friendly'){
+        const n=(gev.matchReport||{}).periods||2;
+        periods=Array.from({length:n},(_,i)=>({id:`p${i+1}`,label:`${i+1}ª Parte`,start:null,end:null}));
+      } else { periods=GAME_PERIODS[gtype]; }
+      titleEl.textContent='⏱ Minuto do evento';
+      const chips=periods.map((p,i)=>`<button class="lv-period-chip" data-pi="${i}">${p.label}</button>`).join('');
+      bodyEl.innerHTML=`
+        <div style="padding:8px 4px">
+          <div class="lv-period-chips">${chips}</div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px" id="lv-min-lbl">Minuto</label>
+          <input id="lv-min-base" type="number" min="1" max="130" placeholder="Ex: 23"
+            style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
+          <div id="lv-extra-wrap" style="display:none;margin-bottom:14px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Acréscimos (opcional)</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:20px;color:var(--muted);font-weight:700;flex-shrink:0">+</span>
+              <input id="lv-min-extra" type="number" min="1" max="30" placeholder="Ex: 2"
+                style="flex:1;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;font-family:inherit">
+            </div>
+            <div id="lv-extra-hint" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+          </div>
+          <button id="lv-min-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center" disabled>Confirmar →</button>
+        </div>`;
+
+      const baseInp=document.getElementById('lv-min-base');
+      const extraWrap=document.getElementById('lv-extra-wrap');
+      const extraInp=document.getElementById('lv-min-extra');
+      const extraHint=document.getElementById('lv-extra-hint');
+      const confirmBtn=document.getElementById('lv-min-confirm');
+      let activePeriod=null;
+
+      // Period chip selection
+      bodyEl.querySelectorAll('.lv-period-chip').forEach(chip=>{
+        chip.addEventListener('click',()=>{
+          bodyEl.querySelectorAll('.lv-period-chip').forEach(c=>c.classList.remove('active'));
+          chip.classList.add('active');
+          const idx=parseInt(chip.dataset.pi);
+          activePeriod=periods[idx];
+          if(activePeriod.isPenalty){
+            // Penalties: no minute needed — save immediately with period marker
+            livePending.data._minute=121; livePending.data._period='pen';
+            if(type==='goal_conceded'){ saveLiveEvent(); return; }
+            livePending.step='init'; showStep(); return;
+          }
+          // Pre-fill with period boundary so acréscimos appear right away
+          if(activePeriod.end){ baseInp.value=activePeriod.end; baseInp.dispatchEvent(new Event('input')); }
+          else { baseInp.value=''; confirmBtn.disabled=true; }
+          baseInp.focus();
+        });
+      });
+
+      baseInp.addEventListener('input',()=>{
+        const v=parseInt(baseInp.value)||0;
+        confirmBtn.disabled=!(v>=1);
+        // Show acréscimos: near period boundary (within 3 min) or standard boundaries if no chip
+        let showExtra=false;
+        if(activePeriod&&activePeriod.end) showExtra=(v>=activePeriod.end-2&&v<=activePeriod.end);
+        else if(gtype==='friendly') showExtra=(v>=20); // all periods open
+        else showExtra=(v>=43&&v<=45)||(v>=88&&v<=90)||(v>=103&&v<=105)||(v>=118&&v<=120);
+        extraWrap.style.display=showExtra?'block':'none';
+        if(showExtra) extraHint.textContent=`Ex: ${v} + 2 → registado como ${v}+2'`;
+      });
+
+      confirmBtn.addEventListener('click',()=>{
+        const base=parseInt(baseInp.value)||0;
+        const extra=parseInt(extraInp.value)||0;
+        livePending.data._minute=base;
+        if(extra>0) livePending.data._extra=extra;
+        if(activePeriod) livePending.data._period=activePeriod.id;
+        if(type==='goal_conceded'){ saveLiveEvent(); return; }
+        livePending.step='init'; showStep();
+      });
+      setTimeout(()=>baseInp.focus(),80);
+      return;
+    }
 
     function playerList(label,onSelect,skipLabel=null,onSkip=null,players=null){
       titleEl.textContent=label;
@@ -2247,10 +2390,6 @@ function openLivePicker(type){
           '— Sem assistência', ()=>saveLiveEvent()
         );
       }
-
-    // ── GOAL CONCEDED ──────────────────────────────────────────────────────
-    } else if(type==='goal_conceded'){
-      saveLiveEvent(); return;
 
     // ── YELLOW / RED ───────────────────────────────────────────────────────
     } else if(type==='yellow'||type==='red'){
@@ -2285,6 +2424,35 @@ function openLivePicker(type){
         pid=>{ livePending.data.playerId=pid; saveLiveEvent(); },
         '— Sem jogador específico', ()=>saveLiveEvent()
       );
+
+    // ── MEDICAL ────────────────────────────────────────────────────────────
+    } else if(type==='medical'){
+      if(step==='init'){
+        livePending.step='med-player';
+        playerList('🏥 Quem recebeu assistência?',
+          pid=>{ livePending.data.playerId=pid; livePending.step='med-sub'; showStep(); },
+          '— Sem jogador específico', ()=>{ livePending.step='med-sub'; showStep(); }
+        );
+      } else if(step==='med-sub'){
+        titleEl.textContent='Foi substituído?';
+        bodyEl.innerHTML=`
+          <div style="padding:8px 4px">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:16px">
+              ${livePending.data.playerId?`<strong>${(DB.getPlayer(livePending.data.playerId)||{}).name||'—'}</strong> continuou em jogo ou saiu?`:'O atleta continuou em jogo ou foi substituído?'}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <button id="med-no" class="btn btn-o" style="padding:14px;font-size:15px;justify-content:center">🟢 Continuou</button>
+              <button id="med-yes" class="btn btn-p" style="padding:14px;font-size:15px;justify-content:center">🔄 Saiu</button>
+            </div>
+          </div>`;
+        document.getElementById('med-no').addEventListener('click',()=>saveLiveEvent());
+        document.getElementById('med-yes').addEventListener('click',()=>{ livePending.step='med-in'; showStep(); });
+      } else if(step==='med-in'){
+        playerList('🔄 Quem entra?',
+          pid=>{ livePending.data.playerInId=pid; saveLiveEvent(); },
+          null, null, getSuplentes()
+        );
+      }
     }
   }
 
@@ -2294,15 +2462,17 @@ function openLivePicker(type){
 
 function saveLiveEvent(){
   const {type,data}=livePending;
-  const ne={id:uid(),minute:liveMinute,type,...data};
+  const {_minute,_extra,_period,...rest}=data;
+  const ne={id:uid(),minute:_minute||1,type,...rest};
+  if(_extra) ne.extra=_extra;
+  if(_period) ne.period=_period;
   const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
   cur.events=[...(cur.events||[]),ne];
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
-  liveMinute=Math.min(130,liveMinute+1);
-  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','red':'🔴','sub':'🔄','injury':'🩺'};
-  toast(`${icons[type]||'✅'} Evento registado!`);
+  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥'};
+  toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
 }
 
