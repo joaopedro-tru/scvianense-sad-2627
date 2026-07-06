@@ -2228,8 +2228,9 @@ function renderLiveRecording(ev){
       <div class="lv-teams"><span>${teamA}</span><span>${teamB}</span></div>
       <div class="lv-score">${scoreA}<span style="font-size:28px;letter-spacing:0;opacity:.45"> — </span>${scoreB}</div>
       <div class="lv-meta">${SQUADS[ev.squad]||''}${ev.competition?' · '+ev.competition:''}${ev.opponent?' · vs '+ev.opponent:''}</div>
-      <div style="margin-top:10px">
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap">
         <button id="btn-edit-lineup" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">✏️ ${lineupStr}</button>
+        ${mr.finished?'<span style="background:rgba(255,255,255,.15);color:#a8f5c8;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600">✅ Finalizado</span>':''}
       </div>
     </div>
     <div class="lv-btns">
@@ -2247,7 +2248,26 @@ function renderLiveRecording(ev){
         <span style="font-weight:400">${evs.length} registo${evs.length!==1?'s':''}</span>
       </div>
       ${timeline}
+    </div>
+    <div style="padding:16px">
+      <button id="btn-finish-game" class="btn ${mr.finished?'btn-o':'btn-d'}" style="width:100%;padding:15px;font-size:15px;justify-content:center;border-radius:12px">
+        ${mr.finished?'🔄 Reabrir Jogo':'🏁 Finalizar Jogo'}
+      </button>
     </div>`;
+
+  // Finish / reopen game
+  document.getElementById('btn-finish-game').addEventListener('click',()=>{
+    if(mr.finished){
+      if(!confirm('Reabrir o jogo para continuar a registar eventos?')) return;
+      const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+      delete cur.finished; delete cur.motm;
+      DB.updateEvent(liveGameId,{matchReport:cur});
+      toast('🔄 Jogo reaberto');
+      renderLive();
+    } else {
+      openLivePicker('finish');
+    }
+  });
 
   // Edit lineup button
   document.getElementById('btn-edit-lineup').addEventListener('click',()=>{
@@ -2314,7 +2334,7 @@ function getOffFieldPlayers(){
 }
 
 function openLivePicker(type){
-  livePending={type,step:'minute',data:{}};
+  livePending={type,step:type==='finish'?'motm':'minute',data:{}};
   const mo=document.getElementById('mo-live');
   document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
 
@@ -2514,11 +2534,36 @@ function openLivePicker(type){
           null, null, getOffFieldPlayers()
         );
       }
+
+    // ── FINISH GAME ────────────────────────────────────────────────────────────
+    } else if(type==='finish'){
+      titleEl.textContent='🏆 Melhor em Campo';
+      const allConv=getConvocados();
+      playerList('Escolhe o MVP (opcional)',
+        pid=>{
+          finishGame(pid);
+        },
+        '— Saltar', ()=>{ finishGame(null); },
+        allConv
+      );
     }
   }
 
   mo.classList.add('open');
   showStep();
+}
+
+function finishGame(motmId){
+  const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+  cur.finished=true;
+  if(motmId) cur.motm=motmId; else delete cur.motm;
+  DB.updateEvent(liveGameId,{matchReport:cur});
+  document.getElementById('mo-live').classList.remove('open');
+  livePending=null;
+  toast('🏁 Jogo finalizado!');
+  const gid=liveGameId;
+  liveGameId=null;
+  nav('game',{id:gid});
 }
 
 function saveLiveEvent(){
@@ -2784,6 +2829,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const lineup=mr.lineup||[];
   const ratings=mr.ratings||{};
   const evs=mr.events||[];
+  const motmId=mr.motm||null;
 
   const subbedOut=new Set([...evs.filter(e=>e.type==='sub'&&e.playerOutId).map(e=>e.playerOutId),...evs.filter(e=>e.type==='medical'&&e.playerInId&&e.playerId).map(e=>e.playerId)]);
   const subbedIn=new Set([...evs.filter(e=>e.type==='sub'&&e.playerInId).map(e=>e.playerInId),...evs.filter(e=>e.type==='medical'&&e.playerInId).map(e=>e.playerInId)]);
@@ -2805,10 +2851,12 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   function pToken(p){
     const wasOut=subbedOut.has(p.id), cameIn=subbedIn.has(p.id);
     const hasY=yellowPids.has(p.id), isExp=expelledPids.has(p.id);
+    const isMvp=p.id===motmId;
     const cardBadge=isExp?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🔴</span>':hasY?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🟡</span>':'';
     const subBadge=wasOut?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#e84444;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↓</span>':cameIn?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#21d07a;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↑</span>':'';
+    const ringStyle=isMvp?'box-shadow:0 0 0 2.5px #ffd700,0 0 8px rgba(255,215,0,.6)':'';
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 6px">
-      <div style="position:relative"><div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:#0e2444;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">${p.number||'?'}</div>${cardBadge}${subBadge}</div>
+      <div style="position:relative"><div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:#0e2444;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;${ringStyle}">${p.number||'?'}</div>${cardBadge}${subBadge}${isMvp?'<span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1">⭐</span>':''}</div>
       <span style="font-size:9.5px;font-weight:600;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.7);white-space:nowrap;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis">${pAbbr(p)}</span>
       ${rBadge(p.id)}
     </div>`;
@@ -2845,6 +2893,16 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       </div>
     </div>`;
 
+  const motmPlayer=motmId?convocados.find(p=>p.id===motmId):null;
+  const motmHtml=motmPlayer?`<div class="card" style="margin-top:12px;display:flex;align-items:center;gap:12px;padding:14px 16px">
+    <span style="font-size:26px">⭐</span>
+    <div style="flex:1">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;margin-bottom:2px">Melhor em Campo</div>
+      <div style="font-size:15px;font-weight:700">${motmPlayer.name}</div>
+    </div>
+    ${rBadge(motmPlayer.id)}
+  </div>`:'';
+
   document.getElementById('gm-tab-content').innerHTML=`
     <div style="position:relative;background:linear-gradient(160deg,#1e7a3e 0%,#0d5a28 50%,#1e7a3e 100%);border-radius:12px;padding:12px 8px;overflow:hidden">
       <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -2861,7 +2919,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
         ?'<div style="color:rgba(255,255,255,.6);text-align:center;padding:60px 0;font-size:13px">11 inicial não definido — usa a aba <strong style="color:rgba(255,255,255,.8)">Editar</strong></div>'
         :pitchRows}
     </div>
-    ${benchHtml}`;
+    ${benchHtml}
+    ${motmHtml}`;
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
