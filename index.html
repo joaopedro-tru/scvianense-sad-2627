@@ -769,7 +769,10 @@ body.pm #v-pf{padding:30px}
         <button class="btn btn-o btn-sm" id="btn-back-game">← Voltar</button>
         <div><h1 id="gm-title">Jogo</h1><div class="sub" id="gm-sub"></div></div>
       </div>
-      <button class="btn btn-o btn-sm" id="btn-edit-game">✏️ Editar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-d btn-sm" id="btn-del-game">🗑️</button>
+        <button class="btn btn-o btn-sm" id="btn-edit-game">✏️ Editar</button>
+      </div>
     </div>
     <div id="gm-content"></div>
   </div>
@@ -2899,6 +2902,11 @@ ${conv.notes?`<div class="obs-box"><div class="obs-label">Observações</div><di
 }
 
 document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
+document.getElementById('btn-del-game').addEventListener('click',()=>{
+  const ev=DB.getEvent(gameEventId); if(!ev)return;
+  if(!confirm(`Eliminar jogo vs ${ev.opponent||'—'}?`))return;
+  DB.deleteEvent(gameEventId); toast('Jogo eliminado.'); nav('sq-games',{squad});
+});
 document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
 document.getElementById('btn-back-game').addEventListener('click',()=>nav('sq-games',{squad}));
 
