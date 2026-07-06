@@ -295,6 +295,15 @@ body.pm #v-pf{padding:30px}
 .mev-icon{font-size:16px;flex-shrink:0;line-height:1}
 .mev-desc{flex:1;font-size:13px}
 
+/* ── MATCH SUMMARY (SUMÁRIO) ────────────────────────────── */
+.sum-period-hdr{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:var(--bg);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
+.sum-period:first-child .sum-period-hdr{border-top:none}
+.sum-ev{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.4}
+.sum-ev:last-child{border-bottom:none}
+.sum-min{font-weight:700;font-size:11px;min-width:34px;flex-shrink:0;color:var(--muted)}
+.sum-desc{flex:1}
+.sum-score-badge{font-size:12px;font-weight:800;color:var(--green-l);flex-shrink:0;background:#e8f0fb;padding:2px 8px;border-radius:6px;letter-spacing:1px;white-space:nowrap}
+
 /* ── LIVE MATCH RECORDING ───────────────────────────────── */
 .lv-header{background:var(--green-d);color:#fff;padding:20px;border-radius:12px;margin-bottom:18px;text-align:center}
 .lv-teams{display:flex;justify-content:space-between;font-size:12px;opacity:.7;margin-bottom:8px}
@@ -738,6 +747,7 @@ body.pm #v-pf{padding:30px}
   <div class="view" id="v-sq-trainings">
     <div class="tb">
       <div><h1 id="sqtr-title">Treinos</h1><div class="sub" id="sqtr-sub"></div></div>
+      <button class="btn btn-p btn-sm" id="btn-new-training">+ Novo Treino</button>
     </div>
     <div class="cc">
       <button class="btn btn-o btn-sm" id="sqtr-prev">← Anterior</button>
@@ -758,6 +768,7 @@ body.pm #v-pf{padding:30px}
   <div class="view" id="v-sq-games">
     <div class="tb">
       <div><h1 id="sqgm-title">Jogos</h1><div class="sub" id="sqgm-sub"></div></div>
+      <button class="btn btn-p btn-sm" id="btn-new-game">+ Novo Jogo</button>
     </div>
     <div id="sqgm-list"></div>
   </div>
@@ -1136,6 +1147,15 @@ function getGameType(ev){
   if(c.includes('taça')) return 'cup';
   if(c.includes('prepara')||c.includes('amig')) return 'friendly';
   return 'league';
+}
+const POS_ORDER=['GR','LD','DC','LE','MD','MC','MO','ED','EE','PL'];
+function sortByPos(players){
+  return [...players].sort((a,b)=>{
+    const ai=POS_ORDER.indexOf(a.position); const bi=POS_ORDER.indexOf(b.position);
+    const an=ai===-1?99:ai; const bn=bi===-1?99:bi;
+    if(an!==bn) return an-bn;
+    return (a.number||99)-(b.number||99);
+  });
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -1838,11 +1858,11 @@ document.getElementById('cal-filters').querySelectorAll('.ftb').forEach(b=>b.add
 }));
 
 // ── EVENT MODAL ───────────────────────────────────────────────────────────────
-function openEventModal(ev=null,date=null){
+function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('mo-e-title').textContent=ev?'Editar Evento':'Adicionar Evento';
   document.getElementById('e-id').value=ev?.id||'';
-  document.getElementById('e-type').value=ev?.type||'training';
-  document.getElementById('e-squad').value=ev?.squad||squad||'sub19';
+  document.getElementById('e-type').value=ev?.type||defaults.type||'training';
+  document.getElementById('e-squad').value=ev?.squad||defaults.squad||squad||'sub19';
   document.getElementById('e-date').value=ev?.date||date||new Date().toISOString().split('T')[0];
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-loc').value=ev?.location||'';
@@ -2086,7 +2106,8 @@ function liveEvLabel(e){
   if(e.type==='goal') return `⚽ <strong>Golo</strong> — ${pn(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
   if(e.type==='goal_conceded') return '🥅 <strong>Golo Sofrido</strong>';
   if(e.type==='yellow') return `🟡 <strong>Amarelo</strong> — ${pn(e.playerId)}`;
-  if(e.type==='red') return `🔴 <strong>Vermelho</strong> — ${pn(e.playerId)}`;
+  if(e.type==='yellow2') return `🟡🔴 <strong>2º Amarelo</strong> — ${pn(e.playerId)}`;
+  if(e.type==='red') return `🔴 <strong>Vermelho Direto</strong> — ${pn(e.playerId)}`;
   if(e.type==='sub') return `🔄 <strong>Sub</strong> — ${pn(e.playerOutId)} ↔ ${pn(e.playerInId)}`;
   if(e.type==='injury') return `🩺 <strong>Lesão</strong>${e.playerId?' — '+pn(e.playerId):''}`;
   if(e.type==='medical'){
@@ -2256,7 +2277,7 @@ function getConvocados(){
   const sq=DB.players(ev.squad==='both'?null:ev.squad);
   const convs=sq.filter(p=>!!conv.players[p.id]);
   const all=convs.length>0?convs:sq;
-  return all.sort((a,b)=>(a.number||99)-(b.number||99));
+  return sortByPos(all);
 }
 function getTitulares(){
   const ev=DB.getEvent(liveGameId); if(!ev) return getConvocados();
@@ -2265,12 +2286,31 @@ function getTitulares(){
   const tits=all.filter(p=>lineup.includes(p.id));
   return tits.length>0?tits:all;
 }
-function getSuplentes(){
-  const ev=DB.getEvent(liveGameId); if(!ev) return [];
-  const lineup=(ev.matchReport||{}).lineup||[];
+// Who is currently on the field (lineup + sub/medical ins - outs - expelled)
+function getCurrentPlayers(){
+  const ev=DB.getEvent(liveGameId); if(!ev) return getTitulares();
+  const mr=ev.matchReport||{};
+  const onField=new Set(mr.lineup||[]);
+  const expelled=new Set();
+  (mr.events||[]).forEach(e=>{
+    if(e.type==='sub'){
+      if(e.playerOutId) onField.delete(e.playerOutId);
+      if(e.playerInId) onField.add(e.playerInId);
+    }
+    if(e.type==='medical'&&e.playerInId){
+      if(e.playerId) onField.delete(e.playerId);
+      onField.add(e.playerInId);
+    }
+    if((e.type==='red'||e.type==='yellow2')&&e.playerId) expelled.add(e.playerId);
+  });
   const all=getConvocados();
-  const sups=all.filter(p=>!lineup.includes(p.id));
-  return sups.length>0?sups:all;
+  const cur=all.filter(p=>onField.has(p.id)&&!expelled.has(p.id));
+  return cur.length>0?cur:getTitulares();
+}
+// Who is in the squad but NOT currently on the field
+function getOffFieldPlayers(){
+  const onField=new Set(getCurrentPlayers().map(p=>p.id));
+  return getConvocados().filter(p=>!onField.has(p.id));
 }
 
 function openLivePicker(type){
@@ -2366,7 +2406,7 @@ function openLivePicker(type){
 
     function playerList(label,onSelect,skipLabel=null,onSkip=null,players=null){
       titleEl.textContent=label;
-      const list=players||getConvocados();
+      const list=players||getCurrentPlayers();
       const rows=list.map(p=>
         `<div class="pp-player" data-pp-pid="${p.id}">
           <span class="pp-num">${p.number||'—'}</span>
@@ -2395,14 +2435,32 @@ function openLivePicker(type){
       }
 
     // ── YELLOW / RED ───────────────────────────────────────────────────────
-    } else if(type==='yellow'||type==='red'){
-      const icon=type==='yellow'?'🟡':'🔴';
-      const label=type==='yellow'?'Cartão Amarelo':'Cartão Vermelho';
-      livePending.step='player';
-      playerList(`${icon} ${label} — quem?`, pid=>{
-        livePending.data.playerId=pid;
-        saveLiveEvent();
-      });
+    } else if(type==='yellow'||type==='red'||type==='yellow2'){
+      if(step==='yellow2-confirm'){
+        const p=DB.getPlayer(livePending.data.playerId);
+        titleEl.textContent='2º Amarelo = Expulsão';
+        bodyEl.innerHTML=`
+          <div style="padding:8px 4px;text-align:center">
+            <div style="font-size:36px;margin-bottom:12px">🟡🔴</div>
+            <p style="font-size:15px;font-weight:700;margin-bottom:6px">${p?.name||'—'}</p>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Já tem amarelo. Registar como expulsão por 2º amarelo?</p>
+            <button id="btn-y2-ok" class="btn btn-d" style="width:100%;padding:14px;font-size:15px;justify-content:center">🟡🔴 Confirmar Expulsão</button>
+          </div>`;
+        document.getElementById('btn-y2-ok').addEventListener('click',()=>saveLiveEvent());
+      } else {
+        const icon=type==='red'?'🔴':'🟡';
+        const label=type==='red'?'Vermelho Direto':'Cartão Amarelo';
+        livePending.step='player';
+        playerList(`${icon} ${label} — quem?`, pid=>{
+          livePending.data.playerId=pid;
+          if(type==='yellow'){
+            const _ev=DB.getEvent(liveGameId);
+            const hasYellow=(_ev?.matchReport?.events||[]).some(e=>e.type==='yellow'&&e.playerId===pid);
+            if(hasYellow){ livePending.type='yellow2'; livePending.step='yellow2-confirm'; showStep(); return; }
+          }
+          saveLiveEvent();
+        });
+      }
 
     // ── SUBSTITUTION ───────────────────────────────────────────────────────
     } else if(type==='sub'){
@@ -2412,12 +2470,12 @@ function openLivePicker(type){
           livePending.data.playerOutId=pid;
           livePending.step='in';
           showStep();
-        }, null, null, getTitulares());
+        }, null, null, getCurrentPlayers());
       } else if(step==='in'){
         playerList('🔄 Quem entra?', pid=>{
           livePending.data.playerInId=pid;
           saveLiveEvent();
-        }, null, null, getSuplentes());
+        }, null, null, getOffFieldPlayers());
       }
 
     // ── INJURY ─────────────────────────────────────────────────────────────
@@ -2453,7 +2511,7 @@ function openLivePicker(type){
       } else if(step==='med-in'){
         playerList('🔄 Quem entra?',
           pid=>{ livePending.data.playerInId=pid; saveLiveEvent(); },
-          null, null, getSuplentes()
+          null, null, getOffFieldPlayers()
         );
       }
     }
@@ -2474,7 +2532,7 @@ function saveLiveEvent(){
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
-  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥'};
+  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥'};
   toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
 }
@@ -2578,13 +2636,17 @@ function renderGame(){
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
-    <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border)">
+    <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
       <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
-      <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">📊 Pós-Jogo</button>
+      <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
+      <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
+      <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Editar</button>
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
   if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
+  else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
+  else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
 }
 
@@ -2653,6 +2715,153 @@ function renderGamePre(ev,sqPlayers,conv){
     DB.updateEvent(gameEventId,{convocatoria:c}); toast('✅ Guardado!');
   });
   document.getElementById('btn-gen-pdf').addEventListener('click',()=>generateConvocatoriaPDF(gameEventId));
+}
+
+// ── SUMÁRIO ───────────────────────────────────────────────────────────────────
+function renderGameSumario(ev,sqPlayers,conv,mr){
+  const evs=(mr.events||[]).sort((a,b)=>sortMin(a)-sortMin(b));
+  const isHome=ev.homeAway!=='away';
+  function pn(id){ const p=DB.getPlayer(id); if(!p)return '—'; const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+
+  function periodOf(e){
+    if(e.period==='pen') return 'Grandes Penalidades';
+    if(e.period==='et2'||(e.minute>=106&&e.minute<=120)) return 'Prolongamento 2';
+    if(e.period==='et1'||(e.minute>=91&&e.minute<=105)) return 'Prolongamento 1';
+    if(e.period==='p3') return '3ª Parte';
+    if(e.period==='p2'||e.minute>45) return '2ª Parte';
+    return '1ª Parte';
+  }
+
+  const PERIOD_ORDER=['1ª Parte','2ª Parte','3ª Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
+  const byPeriod={};
+  evs.forEach(e=>{ const p=periodOf(e); if(!byPeriod[p])byPeriod[p]=[]; byPeriod[p].push(e); });
+  const periods=PERIOD_ORDER.filter(p=>byPeriod[p]);
+
+  let ourG=0,theirG=0;
+  const sectionsHtml=periods.map(period=>{
+    const start=[ourG,theirG];
+    const rows=byPeriod[period].map(e=>{
+      let scoreBadge='';
+      if(e.type==='goal'){ ourG++; const a=isHome?ourG:theirG,b=isHome?theirG:ourG; scoreBadge=`<span class="sum-score-badge">${a} — ${b}</span>`; }
+      else if(e.type==='goal_conceded'){ theirG++; const a=isHome?ourG:theirG,b=isHome?theirG:ourG; scoreBadge=`<span class="sum-score-badge">${a} — ${b}</span>`; }
+      let desc='';
+      if(e.type==='goal') desc=`⚽ <strong>${pn(e.playerId)}</strong>${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
+      else if(e.type==='goal_conceded') desc='🥅 <span style="color:var(--muted)">Golo sofrido</span>';
+      else if(e.type==='yellow') desc=`🟡 ${pn(e.playerId)}`;
+      else if(e.type==='yellow2') desc=`🟡🔴 ${pn(e.playerId)} <span style="color:var(--muted);font-size:11px">(2º amarelo)</span>`;
+      else if(e.type==='red') desc=`🔴 ${pn(e.playerId)} <span style="color:var(--muted);font-size:11px">(direto)</span>`;
+      else if(e.type==='sub') desc=`🔄 <span style="color:var(--muted)">${pn(e.playerOutId)}</span> → <strong>${pn(e.playerInId)}</strong>`;
+      else if(e.type==='injury') desc=`🩺 ${pn(e.playerId)||'—'}`;
+      else if(e.type==='medical'){ desc=`🏥 ${e.playerId?pn(e.playerId):'—'}${e.playerInId?` → <strong>${pn(e.playerInId)}</strong>`:''}`; }
+      return `<div class="sum-ev"><span class="sum-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="sum-desc">${desc}</span>${scoreBadge}</div>`;
+    }).join('');
+    const pOur=ourG-start[0], pTheir=theirG-start[1];
+    const pA=isHome?pOur:pTheir, pB=isHome?pTheir:pOur;
+    return `<div class="sum-period"><div class="sum-period-hdr"><span>${period}</span><span>${pA} — ${pB}</span></div>${rows}</div>`;
+  }).join('');
+
+  const finalA=isHome?ourG:theirG, finalB=isHome?theirG:ourG;
+  const teamA=isHome?'SC Vianense SAD':(ev.opponent||'Adversário');
+  const teamB=isHome?(ev.opponent||'Adversário'):'SC Vianense SAD';
+
+  document.getElementById('gm-tab-content').innerHTML=`
+    <div class="card" style="text-align:center;padding:20px 16px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${ev.competition||''}${ev.competition&&ev.date?' · ':''}${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+        <span style="font-size:13px;font-weight:700;flex:1;text-align:right">${teamA}</span>
+        <span style="font-size:44px;font-weight:800;letter-spacing:6px;color:var(--green);line-height:1">${finalA}—${finalB}</span>
+        <span style="font-size:13px;font-weight:700;flex:1;text-align:left">${teamB}</span>
+      </div>
+    </div>
+    ${evs.length===0
+      ?'<div class="card" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Sem eventos. Usa a aba <strong>Editar</strong> para adicionar ou regista ao vivo no <strong>Dia de Jogo</strong>.</div>'
+      :`<div class="card" style="padding:0;overflow:hidden">${sectionsHtml}</div>`}`;
+}
+
+// ── RELATÓRIO (CAMPO + AVALIAÇÕES) ────────────────────────────────────────────
+function renderGameRelatorio(ev,sqPlayers,conv,mr){
+  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]);
+  const lineup=mr.lineup||[];
+  const ratings=mr.ratings||{};
+  const evs=mr.events||[];
+
+  const subbedOut=new Set([...evs.filter(e=>e.type==='sub'&&e.playerOutId).map(e=>e.playerOutId),...evs.filter(e=>e.type==='medical'&&e.playerInId&&e.playerId).map(e=>e.playerId)]);
+  const subbedIn=new Set([...evs.filter(e=>e.type==='sub'&&e.playerInId).map(e=>e.playerInId),...evs.filter(e=>e.type==='medical'&&e.playerInId).map(e=>e.playerInId)]);
+  const yellowPids=new Set(evs.filter(e=>e.type==='yellow').map(e=>e.playerId).filter(Boolean));
+  const expelledPids=new Set(evs.filter(e=>(e.type==='red'||e.type==='yellow2')&&e.playerId).map(e=>e.playerId));
+
+  function pAbbr(p){ const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+
+  function rBadge(pid,small=false){
+    const r=(ratings[pid]||{}).rating;
+    if(r===null||r===undefined||r==='') return '';
+    const n=parseFloat(r);
+    const bg=n>=8?'#21d07a':n>=7?'#d2d849':n>=6?'#f5a623':'#e84444';
+    const col=(n>=7&&n<8)?'#111':'#fff';
+    const fs=small?'9px':'9.5px';
+    return `<span style="display:inline-block;background:${bg};color:${col};font-size:${fs};font-weight:800;padding:1px 5px;border-radius:3px;line-height:1.7">${n%1===0?n+'.0':n}</span>`;
+  }
+
+  function pToken(p){
+    const wasOut=subbedOut.has(p.id), cameIn=subbedIn.has(p.id);
+    const hasY=yellowPids.has(p.id), isExp=expelledPids.has(p.id);
+    const cardBadge=isExp?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🔴</span>':hasY?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🟡</span>':'';
+    const subBadge=wasOut?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#e84444;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↓</span>':cameIn?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#21d07a;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↑</span>':'';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 6px">
+      <div style="position:relative"><div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:#0e2444;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">${p.number||'?'}</div>${cardBadge}${subBadge}</div>
+      <span style="font-size:9.5px;font-weight:600;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.7);white-space:nowrap;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis">${pAbbr(p)}</span>
+      ${rBadge(p.id)}
+    </div>`;
+  }
+
+  // Row ordering: ATK→GK (top to bottom on pitch)
+  const POS_ROWS=[['PL','EE','ED'],['MO'],['MC'],['MD'],['LD','DC','LE'],['GR']];
+  const tits=convocados.filter(p=>lineup.includes(p.id));
+  const sups=convocados.filter(p=>!lineup.includes(p.id));
+
+  const rowMap={};
+  tits.forEach(p=>{
+    let ri=POS_ROWS.findIndex(r=>r.includes(p.position));
+    if(ri===-1) ri=2;
+    if(!rowMap[ri]) rowMap[ri]=[];
+    rowMap[ri].push(p);
+  });
+
+  const pitchRows=Object.keys(rowMap).sort((a,b)=>+a-+b).map(k=>
+    `<div style="display:flex;justify-content:center;gap:4px;padding:7px 0">${rowMap[k].map(pToken).join('')}</div>`
+  ).join('');
+
+  const benchHtml=sups.length===0?'':
+    `<div class="card" style="margin-top:12px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;font-weight:600">Banco de Suplentes</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${sups.map(p=>{
+          const r=(ratings[p.id]||{}).rating;
+          const badge=r!==null&&r!==undefined&&r!==''?rBadge(p.id,true):'';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
+            <span style="font-weight:700;color:var(--green);min-width:18px;text-align:right;font-size:13px">${p.number||'—'}</span>
+            <span style="font-size:12px">${pAbbr(p)}</span>${badge}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('gm-tab-content').innerHTML=`
+    <div style="position:relative;background:linear-gradient(160deg,#1e7a3e 0%,#0d5a28 50%,#1e7a3e 100%);border-radius:12px;padding:12px 8px;overflow:hidden">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <rect x="3" y="1" width="94" height="98" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".8"/>
+        <line x1="3" y1="50" x2="97" y2="50" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>
+        <circle cx="50" cy="50" r="13" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>
+        <circle cx="50" cy="50" r=".8" fill="rgba(255,255,255,.3)"/>
+        <rect x="27" y="1" width="46" height="16" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+        <rect x="27" y="83" width="46" height="16" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+        <rect x="38" y="1" width="24" height="6" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+        <rect x="38" y="93" width="24" height="6" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+      </svg>
+      ${tits.length===0
+        ?'<div style="color:rgba(255,255,255,.6);text-align:center;padding:60px 0;font-size:13px">11 inicial não definido — usa a aba <strong style="color:rgba(255,255,255,.8)">Editar</strong></div>'
+        :pitchRows}
+    </div>
+    ${benchHtml}`;
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
@@ -2909,6 +3118,8 @@ document.getElementById('btn-del-game').addEventListener('click',()=>{
 });
 document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
 document.getElementById('btn-back-game').addEventListener('click',()=>nav('sq-games',{squad}));
+document.getElementById('btn-new-training').addEventListener('click',()=>openEventModal(null,null,{type:'training',squad}));
+document.getElementById('btn-new-game').addEventListener('click',()=>openEventModal(null,null,{type:'game',squad}));
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.nl[data-view]').forEach(el=>{
