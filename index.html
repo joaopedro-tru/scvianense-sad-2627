@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SC Vianense SAD — Gestão Desportiva</title>
 
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0e2444">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- iOS Safari -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SCV SAD">
+<link rel="apple-touch-icon" href="/icon.svg">
+
 <!-- Firebase SDK (compat) — necessário para upload de ficheiros e Firestore -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
@@ -2550,6 +2560,25 @@ document.getElementById('btn-logout').addEventListener('click',()=>{
   if(confirm('Terminar sessão?')){ sessionStorage.removeItem(AUTH_KEY); location.reload(); }
 });
 document.getElementById('btn-sync-athletes').addEventListener('click',()=>syncPendingAthletes(false));
+
+// ── PWA: Service Worker ───────────────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => {
+        // Notifica quando há uma nova versão disponível
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if(nw.state === 'installed' && navigator.serviceWorker.controller){
+              toast('🔄 Nova versão disponível — recarrega para actualizar');
+            }
+          });
+        });
+      })
+      .catch(() => {}); // falha silenciosa (ex: localhost sem HTTPS)
+  });
+}
 </script>
 </body>
 </html>
