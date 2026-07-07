@@ -1061,17 +1061,6 @@ function compressImage(file, maxPx=600, quality=0.70) {
   });
 }
 
-async function uploadFile(file, playerId, type) {
-  if (storage) {
-    const ext = file.name.split('.').pop();
-    const path = `players/${playerId}/${type}_${Date.now()}.${ext}`;
-    const ref = storage.ref(path);
-    await ref.put(file);
-    return await ref.getDownloadURL();
-  }
-  // Fallback: base64 (funciona local mas não é ideal para produção)
-  return await fileToBase64(file);
-}
 
 // ── DATA LAYER (localStorage cache + Firestore cloud) ─────────────────────────
 // Leituras: localStorage (rápido/síncrono). Escritas: localStorage + Firestore em paralelo.
@@ -3059,7 +3048,6 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       });
     });
   }
-}
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
