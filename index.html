@@ -323,6 +323,9 @@ body.pm #v-pf{padding:30px}
 .lv-setup-parts .sp-n{font-size:36px;font-weight:800;line-height:1;color:var(--green)}
 .lv-setup-parts .sp-l{font-size:12px;color:var(--muted);font-weight:500}
 
+.form-chip{padding:5px 11px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.form-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+.form-chip:hover{border-color:var(--green-l)}
 .lv-period-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .lv-period-chip{background:var(--bg);color:var(--text);border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .lv-period-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
@@ -1124,6 +1127,98 @@ const COMPETITIONS={
   both: ['Jogo de Preparação'],
 };
 // Periods per game type: id, label, start, end (null=open), boundary minute for acréscimos
+// Formation slot definitions — x:left%→right%, y:top%→bottom% on a horizontal pitch
+// Each array has exactly 11 slots in order: GK → DEF → MID → FWD
+const FORMATIONS={
+  '4-3-3':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:24,y:14},{role:'DC',x:24,y:38},{role:'DC',x:24,y:62},{role:'LE',x:24,y:86},
+    {role:'MC',x:50,y:22},{role:'MC',x:50,y:50},{role:'MC',x:50,y:78},
+    {role:'ED',x:79,y:12},{role:'PL',x:84,y:50},{role:'EE',x:79,y:88}
+  ],
+  '4-4-2':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LE',x:24,y:88},
+    {role:'ED',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'EE',x:50,y:88},
+    {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
+  ],
+  '4-4-1-1':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LE',x:24,y:88},
+    {role:'ED',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'EE',x:50,y:88},
+    {role:'MO',x:68,y:50},
+    {role:'PL',x:84,y:50}
+  ],
+  '4-1-4-1':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'MD',x:38,y:50},
+    {role:'ED',x:58,y:12},{role:'MC',x:58,y:37},{role:'MC',x:58,y:63},{role:'EE',x:58,y:88},
+    {role:'PL',x:84,y:50}
+  ],
+  '4-2-3-1':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'MD',x:38,y:33},{role:'MD',x:38,y:67},
+    {role:'ED',x:60,y:12},{role:'MO',x:62,y:50},{role:'EE',x:60,y:88},
+    {role:'PL',x:84,y:50}
+  ],
+  '4-1-3-2':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'MD',x:38,y:50},
+    {role:'ED',x:58,y:20},{role:'MC',x:58,y:50},{role:'EE',x:58,y:80},
+    {role:'PL',x:80,y:30},{role:'PL',x:80,y:70}
+  ],
+  '4-5-1':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:24,y:12},{role:'DC',x:24,y:33},{role:'DC',x:24,y:67},{role:'LE',x:24,y:88},
+    {role:'ED',x:50,y:10},{role:'MC',x:50,y:28},{role:'MC',x:50,y:50},{role:'MC',x:50,y:72},{role:'EE',x:50,y:90},
+    {role:'PL',x:82,y:50}
+  ],
+  '3-4-3':[
+    {role:'GR',x:8,y:50},
+    {role:'DC',x:24,y:25},{role:'DC',x:24,y:50},{role:'DC',x:24,y:75},
+    {role:'LD',x:48,y:12},{role:'MC',x:48,y:37},{role:'MC',x:48,y:63},{role:'LE',x:48,y:88},
+    {role:'ED',x:79,y:15},{role:'PL',x:84,y:50},{role:'EE',x:79,y:85}
+  ],
+  '3-5-2':[
+    {role:'GR',x:8,y:50},
+    {role:'DC',x:22,y:25},{role:'DC',x:22,y:50},{role:'DC',x:22,y:75},
+    {role:'LD',x:46,y:10},{role:'MC',x:48,y:30},{role:'MD',x:46,y:50},{role:'MC',x:48,y:70},{role:'LE',x:46,y:90},
+    {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
+  ],
+  '5-3-2':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LE',x:22,y:92},
+    {role:'MC',x:50,y:25},{role:'MC',x:50,y:50},{role:'MC',x:50,y:75},
+    {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
+  ],
+  '5-2-3':[
+    {role:'GR',x:8,y:50},
+    {role:'LD',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LE',x:22,y:92},
+    {role:'MC',x:48,y:33},{role:'MC',x:48,y:67},
+    {role:'ED',x:79,y:15},{role:'PL',x:84,y:50},{role:'EE',x:79,y:85}
+  ]
+};
+
+// Auto-assign lineup players to formation slots by closest position group
+function buildDefaultPositions(formation,players){
+  const slots=FORMATIONS[formation]; if(!slots) return {};
+  const used=new Set(); const result={};
+  const rg=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:r==='MD'?2:['MC','MO'].includes(r)?3:['ED','EE'].includes(r)?4:5;
+  slots.forEach(slot=>{
+    let best=null,bestScore=999;
+    players.forEach(p=>{
+      if(used.has(p.id)) return;
+      const s=p.position===slot.role?0:Math.abs(rg(p.position||'')-rg(slot.role));
+      if(s<bestScore){bestScore=s;best=p;}
+    });
+    if(best){result[best.id]={x:slot.x,y:slot.y};used.add(best.id);}
+  });
+  return result;
+}
+
 const GAME_PERIODS={
   league:[
     {id:'p1',label:'1ª Parte',start:1,end:45},
@@ -2098,8 +2193,19 @@ function initLiveMinute(){
   } else { liveMinute=1; }
 }
 
-function fmtMin(e){ if(e.period==='pen') return 'GP'; return e.extra?`${e.minute}+${e.extra}`:`${e.minute}`; }
-function sortMin(e){ return (e.minute||0)+(e.extra||0)*0.01; }
+function fmtMin(e){
+  if(e.period==='pen') return 'GP';
+  const m=e.minute||0;
+  // legacy: stored with separate extra field
+  if(e.extra) return `${m}+${e.extra}`;
+  // period-aware cap: if minute exceeds period end, show as cap+overflow
+  const caps={p1:45,p2:90,et1:105,et2:120};
+  if(e.period&&caps[e.period]&&m>caps[e.period]) return `${caps[e.period]}+${m-caps[e.period]}`;
+  // fallback inference without period
+  if(!e.period&&m>90) return `90+${m-90}`;
+  return `${m}`;
+}
+function sortMin(e){ return e.extra?(e.minute||0)+(e.extra||0)*0.01:(e.minute||0); }
 
 function liveEvLabel(e){
   function pn(id){ const p=DB.getPlayer(id); return p?p.name.split(' ')[0]+' '+p.name.split(' ').slice(-1)[0][0]+'.':'—'; }
@@ -2357,27 +2463,31 @@ function openLivePicker(type){
       bodyEl.innerHTML=`
         <div style="padding:8px 4px">
           <div class="lv-period-chips">${chips}</div>
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px" id="lv-min-lbl">Minuto</label>
-          <input id="lv-min-base" type="number" min="1" max="130" placeholder="Ex: 23"
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Minuto</label>
+          <input id="lv-min-base" type="number" min="1" max="200" placeholder="Ex: 23"
             style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
-          <div id="lv-extra-wrap" style="display:none;margin-bottom:14px">
-            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Acréscimos (opcional)</label>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:20px;color:var(--muted);font-weight:700;flex-shrink:0">+</span>
-              <input id="lv-min-extra" type="number" min="1" max="30" placeholder="Ex: 2"
-                style="flex:1;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;font-family:inherit">
-            </div>
-            <div id="lv-extra-hint" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
-          </div>
+          <div id="lv-min-preview" style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;min-height:18px"></div>
           <button id="lv-min-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center" disabled>Confirmar →</button>
         </div>`;
 
       const baseInp=document.getElementById('lv-min-base');
-      const extraWrap=document.getElementById('lv-extra-wrap');
-      const extraInp=document.getElementById('lv-min-extra');
-      const extraHint=document.getElementById('lv-extra-hint');
+      const previewEl=document.getElementById('lv-min-preview');
       const confirmBtn=document.getElementById('lv-min-confirm');
       let activePeriod=null;
+
+      function updatePreview(){
+        const v=parseInt(baseInp.value)||0;
+        confirmBtn.disabled=!(v>=1);
+        if(!v){ previewEl.textContent=''; return; }
+        // Compute preview display
+        const caps={p1:45,p2:90,et1:105,et2:120};
+        let display=`${v}'`;
+        if(activePeriod&&caps[activePeriod.id]&&v>caps[activePeriod.id]){
+          const cap=caps[activePeriod.id];
+          display=`${cap}+${v-cap}'`;
+        } else if(!activePeriod&&v>90){ display=`90+${v-90}'`; }
+        previewEl.textContent=display===`${v}'`?'':`→ será apresentado como ${display}`;
+      }
 
       // Period chip selection
       bodyEl.querySelectorAll('.lv-period-chip').forEach(chip=>{
@@ -2387,35 +2497,20 @@ function openLivePicker(type){
           const idx=parseInt(chip.dataset.pi);
           activePeriod=periods[idx];
           if(activePeriod.isPenalty){
-            // Penalties: no minute needed — save immediately with period marker
             livePending.data._minute=121; livePending.data._period='pen';
             if(type==='goal_conceded'){ saveLiveEvent(); return; }
             livePending.step='init'; showStep(); return;
           }
-          // Pre-fill with period boundary so acréscimos appear right away
-          if(activePeriod.end){ baseInp.value=activePeriod.end; baseInp.dispatchEvent(new Event('input')); }
-          else { baseInp.value=''; confirmBtn.disabled=true; }
+          updatePreview();
           baseInp.focus();
         });
       });
 
-      baseInp.addEventListener('input',()=>{
-        const v=parseInt(baseInp.value)||0;
-        confirmBtn.disabled=!(v>=1);
-        // Show acréscimos: near period boundary (within 3 min) or standard boundaries if no chip
-        let showExtra=false;
-        if(activePeriod&&activePeriod.end) showExtra=(v>=activePeriod.end-2&&v<=activePeriod.end);
-        else if(gtype==='friendly') showExtra=(v>=20); // all periods open
-        else showExtra=(v>=43&&v<=45)||(v>=88&&v<=90)||(v>=103&&v<=105)||(v>=118&&v<=120);
-        extraWrap.style.display=showExtra?'block':'none';
-        if(showExtra) extraHint.textContent=`Ex: ${v} + 2 → registado como ${v}+2'`;
-      });
+      baseInp.addEventListener('input', updatePreview);
 
       confirmBtn.addEventListener('click',()=>{
         const base=parseInt(baseInp.value)||0;
-        const extra=parseInt(extraInp.value)||0;
         livePending.data._minute=base;
-        if(extra>0) livePending.data._extra=extra;
         if(activePeriod) livePending.data._period=activePeriod.id;
         if(type==='goal_conceded'){ saveLiveEvent(); return; }
         livePending.step='init'; showStep();
@@ -2568,9 +2663,8 @@ function finishGame(motmId){
 
 function saveLiveEvent(){
   const {type,data}=livePending;
-  const {_minute,_extra,_period,...rest}=data;
+  const {_minute,_period,...rest}=data;
   const ne={id:uid(),minute:_minute||1,type,...rest};
-  if(_extra) ne.extra=_extra;
   if(_period) ne.period=_period;
   const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
   cur.events=[...(cur.events||[]),ne];
@@ -2823,13 +2917,16 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
       :`<div class="card" style="padding:0;overflow:hidden">${sectionsHtml}</div>`}`;
 }
 
-// ── RELATÓRIO (CAMPO + AVALIAÇÕES) ────────────────────────────────────────────
+// ── RELATÓRIO (CAMPO HORIZONTAL + DRAG-AND-DROP) ──────────────────────────────
 function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const convocados=sqPlayers.filter(p=>!!conv.players[p.id]);
   const lineup=mr.lineup||[];
   const ratings=mr.ratings||{};
   const evs=mr.events||[];
   const motmId=mr.motm||null;
+  const formation=mr.formation||null;
+  const savedPos=mr.fieldPositions||{};
+  const igPos=mr.inGamePositions||{};
 
   const subbedOut=new Set([...evs.filter(e=>e.type==='sub'&&e.playerOutId).map(e=>e.playerOutId),...evs.filter(e=>e.type==='medical'&&e.playerInId&&e.playerId).map(e=>e.playerId)]);
   const subbedIn=new Set([...evs.filter(e=>e.type==='sub'&&e.playerInId).map(e=>e.playerInId),...evs.filter(e=>e.type==='medical'&&e.playerInId).map(e=>e.playerInId)]);
@@ -2837,59 +2934,60 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const expelledPids=new Set(evs.filter(e=>(e.type==='red'||e.type==='yellow2')&&e.playerId).map(e=>e.playerId));
 
   function pAbbr(p){ const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
-
   function rBadge(pid,small=false){
     const r=(ratings[pid]||{}).rating;
     if(r===null||r===undefined||r==='') return '';
     const n=parseFloat(r);
     const bg=n>=8?'#21d07a':n>=7?'#d2d849':n>=6?'#f5a623':'#e84444';
     const col=(n>=7&&n<8)?'#111':'#fff';
-    const fs=small?'9px':'9.5px';
-    return `<span style="display:inline-block;background:${bg};color:${col};font-size:${fs};font-weight:800;padding:1px 5px;border-radius:3px;line-height:1.7">${n%1===0?n+'.0':n}</span>`;
+    return `<span style="display:inline-block;background:${bg};color:${col};font-size:${small?'9px':'9.5px'};font-weight:800;padding:1px 5px;border-radius:3px;line-height:1.7">${n%1===0?n+'.0':n}</span>`;
   }
 
-  function pToken(p){
-    const wasOut=subbedOut.has(p.id), cameIn=subbedIn.has(p.id);
-    const hasY=yellowPids.has(p.id), isExp=expelledPids.has(p.id);
-    const isMvp=p.id===motmId;
-    const cardBadge=isExp?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🔴</span>':hasY?'<span style="position:absolute;top:-3px;right:-3px;font-size:9px;line-height:1">🟡</span>':'';
-    const subBadge=wasOut?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#e84444;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↓</span>':cameIn?'<span style="position:absolute;bottom:-3px;left:-3px;width:13px;height:13px;border-radius:50%;background:#21d07a;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↑</span>':'';
-    const ringStyle=isMvp?'box-shadow:0 0 0 2.5px #ffd700,0 0 8px rgba(255,215,0,.6)':'';
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 6px">
-      <div style="position:relative"><div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:#0e2444;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;${ringStyle}">${p.number||'?'}</div>${cardBadge}${subBadge}${isMvp?'<span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1">⭐</span>':''}</div>
-      <span style="font-size:9.5px;font-weight:600;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.7);white-space:nowrap;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis">${pAbbr(p)}</span>
-      ${rBadge(p.id)}
-    </div>`;
-  }
-
-  // Row ordering: ATK→GK (top to bottom on pitch)
-  const POS_ROWS=[['PL','EE','ED'],['MO'],['MC'],['MD'],['LD','DC','LE'],['GR']];
   const tits=convocados.filter(p=>lineup.includes(p.id));
   const sups=convocados.filter(p=>!lineup.includes(p.id));
 
-  const rowMap={};
-  tits.forEach(p=>{
-    let ri=POS_ROWS.findIndex(r=>r.includes(p.position));
-    if(ri===-1) ri=2;
-    if(!rowMap[ri]) rowMap[ri]=[];
-    rowMap[ri].push(p);
-  });
+  // Resolve position for each player (saved → formation default → fallback)
+  const defaultPos=formation&&tits.length>0?buildDefaultPositions(formation,tits):{};
+  function getPPos(p){
+    if(savedPos[p.id]) return savedPos[p.id];
+    if(defaultPos[p.id]) return defaultPos[p.id];
+    // Fallback: spread evenly
+    const i=tits.indexOf(p); const n=tits.length||1;
+    return {x:8+(i/(n-1||1))*76, y:10+((i*37)%80)};
+  }
 
-  const pitchRows=Object.keys(rowMap).sort((a,b)=>+a-+b).map(k=>
-    `<div style="display:flex;justify-content:center;gap:4px;padding:7px 0">${rowMap[k].map(pToken).join('')}</div>`
-  ).join('');
+  // Build player tokens HTML (absolute positioned on pitch)
+  const tokensHtml=tits.map(p=>{
+    const pos=getPPos(p);
+    const wasOut=subbedOut.has(p.id),cameIn=subbedIn.has(p.id);
+    const hasY=yellowPids.has(p.id),isExp=expelledPids.has(p.id);
+    const isMvp=p.id===motmId;
+    const ringStyle=isMvp?'box-shadow:0 0 0 2.5px #ffd700,0 0 8px rgba(255,215,0,.55)':'';
+    const cardBadge=isExp?`<span style="position:absolute;top:-4px;right:-4px;font-size:9px;line-height:1">🔴</span>`:hasY?`<span style="position:absolute;top:-4px;right:-4px;font-size:9px;line-height:1">🟡</span>`:'';
+    const subBadge=wasOut?`<span style="position:absolute;bottom:-4px;left:-4px;width:13px;height:13px;border-radius:50%;background:#e84444;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↓</span>`:cameIn?`<span style="position:absolute;bottom:-4px;left:-4px;width:13px;height:13px;border-radius:50%;background:#21d07a;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1">↑</span>`:'';
+    const mvpStar=isMvp?`<span style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1">⭐</span>`:'';
+    const posLabel=igPos[p.id]||p.position||'';
+    return `<div class="rel-tok" data-pid="${p.id}"
+      style="position:absolute;left:${pos.x}%;top:${pos.y}%;transform:translate(-50%,-50%);
+             display:flex;flex-direction:column;align-items:center;gap:2px;
+             cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;z-index:10">
+      <div style="position:relative">
+        <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.93);color:#0e2444;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;${ringStyle}">${p.number||'?'}</div>
+        ${mvpStar}${cardBadge}${subBadge}
+      </div>
+      <span style="font-size:9px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${pAbbr(p)}</span>
+      ${posLabel?`<span style="font-size:8px;color:rgba(255,255,255,.7);line-height:1">${posLabel}</span>`:''}
+      ${rBadge(p.id)}
+    </div>`;
+  }).join('');
 
   const benchHtml=sups.length===0?'':
     `<div class="card" style="margin-top:12px">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;font-weight:600">Banco de Suplentes</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${sups.map(p=>{
-          const r=(ratings[p.id]||{}).rating;
-          const badge=r!==null&&r!==undefined&&r!==''?rBadge(p.id,true):'';
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
-            <span style="font-weight:700;color:var(--green);min-width:18px;text-align:right;font-size:13px">${p.number||'—'}</span>
-            <span style="font-size:12px">${pAbbr(p)}</span>${badge}</div>`;
-        }).join('')}
+        ${sups.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
+          <span style="font-weight:700;color:var(--green);min-width:18px;text-align:right;font-size:13px">${p.number||'—'}</span>
+          <span style="font-size:12px">${pAbbr(p)}</span>${rBadge(p.id,true)}</div>`).join('')}
       </div>
     </div>`;
 
@@ -2899,28 +2997,69 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     <div style="flex:1">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;margin-bottom:2px">Melhor em Campo</div>
       <div style="font-size:15px;font-weight:700">${motmPlayer.name}</div>
-    </div>
-    ${rBadge(motmPlayer.id)}
-  </div>`:'';
+    </div>${rBadge(motmPlayer.id)}</div>`:'';
 
   document.getElementById('gm-tab-content').innerHTML=`
-    <div style="position:relative;background:linear-gradient(160deg,#1e7a3e 0%,#0d5a28 50%,#1e7a3e 100%);border-radius:12px;padding:12px 8px;overflow:hidden">
-      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <rect x="3" y="1" width="94" height="98" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".8"/>
-        <line x1="3" y1="50" x2="97" y2="50" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>
-        <circle cx="50" cy="50" r="13" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>
-        <circle cx="50" cy="50" r=".8" fill="rgba(255,255,255,.3)"/>
-        <rect x="27" y="1" width="46" height="16" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
-        <rect x="27" y="83" width="46" height="16" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
-        <rect x="38" y="1" width="24" height="6" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
-        <rect x="38" y="93" width="24" height="6" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">
+      ${formation?`<strong style="color:var(--text)">${formation}</strong> · `:''}Arrasta os jogadores para ajustar posições
+    </div>
+    <div id="rel-pitch" style="position:relative;width:100%;padding-top:62%;
+         background:linear-gradient(125deg,#1e7a3e 0%,#0d5a28 55%,#1a6e36 100%);
+         border-radius:12px;overflow:hidden;touch-action:none">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 100 62" preserveAspectRatio="none">
+        <rect x="2" y="2" width="96" height="58" fill="none" stroke="rgba(255,255,255,.22)" stroke-width=".7"/>
+        <line x1="50" y1="2" x2="50" y2="60" stroke="rgba(255,255,255,.2)" stroke-width=".5"/>
+        <circle cx="50" cy="31" r="9" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".5"/>
+        <circle cx="50" cy="31" r=".8" fill="rgba(255,255,255,.35)"/>
+        <rect x="2" y="13" width="18" height="36" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+        <rect x="80" y="13" width="18" height="36" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+        <rect x="2" y="22" width="7" height="18" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+        <rect x="91" y="22" width="7" height="18" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+        <rect x="0" y="26" width="2" height="10" fill="none" stroke="rgba(255,255,255,.3)" stroke-width=".7"/>
+        <rect x="98" y="26" width="2" height="10" fill="none" stroke="rgba(255,255,255,.3)" stroke-width=".7"/>
+        <circle cx="14" cy="31" r=".7" fill="rgba(255,255,255,.3)"/>
+        <circle cx="86" cy="31" r=".7" fill="rgba(255,255,255,.3)"/>
       </svg>
       ${tits.length===0
-        ?'<div style="color:rgba(255,255,255,.6);text-align:center;padding:60px 0;font-size:13px">11 inicial não definido — usa a aba <strong style="color:rgba(255,255,255,.8)">Editar</strong></div>'
-        :pitchRows}
+        ?'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:13px;text-align:center;padding:20px">11 inicial não definido — define no separador <strong style="color:rgba(255,255,255,.8)">Editar</strong></div>'
+        :tokensHtml}
     </div>
     ${benchHtml}
     ${motmHtml}`;
+
+  // ── DRAG & DROP ──────────────────────────────────────────────────────────────
+  if(tits.length>0){
+    const pitchEl=document.getElementById('rel-pitch');
+    pitchEl.querySelectorAll('.rel-tok').forEach(tok=>{
+      let dragging=false,startCX,startCY,initL,initT;
+      tok.addEventListener('pointerdown',e=>{
+        e.preventDefault(); e.stopPropagation();
+        dragging=true; tok.setPointerCapture(e.pointerId);
+        startCX=e.clientX; startCY=e.clientY;
+        initL=parseFloat(tok.style.left); initT=parseFloat(tok.style.top);
+        tok.style.zIndex='50'; tok.style.cursor='grabbing'; tok.style.transition='none';
+      });
+      tok.addEventListener('pointermove',e=>{
+        if(!dragging) return;
+        const r=pitchEl.getBoundingClientRect();
+        const nx=Math.max(3,Math.min(97,initL+(e.clientX-startCX)/r.width*100));
+        const ny=Math.max(3,Math.min(97,initT+(e.clientY-startCY)/r.height*100));
+        tok.style.left=`${nx}%`; tok.style.top=`${ny}%`;
+      });
+      tok.addEventListener('pointerup',e=>{
+        if(!dragging) return; dragging=false;
+        tok.style.zIndex='10'; tok.style.cursor='grab';
+        const pid=tok.dataset.pid;
+        const nx=Math.round(parseFloat(tok.style.left)*10)/10;
+        const ny=Math.round(parseFloat(tok.style.top)*10)/10;
+        const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+        curMr.fieldPositions=curMr.fieldPositions||{};
+        curMr.fieldPositions[pid]={x:nx,y:ny};
+        DB.updateEvent(gameEventId,{matchReport:curMr});
+      });
+    });
+  }
+}
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
@@ -2966,14 +3105,25 @@ function renderGamePos(ev,sqPlayers,conv,mr){
           ?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">${ev.opponent||'Adversário'}</div><div style="font-size:44px;font-weight:800;letter-spacing:10px;color:var(--green);line-height:1">${goalsConceded} — ${goals}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">SC Vianense SAD</div>`
           :`<div style="font-size:11px;color:var(--muted);margin-bottom:4px">SC Vianense SAD</div><div style="font-size:44px;font-weight:800;letter-spacing:10px;color:var(--green);line-height:1">${goals} — ${goalsConceded}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${ev.opponent||'Adversário'}</div>`}
       </div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Esquema Tático</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${Object.keys(FORMATIONS).map(f=>`<button class="form-chip${mr.formation===f?' active':''}" data-formation="${f}">${f}</button>`).join('')}
+        </div>
+        ${mr.formation?`<div style="margin-top:10px;font-size:11px;color:var(--muted)">Posições calculadas automaticamente. Ajusta arrastando no <strong>Relatório</strong>.</div>`:''}
+      </div>
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid var(--border)">Linha de Equipa</h3>
         ${convocados.length===0?'<p style="color:var(--muted);font-size:12px">Sem convocados definidos.</p>':
           [...titulares,...suplentes].map(p=>{
             const isTit=lineup.includes(p.id);
+            const igPos=(mr.inGamePositions||{})[p.id]||p.position||'';
             return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
               ${p.number?`<span style="font-weight:700;color:${isTit?'var(--green)':'var(--muted)'};min-width:22px;text-align:right;font-size:13px">${p.number}</span>`:''}
               <span style="flex:1;font-size:13px;${!isTit?'color:var(--muted)':''}">${p.name}</span>
+              ${isTit?`<select class="ig-pos-sel" data-igpos-pid="${p.id}" style="font-size:11px;padding:3px 5px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-family:inherit;cursor:pointer">
+                ${POS_ORDER.map(pos=>`<option value="${pos}"${igPos===pos?' selected':''}>${pos}</option>`).join('')}
+              </select>`:''}
               <button class="att-btn${isTit?' present':''}" data-lineup-pid="${p.id}" style="${!isTit?'font-size:11px':''}">${isTit?'Titular':'Suplente'}</button>
             </div>`;
           }).join('')
@@ -3007,6 +3157,27 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       </div>
     </div>
   </div>`;
+
+  // Formation picker
+  document.querySelectorAll('[data-formation]').forEach(btn=>btn.addEventListener('click',()=>{
+    const f=btn.dataset.formation;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{lineup:[],events:[]}));
+    curMr.formation=f;
+    const tits=convocados.filter(p=>(curMr.lineup||[]).includes(p.id));
+    curMr.fieldPositions=buildDefaultPositions(f,tits);
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    toast(`⚽ Esquema ${f} aplicado`);
+    renderGame();
+  }));
+
+  // In-game position selector
+  document.querySelectorAll('[data-igpos-pid]').forEach(sel=>sel.addEventListener('change',()=>{
+    const pid=sel.dataset.igposPid;
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    curMr.inGamePositions=curMr.inGamePositions||{};
+    curMr.inGamePositions[pid]=sel.value;
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+  }));
 
   // Lineup toggle
   document.querySelectorAll('[data-lineup-pid]').forEach(btn=>btn.addEventListener('click',()=>{
