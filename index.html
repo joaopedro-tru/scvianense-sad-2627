@@ -2944,15 +2944,29 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   // Suplentes: convocados que não estão no lineup
   const sups=convocados.filter(p=>!lineup.includes(p.id));
 
-  // Layout por posição natural (usado quando não há formação definida)
+  // Layout por posição natural — coordenadas iguais à aba "Campo" por escalão
+  // (campo horizontal: GR à esquerda, ataque à direita)
   function buildNaturalLayout(players){
-    const xByPos={GR:8,LD:22,DC:22,LE:22,MD:38,MC:50,MO:62,ED:78,EE:78,PL:84};
+    const ZONE={
+      GR:{x:5,y:50},
+      LE:{x:20,y:13},DC:{x:20,y:50},LD:{x:20,y:87},
+      MD:{x:37,y:50},
+      MC:{x:55,y:50},MO:{x:55,y:50},  // MC e MO agrupados como no Campo
+      EE:{x:78,y:13},PL:{x:78,y:50},ED:{x:78,y:87}
+    };
     const groups={};
     players.forEach(p=>{ const k=p.position||'MC'; if(!groups[k])groups[k]=[]; groups[k].push(p); });
     const out={};
     Object.entries(groups).forEach(([pos,list])=>{
-      const x=xByPos[pos]??50;
-      list.forEach((p,i)=>{ out[p.id]={x, y:list.length===1?50:15+(i/(list.length-1))*70}; });
+      const z=ZONE[pos]||{x:50,y:50};
+      const n=list.length;
+      list.forEach((p,i)=>{
+        if(n===1){ out[p.id]={x:z.x,y:z.y}; return; }
+        // vários jogadores na mesma posição — distribui verticalmente em torno do centro da zona
+        const spread=Math.min(20,10*(n-1));
+        const y=z.y-spread+(i/(n-1))*2*spread;
+        out[p.id]={x:z.x,y:Math.max(8,Math.min(92,y))};
+      });
     });
     return out;
   }
