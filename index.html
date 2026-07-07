@@ -2250,10 +2250,7 @@ function renderLiveSetup(ev){
 
 // ── LINEUP SELECTION ──────────────────────────────────────────────────────────
 function renderLiveLineup(ev){
-  const convocados=getConvocados().sort((a,b)=>{
-    const posOrder=['GR','LE','DC','LD','MD','MC','MO','EE','ED','PL'];
-    return (posOrder.indexOf(a.position)||99)-(posOrder.indexOf(b.position)||99)||((a.number||99)-(b.number||99));
-  });
+  const convocados=sortByPos(getConvocados());
   const count=liveTempLineup.size;
   const isOk=count===11;
 
