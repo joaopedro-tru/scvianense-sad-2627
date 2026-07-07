@@ -1341,7 +1341,7 @@ function convName(p){
   const al=alias.toLowerCase();
   if(al===first.toLowerCase()) return `<strong>${first}</strong>${parts.length>1?' '+last:''}`;
   if(al===last.toLowerCase()&&parts.length>1) return `${first} <strong>${last}</strong>`;
-  return `${base} <span style="opacity:.65;font-weight:700">(${alias})</span>`;
+  return `${base} <span style="opacity:.65">(<strong>${alias}</strong>)</span>`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800) }
@@ -3512,7 +3512,7 @@ ${convocados.map(p=>{
     const al=alias.toLowerCase();
     if(al===first.toLowerCase()) nameHtml=`<strong>${first}</strong>${parts.length>1?' '+last:''}`;
     else if(al===last.toLowerCase()&&parts.length>1) nameHtml=`${first} <strong>${last}</strong>`;
-    else nameHtml=`${base} <span style="color:#888;font-weight:700">(${alias})</span>`;
+    else nameHtml=`${base} <span style="color:#888">(<strong>${alias}</strong>)</span>`;
   }
   const travCell=!isHome?`<td style="text-align:center"><span class="trav-check">${traveling[p.id]?'✕':''}</span></td>`:'';
   return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
