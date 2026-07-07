@@ -3072,9 +3072,9 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   }
 
   // Titulares: quem está no lineup (independente da convocatória)
-  const tits=sqPlayers.filter(p=>lineup.includes(p.id));
+  const tits=sortByPos(sqPlayers.filter(p=>lineup.includes(p.id)));
   // Suplentes: convocados que não estão no lineup
-  const sups=convocados.filter(p=>!lineup.includes(p.id));
+  const sups=sortByPos(convocados.filter(p=>!lineup.includes(p.id)));
 
   // Layout por posição natural — coordenadas iguais à aba "Campo" por escalão
   // (campo horizontal: GR à esquerda, ataque à direita)
@@ -3218,7 +3218,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
-  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>(a.number||99)-(b.number||99));
+  const convocados=sortByPos(sqPlayers.filter(p=>!!conv.players[p.id]));
   const lineup=mr.lineup||[];
   const titulares=convocados.filter(p=>lineup.includes(p.id));
   const suplentes=convocados.filter(p=>!lineup.includes(p.id));
