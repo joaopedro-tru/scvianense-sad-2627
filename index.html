@@ -2582,18 +2582,9 @@ function openLivePicker(type){
 
     // ── MINUTE INPUT ────────────────────────────────────────────────────────
     if(step==='minute'){
-      const gev=DB.getEvent(liveGameId)||{};
-      const gtype=getGameType(gev);
-      let periods;
-      if(gtype==='friendly'){
-        const n=(gev.matchReport||{}).periods||2;
-        periods=Array.from({length:n},(_,i)=>({id:`p${i+1}`,label:`${i+1}ª Parte`,start:null,end:null}));
-      } else { periods=GAME_PERIODS[gtype]; }
       titleEl.textContent='⏱ Minuto do evento';
-      const chips=periods.map((p,i)=>`<button class="lv-period-chip" data-pi="${i}">${p.label}</button>`).join('');
       bodyEl.innerHTML=`
         <div style="padding:8px 4px">
-          <div class="lv-period-chips">${chips}</div>
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Minuto</label>
           <input id="lv-min-base" type="number" min="1" max="200" placeholder="Ex: 23"
             style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
@@ -2604,45 +2595,20 @@ function openLivePicker(type){
       const baseInp=document.getElementById('lv-min-base');
       const previewEl=document.getElementById('lv-min-preview');
       const confirmBtn=document.getElementById('lv-min-confirm');
-      let activePeriod=null;
 
       function updatePreview(){
         const v=parseInt(baseInp.value)||0;
         confirmBtn.disabled=!(v>=1);
         if(!v){ previewEl.textContent=''; return; }
-        // Compute preview display
-        const caps={p1:45,p2:90,et1:105,et2:120};
-        let display=`${v}'`;
-        if(activePeriod&&caps[activePeriod.id]&&v>caps[activePeriod.id]){
-          const cap=caps[activePeriod.id];
-          display=`${cap}+${v-cap}'`;
-        } else if(!activePeriod&&v>90){ display=`90+${v-90}'`; }
-        previewEl.textContent=display===`${v}'`?'':`→ será apresentado como ${display}`;
+        const display=v>90?`90+${v-90}'`:`${v}'`;
+        previewEl.textContent=v>90?`→ será apresentado como ${display}`:'';
       }
-
-      // Period chip selection
-      bodyEl.querySelectorAll('.lv-period-chip').forEach(chip=>{
-        chip.addEventListener('click',()=>{
-          bodyEl.querySelectorAll('.lv-period-chip').forEach(c=>c.classList.remove('active'));
-          chip.classList.add('active');
-          const idx=parseInt(chip.dataset.pi);
-          activePeriod=periods[idx];
-          if(activePeriod.isPenalty){
-            livePending.data._minute=121; livePending.data._period='pen';
-            if(type==='goal_conceded'){ saveLiveEvent(); return; }
-            livePending.step='init'; showStep(); return;
-          }
-          updatePreview();
-          baseInp.focus();
-        });
-      });
 
       baseInp.addEventListener('input', updatePreview);
 
       confirmBtn.addEventListener('click',()=>{
         const base=parseInt(baseInp.value)||0;
         livePending.data._minute=base;
-        if(activePeriod) livePending.data._period=activePeriod.id;
         if(type==='goal_conceded'){ saveLiveEvent(); return; }
         livePending.step='init'; showStep();
       });
@@ -3259,7 +3225,8 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const evs=(mr.events||[]).sort((a,b)=>a.minute-b.minute);
   const goals=evs.filter(e=>e.type==='goal').length;
   const goalsConceded=evs.filter(e=>e.type==='goal_conceded').length;
-  function pName(id){ const p=DB.getPlayer(id); return p?p.name:'—'; }
+  function pName(id){ const p=DB.getPlayer(id); return p?dn(p):'—'; }
+  function fmtEvMin(m){ const n=m||0; return n>90?`90+${n-90}'`:`${n}'`; }
   const iStyle='width:100%;padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit';
   function pOpt(arr,label){ return `<option value="">${label}</option>`+arr.map(p=>`<option value="${p.id}">${p.number?'#'+p.number+' ':''}${dn(p)}</option>`).join(''); }
   const evTimeline=evs.map(e=>{
@@ -3269,10 +3236,12 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(e.type==='yellow'){ icon='🟡'; desc=`Cartão Amarelo — ${pName(e.playerId)}` }
     else if(e.type==='red'){ icon='🔴'; desc=`Cartão Vermelho — ${pName(e.playerId)} <span style="color:var(--muted);font-size:11px">(${e.redType==='double_yellow'?'duplo amarelo':'direto'})</span>` }
     else if(e.type==='sub'){ icon='🔄'; desc=`Substituição — ${pName(e.playerOutId)} ↔ ${pName(e.playerInId)}` }
-    return `<div class="mev"><span class="mev-min">${e.minute}'</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
+    else if(e.type==='medical'){ icon='🏥'; desc=`Assist. Médica — ${pName(e.playerId)}${e.playerInId?` <span style="color:var(--muted);font-size:11px">→ ${pName(e.playerInId)}</span>`:''}` }
+    else if(e.type==='injury'){ icon='🩺'; desc=`Lesão — ${pName(e.playerId)}` }
+    return `<div class="mev"><span class="mev-min">${fmtEvMin(e.minute)}</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
   }).join('');
   // Ratings: players who were on the field (lineup + subs in); fallback to all convocados
-  const subsIn=(mr.events||[]).filter(e=>e.type==='sub').map(e=>e.playerInId);
+  const subsIn=(mr.events||[]).filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId);
   const playedIds=new Set([...lineup,...subsIn]);
   const toRate=convocados.filter(p=>playedIds.size>0?playedIds.has(p.id):true);
   const ratings=mr.ratings||{};
@@ -3324,7 +3293,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Eventos da Partida</h3>
         <div style="background:#f5f8ff;border-radius:8px;padding:13px;margin-bottom:16px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="120" placeholder="45" style="${iStyle}"></div>
+            <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="200" placeholder="45" style="${iStyle}"></div>
             <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
               <select id="me-type" style="${iStyle};cursor:pointer">
                 <option value="goal">⚽ Golo</option>
@@ -3395,7 +3364,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
 
   document.getElementById('btn-add-me').addEventListener('click',()=>{
     const min=parseInt(document.getElementById('me-min').value);
-    if(isNaN(min)||min<0||min>120){ toast('❌ Minuto inválido (0–120)'); return; }
+    if(isNaN(min)||min<0){ toast('❌ Minuto inválido'); return; }
     const t=meType.value;
     const ne={id:uid(),minute:min,type:t};
     if(t==='goal'){
