@@ -1050,6 +1050,37 @@ body.pm #v-pf{padding:30px}
   <iframe id="pdf-preview-frame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
 </div>
 
+<!-- ── PLAYER TOKEN EDIT SHEET ── -->
+<div id="mo-tok-edit" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45)" onclick="if(event.target===this)closeTokEdit()">
+  <div style="position:absolute;bottom:0;left:0;right:0;background:var(--card);border-radius:16px 16px 0 0;padding:20px 20px 32px;max-width:480px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div id="te-name" style="font-size:15px;font-weight:700"></div>
+        <div id="te-pos" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <button onclick="closeTokEdit()" style="background:var(--bg);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:14px">
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Posição em Jogo</label>
+        <select id="te-igpos" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+          <option value="">— padrão —</option>
+          ${['GR','LD','DC','LE','MD','MC','MO','ED','EE','PL'].map(p=>`<option value="${p}">${p}</option>`).join('')}
+        </select>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Avaliação (0–10)</label>
+        <input id="te-rating" type="number" min="0" max="10" step="0.5" placeholder="—" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;text-align:center;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Observação</label>
+      <input id="te-comment" type="text" placeholder="Nota sobre o jogador..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+    </div>
+    <button onclick="saveTokEdit()" style="width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Guardar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1217,7 +1248,7 @@ const FORMATIONS={
     {role:'GR',x:8,y:50},
     {role:'LE',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LD',x:21,y:88},
     {role:'MD',x:38,y:33},{role:'MD',x:38,y:67},
-    {role:'EE',x:60,y:12},{role:'MO',x:63,y:50},{role:'ED',x:60,y:88},
+    {role:'EE',x:60,y:12},{role:'MO',x:74,y:50},{role:'ED',x:60,y:88},
     {role:'PL',x:84,y:50}
   ],
   '4-1-3-2':[
@@ -1265,7 +1296,7 @@ const FORMATIONS={
 function buildDefaultPositions(formation,players){
   const slots=FORMATIONS[formation]; if(!slots) return {};
   const used=new Set(); const result={};
-  const rg=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:r==='MD'?2:['MC','MO'].includes(r)?3:['ED','EE'].includes(r)?4:5;
+  const rg=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:r==='MD'?2:r==='MC'?3:r==='MO'?4:['ED','EE'].includes(r)?5:6;
   slots.forEach(slot=>{
     let best=null,bestScore=999;
     players.forEach(p=>{
@@ -3187,16 +3218,18 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   if(tits.length>0){
     const pitchEl=document.getElementById('rel-pitch');
     pitchEl.querySelectorAll('.rel-tok').forEach(tok=>{
-      let dragging=false,startCX,startCY,initL,initT;
+      let dragging=false,hasMoved=false,startCX,startCY,initL,initT;
       tok.addEventListener('pointerdown',e=>{
         e.preventDefault(); e.stopPropagation();
-        dragging=true; tok.setPointerCapture(e.pointerId);
+        dragging=true; hasMoved=false; tok.setPointerCapture(e.pointerId);
         startCX=e.clientX; startCY=e.clientY;
         initL=parseFloat(tok.style.left); initT=parseFloat(tok.style.top);
         tok.style.zIndex='50'; tok.style.cursor='grabbing'; tok.style.transition='none';
       });
       tok.addEventListener('pointermove',e=>{
         if(!dragging) return;
+        if(Math.abs(e.clientX-startCX)>5||Math.abs(e.clientY-startCY)>5) hasMoved=true;
+        if(!hasMoved) return;
         const r=pitchEl.getBoundingClientRect();
         const nx=Math.max(3,Math.min(97,initL+(e.clientX-startCX)/r.width*100));
         const ny=Math.max(3,Math.min(97,initT+(e.clientY-startCY)/r.height*100));
@@ -3206,6 +3239,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
         if(!dragging) return; dragging=false;
         tok.style.zIndex='10'; tok.style.cursor='grab';
         const pid=tok.dataset.pid;
+        if(!hasMoved){ openTokEdit(pid); return; }
         const nx=Math.round(parseFloat(tok.style.left)*10)/10;
         const ny=Math.round(parseFloat(tok.style.top)*10)/10;
         const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
@@ -3401,6 +3435,43 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     curMr.ratings[pid].comment=input.value;
     DB.updateEvent(gameEventId,{matchReport:curMr});
   }));
+}
+
+// ── PLAYER TOKEN QUICK EDIT ──────────────────────────────────────────────────
+let _tokEditPid=null;
+function openTokEdit(pid){
+  const p=DB.getPlayer(pid); if(!p) return;
+  const ev=DB.getEvent(gameEventId); if(!ev) return;
+  const mr=ev.matchReport||{};
+  const igPos=(mr.inGamePositions||{})[pid]||'';
+  const rating=(mr.ratings||{})[pid]||{};
+  _tokEditPid=pid;
+  document.getElementById('te-name').textContent=`#${p.number||'—'} ${dn(p)}`;
+  document.getElementById('te-pos').textContent=p.position||'';
+  document.getElementById('te-igpos').value=igPos;
+  document.getElementById('te-rating').value=rating.rating!==undefined&&rating.rating!==null?rating.rating:'';
+  document.getElementById('te-comment').value=rating.comment||'';
+  document.getElementById('mo-tok-edit').style.display='block';
+}
+function closeTokEdit(){ document.getElementById('mo-tok-edit').style.display='none'; _tokEditPid=null; }
+function saveTokEdit(){
+  if(!_tokEditPid) return;
+  const pid=_tokEditPid;
+  const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+  // in-game position
+  const igVal=document.getElementById('te-igpos').value;
+  curMr.inGamePositions=curMr.inGamePositions||{};
+  if(igVal) curMr.inGamePositions[pid]=igVal; else delete curMr.inGamePositions[pid];
+  // rating + comment
+  const rVal=parseFloat(document.getElementById('te-rating').value);
+  const cVal=document.getElementById('te-comment').value;
+  curMr.ratings=curMr.ratings||{}; curMr.ratings[pid]=curMr.ratings[pid]||{};
+  curMr.ratings[pid].rating=isNaN(rVal)?null:Math.min(10,Math.max(0,rVal));
+  curMr.ratings[pid].comment=cVal;
+  DB.updateEvent(gameEventId,{matchReport:curMr});
+  closeTokEdit();
+  renderGame(gameEventId);
+  toast('✅ Guardado!');
 }
 
 // ── CONVOCATÓRIA PDF ──────────────────────────────────────────────────────────
