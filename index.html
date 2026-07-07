@@ -2844,7 +2844,7 @@ function renderGame(){
       <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
       <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
-      <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Editar</button>
+      <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
