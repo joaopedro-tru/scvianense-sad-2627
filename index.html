@@ -676,9 +676,31 @@ body.pm #v-pf{padding:30px}
               <option value="sub23">Sub-23</option>
             </select>
           </div>
-          <div class="fg"><label>Posição *</label>
+          <div class="fg"><label>Posição Principal *</label>
             <select name="position" required>
               <option value="">Selecionar...</option>
+              <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
+              <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
+              <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+              <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
+              <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+            </select>
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg"><label>Posição Secundária <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+            <select name="position2">
+              <option value="">—</option>
+              <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
+              <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
+              <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+              <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
+              <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+            </select>
+          </div>
+          <div class="fg"><label>Posição Terciária <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+            <select name="position3">
+              <option value="">—</option>
               <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
               <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
               <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
@@ -831,8 +853,30 @@ body.pm #v-pf{padding:30px}
             <option value="eqa">Equipa A</option><option value="sub19">Sub-19</option><option value="sub23">Sub-23</option>
           </select>
         </div>
-        <div class="fg"><label>Posição</label>
+        <div class="fg"><label>Posição Principal</label>
           <select id="f-pos">
+            <option value="">—</option>
+            <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
+            <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
+            <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+            <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
+            <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Posição Secundária <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <select id="f-pos2">
+            <option value="">—</option>
+            <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
+            <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
+            <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+            <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
+            <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+          </select>
+        </div>
+        <div class="fg"><label>Posição Terciária <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <select id="f-pos3">
             <option value="">—</option>
             <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
             <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
@@ -985,6 +1029,16 @@ body.pm #v-pf{padding:30px}
       <button class="btn btn-g" id="mo-edet-cancel">Fechar</button>
     </div>
   </div>
+</div>
+
+<!-- PDF Preview overlay — used instead of window.open (PWA-safe) -->
+<div id="mo-pdf-preview" style="display:none;position:fixed;inset:0;z-index:9998;background:#111;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0d1a;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1)">
+    <button onclick="closePdfPreview()" style="background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">← Voltar</button>
+    <span style="flex:1;color:#aaa;font-size:13px;text-align:center">Pré-visualização</span>
+    <button onclick="printPdfPreview()" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button>
+  </div>
+  <iframe id="pdf-preview-frame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1196,7 +1250,9 @@ const FORMATIONS={
   ]
 };
 
-// Auto-assign lineup players to formation slots by closest position group
+// Auto-assign lineup players to formation slots
+// Scoring: primary exact=0, secondary exact=1, tertiary exact=2,
+//          same group (any pos)=3, cross-group (closest)=4+
 function buildDefaultPositions(formation,players){
   const slots=FORMATIONS[formation]; if(!slots) return {};
   const used=new Set(); const result={};
@@ -1205,8 +1261,19 @@ function buildDefaultPositions(formation,players){
     let best=null,bestScore=999;
     players.forEach(p=>{
       if(used.has(p.id)) return;
-      const pg=rg(p.position||''),sg=rg(slot.role);
-      const s=p.position===slot.role?0:pg===sg?1:Math.abs(pg-sg)+1;
+      const allPos=[p.position,p.position2,p.position3].filter(Boolean);
+      const exactIdx=allPos.findIndex(pos=>pos===slot.role);
+      let s;
+      if(exactIdx===0) s=0;
+      else if(exactIdx===1) s=1;
+      else if(exactIdx===2) s=2;
+      else {
+        // No exact match — best group proximity across all positions
+        const sg=rg(slot.role);
+        s=allPos.reduce((min,pos)=>{
+          const pg=rg(pos); const d=pg===sg?3:Math.abs(pg-sg)+3; return Math.min(min,d);
+        },999);
+      }
       if(s<bestScore){bestScore=s;best=p;}
     });
     if(best){result[best.id]={x:slot.x,y:slot.y};used.add(best.id);}
@@ -1531,7 +1598,11 @@ function renderSquad(){
   grid.style.display=''; pitchEl.style.display='none'; sf.style.display='';
 
   if(ps.length===0){ grid.innerHTML=`<div class="es" style="grid-column:1/-1"><div class="ei2">👥</div><h3>Nenhum atleta</h3><p>Clica em "+ Adicionar Atleta" para começar.</p></div>`; return }
-  grid.innerHTML=ps.map(p=>`<div class="pc" data-pid="${p.id}">${p.number?`<span class="pnb">#${p.number}</span>`:''}<div class="av">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div><div class="pn">${p.name}</div><div class="pp">${POS[p.position]||'—'}</div>${age(p.dob)!==null?`<div class="pa">${age(p.dob)} anos</div>`:''}</div>`).join('');
+  grid.innerHTML=ps.map(p=>{
+    const allPos=[p.position,p.position2,p.position3].filter(Boolean);
+    const posLabel=allPos.length?allPos.map(x=>POS[x]||x).join(' · '):'—';
+    return `<div class="pc" data-pid="${p.id}">${p.number?`<span class="pnb">#${p.number}</span>`:''}<div class="av">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(p.name)}</div><div class="pn">${p.name}</div><div class="pp">${posLabel}</div>${age(p.dob)!==null?`<div class="pa">${age(p.dob)} anos</div>`:''}</div>`;
+  }).join('');
   grid.querySelectorAll('.pc').forEach(c=>c.addEventListener('click',()=>nav('player',{id:c.dataset.pid})));
 }
 
@@ -1678,7 +1749,7 @@ function renderPlayer(){
         <h2>${p.name}</h2>
         <div class="bgs">
           <span class="bg bg-g">${SQUADS[p.squad]||'—'}</span>
-          ${p.position?`<span class="bg bg-pos">${POS[p.position]}</span>`:''}
+          ${[p.position,p.position2,p.position3].filter(Boolean).map(x=>`<span class="bg bg-pos">${x}</span>`).join('')}
           ${p.number?`<span class="bg bg-n">#${p.number}</span>`:''}
           ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
         </div>
@@ -1694,7 +1765,7 @@ function renderPlayer(){
         ${row('NIF',p.nif)}
       </div>
       <div class="card"><h3>Dados Desportivos</h3>
-        ${row('Posição',POS[p.position])}
+        ${row('Posição',[p.position,p.position2,p.position3].filter(Boolean).map(x=>POS[x]||x).join(' · ')||null)}
         ${row('Nº Camisola',p.number?`#${p.number}`:null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
         ${row('Escalão',SQUADS[p.squad])}
@@ -1727,6 +1798,8 @@ function openPlayerModal(p=null){
   f('f-squad').value=p?.squad||_sq||squad||'sub19';
   document.getElementById('f-squad').disabled = !!_sq; // treinadores não mudam escalão
   f('f-pos').value=p?.position||'';
+  f('f-pos2').value=p?.position2||'';
+  f('f-pos3').value=p?.position3||'';
   f('f-num').value=p?.number||'';
   f('f-foot').value=p?.dominantFoot||'right';
   f('f-enrolled').value=p?.enrolledAt||new Date().toISOString().split('T')[0];
@@ -1767,7 +1840,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       id:pid,
       name:f('f-name'),dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
-      squad:f('f-squad'),position:f('f-pos'),number:f('f-num'),dominantFoot:f('f-foot'),
+      squad:f('f-squad'),position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,number:f('f-num'),dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
       injuries:f('f-inj'),
       // preserve existing URLs
@@ -3282,49 +3355,71 @@ function generateConvocatoriaPDF(evId){
   const ev=DB.getEvent(evId); if(!ev)return;
   const conv=ev.convocatoria||{players:{},notes:'',concentrationTime:'',concentrationPlace:'',scheduleArrival:'',schedulePalestra:'',scheduleGkWarmup:'',scheduleWarmup:'',scheduleDressing:''};
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
-  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>(a.number||99)-(b.number||99));
+  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>{
+    const pa=POS_ORDER.indexOf(a.position||''); const pb=POS_ORDER.indexOf(b.position||'');
+    const po=(pa<0?99:pa)-(pb<0?99:pb);
+    return po!==0?po:(a.number||99)-(b.number||99);
+  });
   if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
   const isHome=ev.homeAway!=='away';
   const ourTeam='SC Vianense SAD';
   const opponent=ev.opponent||'Adversário';
   const leftTeam=isHome?ourTeam:opponent;
   const rightTeam=isHome?opponent:ourTeam;
+
+  // Calcular zoom para garantir que tudo cabe numa página A4 (277mm de conteúdo)
+  // Estimativa de altura por secção (em mm, layout compacto):
+  const hasConc=!!(conv.concentrationTime||conv.concentrationPlace);
+  const hasNotes=!!conv.notes;
+  const fixedMm=16/*header*/+18/*game*/+28/*schedule*/+8/*footer*/+18/*gaps*/
+    +(hasConc?12:0)+(hasNotes?14:0);
+  const rowMm=6.2; // altura de cada linha de atleta
+  const totalMm=fixedMm+convocados.length*rowMm;
+  const zoom=Math.min(1,parseFloat((275/totalMm).toFixed(4)));
+
   const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Convocatória — SC Vianense SAD</title><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:28px 24px;color:#111;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.no-print{text-align:right;margin-bottom:18px}
-.no-print button{background:#1a3d6e;color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700}
-.header{display:flex;align-items:center;gap:14px;padding-bottom:16px;margin-bottom:6px;border-bottom:3px solid #1a3d6e}
-.header img{width:60px;height:60px;object-fit:contain;flex-shrink:0}
-.header-text .club{font-size:18px;font-weight:800;color:#1a3d6e}
-.header-text .squad{font-size:11px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:2px 10px;border-radius:10px;margin-top:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.header-text .doc-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:4px}
-.game-box{border:2px solid #1a3d6e;border-radius:10px;padding:16px 20px;margin:18px 0;text-align:center;background:#f0f4fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.game-vs{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
-.game-team{font-size:15px;font-weight:800;color:#1a3d6e;flex:1}
+body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:20px 18px;color:#111;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.no-print{text-align:right;margin-bottom:12px}
+.no-print button{background:#1a3d6e;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:700}
+.header{display:flex;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
+.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
+.header-text .club{font-size:16px;font-weight:800;color:#1a3d6e}
+.header-text .squad{font-size:10px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:1px 8px;border-radius:10px;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header-text .doc-label{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:3px}
+.game-box{border:2px solid #1a3d6e;border-radius:8px;padding:10px 16px;margin:10px 0;text-align:center;background:#f0f4fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.game-vs{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px}
+.game-team{font-size:13px;font-weight:800;color:#1a3d6e;flex:1}
 .game-team.left{text-align:right}
 .game-team.right{text-align:left}
-.game-vs-badge{background:#1a3d6e;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.game-meta{font-size:11px;color:#555;display:flex;justify-content:center;gap:0;flex-wrap:wrap}
-.game-meta span{padding:0 8px;border-right:1px solid #ccc}
+.game-vs-badge{background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.game-meta{font-size:10px;color:#555;display:flex;justify-content:center;flex-wrap:wrap}
+.game-meta span{padding:0 6px;border-right:1px solid #ccc}
 .game-meta span:last-child{border-right:none}
-.conc-box{background:#fff8e1;border-left:4px solid #e8b84b;padding:11px 15px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.conc-item .cl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#7a5f00;font-weight:700;margin-bottom:2px}
-.conc-item .cv{font-size:13px;font-weight:800;color:#333}
-table{width:100%;border-collapse:collapse;margin-bottom:16px}
-.pt th{background:#1a3d6e;color:#fff;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pt td{padding:9px 12px;border-bottom:1px solid #e8e8e8;font-size:13px}
+.conc-box{background:#fff8e1;border-left:4px solid #e8b84b;padding:7px 12px;margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.conc-item .cl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#7a5f00;font-weight:700;margin-bottom:1px}
+.conc-item .cv{font-size:11px;font-weight:800;color:#333}
+table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.pt th{background:#1a3d6e;color:#fff;padding:5px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pt td{padding:5px 10px;border-bottom:1px solid #e8e8e8;font-size:12px;vertical-align:middle}
 .pt tr:nth-child(even) td{background:#f5f8ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pt td:first-child{font-weight:800;color:#1a3d6e;font-size:15px;width:48px}
-.sch-box{border:1px solid #c8dcc8;border-radius:8px;padding:14px 16px;margin-bottom:16px}
-.sch-title{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:10px}
-.sch-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #e0ece0;font-size:12px}
+.pt td:first-child{font-weight:800;color:#1a3d6e;font-size:13px;width:36px}
+.pt .pos-col{width:32px;font-size:10px;font-weight:700;color:#555;text-align:center}
+.pt .sig-col{width:110px}
+.pt .sig-col div{border-bottom:1px solid #aaa;height:17px;width:100%}
+.sch-box{border:1px solid #c8dcc8;border-radius:7px;padding:9px 12px;margin-bottom:10px}
+.sch-title{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:6px}
+.sch-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e0ece0;font-size:11px}
 .sch-row:last-child{border-bottom:none}
-.sch-time{font-weight:800;color:#1a5028;font-size:14px;min-width:52px;text-align:right}
-.obs-box{background:#f5f8ff;border-radius:8px;padding:12px 15px;margin-bottom:14px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.obs-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:6px}
-.footer{text-align:center;font-size:10px;color:#bbb;margin-top:12px;padding-top:10px;border-top:1px solid #eee}
-@media print{.no-print{display:none!important}body{padding:10px;max-width:100%}}
+.sch-time{font-weight:800;color:#1a5028;font-size:12px;min-width:44px;text-align:right}
+.obs-box{background:#f5f8ff;border-radius:7px;padding:8px 12px;margin-bottom:10px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.obs-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:4px}
+.footer{text-align:center;font-size:9px;color:#bbb;margin-top:8px;padding-top:6px;border-top:1px solid #eee}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  .no-print{display:none!important}
+  body{padding:0;margin:0;max-width:100%;zoom:${zoom};overflow:hidden}
+}
 </style></head><body>
 <div class="no-print"><button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
 <div class="header">
@@ -3348,9 +3443,9 @@ table{width:100%;border-collapse:collapse;margin-bottom:16px}
     <span>${isHome?'🏠 Em Casa':'✈️ Fora'}</span>
   </div>
 </div>
-${(conv.concentrationTime||conv.concentrationPlace)?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
-<table class="pt"><thead><tr><th>#</th><th>Nome</th></tr></thead><tbody>
-${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td></tr>`).join('')}
+${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
+<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th><th style="width:32px;text-align:center">Pos</th><th style="width:110px">Assinatura</th></tr></thead><tbody>
+${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td><td class="pos-col">${p.position||'—'}</td><td class="sig-col"><div></div></td></tr>`).join('')}
 </tbody></table>
 <div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
 <div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
@@ -3359,14 +3454,29 @@ ${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td></tr>`).jo
 <div class="sch-row"><span>🏃 Aquecimento dos restantes</span><span class="sch-time">${conv.scheduleWarmup||'—'}</span></div>
 <div class="sch-row"><span>🔒 Recolha ao balneário</span><span class="sch-time">${conv.scheduleDressing||'—'}</span></div>
 </div>
-${conv.notes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:13px">${conv.notes}</div></div>`:''}
-<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})}</div>
+${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
+<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
 </body></html>`;
-  const w=window.open('','_blank');
-  if(!w){ toast('⚠️ Popup bloqueado. Permite popups para este site nas definições do browser.'); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Abre o PDF dentro da app (PWA-safe — evita window.open que fecha o histórico)
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const frame=document.getElementById('pdf-preview-frame');
+  // Revoga URL anterior se existir
+  if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl);}
+  frame._blobUrl=url;
+  frame.src=url;
+  document.getElementById('mo-pdf-preview').style.display='flex';
+}
+function closePdfPreview(){
+  document.getElementById('mo-pdf-preview').style.display='none';
+  const frame=document.getElementById('pdf-preview-frame');
+  if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl); frame._blobUrl=null;}
+  frame.src='';
+}
+function printPdfPreview(){
+  const frame=document.getElementById('pdf-preview-frame');
+  try{ frame.contentWindow.print(); }
+  catch(e){ toast('⚠️ Usa o botão "Imprimir" dentro do documento.'); }
 }
 
 document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
