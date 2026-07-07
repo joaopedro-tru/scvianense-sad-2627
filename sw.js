@@ -1,26 +1,23 @@
 // ─────────────────────────────────────────────────────────────────
 // SC Vianense SAD — Service Worker
-// Versão: incrementa CACHE_NAME para forçar actualização
+// Estratégia: network-first para HTML, cache-first para assets estáticos
 // ─────────────────────────────────────────────────────────────────
-const CACHE_NAME = 'scv-v1';
+const CACHE_NAME = 'scv-v2';
 
-const APP_SHELL = [
-  '/',
-  '/index.html',
+const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg',
   '/icon-maskable.svg',
-  // Firebase SDK (versionados — não mudam)
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js',
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js',
 ];
 
-// ── INSTALL: pré-carrega app shell ───────────────────────────────
+// ── INSTALL: pré-carrega apenas assets estáticos (não o HTML) ────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
+      .then(cache => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -36,11 +33,11 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ── FETCH: cache-first para app shell, network-only para APIs ────
+// ── FETCH ────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Deixa passar: Firestore, Storage, autenticação Firebase, radiogeice (logo)
+  // Deixa passar: Firebase APIs
   if (
     url.includes('firestore.googleapis.com') ||
     url.includes('firebasestorage.app') ||
@@ -48,21 +45,33 @@ self.addEventListener('fetch', event => {
     url.includes('securetoken.googleapis.com') ||
     url.includes('radiogeice.com')
   ) {
-    return; // browser trata normalmente
+    return;
   }
 
-  // Para tudo o resto: cache-first, fallback para network
+  // HTML → network-first: garante que um refresh busca sempre a versão mais recente
+  const isHTML = event.request.mode === 'navigate' ||
+    event.request.headers.get('accept')?.includes('text/html');
+
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Guarda a versão mais recente em cache (para modo offline)
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request)) // offline fallback
+    );
+    return;
+  }
+
+  // Assets estáticos (Firebase SDK, ícones) → cache-first
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
-        // Só guarda em cache respostas válidas de origens conhecidas
-        if (
-          response &&
-          response.status === 200 &&
-          (event.request.url.startsWith(self.location.origin) ||
-           event.request.url.includes('gstatic.com'))
-        ) {
+        if (response?.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
