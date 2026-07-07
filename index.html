@@ -1118,76 +1118,81 @@ const COMPETITIONS={
 // Periods per game type: id, label, start, end (null=open), boundary minute for acréscimos
 // Formation slot definitions — x:left%→right%, y:top%→bottom% on a horizontal pitch
 // Each array has exactly 11 slots in order: GK → DEF → MID → FWD
+// Convenção (igual à aba "Campo"):
+//   LE (Lateral Esquerdo) → topo do campo (y baixo ≈ 12%)
+//   LD (Lateral Direito)  → fundo do campo (y alto  ≈ 88%)
+//   EE (Extremo Esquerdo) → topo do campo (y baixo ≈ 12%)
+//   ED (Extremo Direito)  → fundo do campo (y alto  ≈ 88%)
 const FORMATIONS={
   '4-3-3':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:24,y:14},{role:'DC',x:24,y:38},{role:'DC',x:24,y:62},{role:'LE',x:24,y:86},
+    {role:'LE',x:24,y:14},{role:'DC',x:24,y:38},{role:'DC',x:24,y:62},{role:'LD',x:24,y:86},
     {role:'MC',x:50,y:22},{role:'MC',x:50,y:50},{role:'MC',x:50,y:78},
-    {role:'ED',x:79,y:12},{role:'PL',x:84,y:50},{role:'EE',x:79,y:88}
+    {role:'EE',x:79,y:12},{role:'PL',x:84,y:50},{role:'ED',x:79,y:88}
   ],
   '4-4-2':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LE',x:24,y:88},
-    {role:'ED',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'EE',x:50,y:88},
+    {role:'LE',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LD',x:24,y:88},
+    {role:'EE',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'ED',x:50,y:88},
     {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
   ],
   '4-4-1-1':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LE',x:24,y:88},
-    {role:'ED',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'EE',x:50,y:88},
+    {role:'LE',x:24,y:12},{role:'DC',x:24,y:35},{role:'DC',x:24,y:65},{role:'LD',x:24,y:88},
+    {role:'EE',x:50,y:12},{role:'MC',x:50,y:35},{role:'MC',x:50,y:65},{role:'ED',x:50,y:88},
     {role:'MO',x:68,y:50},
     {role:'PL',x:84,y:50}
   ],
   '4-1-4-1':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'LE',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LD',x:21,y:88},
     {role:'MD',x:38,y:50},
-    {role:'ED',x:58,y:12},{role:'MC',x:58,y:37},{role:'MC',x:58,y:63},{role:'EE',x:58,y:88},
+    {role:'EE',x:58,y:12},{role:'MC',x:58,y:37},{role:'MC',x:58,y:63},{role:'ED',x:58,y:88},
     {role:'PL',x:84,y:50}
   ],
   '4-2-3-1':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'LE',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LD',x:21,y:88},
     {role:'MD',x:38,y:33},{role:'MD',x:38,y:67},
-    {role:'ED',x:60,y:12},{role:'MO',x:62,y:50},{role:'EE',x:60,y:88},
+    {role:'EE',x:60,y:12},{role:'MO',x:63,y:50},{role:'ED',x:60,y:88},
     {role:'PL',x:84,y:50}
   ],
   '4-1-3-2':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LE',x:21,y:88},
+    {role:'LE',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LD',x:21,y:88},
     {role:'MD',x:38,y:50},
-    {role:'ED',x:58,y:20},{role:'MC',x:58,y:50},{role:'EE',x:58,y:80},
+    {role:'EE',x:58,y:20},{role:'MC',x:58,y:50},{role:'ED',x:58,y:80},
     {role:'PL',x:80,y:30},{role:'PL',x:80,y:70}
   ],
   '4-5-1':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:24,y:12},{role:'DC',x:24,y:33},{role:'DC',x:24,y:67},{role:'LE',x:24,y:88},
-    {role:'ED',x:50,y:10},{role:'MC',x:50,y:28},{role:'MC',x:50,y:50},{role:'MC',x:50,y:72},{role:'EE',x:50,y:90},
+    {role:'LE',x:24,y:12},{role:'DC',x:24,y:33},{role:'DC',x:24,y:67},{role:'LD',x:24,y:88},
+    {role:'EE',x:50,y:10},{role:'MC',x:50,y:28},{role:'MC',x:50,y:50},{role:'MC',x:50,y:72},{role:'ED',x:50,y:90},
     {role:'PL',x:82,y:50}
   ],
   '3-4-3':[
     {role:'GR',x:8,y:50},
     {role:'DC',x:24,y:25},{role:'DC',x:24,y:50},{role:'DC',x:24,y:75},
-    {role:'LD',x:48,y:12},{role:'MC',x:48,y:37},{role:'MC',x:48,y:63},{role:'LE',x:48,y:88},
-    {role:'ED',x:79,y:15},{role:'PL',x:84,y:50},{role:'EE',x:79,y:85}
+    {role:'LE',x:48,y:12},{role:'MC',x:48,y:37},{role:'MC',x:48,y:63},{role:'LD',x:48,y:88},
+    {role:'EE',x:79,y:15},{role:'PL',x:84,y:50},{role:'ED',x:79,y:85}
   ],
   '3-5-2':[
     {role:'GR',x:8,y:50},
     {role:'DC',x:22,y:25},{role:'DC',x:22,y:50},{role:'DC',x:22,y:75},
-    {role:'LD',x:46,y:10},{role:'MC',x:48,y:30},{role:'MD',x:46,y:50},{role:'MC',x:48,y:70},{role:'LE',x:46,y:90},
+    {role:'LE',x:46,y:10},{role:'MC',x:48,y:30},{role:'MD',x:46,y:50},{role:'MC',x:48,y:70},{role:'LD',x:46,y:90},
     {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
   ],
   '5-3-2':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LE',x:22,y:92},
+    {role:'LE',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LD',x:22,y:92},
     {role:'MC',x:50,y:25},{role:'MC',x:50,y:50},{role:'MC',x:50,y:75},
     {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
   ],
   '5-2-3':[
     {role:'GR',x:8,y:50},
-    {role:'LD',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LE',x:22,y:92},
+    {role:'LE',x:22,y:8},{role:'DC',x:22,y:28},{role:'DC',x:22,y:50},{role:'DC',x:22,y:72},{role:'LD',x:22,y:92},
     {role:'MC',x:48,y:33},{role:'MC',x:48,y:67},
-    {role:'ED',x:79,y:15},{role:'PL',x:84,y:50},{role:'EE',x:79,y:85}
+    {role:'EE',x:79,y:15},{role:'PL',x:84,y:50},{role:'ED',x:79,y:85}
   ]
 };
 
@@ -1200,7 +1205,8 @@ function buildDefaultPositions(formation,players){
     let best=null,bestScore=999;
     players.forEach(p=>{
       if(used.has(p.id)) return;
-      const s=p.position===slot.role?0:Math.abs(rg(p.position||'')-rg(slot.role));
+      const pg=rg(p.position||''),sg=rg(slot.role);
+      const s=p.position===slot.role?0:pg===sg?1:Math.abs(pg-sg)+1;
       if(s<bestScore){bestScore=s;best=p;}
     });
     if(best){result[best.id]={x:slot.x,y:slot.y};used.add(best.id);}
@@ -2951,7 +2957,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       GR:{x:5,y:50},
       LE:{x:20,y:13},DC:{x:20,y:50},LD:{x:20,y:87},
       MD:{x:37,y:50},
-      MC:{x:55,y:50},MO:{x:55,y:50},  // MC e MO agrupados como no Campo
+      MC:{x:53,y:50},MO:{x:64,y:50},  // MO mais avançado que MC
       EE:{x:78,y:13},PL:{x:78,y:50},ED:{x:78,y:87}
     };
     const groups={};
