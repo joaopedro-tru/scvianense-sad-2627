@@ -2866,14 +2866,21 @@ function renderGame(){
 
 function renderGamePre(ev,sqPlayers,conv){
   const convCount=Object.values(conv.players||{}).filter(v=>!!v).length;
+  const isAway=ev.homeAway==='away';
+  const traveling=conv.traveling||{};
   const pRows=sqPlayers.map(p=>{
     const isConv=!!conv.players[p.id];
+    const isTrav=!!traveling[p.id];
+    const travBtn=isAway&&isConv
+      ?`<button class="att-btn${isTrav?' present':''}" data-gtrav="${p.id}" title="Vai ao local de jogo" style="min-width:38px;padding:5px 8px">${isTrav?'✈️':'✈️'}<span style="font-size:10px;margin-left:3px">${isTrav?'Vai':'—'}</span></button>`
+      :(isAway?`<span style="min-width:38px;display:inline-block"></span>`:'');
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${dn(p)}</div>
         <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
       </div>
+      ${travBtn}
       <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
     </div>`;
   }).join('');
@@ -2916,7 +2923,15 @@ function renderGamePre(ev,sqPlayers,conv){
   document.querySelectorAll('[data-gconv]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.gconv;
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
-    if(c.players[pid]) delete c.players[pid]; else c.players[pid]=true;
+    if(c.players[pid]){ delete c.players[pid]; if(c.traveling) delete c.traveling[pid]; }
+    else c.players[pid]=true;
+    DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
+  }));
+  document.querySelectorAll('[data-gtrav]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.gtrav;
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    c.traveling=c.traveling||{};
+    if(c.traveling[pid]) delete c.traveling[pid]; else c.traveling[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   }));
   document.getElementById('btn-conv-all').addEventListener('click',()=>{
@@ -3372,6 +3387,8 @@ function generateConvocatoriaPDF(evId){
   });
   if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
   const isHome=ev.homeAway!=='away';
+  const traveling=conv.traveling||{};
+  const hasTraveling=!isHome&&Object.keys(traveling).length>0;
   const ourTeam='SC Vianense SAD';
   const opponent=ev.opponent||'Adversário';
   const leftTeam=isHome?ourTeam:opponent;
@@ -3454,8 +3471,8 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
   </div>
 </div>
 ${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
-<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th><th style="width:110px">Assinatura</th></tr></thead><tbody>
-${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${(p.alcunha||'').trim()||p.name}</td><td class="sig-col"><div></div></td></tr>`).join('')}
+<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:28px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
+${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${(p.alcunha||'').trim()||p.name}</td>${!isHome?`<td style="text-align:center;font-size:13px">${traveling[p.id]?'✓':''}</td>`:''}<td class="sig-col"><div></div></td></tr>`).join('')}
 </tbody></table>
 <div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
 <div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
