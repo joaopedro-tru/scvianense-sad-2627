@@ -2944,14 +2944,26 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   // Suplentes: convocados que não estão no lineup
   const sups=convocados.filter(p=>!lineup.includes(p.id));
 
-  // Resolve position for each player (saved → formation default → fallback)
-  const defaultPos=formation&&tits.length>0?buildDefaultPositions(formation,tits):{};
+  // Layout por posição natural (usado quando não há formação definida)
+  function buildNaturalLayout(players){
+    const xByPos={GR:8,LD:22,DC:22,LE:22,MD:38,MC:50,MO:62,ED:78,EE:78,PL:84};
+    const groups={};
+    players.forEach(p=>{ const k=p.position||'MC'; if(!groups[k])groups[k]=[]; groups[k].push(p); });
+    const out={};
+    Object.entries(groups).forEach(([pos,list])=>{
+      const x=xByPos[pos]??50;
+      list.forEach((p,i)=>{ out[p.id]={x, y:list.length===1?50:15+(i/(list.length-1))*70}; });
+    });
+    return out;
+  }
+
+  // Resolve position for each player: saved drag → formation default → natural layout
+  const formationPos=formation&&tits.length>0?buildDefaultPositions(formation,tits):{};
+  const naturalPos=buildNaturalLayout(tits);
   function getPPos(p){
     if(savedPos[p.id]) return savedPos[p.id];
-    if(defaultPos[p.id]) return defaultPos[p.id];
-    // Fallback: spread evenly
-    const i=tits.indexOf(p); const n=tits.length||1;
-    return {x:8+(i/(n-1||1))*76, y:10+((i*37)%80)};
+    if(formationPos[p.id]) return formationPos[p.id];
+    return naturalPos[p.id]||{x:50,y:50};
   }
 
   // Build player tokens HTML (absolute positioned on pitch)
