@@ -281,6 +281,9 @@ body.pm #v-pf{padding:30px}
 .att-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:#eef0f3;color:var(--muted);transition:all .15s;font-family:inherit;white-space:nowrap}
 .att-btn.present{background:var(--ok);color:#fff;border-color:var(--ok)}
 .att-btn:not(.present):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
+.trav-box{width:24px;height:24px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:var(--bg);font-size:15px;font-weight:800;color:transparent;transition:all .15s}
+.trav-box:hover{border-color:#aaa}
+.trav-box.checked{border-color:#e84444;background:#fff0f0;color:#e84444}
 .att-summary{font-size:15px;font-weight:700;color:var(--ok)}
 
 /* TABS */
@@ -2885,9 +2888,9 @@ function renderGamePre(ev,sqPlayers,conv){
   const pRows=sqPlayers.map(p=>{
     const isConv=!!conv.players[p.id];
     const isTrav=!!traveling[p.id];
-    const travBtn=isAway&&isConv
-      ?`<button class="att-btn${isTrav?' present':''}" data-gtrav="${p.id}" title="Vai ao local de jogo" style="min-width:38px;padding:5px 8px">${isTrav?'✈️':'✈️'}<span style="font-size:10px;margin-left:3px">${isTrav?'Vai':'—'}</span></button>`
-      :(isAway?`<span style="min-width:38px;display:inline-block"></span>`:'');
+    const travBtn=isAway
+      ?`<button class="trav-box${isTrav?' checked':''}" data-gtrav="${p.id}" title="Vai ao local de jogo"${!isConv?' disabled style="opacity:.25;cursor:default"':''}>✕</button>`
+      :'';
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
@@ -2931,6 +2934,7 @@ function renderGamePre(ev,sqPlayers,conv){
           <button class="btn btn-o btn-sm" id="btn-conv-all" style="font-size:11px;padding:3px 9px">✓ Todos</button>
         </div>
       </div>
+      ${isAway?`<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--muted)"><span>✈️ Desloca-se</span></div>`:''}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
     </div>
   </div>`;
@@ -2942,8 +2946,10 @@ function renderGamePre(ev,sqPlayers,conv){
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   }));
   document.querySelectorAll('[data-gtrav]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(btn.disabled) return;
     const pid=btn.dataset.gtrav;
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    if(!c.players[pid]) return; // só convocados podem marcar deslocação
     c.traveling=c.traveling||{};
     if(c.traveling[pid]) delete c.traveling[pid]; else c.traveling[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
