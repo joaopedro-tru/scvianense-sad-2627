@@ -1326,6 +1326,20 @@ function age(dob){ if(!dob)return null; const d=new Date(dob),t=new Date(); let 
 function ini(n){ if(!n)return '?'; return n.split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase() }
 // Display name: alcunha se definida, senão nome completo
 function dn(p){ return (p?.alcunha||'').trim() || p?.name || '' }
+// Nome para a convocatória: "Primeiro Último (Alcunha)"
+// Se alcunha == primeiro ou último nome → esse nome a bold, sem parêntesis
+function convName(p){
+  const parts=(p?.name||'').trim().split(/\s+/).filter(Boolean);
+  const first=parts[0]||'';
+  const last=parts.length>1?parts[parts.length-1]:first;
+  const alias=(p?.alcunha||'').trim();
+  const base=parts.length>1?`${first} ${last}`:first;
+  if(!alias) return base;
+  const al=alias.toLowerCase();
+  if(al===first.toLowerCase()) return `<strong>${first}</strong>${parts.length>1?' '+last:''}`;
+  if(al===last.toLowerCase()&&parts.length>1) return `${first} <strong>${last}</strong>`;
+  return `${base} <span style="opacity:.65;font-weight:400">(${alias})</span>`;
+}
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800) }
 function row(l,v){ if(!v||v==='—'||v===''||v===undefined||v===null)return ''; return `<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>` }
@@ -2877,7 +2891,7 @@ function renderGamePre(ev,sqPlayers,conv){
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600">${dn(p)}</div>
+        <div style="font-size:13px;font-weight:600">${convName(p)}</div>
         <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
       </div>
       ${travBtn}
@@ -3472,7 +3486,21 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
 </div>
 ${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
 <table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:28px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
-${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${(p.alcunha||'').trim()||p.name}</td>${!isHome?`<td style="text-align:center;font-size:13px">${traveling[p.id]?'✓':''}</td>`:''}<td class="sig-col"><div></div></td></tr>`).join('')}
+${convocados.map(p=>{
+  const parts=(p.name||'').trim().split(/\s+/).filter(Boolean);
+  const first=parts[0]||''; const last=parts.length>1?parts[parts.length-1]:first;
+  const alias=(p.alcunha||'').trim();
+  const base=parts.length>1?`${first} ${last}`:first;
+  let nameHtml;
+  if(!alias){ nameHtml=base; }
+  else{
+    const al=alias.toLowerCase();
+    if(al===first.toLowerCase()) nameHtml=`<strong>${first}</strong>${parts.length>1?' '+last:''}`;
+    else if(al===last.toLowerCase()&&parts.length>1) nameHtml=`${first} <strong>${last}</strong>`;
+    else nameHtml=`${base} <span style="color:#888;font-weight:400">(${alias})</span>`;
+  }
+  return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${!isHome?`<td style="text-align:center;font-size:13px">${traveling[p.id]?'✓':''}</td>`:''}<td class="sig-col"><div></div></td></tr>`;
+}).join('')}
 </tbody></table>
 <div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
 <div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
