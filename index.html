@@ -3454,6 +3454,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
 .pt .pos-col{width:32px;font-size:10px;font-weight:700;color:#555;text-align:center}
 .pt .sig-col{width:110px}
 .pt .sig-col div{border-bottom:1px solid #aaa;height:17px;width:100%}
+.trav-check{display:inline-block;width:13px;height:13px;border:1.5px solid #333;border-radius:2px;text-align:center;font-size:10px;font-weight:900;line-height:12px;vertical-align:middle}
 .sch-box{border:1px solid #c8dcc8;border-radius:7px;padding:9px 12px;margin-bottom:10px}
 .sch-title{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:6px}
 .sch-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e0ece0;font-size:11px}
@@ -3491,7 +3492,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
   </div>
 </div>
 ${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
-<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:28px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
+<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:24px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
 ${convocados.map(p=>{
   const parts=(p.name||'').trim().split(/\s+/).filter(Boolean);
   const first=parts[0]||''; const last=parts.length>1?parts[parts.length-1]:first;
@@ -3505,7 +3506,8 @@ ${convocados.map(p=>{
     else if(al===last.toLowerCase()&&parts.length>1) nameHtml=`${first} <strong>${last}</strong>`;
     else nameHtml=`${base} <span style="color:#888;font-weight:400">(${alias})</span>`;
   }
-  return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${!isHome?`<td style="text-align:center;font-size:13px">${traveling[p.id]?'✓':''}</td>`:''}<td class="sig-col"><div></div></td></tr>`;
+  const travCell=!isHome?`<td style="text-align:center"><span class="trav-check">${traveling[p.id]?'✕':''}</span></td>`:'';
+  return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
 }).join('')}
 </tbody></table>
 <div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
