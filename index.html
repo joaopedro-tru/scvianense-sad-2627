@@ -1065,7 +1065,16 @@ body.pm #v-pf{padding:30px}
         <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Posição em Jogo</label>
         <select id="te-igpos" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
           <option value="">— padrão —</option>
-          ${['GR','LD','DC','LE','MD','MC','MO','ED','EE','PL'].map(p=>`<option value="${p}">${p}</option>`).join('')}
+          <option value="GR">GR</option>
+          <option value="LD">LD</option>
+          <option value="DC">DC</option>
+          <option value="LE">LE</option>
+          <option value="MD">MD</option>
+          <option value="MC">MC</option>
+          <option value="MO">MO</option>
+          <option value="ED">ED</option>
+          <option value="EE">EE</option>
+          <option value="PL">PL</option>
         </select>
       </div>
       <div style="flex:1">
@@ -1217,7 +1226,15 @@ const COMPETITIONS={
 //   LD (Lateral Direito)  → fundo do campo (y alto  ≈ 88%)
 //   EE (Extremo Esquerdo) → topo do campo (y baixo ≈ 12%)
 //   ED (Extremo Direito)  → fundo do campo (y alto  ≈ 88%)
+const DEFAULT_FORMATION={eqa:'4-1-2-3',sub19:'4-1-2-3',sub23:'4-1-2-3'};
 const FORMATIONS={
+  '4-1-2-3':[
+    {role:'GR',x:8,y:50},
+    {role:'LE',x:21,y:12},{role:'DC',x:21,y:37},{role:'DC',x:21,y:63},{role:'LD',x:21,y:88},
+    {role:'MD',x:38,y:50},
+    {role:'MC',x:55,y:33},{role:'MC',x:55,y:67},
+    {role:'EE',x:79,y:12},{role:'PL',x:84,y:50},{role:'ED',x:79,y:88}
+  ],
   '4-3-3':[
     {role:'GR',x:8,y:50},
     {role:'LE',x:24,y:14},{role:'DC',x:24,y:38},{role:'DC',x:24,y:62},{role:'LD',x:24,y:86},
@@ -3049,7 +3066,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const ratings=mr.ratings||{};
   const evs=mr.events||[];
   const motmId=mr.motm||null;
-  const formation=mr.formation||null;
+  const formation=mr.formation||DEFAULT_FORMATION[ev.squad]||null;
   const savedPos=mr.fieldPositions||{};
   const igPos=mr.inGamePositions||{};
 
@@ -3127,10 +3144,10 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       <div style="position:relative">
         <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.93);color:#0e2444;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;${ringStyle}">${p.number||'?'}</div>
         ${mvpStar}${cardBadge}${subBadge}
+        ${(()=>{const rb=rBadge(p.id);return rb?`<span style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);white-space:nowrap">${rb}</span>`:''})()}
       </div>
-      <span style="font-size:9px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${pAbbr(p)}</span>
+      <span style="font-size:9px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;margin-top:10px">${pAbbr(p)}</span>
       ${posLabel?`<span style="font-size:8px;color:rgba(255,255,255,.7);line-height:1">${posLabel}</span>`:''}
-      ${rBadge(p.id)}
     </div>`;
   }).join('');
 
@@ -3266,7 +3283,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       <div class="card" style="margin-bottom:18px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Esquema Tático</h3>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${Object.keys(FORMATIONS).map(f=>`<button class="form-chip${mr.formation===f?' active':''}" data-formation="${f}">${f}</button>`).join('')}
+          ${Object.keys(FORMATIONS).map(f=>`<button class="form-chip${(mr.formation||DEFAULT_FORMATION[ev.squad])===f?' active':''}" data-formation="${f}">${f}</button>`).join('')}
         </div>
         ${mr.formation?`<div style="margin-top:10px;font-size:11px;color:var(--muted)">Posições calculadas automaticamente. Ajusta arrastando no <strong>Relatório</strong>.</div>`:''}
       </div>
