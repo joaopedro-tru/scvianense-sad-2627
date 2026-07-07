@@ -3444,8 +3444,8 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
   </div>
 </div>
 ${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
-<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th><th style="width:32px;text-align:center">Pos</th><th style="width:110px">Assinatura</th></tr></thead><tbody>
-${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td><td class="pos-col">${p.position||'—'}</td><td class="sig-col"><div></div></td></tr>`).join('')}
+<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th><th style="width:110px">Assinatura</th></tr></thead><tbody>
+${convocados.map(p=>`<tr><td>${p.number||'—'}</td><td>${p.name}</td><td class="sig-col"><div></div></td></tr>`).join('')}
 </tbody></table>
 <div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
 <div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
