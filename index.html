@@ -787,12 +787,20 @@ body.pm #v-pf{padding:30px}
         <div class="fst">Dados Profissionais</div>
         <div class="fr">
           <div class="fg"><label>Função *</label>
-            <select name="staffRole" required>
+            <select name="staffRole" id="sf-role" required onchange="sfRoleChange()">
               <option value="">Selecionar...</option>
-              <option value="adjunto">Adjunto</option>
-              <option value="grcoach">Treinador de GR</option>
-              <option value="condicionamento">Preparador Físico</option>
-              <option value="fisio">Fisioterapeuta</option>
+              <optgroup label="Equipa Técnica">
+                <option value="headcoach">Treinador Principal</option>
+                <option value="adjunto">Adjunto</option>
+                <option value="estagiario">Estagiário</option>
+                <option value="grcoach">Treinador de GR</option>
+                <option value="condicionamento">Preparador Físico</option>
+              </optgroup>
+              <optgroup label="Clínica / Saúde">
+                <option value="fisio">Fisioterapeuta</option>
+                <option value="enfermeiro">Enfermeiro</option>
+                <option value="massagista">Massagista</option>
+              </optgroup>
               <option value="outro">Outro</option>
             </select>
           </div>
@@ -806,7 +814,18 @@ body.pm #v-pf{padding:30px}
             </select>
           </div>
         </div>
-        <div class="fg"><label>Licença de Treinador</label><input type="text" name="license" placeholder="UEFA C, UEFA B, etc."></div>
+        <div class="fg" id="sf-license-wrap" style="display:none">
+          <label>Licença de Treinador *</label>
+          <select name="license" id="sf-license">
+            <option value="">Selecionar...</option>
+            <option value="UEFA C">UEFA C</option>
+            <option value="UEFA B">UEFA B</option>
+            <option value="UEFA A">UEFA A</option>
+            <option value="UEFA PRO">UEFA PRO</option>
+            <option value="Estagiário UEFA C">Estagiário UEFA C</option>
+            <option value="Estagiário UEFA B">Estagiário UEFA B</option>
+          </select>
+        </div>
         <div class="fg"><label>Observações</label><textarea name="notes" placeholder="Outras informações relevantes..."></textarea></div>
         <div class="fa" style="margin-top:18px">
           <button type="submit" class="btn btn-p" id="sf-submit-btn">✓ Submeter</button>
@@ -1195,16 +1214,22 @@ const USERS = [
   { user:'gr-eqa',   pass:'GR*EQA#26',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
   { user:'adj-19',   pass:'ADJ*19#26',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
   { user:'gr-19',    pass:'GR*19#26',      role:'staff', squad:'sub19', staffRole:'grcoach'  },
-  { user:'adj-23',   pass:'ADJ*23#26',     role:'staff', squad:'sub23', staffRole:'adjunto'  },
-  { user:'gr-23',    pass:'GR*23#26',      role:'staff', squad:'sub23', staffRole:'grcoach'  },
+  { user:'adj-23',   pass:'ADJ*23#26',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
+  { user:'gr-23',    pass:'GR*23#26',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
+  // ── Clínica / Saúde ───────────────────────────────────────
+  { user:'med-eqa',  pass:'MED*EQA#26',   role:'medical', squad:'eqa'   },
+  { user:'med-19',   pass:'MED*19#26',    role:'medical', squad:'sub19' },
+  { user:'med-23',   pass:'MED*23#26',    role:'medical', squad:'sub23' },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
 function isAdmin(){ return currentUser()?.role==='admin'; }
 function coachSquad(){ return currentUser()?.squad||null; }
 function isStaff(){ return currentUser()?.role==='staff'; }
+function isMedical(){ return currentUser()?.role==='medical'; }
 function staffRole(){ return currentUser()?.staffRole||null; }
-function staffRoleName(){ const r=staffRole(); return r==='grcoach'?'Treinador de GR':r==='adjunto'?'Adjunto':null; }
+function staffRoleName(){ const r=staffRole(); return STAFF_ROLES_LABEL[r]||r||null; }
+function canSeeClinical(){ return isAdmin()||isMedical(); }
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -1286,7 +1311,35 @@ const DB = {
     this._fse()?.doc(id).delete().catch(e=>console.error('FS deleteEvent:',e));
   },
   getEvent(id){ return this._d().events.find(x=>x.id===id) },
-  getPlayer(id){ return this._d().players.find(x=>x.id===id) }
+  getPlayer(id){ return this._d().players.find(x=>x.id===id) },
+  // ── Clinical Records ─────────────────────────────────────────────────────────
+  _fscr(){ return firestoreDb?.collection('clinicalRecords') },
+  _cr(){ try{ return JSON.parse(localStorage.getItem('scv_cr')||'[]'); }catch{ return []; } },
+  _scr(arr){ localStorage.setItem('scv_cr',JSON.stringify(arr)); },
+  getClinicalRecords(athleteId){
+    const all=this._cr();
+    return athleteId?all.filter(r=>r.athleteId===athleteId):all;
+  },
+  getClinicalByEvent(eventId){
+    return this._cr().filter(r=>r.eventId===eventId);
+  },
+  async addClinicalRecord(rec){
+    rec.id=uid(); rec.createdAt=new Date().toISOString();
+    const arr=this._cr(); arr.push(rec); this._scr(arr);
+    if(this._fscr()) await this._fscr().doc(rec.id).set(rec).catch(e=>console.error('FS addClinical:',e));
+    return rec;
+  },
+  async deleteClinicalRecord(id){
+    const arr=this._cr().filter(r=>r.id!==id); this._scr(arr);
+    if(this._fscr()) await this._fscr().doc(id).delete().catch(e=>console.error('FS delClinical:',e));
+  },
+  async syncClinicalFromFirestore(){
+    if(!this._fscr()) return;
+    try{
+      const snap=await this._fscr().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._scr(arr);
+    }catch(e){ console.warn('syncClinical:',e); }
+  }
 };
 
 function uid(){ return crypto.randomUUID() }
@@ -1896,6 +1949,26 @@ function renderPitch(allPs){
 }
 
 // ── PLAYER DETAIL ─────────────────────────────────────────────────────────────
+function buildPlayerClinicalCard(athleteId){
+  const recs=DB.getClinicalRecords(athleteId).sort((a,b)=>b.date.localeCompare(a.date));
+  if(recs.length===0) return `<div class="card"><h3>🏥 Histórico Clínico</h3><p style="color:var(--muted);font-size:13px">Sem registos clínicos.</p></div>`;
+  const rows=recs.map(r=>{
+    const ev=r.eventId?DB.getEvent(r.eventId):null;
+    const evLabel=ev?`${ev.type==='game'?'Jogo vs '+ev.opponent:'Treino'} · `:'';
+    return `<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span style="font-size:16px">${(CR_TYPES[r.type]||'📝').split(' ')[0]}</span>
+        <div>
+          <span style="font-size:13px;font-weight:600">${CR_TYPES[r.type]||r.type}</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:8px">${evLabel}${fmtDate(r.date)}</span>
+        </div>
+      </div>
+      ${r.notes?`<div style="font-size:12px;color:var(--text);white-space:pre-wrap;padding-left:24px">${r.notes}</div>`:''}
+    </div>`;
+  }).join('');
+  return `<div class="card"><h3>🏥 Histórico Clínico</h3>${rows}</div>`;
+}
+
 function renderPlayer(){
   const p=player; if(!p)return;
   document.getElementById('pd-name').textContent=dn(p);
@@ -1978,6 +2051,7 @@ function renderPlayer(){
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
+      ${canSeeClinical()?buildPlayerClinicalCard(pid):''}
       <div class="card"><h3>Estatísticas</h3>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
           ${statBox('Treinos',trainAttended,'presenças')}
@@ -2141,6 +2215,17 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   }
 });
 
+// ── STAFF FORM ROLE TOGGLE ───────────────────────────────────────────────────
+function sfRoleChange(){
+  const role=document.getElementById('sf-role')?.value||'';
+  const wrap=document.getElementById('sf-license-wrap');
+  const lic=document.getElementById('sf-license');
+  if(!wrap) return;
+  const needsLicense=STAFF_LICENSE_ROLES.includes(role);
+  wrap.style.display=needsLicense?'':'none';
+  if(lic) lic.required=needsLicense;
+}
+
 // ── STAFF FORM (public) ───────────────────────────────────────────────────────
 document.getElementById('sf-form').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -2164,8 +2249,10 @@ document.getElementById('sf-form').addEventListener('submit', async e=>{
 });
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
-const STAFF_ROLES_LABEL={adjunto:'Adjunto',grcoach:'Treinador de GR'};
-const STAFF_ACCOUNTS=USERS.filter(u=>u.role==='staff');
+const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',outro:'Outro'};
+const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario']; // roles that require UEFA license
+const STAFF_ACCOUNTS=USERS.filter(u=>u.role==='staff'||u.role==='medical');
+const MEDICAL_ROLES=['fisio','enfermeiro','massagista'];
 
 async function renderStaff(){
   const el=document.getElementById('staff-content');
@@ -2187,9 +2274,9 @@ async function renderStaff(){
     const members=bySquad[sq]||[];
     const rows=members.map(u=>`
       <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">${u.staffRole==='grcoach'?'🥅':'🎽'}</div>
+        <div style="width:34px;height:34px;border-radius:50%;background:${u.role==='medical'?'#c0392b':'var(--green)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">${u.role==='medical'?'🏥':u.staffRole==='grcoach'?'🥅':'🎽'}</div>
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${STAFF_ROLES_LABEL[u.staffRole]||u.staffRole}</div>
+          <div style="font-size:13px;font-weight:600">${u.role==='medical'?'Clínica / Saúde':STAFF_ROLES_LABEL[u.staffRole]||u.staffRole}</div>
           <div style="font-size:11px;color:var(--muted);font-family:monospace">user: <strong>${u.user}</strong> · pass: <strong>${u.pass}</strong></div>
         </div>
         <button class="btn btn-o btn-sm" onclick="navigator.clipboard.writeText('${u.user}').then(()=>toast('✅ Username copiado!'))">Copiar</button>
@@ -2395,6 +2482,68 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
 });
 
 // ── TRAINING VIEW ─────────────────────────────────────────────────────────────
+// ── CLINICAL RECORDS HELPERS ──────────────────────────────────────────────────
+const CR_TYPES={injury:'🩹 Lesão',treatment:'💊 Tratamento',assessment:'📋 Avaliação',illness:'🤒 Doença',prevention:'🛡️ Prevenção',other:'📝 Outro'};
+
+function buildClinicalSection(eventId, sqPlayers, onSave){
+  if(!canSeeClinical()) return '';
+  const recs=DB.getClinicalByEvent(eventId);
+  const recHtml=recs.length
+    ?recs.map(r=>{
+        const p=DB.getPlayer(r.athleteId);
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="width:30px;height:30px;border-radius:50%;background:#fde8e8;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${(CR_TYPES[r.type]||'📝').split(' ')[0]}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${p?dn(p):'—'}</div>
+            <div style="font-size:11px;color:var(--muted)">${CR_TYPES[r.type]||r.type}</div>
+            ${r.notes?`<div style="font-size:12px;margin-top:3px;white-space:pre-wrap">${r.notes}</div>`:''}
+          </div>
+          ${isAdmin()||isMedical()?`<button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-cr="${r.id}">✕</button>`:''}
+        </div>`;
+      }).join('')
+    :'<p style="color:var(--muted);font-size:13px">Sem registos clínicos neste evento.</p>';
+
+  const playerOpts=sqPlayers.map(p=>`<option value="${p.id}">${dn(p)}</option>`).join('');
+  const addForm=`
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">+ Adicionar Registo</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <select id="cr-athlete" style="flex:1;min-width:140px;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+          <option value="">— Atleta —</option>${playerOpts}
+        </select>
+        <select id="cr-type" style="flex:1;min-width:120px;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+          ${Object.entries(CR_TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
+        </select>
+      </div>
+      <textarea id="cr-notes" rows="2" placeholder="Descrição, diagnóstico, tratamento..." style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)"></textarea>
+      <button class="btn btn-p btn-sm" id="btn-add-cr" style="margin-top:7px" data-event-id="${eventId}">+ Guardar Registo</button>
+    </div>`;
+
+  return `<div class="card" style="margin-top:14px">
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#c0392b;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🏥 Registos Clínicos</h3>
+    ${recHtml}
+    ${addForm}
+  </div>`;
+}
+
+function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
+  // Delete
+  document.querySelectorAll('[data-del-cr]').forEach(btn=>btn.addEventListener('click',async()=>{
+    await DB.deleteClinicalRecord(btn.dataset.delCr); rerenderFn();
+  }));
+  // Add
+  const addBtn=document.getElementById('btn-add-cr');
+  if(addBtn) addBtn.addEventListener('click',async()=>{
+    const pid=document.getElementById('cr-athlete').value;
+    const type=document.getElementById('cr-type').value;
+    const notes=document.getElementById('cr-notes').value.trim();
+    if(!pid){ toast('⚠️ Seleciona um atleta'); return; }
+    const ev=DB.getEvent(eventId);
+    await DB.addClinicalRecord({athleteId:pid,eventId,eventType:ev?.type||'',date:ev?.date||new Date().toISOString().split('T')[0],type,notes,addedBy:currentUser()?.user||''});
+    toast('✅ Registo clínico guardado!'); rerenderFn();
+  });
+}
+
 function renderTraining(){
   const ev=DB.getEvent(trainingEventId); if(!ev){ nav('calendar'); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
@@ -2493,7 +2642,8 @@ function renderTraining(){
       ${extraSection}
     </div>
   </div>
-  ${fichaPreview}`;
+  ${fichaPreview}
+  ${buildClinicalSection(trainingEventId, allPl)}`;
 
   // Toggle attendance
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -2557,6 +2707,9 @@ function renderTraining(){
       toast('✅ Notas GR guardadas!');
     });
   }
+
+  // Clinical records
+  bindClinicalHandlers(trainingEventId, allPl, renderTraining);
 }
 
 document.getElementById('btn-back-training').addEventListener('click',()=>nav('sq-trainings',{squad}));
@@ -3616,6 +3769,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       </div>
     </div>
   </div>
+  ${buildClinicalSection(gameEventId, convocados)}
   <div class="card" style="margin-top:18px">
     <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📝 Observações da Equipa Técnica</h3>
     ${obsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>'}
@@ -3728,6 +3882,9 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       toast('✅ Observação guardada!'); renderGame();
     });
   }
+
+  // Clinical records
+  bindClinicalHandlers(gameEventId, convocados, renderGame);
 }
 
 // ── PLAYER TOKEN QUICK EDIT ──────────────────────────────────────────────────
@@ -4123,6 +4280,17 @@ function applyRoleUI(){
     const foot=document.getElementById('sb-foot');
     const roleName=staffRoleName()||'Staff';
     if(foot) foot.textContent=`${roleName} ${u.squad.toUpperCase()} · SC Vianense`;
+  } else if(u.role==='medical'){
+    // Medical: same squad restrictions; hide admin items
+    document.getElementById('btn-sync-athletes').style.display='none';
+    document.getElementById('nl-publink').style.display='none';
+    staffSection.forEach(el=>el&&(el.style.display='none'));
+    const allSquads=['eqa','sub19','sub23'];
+    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+      document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+    });
+    const foot=document.getElementById('sb-foot');
+    if(foot) foot.textContent=`Clínica ${u.squad.toUpperCase()} · SC Vianense`;
   } else if(u.role==='admin'){
     // Admin: staff section visible
     staffSection.forEach(el=>el&&(el.style.display=''));
@@ -4141,6 +4309,7 @@ function initCoordApp(){
     if(firestoreDb){
       await migrateLocalToFirestore();
       await syncFromFirestore();
+      await DB.syncClinicalFromFirestore();
       if(isAdmin()) await syncPendingAthletes(true);
       if(isAdmin()) checkPendingBadge();
     } else {
