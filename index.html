@@ -1125,8 +1125,32 @@ body.pm #v-pf{padding:30px}
     <div id="edet-content"></div>
     <div class="fa">
       <button class="btn btn-d btn-sm" id="btn-del-event">🗑️ Eliminar</button>
+      <button class="btn btn-d btn-sm" id="btn-del-series" style="display:none">🗑️ Eliminar série</button>
       <button class="btn btn-o btn-sm" id="btn-edit-event">✏️ Editar</button>
       <button class="btn btn-g" id="mo-edet-cancel">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DELETE TRAINING SERIES -->
+<div class="mo" id="mo-del-series">
+  <div class="md" style="max-width:380px">
+    <div class="mh"><h2>Eliminar Treinos</h2><button class="mc" id="mo-del-series-close">✕</button></div>
+    <div style="padding:0 4px 12px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Elimina este treino e todos os seguintes da mesma série (mesmo escalão, mesmo dia da semana), até à data indicada.</p>
+      <div class="fg">
+        <label>Eliminar a partir de</label>
+        <input type="date" id="del-series-from" readonly style="background:#f5f8ff">
+      </div>
+      <div class="fg">
+        <label>Até à data (inclusive)</label>
+        <input type="date" id="del-series-until">
+      </div>
+      <div id="del-series-preview" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-d" id="btn-confirm-del-series">🗑️ Eliminar série</button>
+      <button class="btn btn-g" id="mo-del-series-cancel">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2374,6 +2398,8 @@ function showEventDetail(id){
   calEvent=ev;
   document.getElementById('edet-title').textContent=evLabel(ev);
   document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
+  // Show/hide "Eliminar série" button based on event type
+  document.getElementById('btn-del-series').style.display=ev.type==='training'?'':'none';
   document.getElementById('mo-edet').classList.add('open');
   if(ev.type==='training'){
     document.getElementById('btn-open-training').addEventListener('click',()=>{
@@ -2392,10 +2418,58 @@ function deleteEvent(id){
   if(!confirm('Eliminar este evento?'))return;
   DB.deleteEvent(id); document.getElementById('mo-edet').classList.remove('open'); toast('Evento eliminado.'); renderCal(); if(view==='dashboard')renderDash();
 }
+function openDeleteSeries(ev){
+  document.getElementById('mo-edet').classList.remove('open');
+  document.getElementById('del-series-from').value=ev.date;
+  document.getElementById('del-series-until').value='';
+  document.getElementById('del-series-preview').textContent='';
+  document.getElementById('mo-del-series').classList.add('open');
+  // Preview count on date change
+  const untilInput=document.getElementById('del-series-until');
+  const preview=document.getElementById('del-series-preview');
+  const weekday=new Date(ev.date+'T00:00:00').getDay();
+  function updatePreview(){
+    const until=untilInput.value;
+    if(!until){ preview.textContent=''; return; }
+    const matches=DB.events().filter(e=>
+      e.type==='training' && e.squad===ev.squad &&
+      e.date>=ev.date && e.date<=until &&
+      new Date(e.date+'T00:00:00').getDay()===weekday
+    );
+    preview.textContent=`${matches.length} treino${matches.length!==1?'s':''} serão eliminados.`;
+  }
+  untilInput.removeEventListener('input',untilInput._preview);
+  untilInput._preview=updatePreview;
+  untilInput.addEventListener('input',updatePreview);
+  document.getElementById('btn-confirm-del-series')._ev=ev;
+}
 document.getElementById('btn-del-event').addEventListener('click',()=>calEvent&&deleteEvent(calEvent.id));
+document.getElementById('btn-del-series').addEventListener('click',()=>calEvent&&openDeleteSeries(calEvent));
 document.getElementById('btn-edit-event').addEventListener('click',()=>{ document.getElementById('mo-edet').classList.remove('open'); openEventModal(calEvent); });
 document.getElementById('mo-edet-close').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 document.getElementById('mo-edet-cancel').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
+
+// ── DELETE TRAINING SERIES ────────────────────────────────────────────────────
+document.getElementById('mo-del-series-close').addEventListener('click',()=>document.getElementById('mo-del-series').classList.remove('open'));
+document.getElementById('mo-del-series-cancel').addEventListener('click',()=>document.getElementById('mo-del-series').classList.remove('open'));
+document.getElementById('btn-confirm-del-series').addEventListener('click',function(){
+  const ev=this._ev; if(!ev) return;
+  const until=document.getElementById('del-series-until').value;
+  if(!until){ toast('⚠️ Indica uma data de fim'); return; }
+  const weekday=new Date(ev.date+'T00:00:00').getDay();
+  const toDelete=DB.events().filter(e=>
+    e.type==='training' && e.squad===ev.squad &&
+    e.date>=ev.date && e.date<=until &&
+    new Date(e.date+'T00:00:00').getDay()===weekday
+  );
+  if(!toDelete.length){ toast('Nenhum treino encontrado nesse intervalo.'); return; }
+  if(!confirm(`Eliminar ${toDelete.length} treino${toDelete.length!==1?'s':''}?`)) return;
+  toDelete.forEach(e=>DB.deleteEvent(e.id));
+  document.getElementById('mo-del-series').classList.remove('open');
+  toast(`✅ ${toDelete.length} treino${toDelete.length!==1?'s':''} eliminados.`);
+  renderCal(); if(view==='dashboard')renderDash();
+  if(view==='sq-trainings')renderSqTrainings();
+});
 document.getElementById('cal-prev').addEventListener('click',()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--} renderCal() });
 document.getElementById('cal-next').addEventListener('click',()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++} renderCal() });
 document.getElementById('cal-filters').querySelectorAll('.ftb').forEach(b=>b.addEventListener('click',()=>{
