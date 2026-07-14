@@ -518,6 +518,10 @@ body.pm #v-pf{padding:30px}
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
     <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
+    <hr class="nd">
+    <div class="nsl" id="nsl-staff">Equipa Técnica</div>
+    <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
+    <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
   </nav>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
   <div id="sb-foot">SC Vianense SAD © 2026</div>
@@ -756,6 +760,68 @@ body.pm #v-pf{padding:30px}
         </div>
       </form>
     </div>
+  </div>
+
+  <!-- STAFF PUBLIC FORM -->
+  <div class="view" id="v-sf">
+    <div class="pfh">
+      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
+      <h1>SC Vianense SAD</h1>
+      <p>Formulário de Registo — Equipa Técnica</p>
+    </div>
+    <div class="card">
+      <div id="sf-success" style="display:none;background:#d4edda;color:#155724;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center">
+        ✅ Dados submetidos com sucesso! Obrigado.
+      </div>
+      <form id="sf-form">
+        <div class="fst">Dados Pessoais</div>
+        <div class="fr">
+          <div class="fg"><label>Nome Completo *</label><input type="text" name="name" required></div>
+          <div class="fg"><label>Data de Nascimento</label><input type="date" name="dob"></div>
+        </div>
+        <div class="fr">
+          <div class="fg"><label>Telefone *</label><input type="tel" name="phone" required></div>
+          <div class="fg"><label>E-mail</label><input type="email" name="email"></div>
+        </div>
+        <div class="fg"><label>NIF</label><input type="text" name="nif" placeholder="000 000 000"></div>
+        <div class="fst">Dados Profissionais</div>
+        <div class="fr">
+          <div class="fg"><label>Função *</label>
+            <select name="staffRole" required>
+              <option value="">Selecionar...</option>
+              <option value="adjunto">Adjunto</option>
+              <option value="grcoach">Treinador de GR</option>
+              <option value="condicionamento">Preparador Físico</option>
+              <option value="fisio">Fisioterapeuta</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div class="fg"><label>Escalão *</label>
+            <select name="squad" required>
+              <option value="">Selecionar...</option>
+              <option value="eqa">Equipa A</option>
+              <option value="sub23">Sub-23</option>
+              <option value="sub19">Sub-19</option>
+              <option value="ambos">Ambas as equipas</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg"><label>Licença de Treinador</label><input type="text" name="license" placeholder="UEFA C, UEFA B, etc."></div>
+        <div class="fg"><label>Observações</label><textarea name="notes" placeholder="Outras informações relevantes..."></textarea></div>
+        <div class="fa" style="margin-top:18px">
+          <button type="submit" class="btn btn-p" id="sf-submit-btn">✓ Submeter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- STAFF MANAGEMENT (admin) -->
+  <div class="view" id="v-staff">
+    <div class="tb">
+      <div><h1>Equipa Técnica</h1><div class="sub">Gestão de staff e acessos</div></div>
+      <button class="btn btn-o btn-sm" id="btn-copy-stafflink">🔗 Copiar Link do Formulário</button>
+    </div>
+    <div id="staff-content"></div>
   </div>
 
   <!-- MATCH DAY HUB -->
@@ -1118,17 +1184,27 @@ const FB_CONFIG = {
 // ════════════════════════════════════════════════════════
 
 // ── ACESSO / UTILIZADORES ─────────────────────────────────────────────────────
-// role: 'admin' → acesso total | 'coach' → acesso ao seu escalão apenas
+// role: 'admin' → acesso total | 'coach' → escalão | 'staff' → adjunto/GR coach
 const USERS = [
-  { user:'admin',  pass:'scv2025*',       role:'admin' },
-  { user:'sub19',  pass:'SCV2627*#19',    role:'coach', squad:'sub19' },
-  { user:'sub23',  pass:'SCV2627#23*',    role:'coach', squad:'sub23' },
-  { user:'eqa',    pass:'SCV2627*#EQA',   role:'coach', squad:'eqa'   },
+  { user:'admin',    pass:'scv2025*',       role:'admin' },
+  { user:'sub19',    pass:'SCV2627*#19',    role:'coach', squad:'sub19' },
+  { user:'sub23',    pass:'SCV2627#23*',    role:'coach', squad:'sub23' },
+  { user:'eqa',      pass:'SCV2627*#EQA',   role:'coach', squad:'eqa'   },
+  // ── Equipa técnica ────────────────────────────────────────
+  { user:'adj-eqa',  pass:'ADJ*EQA#26',    role:'staff', squad:'eqa',   staffRole:'adjunto'  },
+  { user:'gr-eqa',   pass:'GR*EQA#26',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
+  { user:'adj-19',   pass:'ADJ*19#26',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
+  { user:'gr-19',    pass:'GR*19#26',      role:'staff', squad:'sub19', staffRole:'grcoach'  },
+  { user:'adj-23',   pass:'ADJ*23#26',     role:'staff', squad:'sub23', staffRole:'adjunto'  },
+  { user:'gr-23',    pass:'GR*23#26',      role:'staff', squad:'sub23', staffRole:'grcoach'  },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
 function isAdmin(){ return currentUser()?.role==='admin'; }
 function coachSquad(){ return currentUser()?.squad||null; }
+function isStaff(){ return currentUser()?.role==='staff'; }
+function staffRole(){ return currentUser()?.staffRole||null; }
+function staffRoleName(){ const r=staffRole(); return r==='grcoach'?'Treinador de GR':r==='adjunto'?'Adjunto':null; }
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -1530,6 +1606,8 @@ function nav(v,opts={}){
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
+  else if(v==='staff'){ show('v-staff'); setActive('[data-view="staff"]'); renderStaff() }
+  else if(v==='staff-form'){ show('v-sf') }
   else if(v==='live'){
     if(opts.id){ liveGameId=opts.id; }
     if(opts.step){ liveStep=opts.step; }
@@ -2063,6 +2141,87 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   }
 });
 
+// ── STAFF FORM (public) ───────────────────────────────────────────────────────
+document.getElementById('sf-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('sf-submit-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> A enviar...';
+  try {
+    const fd=new FormData(e.target), p={};
+    for(const[k,v]of fd.entries()) p[k]=v;
+    p.id=uid(); p.submittedAt=new Date().toISOString();
+    if(firestoreDb){
+      await firestoreDb.collection('pending_staff').doc(p.id).set(p);
+    }
+    e.target.reset();
+    document.getElementById('sf-success').style.display='block';
+    setTimeout(()=>document.getElementById('sf-success').style.display='none',7000);
+  } catch(err) {
+    console.error('Staff form error:',err); toast('❌ Erro ao submeter. Verifica a ligação.');
+  } finally {
+    btn.disabled=false; btn.innerHTML='✓ Submeter';
+  }
+});
+
+// ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
+const STAFF_ROLES_LABEL={adjunto:'Adjunto',grcoach:'Treinador de GR'};
+const STAFF_ACCOUNTS=USERS.filter(u=>u.role==='staff');
+
+async function renderStaff(){
+  const el=document.getElementById('staff-content');
+  el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar...</div>';
+
+  // Load pending submissions
+  let pending=[];
+  if(firestoreDb){
+    try{
+      const snap=await firestoreDb.collection('pending_staff').get();
+      snap.forEach(d=>pending.push(d.data()));
+    }catch(e){ console.warn('Could not load pending_staff',e); }
+  }
+
+  const bySquad={eqa:[],sub19:[],sub23:[]};
+  STAFF_ACCOUNTS.forEach(u=>{ if(bySquad[u.squad]) bySquad[u.squad].push(u); });
+
+  const squadCards=Object.entries({eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}).map(([sq,label])=>{
+    const members=bySquad[sq]||[];
+    const rows=members.map(u=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">${u.staffRole==='grcoach'?'🥅':'🎽'}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${STAFF_ROLES_LABEL[u.staffRole]||u.staffRole}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:monospace">user: <strong>${u.user}</strong> · pass: <strong>${u.pass}</strong></div>
+        </div>
+        <button class="btn btn-o btn-sm" onclick="navigator.clipboard.writeText('${u.user}').then(()=>toast('✅ Username copiado!'))">Copiar</button>
+      </div>`).join('');
+    return `<div class="card" style="margin-bottom:14px">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">${label}</h3>
+      ${rows||'<p style="color:var(--muted);font-size:13px">Sem contas configuradas.</p>'}
+    </div>`;
+  }).join('');
+
+  const pendingSection=pending.length?`
+    <div class="card">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📥 Formulários Recebidos (${pending.length})</h3>
+      ${pending.map(s=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600">${s.name||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[s.staffRole]||s.staffRole||'—'} · ${s.squad||'—'} · ${s.phone||'—'}</div>
+        ${s.notes?`<div style="font-size:12px;margin-top:3px">${s.notes}</div>`:''}
+      </div>`).join('')}
+    </div>`:'';
+
+  el.innerHTML=`<div class="ds">${squadCards}${pendingSection}</div>`;
+}
+
+document.getElementById('btn-copy-stafflink').addEventListener('click',()=>{
+  const url=location.href.split('?')[0]+'?mode=staff-form';
+  navigator.clipboard.writeText(url).then(()=>toast('🔗 Link do staff copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
+});
+document.getElementById('nl-stafflink').addEventListener('click',()=>{
+  const url=location.href.split('?')[0]+'?mode=staff-form';
+  navigator.clipboard.writeText(url).then(()=>toast('🔗 Link do staff copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
+});
+
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function getGameOverlaps(events){
   const toMin=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;};
@@ -2276,6 +2435,17 @@ function renderTraining(){
       </div>
     </div>`:'';
 
+  // GR Training section
+  const canEditGR = isAdmin() || staffRole()==='grcoach';
+  const grData = ev.grTraining || {};
+  const grZone = grData.fileUrl
+    ? `<div class="doc-zone has-file" id="gr-ficha-zone" ${canEditGR?'onclick="document.getElementById(\'gr-ficha-input\').click()"':''}><span class="dz-icon">✅</span><div class="dz-info"><div class="dz-name">${grData.fileName||'Treino GR'}</div><div class="dz-sub">${canEditGR?'Clica para substituir':''}</div></div></div>`
+    : `<div class="doc-zone empty" id="gr-ficha-zone" ${canEditGR?'onclick="document.getElementById(\'gr-ficha-input\').click()"':'style="opacity:.5;pointer-events:none"'}><span class="dz-icon">🥅</span><span>PDF, JPG ou PNG</span></div>`;
+  const grFileName=(grData.fileName||grData.fileUrl||'').toLowerCase();
+  const grIsPdf=grFileName.includes('.pdf')||grFileName.startsWith('data:application/pdf');
+  const grIsImg=/\.(jpg|jpeg|png|webp)/.test(grFileName)||/^data:image\//.test(grData.fileUrl||'');
+  const grPreview=grData.fileUrl?(grIsPdf?`<iframe src="${grData.fileUrl}" style="width:100%;height:400px;border:none;border-radius:6px;margin-top:12px"></iframe>`:grIsImg?`<img src="${grData.fileUrl}" style="width:100%;border-radius:6px;display:block;margin-top:12px">`:''): '';
+
   const fichaZone=ev.fichaTreinoUrl
     ?`<div class="doc-zone has-file" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">✅</span><div class="dz-info"><div class="dz-name">${ev.fichaTreinoFileName||'Ficha de Treino'}</div><div class="dz-sub">Clica para substituir</div></div></div>`
     :`<div class="doc-zone empty" id="tr-ficha-zone" onclick="document.getElementById('tr-ficha-input').click()"><span class="dz-icon">📋</span><span>PDF, JPG ou PNG</span></div>`;
@@ -2300,6 +2470,18 @@ function renderTraining(){
         ${fichaZone}
         <input type="file" id="tr-ficha-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
         ${ev.fichaTreinoUrl?`<a href="${ev.fichaTreinoUrl}" target="_blank" class="btn btn-o btn-sm" style="margin-top:9px;width:100%;justify-content:center">Ver Ficha ↗</a>`:''}
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🥅 Treino de Guarda-Redes</h3>
+        ${grZone}
+        ${canEditGR?`<input type="file" id="gr-ficha-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">`:''}
+        ${grData.fileUrl?`<a href="${grData.fileUrl}" target="_blank" class="btn btn-o btn-sm" style="margin-top:9px;width:100%;justify-content:center">Ver Ficha GR ↗</a>`:''}
+        ${grPreview}
+        <div style="margin-top:12px">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Notas do Treino GR</label>
+          <textarea id="gr-notes" rows="4" placeholder="${canEditGR?'Objetivos, exercícios, observações...':'Sem notas registadas.'}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)" ${canEditGR?'':'readonly'}>${grData.notes||''}</textarea>
+          ${canEditGR?`<button class="btn btn-p btn-sm" id="btn-save-grnotes" style="margin-top:8px">Guardar Notas</button>`:''}
+        </div>
       </div>
     </div>
     <div class="card">
@@ -2348,6 +2530,33 @@ function renderTraining(){
       renderTraining(); // repõe a zona
     }
   });
+
+  // GR ficha upload
+  const grInput=document.getElementById('gr-ficha-input');
+  if(grInput){
+    grInput.addEventListener('change',async()=>{
+      const f=grInput.files[0]; if(!f)return;
+      const zone=document.getElementById('gr-ficha-zone');
+      zone.innerHTML='<span class="dz-icon"><span class="spin" style="border-color:rgba(26,61,110,.3);border-top-color:var(--green)"></span></span><span>A carregar...</span>';
+      try{
+        const url=await uploadFile(f,trainingEventId,'gr-ficha');
+        const gr={...(DB.getEvent(trainingEventId).grTraining||{}),fileUrl:url,fileName:f.name};
+        DB.updateEvent(trainingEventId,{grTraining:gr});
+        toast('✅ Ficha GR carregada!'); renderTraining();
+      }catch(err){ toast('❌ Erro ao carregar ficha GR: '+err.message); renderTraining(); }
+    });
+  }
+
+  // GR notes save
+  const btnGrNotes=document.getElementById('btn-save-grnotes');
+  if(btnGrNotes){
+    btnGrNotes.addEventListener('click',()=>{
+      const notes=document.getElementById('gr-notes').value;
+      const gr={...(DB.getEvent(trainingEventId).grTraining||{}),notes};
+      DB.updateEvent(trainingEventId,{grTraining:gr});
+      toast('✅ Notas GR guardadas!');
+    });
+  }
 }
 
 document.getElementById('btn-back-training').addEventListener('click',()=>nav('sq-trainings',{squad}));
@@ -3296,6 +3505,20 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
+  // Staff observations helpers
+  const staffObs=mr.staffObs||{};
+  const cu=currentUser();
+  const myUser=cu?.user||null;
+  const canWriteObs=isStaff()||isAdmin();
+  const myObs=myUser?staffObs[myUser]||{}:{};
+  const obsCards=Object.entries(staffObs).map(([usr,obs])=>{
+    const u=USERS.find(x=>x.user===usr);
+    const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+' — '+u.squad.toUpperCase():'Staff';
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
+      <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
+    </div>`;
+  }).join('');
   const convocados=sortByPos(sqPlayers.filter(p=>!!conv.players[p.id]));
   const lineup=mr.lineup||[];
   const titulares=convocados.filter(p=>lineup.includes(p.id));
@@ -3392,6 +3615,16 @@ function renderGamePos(ev,sqPlayers,conv,mr){
         ${toRate.length===0?'<p style="color:var(--muted);font-size:13px">Sem atletas convocados.</p>':ratingRows}
       </div>
     </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📝 Observações da Equipa Técnica</h3>
+    ${obsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>'}
+    ${canWriteObs?`
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">A minha observação${staffRoleName()?` (${staffRoleName()})`:''}</label>
+      <textarea id="staff-obs-text" rows="4" placeholder="Análise do jogo, observações técnicas..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)">${myObs.text||''}</textarea>
+      <button class="btn btn-p btn-sm" id="btn-save-staffobs" style="margin-top:8px">Guardar Observação</button>
+    </div>`:''}
   </div>`;
 
   // Formation picker
@@ -3482,6 +3715,19 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     curMr.ratings[pid].comment=input.value;
     DB.updateEvent(gameEventId,{matchReport:curMr});
   }));
+
+  // Staff observation save
+  const btnSaveObs=document.getElementById('btn-save-staffobs');
+  if(btnSaveObs&&myUser){
+    btnSaveObs.addEventListener('click',()=>{
+      const text=document.getElementById('staff-obs-text').value.trim();
+      const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+      curMr.staffObs=curMr.staffObs||{};
+      curMr.staffObs[myUser]={role:staffRole()||cu?.role,text,ts:new Date().toISOString()};
+      DB.updateEvent(gameEventId,{matchReport:curMr});
+      toast('✅ Observação guardada!'); renderGame();
+    });
+  }
 }
 
 // ── PLAYER TOKEN QUICK EDIT ──────────────────────────────────────────────────
@@ -3680,6 +3926,7 @@ document.getElementById('btn-new-training').addEventListener('click',()=>openEve
 document.getElementById('btn-new-game').addEventListener('click',()=>openEventModal(null,null,{type:'game',squad}));
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
+document.getElementById('nl-staff').addEventListener('click',()=>nav('staff'));
 document.querySelectorAll('.nl[data-view]').forEach(el=>{
   el.addEventListener('click',()=>{
     const v=el.dataset.view, sq=el.dataset.squad;
@@ -3853,17 +4100,32 @@ async function checkPendingBadge(){
 
 function applyRoleUI(){
   const u=currentUser(); if(!u) return;
+  const staffSection=[document.getElementById('nsl-staff'),document.getElementById('nl-staff'),document.getElementById('nl-stafflink')];
+
   if(u.role==='coach'){
-    // Esconder sincronizar
     document.getElementById('btn-sync-athletes').style.display='none';
-    // Esconder os escalões de outros treinadores
+    staffSection.forEach(el=>el&&(el.style.display='none'));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
-    // Indicar na sidebar o nome do utilizador
     const foot=document.getElementById('sb-foot');
     if(foot) foot.textContent=`Treinador ${u.squad.toUpperCase()} · SC Vianense`;
+  } else if(u.role==='staff'){
+    // Staff: same squad restrictions as coach
+    document.getElementById('btn-sync-athletes').style.display='none';
+    document.getElementById('nl-publink').style.display='none';
+    staffSection.forEach(el=>el&&(el.style.display='none'));
+    const allSquads=['eqa','sub19','sub23'];
+    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+      document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+    });
+    const foot=document.getElementById('sb-foot');
+    const roleName=staffRoleName()||'Staff';
+    if(foot) foot.textContent=`${roleName} ${u.squad.toUpperCase()} · SC Vianense`;
+  } else if(u.role==='admin'){
+    // Admin: staff section visible
+    staffSection.forEach(el=>el&&(el.style.display=''));
   }
 }
 
@@ -3901,6 +4163,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     return;
   }
 
+  // Formulário staff — sem login
+  if(params.get('mode')==='staff-form'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm'); nav('staff-form');
+    return;
+  }
+
   // Sessão já autenticada (verificar JSON válido com role)
   const existing=currentUser();
   if(existing?.role){ initCoordApp(); return; }
@@ -3914,7 +4183,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   function tryLogin(){
     const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase() && x.pass===pwIn.value);
     if(u){
-      sessionStorage.setItem(AUTH_KEY, JSON.stringify({role:u.role, squad:u.squad||null}));
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify({role:u.role, squad:u.squad||null, user:u.user, staffRole:u.staffRole||null}));
       initCoordApp();
     } else {
       errEl.textContent='Credenciais incorretas.';
