@@ -267,7 +267,7 @@ body.pm #v-pf{padding:30px}
 .pitch-svg{position:absolute;inset:0;width:100%;height:100%}
 .pzone{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px;transform:translate(-50%,-50%);z-index:2}
 .pzone-lbl{font-size:9px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.6px;text-align:center;margin-bottom:1px;white-space:nowrap}
-.ppill{font-size:10.5px;font-weight:600;color:#fff;background:rgba(20,50,100,.88);border:1.5px solid rgba(255,255,255,.35);border-radius:14px;padding:3px 9px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;cursor:default;line-height:1.4}
+.ppill{font-size:10.5px;font-weight:600;color:#fff;background:rgba(20,50,100,.88);border:1.5px solid rgba(255,255,255,.35);border-radius:14px;padding:3px 9px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.4}
 .ppill.gk{background:rgba(170,120,5,.93);border-color:rgba(255,255,255,.55)}
 .ppill.trinco{background:rgba(20,55,115,.9);border:2px solid #e8b84b}
 .ppill.empty{background:rgba(255,255,255,.07);color:rgba(255,255,255,.28);border:1.5px dashed rgba(255,255,255,.22);font-weight:400;font-size:9px;font-style:italic}
@@ -867,9 +867,11 @@ body.pm #v-pf{padding:30px}
             <option value="">—</option>
             <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
             <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
-            <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+            <option value="ALD">Ala Direito</option><option value="ALE">Ala Esquerdo</option>
+            <option value="MD">Médio Defensivo</option><option value="MC">Médio Centro</option>
             <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
             <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+            <option value="AV">Avançado</option>
           </select>
         </div>
       </div>
@@ -879,9 +881,11 @@ body.pm #v-pf{padding:30px}
             <option value="">—</option>
             <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
             <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
-            <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+            <option value="ALD">Ala Direito</option><option value="ALE">Ala Esquerdo</option>
+            <option value="MD">Médio Defensivo</option><option value="MC">Médio Centro</option>
             <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
             <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+            <option value="AV">Avançado</option>
           </select>
         </div>
         <div class="fg"><label>Posição Terciária <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
@@ -889,9 +893,11 @@ body.pm #v-pf{padding:30px}
             <option value="">—</option>
             <option value="GR">Guarda-Redes</option><option value="DC">Defesa Central</option>
             <option value="LD">Lateral Direito</option><option value="LE">Lateral Esquerdo</option>
-            <option value="MC">Médio Centro</option><option value="MD">Médio Defensivo</option>
+            <option value="ALD">Ala Direito</option><option value="ALE">Ala Esquerdo</option>
+            <option value="MD">Médio Defensivo</option><option value="MC">Médio Centro</option>
             <option value="MO">Médio Ofensivo</option><option value="ED">Extremo Direito</option>
             <option value="EE">Extremo Esquerdo</option><option value="PL">Ponta-de-Lança</option>
+            <option value="AV">Avançado</option>
           </select>
         </div>
       </div>
@@ -1069,12 +1075,15 @@ body.pm #v-pf{padding:30px}
           <option value="LD">LD</option>
           <option value="DC">DC</option>
           <option value="LE">LE</option>
+          <option value="ALD">ALD</option>
+          <option value="ALE">ALE</option>
           <option value="MD">MD</option>
           <option value="MC">MC</option>
           <option value="MO">MO</option>
           <option value="ED">ED</option>
           <option value="EE">EE</option>
           <option value="PL">PL</option>
+          <option value="AV">AV</option>
         </select>
       </div>
       <div style="flex:1">
@@ -1209,7 +1218,7 @@ function uid(){ return crypto.randomUUID() }
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTHS_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança'};
+const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',ALD:'Ala Direito',ALE:'Ala Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança',AV:'Avançado'};
 const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
 const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
 const COMPETITIONS={
@@ -1226,7 +1235,7 @@ const COMPETITIONS={
 //   LD (Lateral Direito)  → fundo do campo (y alto  ≈ 88%)
 //   EE (Extremo Esquerdo) → topo do campo (y baixo ≈ 12%)
 //   ED (Extremo Direito)  → fundo do campo (y alto  ≈ 88%)
-const DEFAULT_FORMATION={eqa:'4-1-2-3',sub19:'4-1-2-3',sub23:'4-1-2-3'};
+const DEFAULT_FORMATION={eqa:'4-1-2-3',sub19:'4-1-2-3',sub23:'3-5-2'};
 const FORMATIONS={
   '4-1-2-3':[
     {role:'GR',x:8,y:50},
@@ -1290,7 +1299,7 @@ const FORMATIONS={
   '3-5-2':[
     {role:'GR',x:8,y:50},
     {role:'DC',x:22,y:25},{role:'DC',x:22,y:50},{role:'DC',x:22,y:75},
-    {role:'LE',x:46,y:10},{role:'MC',x:48,y:30},{role:'MD',x:46,y:50},{role:'MC',x:48,y:70},{role:'LD',x:46,y:90},
+    {role:'ALE',x:46,y:10},{role:'MC',x:48,y:30},{role:'MD',x:46,y:50},{role:'MC',x:48,y:70},{role:'ALD',x:46,y:90},
     {role:'PL',x:80,y:33},{role:'PL',x:80,y:67}
   ],
   '5-3-2':[
@@ -1313,7 +1322,7 @@ const FORMATIONS={
 function buildDefaultPositions(formation,players){
   const slots=FORMATIONS[formation]; if(!slots) return {};
   const used=new Set(); const result={};
-  const rg=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:r==='MD'?2:r==='MC'?3:r==='MO'?4:['ED','EE'].includes(r)?5:6;
+  const rg=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:['ALD','ALE'].includes(r)?1.5:r==='MD'?2:r==='MC'?3:r==='MO'?4:['ED','EE'].includes(r)?5:6;
   slots.forEach(slot=>{
     let best=null,bestScore=999;
     players.forEach(p=>{
@@ -1362,7 +1371,7 @@ function getGameType(ev){
   if(c.includes('prepara')||c.includes('amig')) return 'friendly';
   return 'league';
 }
-const POS_ORDER=['GR','LD','DC','LE','MD','MC','MO','ED','EE','PL'];
+const POS_ORDER=['GR','LD','DC','LE','ALD','ALE','MD','MC','MO','ED','EE','PL','AV'];
 function sortByPos(players){
   return [...players].sort((a,b)=>{
     const ai=POS_ORDER.indexOf(a.position); const bi=POS_ORDER.indexOf(b.position);
@@ -1697,7 +1706,7 @@ function renderPitch(allPs){
   function pills(pos,cls=''){
     const pls=byPos[pos]||[];
     if(pls.length===0) return `<div class="ppill empty">${POS[pos]||pos}</div>`;
-    return pls.map(p=>`<div class="ppill ${cls}" title="${p.name}">${sn(dn(p))}</div>`).join('');
+    return pls.map(p=>`<div class="ppill ${cls}" title="${p.name}" onclick="nav('player',{id:'${p.id}'})">${sn(dn(p))}</div>`).join('');
   }
 
   // MC zone: MC + MO — split evenly into 2 columns
@@ -1705,7 +1714,7 @@ function renderPitch(allPs){
   const mcSplit=Math.ceil(mcAll.length/2);
   const mcL=mcAll.slice(0,mcSplit);
   const mcR=mcAll.slice(mcSplit);
-  function mcColPills(arr){ if(arr.length===0) return `<div class="ppill empty">MC</div>`; return arr.map(p=>`<div class="ppill" title="${p.name}">${sn(dn(p))}</div>`).join(''); }
+  function mcColPills(arr){ if(arr.length===0) return `<div class="ppill empty">MC</div>`; return arr.map(p=>`<div class="ppill" title="${p.name}" onclick="nav('player',{id:'${p.id}'})">${sn(dn(p))}</div>`).join(''); }
 
   const formPos=['GR','LE','DC','LD','MD','MC','MO','EE','PL','ED'];
   const outsiders=allPs.filter(p=>!p.position||!formPos.includes(p.position));
@@ -1813,7 +1822,45 @@ function renderPlayer(){
   const p=player; if(!p)return;
   document.getElementById('pd-name').textContent=dn(p);
   const a=age(p.dob);
+  const pid=p.id;
 
+  // ── Compute stats ──────────────────────────────────────────────
+  const allEvs=DB.events();
+  let trainAttended=0, gamesConv=0, gamesPlayed=0;
+  let goals=0, assists=0, yellows=0, reds=0;
+  const ratings=[];
+
+  allEvs.forEach(ev=>{
+    if(ev.type==='training'){
+      if(ev.attendance&&ev.attendance[pid]===true) trainAttended++;
+    } else if(ev.type==='game'){
+      const conv=(ev.convocatoria?.players||[]).some(cp=>cp.id===pid);
+      if(conv) gamesConv++;
+      const mr=ev.matchReport||{};
+      const evList=mr.events||[];
+      const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
+      const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
+      const subbedOut=evList.some(e=>e.type==='sub'&&e.playerOutId===pid);
+      if(hasRating||subbedIn) gamesPlayed++;
+      else if(conv&&!subbedOut) {/* stayed on bench — don't count */}
+      evList.forEach(e=>{
+        if(e.type==='goal'&&e.playerId===pid) goals++;
+        if(e.type==='goal'&&e.assistId===pid) assists++;
+        if((e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid) yellows++;
+        if((e.type==='red'||e.type==='yellow2')&&e.playerId===pid) reds++;
+      });
+      if(hasRating) ratings.push(parseFloat(mr.ratings[pid]));
+    }
+  });
+  const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
+
+  function statBox(label,val,sub=''){
+    return `<div style="text-align:center;padding:10px 6px">
+      <div style="font-size:22px;font-weight:700;color:var(--green);line-height:1">${val}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--text);margin-top:3px;line-height:1.2">${label}</div>
+      ${sub?`<div style="font-size:9px;color:var(--muted);margin-top:1px">${sub}</div>`:''}
+    </div>`;
+  }
 
   document.getElementById('pd-content').innerHTML=`
     <div class="pdh">
@@ -1852,6 +1899,20 @@ function renderPlayer(){
           ${row('Peso',p.weight?p.weight+' kg':null)}
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
+      </div>
+      <div class="card"><h3>Estatísticas</h3>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
+          ${statBox('Treinos',trainAttended,'presenças')}
+          ${statBox('Convocado',gamesConv,'jogos')}
+          ${statBox('Jogou',gamesPlayed,'jogos')}
+          ${statBox('Média',avgRating??'—','avaliação')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+          ${statBox('Golos',goals,'')}
+          ${statBox('Assist.',assists,'')}
+          ${statBox('Amarelos',yellows,'')}
+          ${statBox('Vermelhos',reds,'')}
+        </div>
       </div>
     </div>`;
 }
