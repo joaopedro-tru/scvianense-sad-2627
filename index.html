@@ -133,6 +133,9 @@ select.si{cursor:pointer}
 .conflict-banner .cb-body{flex:1}
 .conflict-banner .cb-title{font-weight:700;color:var(--red);margin-bottom:4px}
 .conflict-banner .cb-row{color:#7a1a1a;margin-top:3px;line-height:1.4}
+.unavail-banner{background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:13px;display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.unavail-banner .ub-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.unavail-banner .ub-body{flex:1}
 .cd:hover{background:#f5f7fb}
 .cd:nth-child(7n){border-right:none}
 .cd.om{opacity:.35}
@@ -517,6 +520,7 @@ body.pm #v-pf{padding:30px}
     <hr class="nd">
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
+    <div class="nl" id="nl-availlink"><span class="ic">📆</span> Link de Disponibilidade</div>
     <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
     <hr class="nd">
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
@@ -829,6 +833,66 @@ body.pm #v-pf{padding:30px}
         <div class="fg"><label>Observações</label><textarea name="notes" placeholder="Outras informações relevantes..."></textarea></div>
         <div class="fa" style="margin-top:18px">
           <button type="submit" class="btn btn-p" id="sf-submit-btn">✓ Submeter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AVAILABILITY FORM (public) -->
+  <div class="view" id="v-avail">
+    <div class="pfh">
+      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
+      <h1>SC Vianense SAD</h1>
+      <p>Declaração de Indisponibilidade — indica os períodos em que não estarás disponível</p>
+    </div>
+    <div class="card">
+      <div id="av-success" style="display:none;background:#d4edda;color:#155724;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center">
+        ✅ Período de indisponibilidade registado com sucesso. Obrigado!
+      </div>
+      <form id="av-form">
+        <div class="fst">Quem és?</div>
+        <div class="fr">
+          <div class="fg">
+            <label>Tipo *</label>
+            <select id="av-type" required onchange="avTypeChange()">
+              <option value="">Selecionar...</option>
+              <option value="athlete">Atleta</option>
+              <option value="staff">Equipa Técnica / Clínica</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Escalão *</label>
+            <select id="av-squad" required onchange="avSquadChange()">
+              <option value="">Selecionar...</option>
+              <option value="eqa">Equipa A</option>
+              <option value="sub23">Sub-23</option>
+              <option value="sub19">Sub-19</option>
+              <option value="ambos">Ambos</option>
+            </select>
+          </div>
+        </div>
+        <!-- Atleta: selecionar nome da lista -->
+        <div class="fg" id="av-athlete-wrap" style="display:none">
+          <label>Nome *</label>
+          <select id="av-athlete-name" required>
+            <option value="">— seleciona o teu escalão primeiro —</option>
+          </select>
+        </div>
+        <!-- Staff: nome livre -->
+        <div class="fg" id="av-staff-wrap" style="display:none">
+          <label>Nome Completo *</label>
+          <input type="text" id="av-staff-name" placeholder="O teu nome">
+        </div>
+        <div class="fst">Período de Indisponibilidade</div>
+        <div class="fr">
+          <div class="fg"><label>De (data início) *</label><input type="date" id="av-from" required></div>
+          <div class="fg"><label>Até (data fim) *</label><input type="date" id="av-until" required></div>
+        </div>
+        <div class="fg"><label>Motivo <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <input type="text" id="av-reason" placeholder="Ex: Férias, compromisso pessoal, lesão...">
+        </div>
+        <div class="fa">
+          <button type="submit" class="btn btn-p" id="av-submit-btn">✓ Submeter</button>
         </div>
       </form>
     </div>
@@ -1363,6 +1427,31 @@ const DB = {
       const snap=await this._fscr().get();
       const arr=[]; snap.forEach(d=>arr.push(d.data())); this._scr(arr);
     }catch(e){ console.warn('syncClinical:',e); }
+  },
+  // ── Unavailability ───────────────────────────────────────────────────────────
+  _funavail(){ return firestoreDb?.collection('unavailability') },
+  _unavail(){ try{ return JSON.parse(localStorage.getItem('scv_unavail')||'[]'); }catch{ return []; } },
+  _sunavail(arr){ localStorage.setItem('scv_unavail',JSON.stringify(arr)); },
+  getUnavailability(personId){ const all=this._unavail(); return personId?all.filter(r=>r.personId===personId):all; },
+  getUnavailableOn(date){
+    return this._unavail().filter(r=>r.startDate<=date&&r.endDate>=date);
+  },
+  async addUnavailability(rec){
+    rec.id=uid(); rec.createdAt=new Date().toISOString();
+    const arr=this._unavail(); arr.push(rec); this._sunavail(arr);
+    if(this._funavail()) await this._funavail().doc(rec.id).set(rec).catch(e=>console.error('FS addUnavail:',e));
+    return rec;
+  },
+  async deleteUnavailability(id){
+    const arr=this._unavail().filter(r=>r.id!==id); this._sunavail(arr);
+    if(this._funavail()) await this._funavail().doc(id).delete().catch(e=>console.error('FS delUnavail:',e));
+  },
+  async syncUnavailFromFirestore(){
+    if(!this._funavail()) return;
+    try{
+      const snap=await this._funavail().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sunavail(arr);
+    }catch(e){ console.warn('syncUnavail:',e); }
   }
 };
 
@@ -1685,6 +1774,7 @@ function nav(v,opts={}){
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='staff'){ show('v-staff'); setActive('[data-view="staff"]'); renderStaff() }
   else if(v==='staff-form'){ show('v-sf') }
+  else if(v==='availability-form'){ show('v-avail') }
   else if(v==='live'){
     if(opts.id){ liveGameId=opts.id; }
     if(opts.step){ liveStep=opts.step; }
@@ -2076,6 +2166,7 @@ function renderPlayer(){
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
       ${canSeeClinical()?buildPlayerClinicalCard(pid):''}
+      ${isAdmin()?buildPlayerUnavailCard(pid):''}
       <div class="card"><h3>Estatísticas</h3>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
           ${statBox('Treinos',trainAttended,'presenças')}
@@ -2091,6 +2182,7 @@ function renderPlayer(){
         </div>
       </div>
     </div>`;
+  if(isAdmin()) bindUnavailHandlers();
 }
 
 // ── PLAYER MODAL ──────────────────────────────────────────────────────────────
@@ -2332,6 +2424,144 @@ document.getElementById('nl-stafflink').addEventListener('click',()=>{
   const url=location.href.split('?')[0]+'?mode=staff-form';
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link do staff copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
 });
+document.getElementById('nl-availlink').addEventListener('click',()=>{
+  const url=location.href.split('?')[0]+'?mode=availability';
+  navigator.clipboard.writeText(url).then(()=>toast('📆 Link de disponibilidade copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
+});
+
+// ── UNAVAILABILITY ────────────────────────────────────────────────────────────
+function buildUnavailabilityAlert(date, playerIds, squad){
+  const all=DB.getUnavailableOn(date);
+  const athleteHits=all.filter(r=>r.personType==='athlete'&&playerIds.includes(r.personId));
+  const staffHits=squad?all.filter(r=>r.personType==='staff'&&(r.squad===squad||r.squad==='ambos')):[];
+  const hits=[...athleteHits,...staffHits];
+  if(!hits.length) return '';
+  const names=hits.map(r=>`<strong>${r.personName}</strong>${r.reason?` <span style="color:#856404;font-weight:400">(${r.reason})</span>`:''}`).join(', ');
+  return `<div class="unavail-banner"><span class="ub-icon">⚠️</span><div class="ub-body"><strong style="color:#856404">Indisponibilidade declarada</strong> — ${names}</div></div>`;
+}
+
+function buildPlayerUnavailCard(pid){
+  if(!isAdmin()) return '';
+  const recs=DB.getUnavailability(pid).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  const rows=recs.length
+    ?recs.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:13px"><strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
+      <button class="btn btn-d btn-sm" data-del-unavail="${r.id}">🗑️</button>
+    </div>`).join('')
+    :'<p style="color:var(--muted);font-size:13px;font-style:italic">Nenhum período declarado.</p>';
+  return `<div class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📆 Indisponibilidades</h3>
+    ${rows}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div class="fg" id="add-unavail-wrap">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Adicionar período</label>
+        <div class="fr" style="margin-top:6px">
+          <div class="fg" style="margin:0"><input type="date" id="addunavail-from" placeholder="De"></div>
+          <div class="fg" style="margin:0"><input type="date" id="addunavail-until" placeholder="Até"></div>
+        </div>
+        <input type="text" id="addunavail-reason" placeholder="Motivo (opcional)" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none">
+        <button class="btn btn-p btn-sm" id="btn-add-unavail" data-pid="${pid}" style="margin-top:8px">+ Adicionar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindUnavailHandlers(){
+  document.querySelectorAll('[data-del-unavail]').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(!confirm('Eliminar este período de indisponibilidade?')) return;
+    await DB.deleteUnavailability(btn.dataset.delUnavail);
+    renderPlayer();
+    toast('🗑️ Período eliminado');
+  }));
+  const addBtn=document.getElementById('btn-add-unavail');
+  if(addBtn) addBtn.addEventListener('click',async()=>{
+    const pid=addBtn.dataset.pid;
+    const from=document.getElementById('addunavail-from').value;
+    const until=document.getElementById('addunavail-until').value;
+    const reason=document.getElementById('addunavail-reason').value.trim();
+    if(!from||!until){ toast('⚠️ Preenche as datas'); return; }
+    if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
+    const p=DB.getPlayer(pid);
+    await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,reason});
+    renderPlayer();
+    toast('✅ Período adicionado');
+  });
+}
+
+// Availability form (public)
+function avTypeChange(){
+  const t=document.getElementById('av-type').value;
+  document.getElementById('av-athlete-wrap').style.display=t==='athlete'?'':'none';
+  document.getElementById('av-staff-wrap').style.display=t==='staff'?'':'none';
+  const athleteNameSel=document.getElementById('av-athlete-name');
+  const staffNameInput=document.getElementById('av-staff-name');
+  if(t==='athlete'){ athleteNameSel.required=true; staffNameInput.required=false; }
+  else if(t==='staff'){ athleteNameSel.required=false; staffNameInput.required=true; }
+  else{ athleteNameSel.required=false; staffNameInput.required=false; }
+}
+
+async function avSquadChange(){
+  const type=document.getElementById('av-type').value;
+  const squad=document.getElementById('av-squad').value;
+  if(type!=='athlete'||!squad||squad==='ambos') return;
+  const sel=document.getElementById('av-athlete-name');
+  sel.innerHTML='<option value="">A carregar...</option>';
+  // Load from Firestore if available, else localStorage
+  let players=[];
+  if(firestoreDb){
+    try{
+      const snap=await firestoreDb.collection('players').where('squad','==',squad).get();
+      snap.forEach(d=>players.push(d.data()));
+    }catch(e){ players=DB.players(squad); }
+  } else {
+    players=DB.players(squad);
+  }
+  players.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  sel.innerHTML='<option value="">Selecionar...</option>'+players.map(p=>`<option value="${p.id}" data-name="${(p.alcunha||p.name).replace(/"/g,'&quot;')}">${p.alcunha?p.alcunha+' ('+p.name+')':p.name}</option>`).join('');
+}
+
+(function avFormInit(){
+  const form=document.getElementById('av-form');
+  if(!form) return;
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const type=document.getElementById('av-type').value;
+    const squad=document.getElementById('av-squad').value;
+    const from=document.getElementById('av-from').value;
+    const until=document.getElementById('av-until').value;
+    const reason=document.getElementById('av-reason').value.trim();
+    if(!type||!squad||!from||!until){ toast('⚠️ Preenche todos os campos obrigatórios'); return; }
+    if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
+    const btn=document.getElementById('av-submit-btn');
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span> A enviar...';
+    let personId,personName;
+    if(type==='athlete'){
+      const sel=document.getElementById('av-athlete-name');
+      personId=sel.value; personName=sel.options[sel.selectedIndex]?.dataset?.name||sel.options[sel.selectedIndex]?.text||'';
+      if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
+    } else {
+      personName=document.getElementById('av-staff-name').value.trim();
+      personId='staff_'+personName.toLowerCase().replace(/\s+/g,'_');
+      if(!personName){ toast('⚠️ Introduz o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
+    }
+    try{
+      const rec={personId,personName,personType:type,squad,startDate:from,endDate:until,reason};
+      if(firestoreDb){
+        rec.id=crypto.randomUUID(); rec.createdAt=new Date().toISOString();
+        await firestoreDb.collection('unavailability').doc(rec.id).set(rec);
+      } else {
+        await DB.addUnavailability(rec);
+      }
+      document.getElementById('av-success').style.display='';
+      form.reset();
+      document.getElementById('av-athlete-wrap').style.display='none';
+      document.getElementById('av-staff-wrap').style.display='none';
+    } catch(err){
+      toast('❌ Erro ao enviar. Tenta novamente.');
+      console.error(err);
+    }
+    btn.disabled=false; btn.textContent='✓ Submeter';
+  });
+})();
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function getGameOverlaps(events){
@@ -2628,6 +2858,7 @@ function renderTraining(){
   const allPl=[...sqPlayers,...extraObjs];
   const att=ev.attendance||{};
   const presCount=allPl.filter(p=>att[p.id]===true).length;
+  const unavailAlert=buildUnavailabilityAlert(ev.date,allPl.map(p=>p.id),ev.squad==='both'?null:ev.squad);
 
   document.getElementById('tr-title').textContent=trainingLabel(ev);
   document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
@@ -2712,6 +2943,7 @@ function renderTraining(){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">👥 Presenças</h3>
         <span class="att-summary">${presCount} / ${allPl.length} presentes</span>
       </div>
+      ${unavailAlert}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
       ${extraSection}
     </div>
@@ -3404,6 +3636,8 @@ function renderGamePre(ev,sqPlayers,conv){
   const convCount=Object.values(conv.players||{}).filter(v=>!!v).length;
   const isAway=ev.homeAway==='away';
   const traveling=conv.traveling||{};
+  const convIds=sqPlayers.filter(p=>!!conv.players[p.id]).map(p=>p.id);
+  const convUnavailAlert=buildUnavailabilityAlert(ev.date,convIds,ev.squad==='both'?null:ev.squad);
   const pRows=sqPlayers.map(p=>{
     const isConv=!!conv.players[p.id];
     const isTrav=!!traveling[p.id];
@@ -3453,6 +3687,7 @@ function renderGamePre(ev,sqPlayers,conv){
           <button class="btn btn-o btn-sm" id="btn-conv-all" style="font-size:11px;padding:3px 9px">✓ Todos</button>
         </div>
       </div>
+      ${convUnavailAlert}
       ${isAway?`<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--muted)"><span>✈️ Desloca-se</span></div>`:''}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
     </div>
@@ -4346,6 +4581,7 @@ function applyRoleUI(){
     // Staff: same squad restrictions as coach
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
+    document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -4358,6 +4594,7 @@ function applyRoleUI(){
     // Medical: same squad restrictions; hide admin items
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
+    document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -4384,6 +4621,7 @@ function initCoordApp(){
       await migrateLocalToFirestore();
       await syncFromFirestore();
       await DB.syncClinicalFromFirestore();
+      await DB.syncUnavailFromFirestore();
       if(isAdmin()) await syncPendingAthletes(true);
       if(isAdmin()) checkPendingBadge();
     } else {
@@ -4410,6 +4648,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(params.get('mode')==='staff-form'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('staff-form');
+    return;
+  }
+
+  // Formulário de disponibilidade — sem login
+  if(params.get('mode')==='availability'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm'); nav('availability-form');
     return;
   }
 
