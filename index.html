@@ -887,6 +887,7 @@ body.pm #v-pf{padding:30px}
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Modelo 2 FPF</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Exame Médico</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Foto</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center" title="Só para atletas menores de idade">CC de EE</th>
             </tr>
           </thead>
           <tbody id="tm-docs-body"></tbody>
@@ -1472,7 +1473,7 @@ const USERS = [
   { user:'adj-eqa',  email:'adj-eqa@vianensesad.pt',    role:'staff', squad:'eqa',   staffRole:'adjunto'  },
   { user:'gr-eqa',   email:'gr-eqa@vianensesad.pt',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
   { user:'adj-19',   email:'adj-19@vianensesad.pt',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
-  { user:'gr-19',    email:'gr-19@vianensesad.pt',      role:'staff', squad:'sub19', staffRole:'grcoach'  },
+  { user:'gr-19',    email:'jorgecorreia84@hotmail.com',  role:'staff', squad:'sub19', staffRole:'grcoach'  },
   { user:'adj-23',   email:'nuno.vegar@hotmail.com',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
   { user:'adj-23b',  email:'peresfilipe91@gmail.com',    role:'staff',   squad:'sub23', staffRole:'adjunto'  },
   { user:'gr-23',    email:'no_drums@hotmail.com',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
@@ -1482,7 +1483,7 @@ const USERS = [
   { user:'med-23',   email:'med-23@vianensesad.pt',    role:'medical', squad:'sub23' },
   // ── Team Manager ──────────────────────────────────────────
   { user:'tm-eqa',   email:'tm-eqa@vianensesad.pt',         role:'teammanager', squad:'eqa'   },
-  { user:'tm-19',    email:'tm-19@vianensesad.pt',          role:'teammanager', squad:'sub19' },
+  { user:'tm-19',    email:'goncalojmrego@gmail.com',        role:'teammanager', squad:'sub19' },
   { user:'tm-23',    email:'brunoarezes@vianensesad.pt',    role:'teammanager', squad:'sub23' },
 ];
 const AUTH_KEY = 'scv_auth';
@@ -5208,7 +5209,13 @@ const TM_DOC_FIELDS=[
   {key:'modelo2',label:'Modelo 2 FPF'},
   {key:'exameMedico',label:'Exame Médico'},
   {key:'foto',label:'Foto'},
+  {key:'ccEE',label:'CC de EE',minorOnly:true},
 ];
+function isMinor(p){
+  if(!p.dob) return false;
+  const ms=Date.now()-new Date(p.dob).getTime();
+  return ms/(365.25*24*3600*1000)<18;
+}
 function renderTM(){
   const u=currentUser();
   // Pre-filter squad selector to TM's own squad (non-admin)
@@ -5230,15 +5237,19 @@ function renderTM(){
     const total=players.length;
     const complete=players.filter(p=>{
       const d=DB.getAthleteDoc(p.id)||{};
-      return TM_DOC_FIELDS.every(f=>d[f.key]);
+      return TM_DOC_FIELDS.filter(f=>!f.minorOnly||isMinor(p)).every(f=>d[f.key]);
     }).length;
     document.getElementById('tm-docs-stats').textContent=`${complete}/${total} completos`;
     const body=document.getElementById('tm-docs-body');
-    if(!players.length){ body.innerHTML=`<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`; return; }
+    if(!players.length){ body.innerHTML=`<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`; return; }
     body.innerHTML=players.map(p=>{
       const d=DB.getAthleteDoc(p.id)||{};
-      const allOk=TM_DOC_FIELDS.every(f=>d[f.key]);
+      const minor=isMinor(p);
+      const allOk=TM_DOC_FIELDS.filter(f=>!f.minorOnly||minor).every(f=>d[f.key]);
       const docCells=TM_DOC_FIELDS.map(f=>{
+        if(f.minorOnly && !minor){
+          return `<td style="text-align:center;padding:10px;color:var(--muted);font-size:18px" title="Não aplicável">—</td>`;
+        }
         const ok=!!d[f.key];
         return `<td style="text-align:center;padding:10px">
           <button class="tm-doc-btn" data-pid="${p.id}" data-field="${f.key}" data-val="${ok?'1':'0'}"
