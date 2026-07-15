@@ -786,68 +786,76 @@ body.pm #v-pf{padding:30px}
     <div class="pfh">
       <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
       <h1>SC Vianense SAD</h1>
-      <p>Formulário de Registo — Equipa Técnica</p>
+      <p>Registo de Equipa Técnica — preenche os teus dados e define a tua password de acesso</p>
     </div>
     <div class="card">
       <div id="sf-success" style="display:none;background:#d4edda;color:#155724;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center">
-        ✅ Dados submetidos com sucesso! Obrigado.
+        ✅ Perfil criado e conta configurada! Podes fazer login na app.
+      </div>
+      <div id="sf-already" style="display:none;background:#fff3cd;color:#856404;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center">
+        ⚠️ Esta conta já foi configurada. Faz login directamente na app.
       </div>
       <form id="sf-form">
-        <div class="fst">Dados Pessoais</div>
-        <div class="fr">
-          <div class="fg"><label>Nome Completo *</label><input type="text" name="name" required></div>
-          <div class="fg"><label>Data de Nascimento</label><input type="date" name="dob"></div>
-        </div>
-        <div class="fr">
-          <div class="fg"><label>Telefone *</label><input type="tel" name="phone" required></div>
-          <div class="fg"><label>E-mail</label><input type="email" name="email"></div>
-        </div>
-        <div class="fg"><label>NIF</label><input type="text" name="nif" placeholder="000 000 000"></div>
-        <div class="fst">Dados Profissionais</div>
-        <div class="fr">
-          <div class="fg"><label>Função *</label>
-            <select name="staffRole" id="sf-role" required onchange="sfRoleChange()">
-              <option value="">Selecionar...</option>
-              <optgroup label="Equipa Técnica">
-                <option value="headcoach">Treinador Principal</option>
-                <option value="adjunto">Adjunto</option>
-                <option value="estagiario">Estagiário</option>
-                <option value="grcoach">Treinador de GR</option>
-                <option value="condicionamento">Preparador Físico</option>
-              </optgroup>
-              <optgroup label="Clínica / Saúde">
-                <option value="fisio">Fisioterapeuta</option>
-                <option value="enfermeiro">Enfermeiro</option>
-                <option value="massagista">Massagista</option>
-              </optgroup>
-              <option value="outro">Outro</option>
-            </select>
-          </div>
-          <div class="fg"><label>Escalão *</label>
-            <select name="squad" required>
-              <option value="">Selecionar...</option>
-              <option value="eqa">Equipa A</option>
-              <option value="sub23">Sub-23</option>
-              <option value="sub19">Sub-19</option>
-              <option value="ambos">Ambas as equipas</option>
-            </select>
-          </div>
-        </div>
-        <div class="fg" id="sf-license-wrap" style="display:none">
-          <label>Licença de Treinador *</label>
-          <select name="license" id="sf-license">
-            <option value="">Selecionar...</option>
-            <option value="UEFA C">UEFA C</option>
-            <option value="UEFA B">UEFA B</option>
-            <option value="UEFA A">UEFA A</option>
-            <option value="UEFA PRO">UEFA PRO</option>
-            <option value="Estagiário UEFA C">Estagiário UEFA C</option>
-            <option value="Estagiário UEFA B">Estagiário UEFA B</option>
+        <div class="fst">A tua conta</div>
+        <div class="fg">
+          <label>Seleciona o teu utilizador *</label>
+          <select id="sf-user" required>
+            <option value="">— selecionar —</option>
           </select>
         </div>
-        <div class="fg"><label>Observações</label><textarea name="notes" placeholder="Outras informações relevantes..."></textarea></div>
-        <div class="fa" style="margin-top:18px">
-          <button type="submit" class="btn btn-p" id="sf-submit-btn">✓ Submeter</button>
+        <div id="sf-account-info" style="display:none;background:#f0f4ff;border:1px solid #c7d4f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+          <span id="sf-account-role" style="font-weight:600"></span> · <span id="sf-account-squad" style="color:var(--muted)"></span>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Email de acesso: <strong id="sf-account-email"></strong></div>
+        </div>
+
+        <div id="sf-fields" style="display:none">
+          <div class="fst">Dados Pessoais</div>
+          <!-- Photo -->
+          <div class="fg" style="margin-bottom:16px">
+            <label>Foto</label>
+            <div style="display:flex;align-items:center;gap:16px">
+              <div id="sf-photo-circle" class="av" style="width:72px;height:72px;font-size:24px;cursor:pointer;flex-shrink:0">
+                <span id="sf-photo-initials">?</span>
+              </div>
+              <div>
+                <input type="file" id="sf-photo-input" accept="image/*" style="display:none">
+                <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('sf-photo-input').click()">📷 Escolher foto</button>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG ou PNG, máx. 2MB</div>
+              </div>
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>Nome Completo *</label><input type="text" id="sf-name" required></div>
+            <div class="fg"><label>Data de Nascimento</label><input type="date" id="sf-dob"></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>Telefone *</label><input type="tel" id="sf-phone" required></div>
+            <div class="fg"><label>NIF</label><input type="text" id="sf-nif" placeholder="000 000 000"></div>
+          </div>
+          <div class="fg" id="sf-license-wrap" style="display:none">
+            <label>Licença de Treinador</label>
+            <select id="sf-license">
+              <option value="">Selecionar...</option>
+              <option value="UEFA C">UEFA C</option>
+              <option value="UEFA B">UEFA B</option>
+              <option value="UEFA A">UEFA A</option>
+              <option value="UEFA PRO">UEFA PRO</option>
+              <option value="Estagiário UEFA C">Estagiário UEFA C</option>
+              <option value="Estagiário UEFA B">Estagiário UEFA B</option>
+            </select>
+          </div>
+          <div class="fg"><label>Observações</label><textarea id="sf-notes" placeholder="Outras informações relevantes..." style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px"></textarea></div>
+
+          <div class="fst">Password de Acesso</div>
+          <div class="fr">
+            <div class="fg"><label>Nova password *</label><input type="password" id="sf-pw" placeholder="Mínimo 6 caracteres" autocomplete="new-password" required></div>
+            <div class="fg"><label>Confirmar password *</label><input type="password" id="sf-pw2" placeholder="Repetir password" autocomplete="new-password" required></div>
+          </div>
+
+          <div id="sf-err" style="color:#c0392b;font-size:12px;font-weight:600;margin-bottom:10px;min-height:16px"></div>
+          <div class="fa" style="margin-top:18px">
+            <button type="submit" class="btn btn-p" id="sf-submit-btn">✓ Criar Perfil e Conta</button>
+          </div>
         </div>
       </form>
     </div>
@@ -2598,38 +2606,117 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   }
 });
 
-// ── STAFF FORM ROLE TOGGLE ───────────────────────────────────────────────────
-function sfRoleChange(){
-  const role=document.getElementById('sf-role')?.value||'';
-  const wrap=document.getElementById('sf-license-wrap');
-  const lic=document.getElementById('sf-license');
-  if(!wrap) return;
-  const needsLicense=STAFF_LICENSE_ROLES.includes(role);
-  wrap.style.display=needsLicense?'':'none';
-  if(lic) lic.required=needsLicense;
-}
-
 // ── STAFF FORM (public) ───────────────────────────────────────────────────────
-document.getElementById('sf-form').addEventListener('submit', async e=>{
-  e.preventDefault();
-  const btn=document.getElementById('sf-submit-btn');
-  btn.disabled=true; btn.innerHTML='<span class="spin"></span> A enviar...';
-  try {
-    const fd=new FormData(e.target), p={};
-    for(const[k,v]of fd.entries()) p[k]=v;
-    p.id=uid(); p.submittedAt=new Date().toISOString();
-    if(firestoreDb){
-      await firestoreDb.collection('pending_staff').doc(p.id).set(p);
+(function initStaffForm(){
+  // Populate user selector — only non-admin accounts
+  const sel=document.getElementById('sf-user');
+  if(!sel) return;
+  const formUsers=USERS.filter(u=>u.role!=='admin');
+  formUsers.forEach(u=>{
+    const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
+    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
+    const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'';
+    const opt=document.createElement('option');
+    opt.value=u.user;
+    opt.textContent=`${roleLabel}${squadLabel?' — '+squadLabel:''}  (${u.user})`;
+    sel.appendChild(opt);
+  });
+
+  let sfPhotoDataUrl=null;
+  setupPhotoZone('sf-photo-circle','sf-photo-input','sf-photo-initials',null);
+
+  sel.addEventListener('change',()=>{
+    const u=formUsers.find(x=>x.user===sel.value);
+    const info=document.getElementById('sf-account-info');
+    const fields=document.getElementById('sf-fields');
+    if(!u){ info.style.display='none'; fields.style.display='none'; return; }
+    const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
+    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
+    const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'—';
+    document.getElementById('sf-account-role').textContent=roleLabel;
+    document.getElementById('sf-account-squad').textContent=squadLabel;
+    document.getElementById('sf-account-email').textContent=u.email||'—';
+    info.style.display='';
+    fields.style.display='';
+    // Show license field only for coaching roles
+    const licWrap=document.getElementById('sf-license-wrap');
+    const needsLic=['headcoach','adjunto','estagiario'].includes(role);
+    licWrap.style.display=needsLic?'':'none';
+    // Update initials placeholder
+    document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
+  });
+
+  document.getElementById('sf-form').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('sf-submit-btn');
+    const errEl=document.getElementById('sf-err');
+    errEl.textContent='';
+    const username=document.getElementById('sf-user').value;
+    const u=formUsers.find(x=>x.user===username);
+    if(!u){ errEl.textContent='Seleciona a tua conta.'; return; }
+    const name=document.getElementById('sf-name').value.trim();
+    const pw=document.getElementById('sf-pw').value;
+    const pw2=document.getElementById('sf-pw2').value;
+    if(!name){ errEl.textContent='Preenche o nome completo.'; return; }
+    if(pw.length<6){ errEl.textContent='A password deve ter pelo menos 6 caracteres.'; return; }
+    if(pw!==pw2){ errEl.textContent='As passwords não coincidem.'; return; }
+
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span> A criar…';
+    try{
+      // 1. Criar conta Firebase Auth via REST API
+      if(!FB_READY||!FB_CONFIG.apiKey) throw new Error('Firebase não configurado.');
+      const authRes=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:u.email,password:pw,returnSecureToken:false})
+      });
+      const authData=await authRes.json();
+      if(authData.error){
+        if(authData.error.message==='EMAIL_EXISTS'){
+          document.getElementById('sf-already').style.display='block';
+          return;
+        }
+        throw new Error(authData.error.message);
+      }
+
+      // 2. Guardar foto se existir
+      let photoUrl=null;
+      const photoInput=document.getElementById('sf-photo-input');
+      if(photoInput.files[0]&&storage){
+        const file=photoInput.files[0];
+        const compressed=await compressImage(file,800,0.82);
+        const ref=storage.ref(`staff_photos/${u.user}_${Date.now()}.jpg`);
+        await ref.putString(compressed,'data_url');
+        photoUrl=await ref.getDownloadURL();
+      }
+
+      // 3. Criar staff profile directamente no Firestore
+      const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
+      const profile={
+        id:uid(), username:u.user, name,
+        dob:document.getElementById('sf-dob').value||null,
+        phone:document.getElementById('sf-phone').value.trim()||null,
+        nif:document.getElementById('sf-nif').value.trim()||null,
+        license:document.getElementById('sf-license').value||null,
+        notes:document.getElementById('sf-notes').value.trim()||null,
+        squad:u.squad||null, staffRole:role,
+        photoUrl, email:u.email,
+        createdAt:new Date().toISOString()
+      };
+      if(firestoreDb) await firestoreDb.collection('staff_profiles').doc(profile.id).set(profile);
+
+      document.getElementById('sf-form').reset();
+      document.getElementById('sf-account-info').style.display='none';
+      document.getElementById('sf-fields').style.display='none';
+      document.getElementById('sf-success').style.display='block';
+    }catch(err){
+      console.error('Staff form error:',err);
+      errEl.textContent='Erro: '+err.message;
+    }finally{
+      btn.disabled=false; btn.innerHTML='✓ Criar Perfil e Conta';
     }
-    e.target.reset();
-    document.getElementById('sf-success').style.display='block';
-    setTimeout(()=>document.getElementById('sf-success').style.display='none',7000);
-  } catch(err) {
-    console.error('Staff form error:',err); toast('❌ Erro ao submeter. Verifica a ligação.');
-  } finally {
-    btn.disabled=false; btn.innerHTML='✓ Submeter';
-  }
-});
+  });
+})();
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
 const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'};
