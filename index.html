@@ -1387,6 +1387,7 @@ body.pm #v-pf{padding:30px}
           <option value="fisio">Fisioterapeuta</option>
           <option value="enfermeiro">Enfermeiro</option>
           <option value="massagista">Massagista</option>
+          <option value="delegado">Delegado</option>
           <option value="teammanager">Team Manager</option>
           <option value="outro">Outro</option>
         </select>
@@ -1505,6 +1506,7 @@ const USERS = [
   { user:'gr-eqa',   email:'gr-eqa@vianensesad.pt',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
   { user:'adj-19',   email:'adj-19@vianensesad.pt',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
   { user:'gr-19',    email:'jorgecorreia84@hotmail.com',  role:'staff', squad:'sub19', staffRole:'grcoach'  },
+  { user:'del-19',   email:'luisturma23@gmail.com',       role:'staff', squad:'sub19', staffRole:'delegado' },
   { user:'adj-23',   email:'nuno.vegar@hotmail.com',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
   { user:'adj-23-2', email:'peresfilipe91@gmail.com',   role:'staff',   squad:'sub23', staffRole:'adjunto'  },
   { user:'gr-23',    email:'no_drums@hotmail.com',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
@@ -2625,7 +2627,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   const formUsers=USERS.filter(u=>u.role!=='admin');
   formUsers.forEach(u=>{
     const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
-    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
+    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
     const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'';
     const opt=document.createElement('option');
     opt.value=u.user;
@@ -2643,7 +2645,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     const alreadyBanner=document.getElementById('sf-already');
     if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; return; }
     const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
-    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
+    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
     const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'—';
     document.getElementById('sf-account-role').textContent=roleLabel;
     document.getElementById('sf-account-squad').textContent=squadLabel;
@@ -2745,7 +2747,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 })();
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
-const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'};
+const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'};
 const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario'];
 const STAFF_ACCOUNTS=USERS.filter(u=>u.role==='staff'||u.role==='medical');
 const ALL_PROFILE_USERS=USERS.filter(u=>u.role!=='admin');
