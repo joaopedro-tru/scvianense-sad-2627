@@ -523,6 +523,10 @@ body.pm #v-pf{padding:30px}
     <div class="nl" id="nl-availlink"><span class="ic">📆</span> Link de Disponibilidade</div>
     <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
     <hr class="nd">
+    <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
+    <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
+    <div class="nsl" id="nsl-tm">Gestão Clube</div>
+    <div class="nl" id="nl-tm" data-view="tm"><span class="ic">📋</span> Team Manager</div>
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
     <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
@@ -838,6 +842,74 @@ body.pm #v-pf{padding:30px}
     </div>
   </div>
 
+  <!-- TEAM MANAGER MODULE -->
+  <div class="view" id="v-tm">
+    <div class="tb">
+      <div><h1>Team Manager</h1><div class="sub">Gestão de documentos e pagamentos</div></div>
+    </div>
+    <!-- tabs -->
+    <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border)">
+      <button class="tm-tab active" data-tm-tab="docs" style="background:none;border:none;border-bottom:2px solid var(--green);margin-bottom:-2px;padding:9px 20px;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--green);font-family:inherit">📄 Documentos</button>
+      <button class="tm-tab" data-tm-tab="pay" style="background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);font-family:inherit">💶 Pagamentos U23</button>
+    </div>
+    <!-- docs panel -->
+    <div id="tm-panel-docs">
+      <div class="sf">
+        <select class="si" id="tm-docs-squad">
+          <option value="">Todos os escalões</option>
+          <option value="eqa">Equipa A</option>
+          <option value="sub19">Sub-19</option>
+          <option value="sub23">Sub-23</option>
+        </select>
+        <input class="si" id="tm-docs-search" placeholder="Pesquisar atleta..." style="max-width:220px">
+        <span id="tm-docs-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table id="tm-docs-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">CC</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Modelo 2 FPF</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Exame Médico</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Foto</th>
+            </tr>
+          </thead>
+          <tbody id="tm-docs-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- payments panel -->
+    <div id="tm-panel-pay" style="display:none">
+      <div class="sf">
+        <input class="si" id="tm-pay-search" placeholder="Pesquisar atleta..." style="max-width:220px">
+        <span id="tm-pay-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table id="tm-pay-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Tipo de Recibo</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Dezembro</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Maio</th>
+            </tr>
+          </thead>
+          <tbody id="tm-pay-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MY PROFILE (staff/coach/medical) -->
+  <div class="view" id="v-myprofile">
+    <div class="tb">
+      <div><h1 id="myp-name">O Meu Perfil</h1><div class="sub" id="myp-sub"></div></div>
+      <button class="btn btn-p" id="btn-edit-myprofile">✏️ Editar Perfil</button>
+    </div>
+    <div id="myprofile-content"></div>
+  </div>
+
   <!-- AVAILABILITY FORM (public) -->
   <div class="view" id="v-avail">
     <div class="pfh">
@@ -878,10 +950,13 @@ body.pm #v-pf{padding:30px}
             <option value="">— seleciona o teu escalão primeiro —</option>
           </select>
         </div>
-        <!-- Staff: nome livre -->
+        <!-- Staff: pick from profiles -->
         <div class="fg" id="av-staff-wrap" style="display:none">
-          <label>Nome Completo *</label>
-          <input type="text" id="av-staff-name" placeholder="O teu nome">
+          <label>Nome *</label>
+          <select id="av-staff-profile-sel">
+            <option value="">— seleciona o teu escalão primeiro —</option>
+          </select>
+          <p style="font-size:11px;color:var(--muted);margin-top:5px">Não encontras o teu nome? Pede ao coordenador para criar o teu perfil.</p>
         </div>
         <div class="fst">Período de Indisponibilidade</div>
         <div class="fr">
@@ -1219,6 +1294,77 @@ body.pm #v-pf{padding:30px}
   </div>
 </div>
 
+<!-- STAFF PROFILE MODAL -->
+<div class="mo" id="mo-sp">
+  <div class="md" style="max-width:560px">
+    <div class="mh"><h2 id="mo-sp-title">Perfil</h2><button class="mc" id="mo-sp-close">✕</button></div>
+    <input type="hidden" id="sp-id">
+    <input type="hidden" id="sp-username">
+    <div style="text-align:center;margin-bottom:18px">
+      <div class="photo-upload-wrap">
+        <div class="photo-circle" id="sp-photo-circle" onclick="document.getElementById('sp-photo-input').click()">
+          <span id="sp-photo-initials">?</span>
+          <div class="cam-overlay">📷</div>
+        </div>
+        <div class="photo-hint" onclick="document.getElementById('sp-photo-input').click()">Clica para adicionar foto</div>
+      </div>
+      <input type="file" id="sp-photo-input" accept="image/*" style="display:none">
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Nome Completo *</label><input type="text" id="sp-name" required></div>
+      <div class="fg"><label>Data de Nascimento</label><input type="date" id="sp-dob"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Telefone</label><input type="tel" id="sp-phone"></div>
+      <div class="fg"><label>E-mail</label><input type="email" id="sp-email"></div>
+    </div>
+    <div class="fr" id="sp-role-row">
+      <div class="fg">
+        <label>Função</label>
+        <select id="sp-role">
+          <option value="">—</option>
+          <option value="headcoach">Treinador Principal</option>
+          <option value="adjunto">Adjunto</option>
+          <option value="estagiario">Estagiário</option>
+          <option value="grcoach">Treinador de GR</option>
+          <option value="condicionamento">Preparador Físico</option>
+          <option value="fisio">Fisioterapeuta</option>
+          <option value="enfermeiro">Enfermeiro</option>
+          <option value="massagista">Massagista</option>
+          <option value="teammanager">Team Manager</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Escalão</label>
+        <select id="sp-squad">
+          <option value="eqa">Equipa A</option>
+          <option value="sub23">Sub-23</option>
+          <option value="sub19">Sub-19</option>
+          <option value="ambos">Ambos</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" id="sp-license-wrap">
+      <label>Licença de Treinador</label>
+      <select id="sp-license">
+        <option value="">—</option>
+        <option value="UEFA C">UEFA C</option>
+        <option value="UEFA B">UEFA B</option>
+        <option value="UEFA A">UEFA A</option>
+        <option value="UEFA PRO">UEFA PRO</option>
+        <option value="Estagiário UEFA C">Estagiário UEFA C</option>
+        <option value="Estagiário UEFA B">Estagiário UEFA B</option>
+      </select>
+    </div>
+    <div class="fg"><label>Observações</label><textarea id="sp-notes" rows="3"></textarea></div>
+    <div class="fa">
+      <button class="btn btn-g" id="mo-sp-cancel">Cancelar</button>
+      <button class="btn btn-p" id="mo-sp-save">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- PDF Preview overlay — used instead of window.open (PWA-safe) -->
 <div id="mo-pdf-preview" style="display:none;position:fixed;inset:0;z-index:9998;background:#111;flex-direction:column">
   <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0d1a;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1)">
@@ -1308,6 +1454,8 @@ const USERS = [
   { user:'med-eqa',  pass:'MED*EQA#26',   role:'medical', squad:'eqa'   },
   { user:'med-19',   pass:'MED*19#26',    role:'medical', squad:'sub19' },
   { user:'med-23',   pass:'MED*23#26',    role:'medical', squad:'sub23' },
+  // ── Team Manager ──────────────────────────────────────────
+  { user:'tm',       pass:'TM*SCV#26',    role:'teammanager' },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
@@ -1452,6 +1600,76 @@ const DB = {
       const snap=await this._funavail().get();
       const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sunavail(arr);
     }catch(e){ console.warn('syncUnavail:',e); }
+  },
+  // ── Staff Profiles ────────────────────────────────────────────────────────────
+  _fssp(){ return firestoreDb?.collection('staff_profiles') },
+  _sp(){ try{ return JSON.parse(localStorage.getItem('scv_sp')||'[]'); }catch{ return []; } },
+  _ssp(arr){ localStorage.setItem('scv_sp',JSON.stringify(arr)); },
+  staffProfiles(squad){ const p=this._sp(); return squad?p.filter(x=>x.squad===squad||x.squad==='ambos'):p; },
+  getStaffProfile(username){ return this._sp().find(x=>x.username===username); },
+  getStaffProfileById(id){ return this._sp().find(x=>x.id===id); },
+  addStaffProfile(profile){
+    profile.id=uid(); profile.createdAt=new Date().toISOString();
+    const arr=this._sp(); arr.push(profile); this._ssp(arr);
+    if(this._fssp()) this._fssp().doc(profile.id).set(profile).catch(e=>console.error('FS addStaffProfile:',e));
+    return profile;
+  },
+  updateStaffProfile(id,u){
+    const arr=this._sp(); const i=arr.findIndex(x=>x.id===id);
+    if(i>-1){ arr[i]={...arr[i],...u,id}; this._ssp(arr); this._fssp()?.doc(id).set(arr[i]).catch(e=>console.error('FS updateStaffProfile:',e)); }
+  },
+  deleteStaffProfile(id){
+    const arr=this._sp().filter(x=>x.id!==id); this._ssp(arr);
+    this._fssp()?.doc(id).delete().catch(e=>console.error('FS delStaffProfile:',e));
+  },
+  async syncStaffProfilesFromFirestore(){
+    if(!this._fssp()) return;
+    try{
+      const snap=await this._fssp().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._ssp(arr);
+    }catch(e){ console.warn('syncStaffProfiles:',e); }
+  },
+
+  // ── ATHLETE DOCS ─────────────────────────────────────────
+  _fadocs(){ return firestoreDb?.collection('athlete_docs') },
+  _adocs(){ try{ return JSON.parse(localStorage.getItem('scv_adocs')||'[]'); }catch{ return []; } },
+  _sadocs(arr){ localStorage.setItem('scv_adocs',JSON.stringify(arr)); },
+  getAthleteDoc(playerId){ return this._adocs().find(r=>r.playerId===playerId)||null; },
+  setAthleteDoc(playerId, fields){
+    const arr=this._adocs();
+    let rec=arr.find(r=>r.playerId===playerId);
+    if(rec){ Object.assign(rec,fields,{updatedAt:new Date().toISOString()}); }
+    else{ rec={id:uid(),playerId,...fields,updatedAt:new Date().toISOString()}; arr.push(rec); }
+    this._sadocs(arr);
+    this._fadocs()?.doc(rec.id).set(rec).catch(e=>console.error('FS setAthleteDoc:',e));
+  },
+  async syncAthleteDocsFromFirestore(){
+    if(!this._fadocs()) return;
+    try{
+      const snap=await this._fadocs().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sadocs(arr);
+    }catch(e){ console.warn('syncAthleteDocs:',e); }
+  },
+
+  // ── ATHLETE PAYMENTS (U23) ───────────────────────────────
+  _fapay(){ return firestoreDb?.collection('athlete_payments') },
+  _apay(){ try{ return JSON.parse(localStorage.getItem('scv_pay')||'[]'); }catch{ return []; } },
+  _sapay(arr){ localStorage.setItem('scv_pay',JSON.stringify(arr)); },
+  getAthletePayment(playerId){ return this._apay().find(r=>r.playerId===playerId)||null; },
+  setAthletePayment(playerId, fields){
+    const arr=this._apay();
+    let rec=arr.find(r=>r.playerId===playerId);
+    if(rec){ Object.assign(rec,fields,{updatedAt:new Date().toISOString()}); }
+    else{ rec={id:uid(),playerId,...fields,updatedAt:new Date().toISOString()}; arr.push(rec); }
+    this._sapay(arr);
+    this._fapay()?.doc(rec.id).set(rec).catch(e=>console.error('FS setAthletePayment:',e));
+  },
+  async syncAthletePaymentsFromFirestore(){
+    if(!this._fapay()) return;
+    try{
+      const snap=await this._fapay().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sapay(arr);
+    }catch(e){ console.warn('syncAthletePayments:',e); }
   }
 };
 
@@ -1772,6 +1990,8 @@ function nav(v,opts={}){
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
+  else if(v==='myprofile'){ show('v-myprofile'); setActive('[data-view="myprofile"]'); renderMyProfile() }
+  else if(v==='tm'){ show('v-tm'); setActive('[data-view="tm"]'); renderTM() }
   else if(v==='staff'){ show('v-staff'); setActive('[data-view="staff"]'); renderStaff() }
   else if(v==='staff-form'){ show('v-sf') }
   else if(v==='availability-form'){ show('v-avail') }
@@ -2365,16 +2585,22 @@ document.getElementById('sf-form').addEventListener('submit', async e=>{
 });
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
-const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',outro:'Outro'};
-const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario']; // roles that require UEFA license
+const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'};
+const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario'];
 const STAFF_ACCOUNTS=USERS.filter(u=>u.role==='staff'||u.role==='medical');
+const ALL_PROFILE_USERS=USERS.filter(u=>u.role!=='admin');
 const MEDICAL_ROLES=['fisio','enfermeiro','massagista'];
+
+// Helper: get the effective staffRole for any non-admin user
+function userStaffRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null); }
+function isTeamManager(){ return currentUser()?.role==='teammanager'; }
+
+function spIni(name){ return (name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 
 async function renderStaff(){
   const el=document.getElementById('staff-content');
   el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar...</div>';
 
-  // Load pending submissions
   let pending=[];
   if(firestoreDb){
     try{
@@ -2384,19 +2610,28 @@ async function renderStaff(){
   }
 
   const bySquad={eqa:[],sub19:[],sub23:[]};
-  STAFF_ACCOUNTS.forEach(u=>{ if(bySquad[u.squad]) bySquad[u.squad].push(u); });
+  ALL_PROFILE_USERS.forEach(u=>{ if(bySquad[u.squad]) bySquad[u.squad].push(u); });
 
   const squadCards=Object.entries({eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}).map(([sq,label])=>{
     const members=bySquad[sq]||[];
-    const rows=members.map(u=>`
-      <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="width:34px;height:34px;border-radius:50%;background:${u.role==='medical'?'#c0392b':'var(--green)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">${u.role==='medical'?'🏥':u.staffRole==='grcoach'?'🥅':'🎽'}</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${u.role==='medical'?'Clínica / Saúde':STAFF_ROLES_LABEL[u.staffRole]||u.staffRole}</div>
-          <div style="font-size:11px;color:var(--muted);font-family:monospace">user: <strong>${u.user}</strong> · pass: <strong>${u.pass}</strong></div>
+    const rows=members.map(u=>{
+      const profile=DB.getStaffProfile(u.user);
+      const role=userStaffRole(u);
+      const isMed=MEDICAL_ROLES.includes(role);
+      const av=profile?.photoUrl
+        ?`<img src="${profile.photoUrl}" style="width:100%;height:100%;object-fit:cover">`
+        :`<span style="font-size:13px;font-weight:700">${profile?spIni(profile.name):(isMed?'🏥':role==='grcoach'?'🥅':'🎽')}</span>`;
+      const bg=isMed?'#c0392b':role==='headcoach'?'#1a3d6e':'var(--green)';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="width:40px;height:40px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;overflow:hidden">${av}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:700">${profile?.name||'<span style="color:var(--muted);font-weight:400;font-style:italic">Sem perfil</span>'}</div>
+          <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}${profile?.license?' · '+profile.license:''}</div>
+          <div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">user: <strong>${u.user}</strong></div>
         </div>
-        <button class="btn btn-o btn-sm" onclick="navigator.clipboard.writeText('${u.user}').then(()=>toast('✅ Username copiado!'))">Copiar</button>
-      </div>`).join('');
+        <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
+      </div>`;
+    }).join('');
     return `<div class="card" style="margin-bottom:14px">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">${label}</h3>
       ${rows||'<p style="color:var(--muted);font-size:13px">Sem contas configuradas.</p>'}
@@ -2406,14 +2641,152 @@ async function renderStaff(){
   const pendingSection=pending.length?`
     <div class="card">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📥 Formulários Recebidos (${pending.length})</h3>
-      ${pending.map(s=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600">${s.name||'—'}</div>
-        <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[s.staffRole]||s.staffRole||'—'} · ${s.squad||'—'} · ${s.phone||'—'}</div>
-        ${s.notes?`<div style="font-size:12px;margin-top:3px">${s.notes}</div>`:''}
+      ${pending.map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${s.name||'—'}</div>
+          <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[s.staffRole]||s.staffRole||'—'} · ${s.squad||'—'} · ${s.phone||'—'}${s.license?' · '+s.license:''}</div>
+          ${s.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${s.notes}</div>`:''}
+        </div>
       </div>`).join('')}
     </div>`:'';
 
   el.innerHTML=`<div class="ds">${squadCards}${pendingSection}</div>`;
+}
+
+// ── STAFF PROFILE MODAL ───────────────────────────────────────────────────────
+function openStaffProfileModal(username, profileId){
+  const u=ALL_PROFILE_USERS.find(x=>x.user===username);
+  const profile=profileId?DB.getStaffProfileById(profileId):null;
+  const role=userStaffRole(u||{});
+  const isAdmin_=isAdmin();
+
+  document.getElementById('mo-sp-title').textContent=profile?`Perfil — ${profile.name}`:'Criar Perfil';
+  document.getElementById('sp-id').value=profile?.id||'';
+  document.getElementById('sp-username').value=username;
+  document.getElementById('sp-name').value=profile?.name||'';
+  document.getElementById('sp-dob').value=profile?.dob||'';
+  document.getElementById('sp-phone').value=profile?.phone||'';
+  document.getElementById('sp-email').value=profile?.email||'';
+  document.getElementById('sp-notes').value=profile?.notes||'';
+
+  // Role/squad selects — pre-fill from USERS if no profile yet
+  const roleVal=profile?.staffRole||role||'';
+  const squadVal=profile?.squad||u?.squad||'eqa';
+  document.getElementById('sp-role').value=roleVal;
+  document.getElementById('sp-squad').value=squadVal;
+  // License
+  document.getElementById('sp-license').value=profile?.license||'';
+  document.getElementById('sp-license-wrap').style.display=STAFF_LICENSE_ROLES.includes(roleVal)?'':'none';
+  document.getElementById('sp-role').onchange=function(){
+    document.getElementById('sp-license-wrap').style.display=STAFF_LICENSE_ROLES.includes(this.value)?'':'none';
+  };
+
+  // Role/squad selects: read-only for non-admin editing own profile
+  const lock=!isAdmin_;
+  document.getElementById('sp-role').disabled=lock;
+  document.getElementById('sp-squad').disabled=lock;
+
+  // Photo
+  setPhotoZoneExisting('sp-photo-circle','sp-photo-initials',profile?.photoUrl,null,profile?.name?spIni(profile.name):'?');
+  setupPhotoZone('sp-photo-circle','sp-photo-input','sp-photo-initials',null);
+
+  document.getElementById('mo-sp').classList.add('open');
+}
+function closeStaffProfileModal(){ document.getElementById('mo-sp').classList.remove('open'); }
+document.getElementById('mo-sp-close').addEventListener('click',closeStaffProfileModal);
+document.getElementById('mo-sp-cancel').addEventListener('click',closeStaffProfileModal);
+document.getElementById('mo-sp').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeStaffProfileModal(); });
+
+document.getElementById('mo-sp-save').addEventListener('click',async()=>{
+  const name=document.getElementById('sp-name').value.trim();
+  if(!name){ toast('⚠️ Nome obrigatório'); return; }
+  const id=document.getElementById('sp-id').value;
+  const username=document.getElementById('sp-username').value;
+  const u=ALL_PROFILE_USERS.find(x=>x.user===username);
+
+  const btn=document.getElementById('mo-sp-save');
+  btn.disabled=true;
+
+  let photoUrl=DB.getStaffProfile(username)?.photoUrl||null;
+  const photoFile=document.getElementById('sp-photo-input').files[0];
+  if(photoFile){
+    try{
+      const compressed=await compressImage(photoFile);
+      photoUrl=await fileToBase64(compressed);
+    }catch(e){ console.warn('photo compress:',e); }
+  }
+
+  const data={
+    username,
+    name,
+    dob:document.getElementById('sp-dob').value,
+    phone:document.getElementById('sp-phone').value,
+    email:document.getElementById('sp-email').value,
+    staffRole:document.getElementById('sp-role').value||userStaffRole(u||{})||'',
+    squad:document.getElementById('sp-squad').value||u?.squad||'eqa',
+    license:document.getElementById('sp-license').value,
+    notes:document.getElementById('sp-notes').value,
+    photoUrl
+  };
+
+  if(id){ DB.updateStaffProfile(id,data); toast('✅ Perfil atualizado!'); }
+  else { DB.addStaffProfile(data); toast('✅ Perfil criado!'); }
+
+  btn.disabled=false;
+  closeStaffProfileModal();
+  if(view==='staff') renderStaff();
+  else if(view==='myprofile') renderMyProfile();
+});
+
+// ── MY PROFILE VIEW ───────────────────────────────────────────────────────────
+function renderMyProfile(){
+  const u=currentUser(); if(!u||u.role==='admin') return;
+  const profile=DB.getStaffProfile(u.user);
+  const role=userStaffRole(u);
+  const roleName=STAFF_ROLES_LABEL[role]||role||'—';
+
+  document.getElementById('myp-name').textContent=profile?.name||'O Meu Perfil';
+  document.getElementById('myp-sub').textContent=`${roleName} · ${SQUADS[u.squad]||u.squad||''}`;
+  document.getElementById('btn-edit-myprofile').onclick=()=>openStaffProfileModal(u.user,profile?.id||null);
+
+  const el=document.getElementById('myprofile-content');
+  if(!profile){
+    el.innerHTML=`<div class="card" style="text-align:center;padding:40px 20px">
+      <div style="font-size:44px;margin-bottom:12px">👤</div>
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:8px">Ainda não tens perfil criado</h3>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Clica em "Editar Perfil" para adicionar a tua foto, contacto e informações.</p>
+      <button class="btn btn-p" onclick="openStaffProfileModal('${u.user}',null)">+ Criar Perfil</button>
+    </div>`;
+    return;
+  }
+
+  const a=profile.dob?Math.floor((Date.now()-new Date(profile.dob+'T00:00:00'))/(365.25*86400000)):null;
+  el.innerHTML=`
+    <div class="pdh">
+      <div class="pda">${profile.photoUrl?`<img src="${profile.photoUrl}">`:`<span style="font-size:32px;font-weight:700">${spIni(profile.name)}</span>`}</div>
+      <div>
+        <h2>${profile.name}</h2>
+        <div class="bgs">
+          <span class="bg bg-g">${SQUADS[profile.squad]||profile.squad}</span>
+          <span class="bg bg-pos">${roleName}</span>
+          ${profile.license?`<span class="bg bg-n">${profile.license}</span>`:''}
+          ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="ds">
+      <div class="card"><h3>Dados Pessoais</h3>
+        ${row('Data de Nascimento',fmtDate(profile.dob))}
+        ${row('Telefone',profile.phone)}
+        ${row('E-mail',profile.email)}
+      </div>
+      <div class="card"><h3>Dados Profissionais</h3>
+        ${row('Função',roleName)}
+        ${row('Escalão',SQUADS[profile.squad]||profile.squad)}
+        ${profile.license?row('Licença',profile.license):''}
+        ${profile.notes?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Observações</div><div style="font-size:13px">${profile.notes}</div></div>`:''}
+      </div>
+    </div>`;
 }
 
 document.getElementById('btn-copy-stafflink').addEventListener('click',()=>{
@@ -2493,30 +2866,47 @@ function avTypeChange(){
   document.getElementById('av-athlete-wrap').style.display=t==='athlete'?'':'none';
   document.getElementById('av-staff-wrap').style.display=t==='staff'?'':'none';
   const athleteNameSel=document.getElementById('av-athlete-name');
-  const staffNameInput=document.getElementById('av-staff-name');
-  if(t==='athlete'){ athleteNameSel.required=true; staffNameInput.required=false; }
-  else if(t==='staff'){ athleteNameSel.required=false; staffNameInput.required=true; }
-  else{ athleteNameSel.required=false; staffNameInput.required=false; }
+  const staffProfileSel=document.getElementById('av-staff-profile-sel');
+  if(t==='athlete'){ athleteNameSel.required=true; staffProfileSel.required=false; }
+  else if(t==='staff'){ athleteNameSel.required=false; staffProfileSel.required=true; }
+  else{ athleteNameSel.required=false; staffProfileSel.required=false; }
+  // Reset squad and trigger reload
+  avSquadChange();
 }
 
 async function avSquadChange(){
   const type=document.getElementById('av-type').value;
   const squad=document.getElementById('av-squad').value;
-  if(type!=='athlete'||!squad||squad==='ambos') return;
-  const sel=document.getElementById('av-athlete-name');
-  sel.innerHTML='<option value="">A carregar...</option>';
-  // Load from Firestore if available, else localStorage
-  let players=[];
-  if(firestoreDb){
-    try{
-      const snap=await firestoreDb.collection('players').where('squad','==',squad).get();
-      snap.forEach(d=>players.push(d.data()));
-    }catch(e){ players=DB.players(squad); }
-  } else {
-    players=DB.players(squad);
+
+  if(type==='athlete'){
+    if(!squad) return;
+    const sel=document.getElementById('av-athlete-name');
+    sel.innerHTML='<option value="">A carregar...</option>';
+    let players=[];
+    if(firestoreDb){
+      try{
+        const q=squad==='ambos'?firestoreDb.collection('players').get():firestoreDb.collection('players').where('squad','==',squad).get();
+        const snap=await q; snap.forEach(d=>players.push(d.data()));
+      }catch(e){ players=DB.players(squad==='ambos'?null:squad); }
+    } else { players=DB.players(squad==='ambos'?null:squad); }
+    players.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    sel.innerHTML='<option value="">Selecionar...</option>'+players.map(p=>`<option value="${p.id}" data-name="${(p.alcunha||p.name).replace(/"/g,'&quot;')}">${p.alcunha?p.alcunha+' ('+p.name+')':p.name}</option>`).join('');
+
+  } else if(type==='staff'){
+    // Use staff profiles stored locally/Firestore
+    const sel=document.getElementById('av-staff-profile-sel');
+    if(!sel) return;
+    let profiles=[];
+    if(firestoreDb){
+      try{
+        const snap=await firestoreDb.collection('staff_profiles').get();
+        snap.forEach(d=>profiles.push(d.data()));
+      }catch(e){ profiles=DB.staffProfiles(null); }
+    } else { profiles=DB.staffProfiles(null); }
+    if(squad&&squad!=='ambos') profiles=profiles.filter(p=>p.squad===squad||p.squad==='ambos');
+    profiles.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    sel.innerHTML='<option value="">Selecionar...</option>'+profiles.map(p=>`<option value="${p.id}" data-name="${p.name.replace(/"/g,'&quot;')}">${p.name} (${STAFF_ROLES_LABEL[p.staffRole]||p.staffRole||'—'})</option>`).join('');
   }
-  players.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  sel.innerHTML='<option value="">Selecionar...</option>'+players.map(p=>`<option value="${p.id}" data-name="${(p.alcunha||p.name).replace(/"/g,'&quot;')}">${p.alcunha?p.alcunha+' ('+p.name+')':p.name}</option>`).join('');
 }
 
 (function avFormInit(){
@@ -2539,9 +2929,9 @@ async function avSquadChange(){
       personId=sel.value; personName=sel.options[sel.selectedIndex]?.dataset?.name||sel.options[sel.selectedIndex]?.text||'';
       if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
     } else {
-      personName=document.getElementById('av-staff-name').value.trim();
-      personId='staff_'+personName.toLowerCase().replace(/\s+/g,'_');
-      if(!personName){ toast('⚠️ Introduz o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
+      const sel=document.getElementById('av-staff-profile-sel');
+      personId=sel.value; personName=sel.options[sel.selectedIndex]?.dataset?.name||sel.options[sel.selectedIndex]?.text||'';
+      if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
     }
     try{
       const rec={personId,personName,personType:type,squad,startDate:from,endDate:until,reason};
@@ -2860,6 +3250,29 @@ function renderTraining(){
   const presCount=allPl.filter(p=>att[p.id]===true).length;
   const unavailAlert=buildUnavailabilityAlert(ev.date,allPl.map(p=>p.id),ev.squad==='both'?null:ev.squad);
 
+  // Staff attendance
+  const trSq=ev.squad==='both'?null:ev.squad;
+  const staffMembers=ALL_PROFILE_USERS.filter(u=>!trSq||u.squad===trSq);
+  const staffAtt=ev.staffAttendance||{};
+  const staffRows=staffMembers.map(u=>{
+    const profile=DB.getStaffProfile(u.user);
+    if(!profile) return '';
+    const present=staffAtt[u.user]===true;
+    const role=userStaffRole(u);
+    return `<div class="att-row">
+      <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${profile.photoUrl?`<img src="${profile.photoUrl}">`:spIni(profile.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${profile.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}</div>
+      </div>
+      <button class="att-btn${present?' present':''}" data-statt-user="${u.user}">${present?'✓ Presente':'— Ausente'}</button>
+    </div>`;
+  }).filter(Boolean).join('');
+  const staffSection=staffRows?`<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">🧑‍💼 Equipa Técnica</div>
+    ${staffRows}
+  </div>`:'';
+
   document.getElementById('tr-title').textContent=trainingLabel(ev);
   document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
 
@@ -2946,6 +3359,7 @@ function renderTraining(){
       ${unavailAlert}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
       ${extraSection}
+      ${staffSection}
     </div>
   </div>
   ${fichaPreview}
@@ -2957,6 +3371,14 @@ function renderTraining(){
     const a=DB.getEvent(trainingEventId).attendance||{};
     a[pid]=a[pid]!==true;
     DB.updateEvent(trainingEventId,{attendance:a});
+    renderTraining();
+  }));
+  // Staff attendance toggle
+  document.querySelectorAll('[data-statt-user]').forEach(btn=>btn.addEventListener('click',()=>{
+    const uname=btn.dataset.stattUser;
+    const sa=DB.getEvent(trainingEventId).staffAttendance||{};
+    sa[uname]=sa[uname]!==true;
+    DB.updateEvent(trainingEventId,{staffAttendance:sa});
     renderTraining();
   }));
 
@@ -3655,6 +4077,23 @@ function renderGamePre(ev,sqPlayers,conv){
     </div>`;
   }).join('');
   const haLabel=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
+  // Staff section for game
+  const gmSq=ev.squad==='both'?null:ev.squad;
+  const gmStaffProfiles=ALL_PROFILE_USERS.filter(u=>!gmSq||u.squad===gmSq).map(u=>({u,p:DB.getStaffProfile(u.user)})).filter(x=>!!x.p);
+  const gmStaffRows=gmStaffProfiles.map(({u,p})=>{
+    const role=userStaffRole(u);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden">${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:cover">`:spIni(p.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${p.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}${p.license?' · '+p.license:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const gmStaffCard=gmStaffRows?`<div class="card" style="margin-top:14px">
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🧑‍💼 Equipa Técnica</h3>
+    ${gmStaffRows}
+  </div>`:'';
   document.getElementById('gm-tab-content').innerHTML=`
   <div class="gm-detail-grid" style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
     <div>
@@ -3662,7 +4101,8 @@ function renderGamePre(ev,sqPlayers,conv){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
         ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
       </div>
-      <div class="card">
+      ${gmStaffCard}
+      <div class="card" style="margin-top:${gmStaffCard?'14':'0'}px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🎯 Concentração</h3>
         <div class="fg"><label>Hora de Concentração</label><input type="time" id="gm-conc-time" value="${conv.concentrationTime||''}"></div>
         <div class="fg"><label>Local de Concentração</label><input type="text" id="gm-conc-place" value="${conv.concentrationPlace||''}" placeholder="Ex: Balneários principais"></div>
@@ -4564,47 +5004,210 @@ async function checkPendingBadge(){
   } catch(e){}
 }
 
+// ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
+const TM_DOC_FIELDS=[
+  {key:'cc',label:'CC'},
+  {key:'modelo2',label:'Modelo 2 FPF'},
+  {key:'exameMedico',label:'Exame Médico'},
+  {key:'foto',label:'Foto'},
+];
+const TM_PAY_TIPOS=[
+  {value:'',label:'— selecionar —'},
+  {value:'mensal',label:'Recibo Mensal'},
+  {value:'isolado',label:'Ato Isolado'},
+];
+
+function renderTM(){
+  // wire up tabs once
+  document.querySelectorAll('.tm-tab').forEach(btn=>{
+    btn.onclick=()=>{
+      const tab=btn.dataset.tmTab;
+      document.querySelectorAll('.tm-tab').forEach(b=>{
+        const active=b.dataset.tmTab===tab;
+        b.style.color=active?'var(--green)':'var(--muted)';
+        b.style.fontWeight=active?'700':'600';
+        b.style.borderBottomColor=active?'var(--green)':'transparent';
+        b.classList.toggle('active',active);
+      });
+      document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
+      document.getElementById('tm-panel-pay').style.display=tab==='pay'?'':'none';
+    };
+  });
+
+  // Docs tab filters
+  const docsSquadSel=document.getElementById('tm-docs-squad');
+  const docsSearch=document.getElementById('tm-docs-search');
+  const renderDocs=()=>{
+    const sq=docsSquadSel.value;
+    const q=(docsSearch.value||'').toLowerCase();
+    let players=DB.players().filter(p=>!sq||p.squad===sq);
+    if(q) players=players.filter(p=>dn(p).toLowerCase().includes(q));
+    players.sort((a,b)=>dn(a).localeCompare(dn(b)));
+    const total=players.length;
+    const complete=players.filter(p=>{
+      const d=DB.getAthleteDoc(p.id)||{};
+      return TM_DOC_FIELDS.every(f=>d[f.key]);
+    }).length;
+    document.getElementById('tm-docs-stats').textContent=`${complete}/${total} completos`;
+    const body=document.getElementById('tm-docs-body');
+    if(!players.length){ body.innerHTML=`<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`; return; }
+    body.innerHTML=players.map(p=>{
+      const d=DB.getAthleteDoc(p.id)||{};
+      const allOk=TM_DOC_FIELDS.every(f=>d[f.key]);
+      const docCells=TM_DOC_FIELDS.map(f=>{
+        const ok=!!d[f.key];
+        return `<td style="text-align:center;padding:10px">
+          <button class="tm-doc-btn" data-pid="${p.id}" data-field="${f.key}" data-val="${ok?'1':'0'}"
+            style="background:${ok?'#e8f5e9':'#fafafa'};border:1.5px solid ${ok?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 12px;cursor:pointer;font-size:15px;transition:all .15s"
+            title="${ok?'Entregue — clica para remover':'Pendente — clica para marcar como entregue'}">${ok?'✅':'⏳'}</button>
+        </td>`;
+      }).join('');
+      return `<tr style="border-bottom:1px solid var(--border);${allOk?'background:#f9fff9':''}">
+        <td style="padding:10px 14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="av" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+            <div>
+              <div style="font-weight:600;font-size:13px">${dn(p)}</div>
+              <div style="font-size:11px;color:var(--muted)">${SQUADS[p.squad]||p.squad}${p.number?' · #'+p.number:''}</div>
+            </div>
+          </div>
+        </td>${docCells}
+      </tr>`;
+    }).join('');
+    // toggle handlers
+    body.querySelectorAll('.tm-doc-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const pid=btn.dataset.pid;
+        const field=btn.dataset.field;
+        const newVal=btn.dataset.val!=='1';
+        DB.setAthleteDoc(pid,{[field]:newVal});
+        renderDocs();
+      };
+    });
+  };
+  docsSquadSel.onchange=renderDocs;
+  docsSearch.oninput=renderDocs;
+  renderDocs();
+
+  // Payments tab (U23 only)
+  const paySearch=document.getElementById('tm-pay-search');
+  const renderPay=()=>{
+    const q=(paySearch.value||'').toLowerCase();
+    let players=DB.players('sub23');
+    if(q) players=players.filter(p=>dn(p).toLowerCase().includes(q));
+    players.sort((a,b)=>dn(a).localeCompare(dn(b)));
+    const total=players.length;
+    const done=players.filter(p=>{
+      const pay=DB.getAthletePayment(p.id)||{};
+      return pay.tipo&&pay.dezPago&&pay.maioPago;
+    }).length;
+    document.getElementById('tm-pay-stats').textContent=`${done}/${total} em dia`;
+    const body=document.getElementById('tm-pay-body');
+    if(!players.length){ body.innerHTML=`<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas Sub-23.</td></tr>`; return; }
+    body.innerHTML=players.map(p=>{
+      const pay=DB.getAthletePayment(p.id)||{};
+      const tipoOpts=TM_PAY_TIPOS.map(o=>`<option value="${o.value}"${pay.tipo===o.value?' selected':''}>${o.label}</option>`).join('');
+      const dezOk=!!pay.dezPago; const maiOk=!!pay.maioPago;
+      const allOk=pay.tipo&&dezOk&&maiOk;
+      return `<tr style="border-bottom:1px solid var(--border);${allOk?'background:#f9fff9':''}">
+        <td style="padding:10px 14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="av" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+            <div>
+              <div style="font-weight:600;font-size:13px">${dn(p)}</div>
+              <div style="font-size:11px;color:var(--muted)">${p.number?'#'+p.number:''}</div>
+            </div>
+          </div>
+        </td>
+        <td style="padding:10px;text-align:center">
+          <select class="tm-pay-tipo" data-pid="${p.id}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;background:#fff">
+            ${tipoOpts}
+          </select>
+        </td>
+        <td style="text-align:center;padding:10px">
+          <button class="tm-pay-btn" data-pid="${p.id}" data-field="dezPago" data-val="${dezOk?'1':'0'}"
+            style="background:${dezOk?'#e8f5e9':'#fafafa'};border:1.5px solid ${dezOk?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 14px;cursor:pointer;font-size:14px">${dezOk?'✅':'⏳'}</button>
+        </td>
+        <td style="text-align:center;padding:10px">
+          <button class="tm-pay-btn" data-pid="${p.id}" data-field="maioPago" data-val="${maiOk?'1':'0'}"
+            style="background:${maiOk?'#e8f5e9':'#fafafa'};border:1.5px solid ${maiOk?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 14px;cursor:pointer;font-size:14px">${maiOk?'✅':'⏳'}</button>
+        </td>
+      </tr>`;
+    }).join('');
+    body.querySelectorAll('.tm-pay-tipo').forEach(sel=>{
+      sel.onchange=()=>{ DB.setAthletePayment(sel.dataset.pid,{tipo:sel.value}); renderPay(); };
+    });
+    body.querySelectorAll('.tm-pay-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const newVal=btn.dataset.val!=='1';
+        DB.setAthletePayment(btn.dataset.pid,{[btn.dataset.field]:newVal});
+        renderPay();
+      };
+    });
+  };
+  paySearch.oninput=renderPay;
+  renderPay();
+}
+
 function applyRoleUI(){
   const u=currentUser(); if(!u) return;
   const staffSection=[document.getElementById('nsl-staff'),document.getElementById('nl-staff'),document.getElementById('nl-stafflink')];
+  const myProfileSection=[document.getElementById('nsl-myprofile'),document.getElementById('nl-myprofile')];
+  const tmSection=[document.getElementById('nsl-tm'),document.getElementById('nl-tm')];
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
+    tmSection.forEach(el=>el&&(el.style.display='none'));
+    myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const foot=document.getElementById('sb-foot');
-    if(foot) foot.textContent=`Treinador ${u.squad.toUpperCase()} · SC Vianense`;
+    const profile=DB.getStaffProfile(u.user);
+    if(foot) foot.textContent=`${profile?.name||'Treinador'} · ${SQUADS[u.squad]||u.squad}`;
   } else if(u.role==='staff'){
-    // Staff: same squad restrictions as coach
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
     document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
+    tmSection.forEach(el=>el&&(el.style.display='none'));
+    myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const foot=document.getElementById('sb-foot');
-    const roleName=staffRoleName()||'Staff';
-    if(foot) foot.textContent=`${roleName} ${u.squad.toUpperCase()} · SC Vianense`;
+    const profile=DB.getStaffProfile(u.user);
+    const roleName=profile?STAFF_ROLES_LABEL[profile.staffRole]||staffRoleName():staffRoleName()||'Staff';
+    if(foot) foot.textContent=`${profile?.name||roleName} · ${SQUADS[u.squad]||u.squad}`;
   } else if(u.role==='medical'){
-    // Medical: same squad restrictions; hide admin items
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
     document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
+    tmSection.forEach(el=>el&&(el.style.display='none'));
+    myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const foot=document.getElementById('sb-foot');
-    if(foot) foot.textContent=`Clínica ${u.squad.toUpperCase()} · SC Vianense`;
+    const profile=DB.getStaffProfile(u.user);
+    if(foot) foot.textContent=`${profile?.name||'Clínica'} · ${SQUADS[u.squad]||u.squad}`;
+  } else if(u.role==='teammanager'){
+    document.getElementById('btn-sync-athletes').style.display='none';
+    staffSection.forEach(el=>el&&(el.style.display='none'));
+    myProfileSection.forEach(el=>el&&(el.style.display=''));
+    tmSection.forEach(el=>el&&(el.style.display=''));
+    const foot=document.getElementById('sb-foot');
+    const profile=DB.getStaffProfile(u.user);
+    if(foot) foot.textContent=`${profile?.name||'Team Manager'}`;
   } else if(u.role==='admin'){
-    // Admin: staff section visible
     staffSection.forEach(el=>el&&(el.style.display=''));
+    tmSection.forEach(el=>el&&(el.style.display=''));
+    myProfileSection.forEach(el=>el&&(el.style.display='none'));
   }
 }
 
@@ -4615,6 +5218,7 @@ function initCoordApp(){
   setupDocZone('f-med-zone','f-med-file');
   setupPhotoZone('f-photo-circle','f-photo-input','f-photo-initials','f-photo-hint');
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
+  setupPhotoZone('sp-photo-circle','sp-photo-input','sp-photo-initials',null);
   applyRoleUI();
   (async()=>{
     if(firestoreDb){
@@ -4622,6 +5226,9 @@ function initCoordApp(){
       await syncFromFirestore();
       await DB.syncClinicalFromFirestore();
       await DB.syncUnavailFromFirestore();
+      await DB.syncStaffProfilesFromFirestore();
+      await DB.syncAthleteDocsFromFirestore();
+      await DB.syncAthletePaymentsFromFirestore();
       if(isAdmin()) await syncPendingAthletes(true);
       if(isAdmin()) checkPendingBadge();
     } else {
