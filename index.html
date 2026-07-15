@@ -17,6 +17,7 @@
 
 <!-- Firebase SDK (compat) — necessário para upload de ficheiros e Firestore -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -481,6 +482,9 @@ body.pm #v-pf{padding:30px}
     <input type="password" id="login-pw" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" id="login-btn">Entrar</button>
     <div class="login-err" id="login-err"></div>
+    <div id="login-reset-wrap" style="margin-top:14px;display:none">
+      <a id="login-reset-link" href="#" style="font-size:12px;color:var(--muted);text-decoration:none">Esqueci a password</a>
+    </div>
   </div>
 </div>
 
@@ -908,6 +912,15 @@ body.pm #v-pf{padding:30px}
       <button class="btn btn-p" id="btn-edit-myprofile">✏️ Editar Perfil</button>
     </div>
     <div id="myprofile-content"></div>
+    <!-- Password change -->
+    <div class="card" style="margin-top:20px;max-width:440px" id="myp-pw-card">
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border)">🔑 Alterar Password</h3>
+      <div class="fg" style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Password actual</label><input type="password" id="myp-pw-current" class="si" style="max-width:100%;width:100%" placeholder="Password actual" autocomplete="current-password"></div>
+      <div class="fg" style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Nova password</label><input type="password" id="myp-pw-new" class="si" style="max-width:100%;width:100%" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+      <div class="fg" style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Confirmar nova password</label><input type="password" id="myp-pw-confirm" class="si" style="max-width:100%;width:100%" placeholder="Repetir nova password" autocomplete="new-password"></div>
+      <div id="myp-pw-err" style="color:#c0392b;font-size:12px;margin-bottom:10px;font-weight:600;min-height:16px"></div>
+      <button class="btn btn-p" id="myp-pw-save">Alterar Password</button>
+    </div>
   </div>
 
   <!-- AVAILABILITY FORM (public) -->
@@ -1294,6 +1307,27 @@ body.pm #v-pf{padding:30px}
   </div>
 </div>
 
+<!-- ACCOUNT SETUP MODAL (admin only) -->
+<div class="mo" id="mo-acct">
+  <div class="md" style="max-width:420px">
+    <div class="mh"><h2>🔑 Configurar Conta</h2><button class="mc" onclick="document.getElementById('mo-acct').classList.remove('open')">✕</button></div>
+    <p id="mo-acct-desc" style="font-size:13px;color:var(--muted);margin-bottom:18px"></p>
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Nova password</label>
+      <input type="password" id="mo-acct-pw" class="si" style="max-width:100%;width:100%" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+    </div>
+    <div class="fg" style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Confirmar password</label>
+      <input type="password" id="mo-acct-pw2" class="si" style="max-width:100%;width:100%" placeholder="Repetir password" autocomplete="new-password">
+    </div>
+    <div id="mo-acct-err" style="color:#c0392b;font-size:12px;margin-bottom:10px;font-weight:600;min-height:16px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-p" id="mo-acct-save">Criar / Repor Conta</button>
+      <button class="btn btn-g" onclick="document.getElementById('mo-acct').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAFF PROFILE MODAL -->
 <div class="mo" id="mo-sp">
   <div class="md" style="max-width:560px">
@@ -1437,25 +1471,26 @@ const FB_CONFIG = {
 // ════════════════════════════════════════════════════════
 
 // ── ACESSO / UTILIZADORES ─────────────────────────────────────────────────────
-// role: 'admin' → acesso total | 'coach' → escalão | 'staff' → adjunto/GR coach
+/// Passwords geridas pelo Firebase Authentication — não são armazenadas aqui.
+// Email padrão: [user]@vianensesad.pt  (configurável no Firebase Console)
 const USERS = [
-  { user:'admin',    pass:'scv2025*',       role:'admin' },
-  { user:'sub19',    pass:'SCV2627*#19',    role:'coach', squad:'sub19' },
-  { user:'sub23',    pass:'SCV2627#23*',    role:'coach', squad:'sub23' },
-  { user:'eqa',      pass:'SCV2627*#EQA',   role:'coach', squad:'eqa'   },
+  { user:'admin',    email:'admin@vianensesad.pt',    role:'admin' },
+  { user:'sub19',    email:'sub19@vianensesad.pt',    role:'coach', squad:'sub19' },
+  { user:'sub23',    email:'sub23@vianensesad.pt',    role:'coach', squad:'sub23' },
+  { user:'eqa',      email:'eqa@vianensesad.pt',      role:'coach', squad:'eqa'   },
   // ── Equipa técnica ────────────────────────────────────────
-  { user:'adj-eqa',  pass:'ADJ*EQA#26',    role:'staff', squad:'eqa',   staffRole:'adjunto'  },
-  { user:'gr-eqa',   pass:'GR*EQA#26',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
-  { user:'adj-19',   pass:'ADJ*19#26',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
-  { user:'gr-19',    pass:'GR*19#26',      role:'staff', squad:'sub19', staffRole:'grcoach'  },
-  { user:'adj-23',   pass:'ADJ*23#26',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
-  { user:'gr-23',    pass:'GR*23#26',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
+  { user:'adj-eqa',  email:'adj-eqa@vianensesad.pt',    role:'staff', squad:'eqa',   staffRole:'adjunto'  },
+  { user:'gr-eqa',   email:'gr-eqa@vianensesad.pt',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
+  { user:'adj-19',   email:'adj-19@vianensesad.pt',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
+  { user:'gr-19',    email:'gr-19@vianensesad.pt',      role:'staff', squad:'sub19', staffRole:'grcoach'  },
+  { user:'adj-23',   email:'adj-23@vianensesad.pt',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
+  { user:'gr-23',    email:'gr-23@vianensesad.pt',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
   // ── Clínica / Saúde ───────────────────────────────────────
-  { user:'med-eqa',  pass:'MED*EQA#26',   role:'medical', squad:'eqa'   },
-  { user:'med-19',   pass:'MED*19#26',    role:'medical', squad:'sub19' },
-  { user:'med-23',   pass:'MED*23#26',    role:'medical', squad:'sub23' },
+  { user:'med-eqa',  email:'med-eqa@vianensesad.pt',   role:'medical', squad:'eqa'   },
+  { user:'med-19',   email:'med-19@vianensesad.pt',    role:'medical', squad:'sub19' },
+  { user:'med-23',   email:'med-23@vianensesad.pt',    role:'medical', squad:'sub23' },
   // ── Team Manager ──────────────────────────────────────────
-  { user:'tm',       pass:'TM*SCV#26',    role:'teammanager' },
+  { user:'tm',       email:'tm@vianensesad.pt',    role:'teammanager' },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
@@ -1471,12 +1506,16 @@ function canSeeClinical(){ return isAdmin()||isMedical(); }
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
 let storage = null;
 let firestoreDb = null;
+let firebaseAuth = null;
 if (FB_READY) {
   try {
     firebase.initializeApp(FB_CONFIG);
     storage = firebase.storage();
     firestoreDb = firebase.firestore();
-    console.log('✅ Firebase pronto (Storage + Firestore)');
+    firebaseAuth = firebase.auth();
+    // Sessão dura apenas enquanto o tab estiver aberto (como sessionStorage)
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+    console.log('✅ Firebase pronto (Auth + Storage + Firestore)');
   } catch(e) { console.warn('Firebase init failed:', e); }
 }
 
@@ -2629,7 +2668,10 @@ async function renderStaff(){
           <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}${profile?.license?' · '+profile.license:''}</div>
           <div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">user: <strong>${u.user}</strong></div>
         </div>
-        <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
+          <button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>
+        </div>
       </div>`;
     }).join('');
     return `<div class="card" style="margin-bottom:14px">
@@ -2787,6 +2829,42 @@ function renderMyProfile(){
         ${profile.notes?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Observações</div><div style="font-size:13px">${profile.notes}</div></div>`:''}
       </div>
     </div>`;
+
+  // ── Password change handler ──────────────────────────────
+  const pwCard=document.getElementById('myp-pw-card');
+  if(!firebaseAuth||!firebaseAuth.currentUser){ if(pwCard)pwCard.style.display='none'; }
+  else {
+    if(pwCard)pwCard.style.display='';
+    document.getElementById('myp-pw-save').onclick=async()=>{
+      const curr=document.getElementById('myp-pw-current').value;
+      const nw=document.getElementById('myp-pw-new').value;
+      const conf=document.getElementById('myp-pw-confirm').value;
+      const errEl=document.getElementById('myp-pw-err');
+      errEl.style.color='#c0392b';
+      if(!curr||!nw||!conf){ errEl.textContent='Preenche todos os campos.'; return; }
+      if(nw.length<6){ errEl.textContent='A nova password deve ter pelo menos 6 caracteres.'; return; }
+      if(nw!==conf){ errEl.textContent='As passwords não coincidem.'; return; }
+      const fbUser=firebaseAuth.currentUser;
+      const credential=firebase.auth.EmailAuthProvider.credential(fbUser.email,curr);
+      const btn=document.getElementById('myp-pw-save');
+      btn.disabled=true; btn.textContent='A guardar…';
+      try{
+        await fbUser.reauthenticateWithCredential(credential);
+        await fbUser.updatePassword(nw);
+        errEl.style.color='var(--ok)';
+        errEl.textContent='✅ Password alterada com sucesso!';
+        document.getElementById('myp-pw-current').value='';
+        document.getElementById('myp-pw-new').value='';
+        document.getElementById('myp-pw-confirm').value='';
+      }catch(err){
+        if(err.code==='auth/wrong-password') errEl.textContent='Password actual incorreta.';
+        else if(err.code==='auth/too-many-requests') errEl.textContent='Demasiadas tentativas. Tenta mais tarde.';
+        else errEl.textContent='Erro: '+err.message;
+      }finally{
+        btn.disabled=false; btn.textContent='Alterar Password';
+      }
+    };
+  }
 }
 
 document.getElementById('btn-copy-stafflink').addEventListener('click',()=>{
@@ -5004,6 +5082,54 @@ async function checkPendingBadge(){
   } catch(e){}
 }
 
+// ── ACCOUNT SETUP (admin cria/repõe password de qualquer conta) ──────────────
+function openAccountSetup(username){
+  const u=USERS.find(x=>x.user===username); if(!u) return;
+  const mo=document.getElementById('mo-acct');
+  document.getElementById('mo-acct-desc').textContent=`Conta: ${username} (${u.email})`;
+  document.getElementById('mo-acct-pw').value='';
+  document.getElementById('mo-acct-pw2').value='';
+  document.getElementById('mo-acct-err').textContent='';
+  document.getElementById('mo-acct-err').style.color='#c0392b';
+  mo.classList.add('open');
+
+  document.getElementById('mo-acct-save').onclick=async()=>{
+    const pw=document.getElementById('mo-acct-pw').value;
+    const pw2=document.getElementById('mo-acct-pw2').value;
+    const errEl=document.getElementById('mo-acct-err');
+    errEl.style.color='#c0392b';
+    if(pw.length<6){ errEl.textContent='Mínimo 6 caracteres.'; return; }
+    if(pw!==pw2){ errEl.textContent='As passwords não coincidem.'; return; }
+    if(!FB_READY||!FB_CONFIG.apiKey){ errEl.textContent='Firebase não configurado.'; return; }
+    const btn=document.getElementById('mo-acct-save');
+    btn.disabled=true; btn.textContent='A processar…';
+    try{
+      // Tentar criar a conta via REST API (não afecta a sessão admin actual)
+      const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:u.email,password:pw,returnSecureToken:false})
+      });
+      const data=await res.json();
+      if(data.error){
+        // Se a conta já existe, resetar via sendPasswordResetEmail
+        if(data.error.message==='EMAIL_EXISTS'){
+          await firebaseAuth.sendPasswordResetEmail(u.email);
+          errEl.style.color='var(--ok)';
+          errEl.textContent='Conta já existe — email de redefinição enviado para '+u.email;
+        } else {
+          errEl.textContent='Erro: '+data.error.message;
+        }
+      } else {
+        errEl.style.color='var(--ok)';
+        errEl.textContent='✅ Conta criada com sucesso!';
+        setTimeout(()=>mo.classList.remove('open'),2000);
+      }
+    }catch(e){ errEl.textContent='Erro de rede: '+e.message; }
+    finally{ btn.disabled=false; btn.textContent='Criar / Repor Conta'; }
+  };
+}
+
 // ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
 const TM_DOC_FIELDS=[
   {key:'cc',label:'CC'},
@@ -5243,56 +5369,115 @@ function initCoordApp(){
 document.addEventListener('DOMContentLoaded',()=>{
   const params=new URLSearchParams(location.search);
 
-  // Formulário público — sem login
+  // Formulários públicos — sem login
   if(params.get('mode')==='public'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('public-form');
     setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
     return;
   }
-
-  // Formulário staff — sem login
   if(params.get('mode')==='staff-form'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('staff-form');
     return;
   }
-
-  // Formulário de disponibilidade — sem login
   if(params.get('mode')==='availability'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('availability-form');
     return;
   }
 
-  // Sessão já autenticada (verificar JSON válido com role)
-  const existing=currentUser();
-  if(existing?.role){ initCoordApp(); return; }
-
-  // Mostrar login
   const userIn=document.getElementById('login-user');
   const pwIn=document.getElementById('login-pw');
   const errEl=document.getElementById('login-err');
-  setTimeout(()=>userIn.focus(),120);
+  const loginBtn=document.getElementById('login-btn');
+  const resetWrap=document.getElementById('login-reset-wrap');
+  const resetLink=document.getElementById('login-reset-link');
 
-  function tryLogin(){
-    const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase() && x.pass===pwIn.value);
-    if(u){
-      sessionStorage.setItem(AUTH_KEY, JSON.stringify({role:u.role, squad:u.squad||null, user:u.user, staffRole:u.staffRole||null}));
-      initCoordApp();
-    } else {
-      errEl.textContent='Credenciais incorretas.';
-      pwIn.value=''; pwIn.focus();
-      setTimeout(()=>errEl.textContent='',3000);
+  // ── Firebase Auth disponível ─────────────────────────────
+  if(firebaseAuth){
+    // Observador de sessão — dispara automaticamente se sessão já existe
+    firebaseAuth.onAuthStateChanged(fbUser=>{
+      if(fbUser){
+        const u=USERS.find(x=>x.email===fbUser.email);
+        if(u){
+          sessionStorage.setItem(AUTH_KEY, JSON.stringify({
+            role:u.role, squad:u.squad||null, user:u.user,
+            staffRole:u.staffRole||null, email:fbUser.email, uid:fbUser.uid
+          }));
+          initCoordApp();
+        } else {
+          // Email não mapeado — sair
+          firebaseAuth.signOut();
+          errEl.textContent='Conta não reconhecida neste sistema.';
+        }
+      }
+      // se fbUser===null → login overlay já está visível, nada a fazer
+    });
+
+    // Mostrar "Esqueci a password" quando utilizador digitar o username
+    userIn.addEventListener('input',()=>{
+      const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase());
+      resetWrap.style.display=u?'':'none';
+    });
+
+    resetLink.addEventListener('click',async e=>{
+      e.preventDefault();
+      const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase());
+      if(!u){ errEl.textContent='Introduz o utilizador primeiro.'; return; }
+      try{
+        await firebaseAuth.sendPasswordResetEmail(u.email);
+        errEl.style.color='var(--ok)';
+        errEl.textContent='Email de recuperação enviado!';
+        setTimeout(()=>{ errEl.textContent=''; errEl.style.color=''; },5000);
+      }catch(err){
+        errEl.textContent='Erro ao enviar email: '+err.message;
+      }
+    });
+
+    async function tryLoginFirebase(){
+      const username=userIn.value.trim().toLowerCase();
+      const password=pwIn.value;
+      const u=USERS.find(x=>x.user===username);
+      if(!u){ errEl.textContent='Utilizador não encontrado.'; pwIn.value=''; return; }
+      loginBtn.disabled=true; loginBtn.textContent='A entrar…';
+      try{
+        await firebaseAuth.signInWithEmailAndPassword(u.email, password);
+        // onAuthStateChanged tratará do resto
+      }catch(err){
+        let msg='Credenciais incorretas.';
+        if(err.code==='auth/too-many-requests') msg='Demasiadas tentativas. Tenta mais tarde.';
+        if(err.code==='auth/user-not-found') msg='Conta ainda não configurada. Pede ao admin.';
+        if(err.code==='auth/wrong-password') msg='Password incorreta.';
+        errEl.textContent=msg;
+        pwIn.value=''; pwIn.focus();
+        setTimeout(()=>errEl.textContent='',4000);
+        loginBtn.disabled=false; loginBtn.textContent='Entrar';
+      }
     }
+    loginBtn.addEventListener('click',tryLoginFirebase);
+    userIn.addEventListener('keydown',e=>{ if(e.key==='Enter')pwIn.focus(); });
+    pwIn.addEventListener('keydown',e=>{ if(e.key==='Enter')tryLoginFirebase(); });
+
+  } else {
+    // ── Fallback sem Firebase (localStorage) ────────────────
+    const existing=currentUser();
+    if(existing?.role){ initCoordApp(); return; }
+    setTimeout(()=>userIn.focus(),120);
+    function tryLoginLocal(){
+      errEl.textContent='Firebase não configurado — login indisponível.';
+    }
+    loginBtn.addEventListener('click',tryLoginLocal);
   }
-  document.getElementById('login-btn').addEventListener('click',tryLogin);
-  userIn.addEventListener('keydown',e=>{ if(e.key==='Enter')pwIn.focus(); });
-  pwIn.addEventListener('keydown',e=>{ if(e.key==='Enter')tryLogin(); });
+
+  setTimeout(()=>userIn.focus(),120);
 });
 
 document.getElementById('btn-logout').addEventListener('click',()=>{
-  if(confirm('Terminar sessão?')){ sessionStorage.removeItem(AUTH_KEY); location.reload(); }
+  if(!confirm('Terminar sessão?')) return;
+  sessionStorage.removeItem(AUTH_KEY);
+  if(firebaseAuth){ firebaseAuth.signOut().then(()=>location.reload()); }
+  else { location.reload(); }
 });
 document.getElementById('btn-sync-athletes').addEventListener('click',()=>syncPendingAthletes(false));
 
