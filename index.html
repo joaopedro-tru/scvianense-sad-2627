@@ -543,6 +543,7 @@ body.pm #v-pf{padding:30px}
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
     <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
   </nav>
+  <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
   <div id="sb-foot">SC Vianense SAD © 2026</div>
 </aside>
@@ -665,6 +666,12 @@ body.pm #v-pf{padding:30px}
       <div class="cb" id="cal-body"></div>
     </div>
     <div class="el"><h3>Eventos do Mês</h3><div id="cal-list"></div></div>
+  </div>
+
+  <!-- HELP VIEW -->
+  <div class="view" id="v-help">
+    <div class="tb"><div class="tb-t">Ajuda</div></div>
+    <div class="content" id="help-content"></div>
   </div>
 
   <!-- PUBLIC FORM -->
@@ -2072,6 +2079,7 @@ function nav(v,opts={}){
     }
     show('v-live'); renderLive();
   }
+  else if(v==='help'){ show('v-help'); setActive('[data-view="help"]'); renderHelp() }
   else if(v==='public-form'){ show('v-pf') }
 }
 function show(id){ document.getElementById(id).classList.add('active') }
@@ -5323,6 +5331,81 @@ function renderTM(){
   docsSquadSel.onchange=renderDocs;
   docsSearch.oninput=renderDocs;
   renderDocs();
+}
+
+// ── HELP VIEW ─────────────────────────────────────────────────────────────────
+function renderHelp(){
+  const u=currentUser();
+  const role=u?.role||'';
+
+  const card=(icon,title,desc)=>`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;display:flex;gap:16px;align-items:flex-start">
+      <div style="font-size:28px;flex-shrink:0;line-height:1">${icon}</div>
+      <div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px">${title}</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5">${desc}</div>
+      </div>
+    </div>`;
+
+  const section=(title,cards)=>`
+    <div style="margin-bottom:28px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px">${title}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+        ${cards.join('')}
+      </div>
+    </div>`;
+
+  const sections=[];
+
+  // Geral — all roles
+  sections.push(section('Geral',[
+    card('📊','Dashboard','Resumo do clube: próximos eventos, aniversários e atletas recentes.'),
+    card('📅','Calendário','Vista mensal de todos os treinos e jogos. Clica num evento para ver os detalhes.'),
+    card('🚫','Indisponibilidades','Lista de atletas e staff com períodos de indisponibilidade declarados. Podes filtrar por escalão e por estado (ativas, futuras ou passadas).'),
+  ]));
+
+  // Plantel e eventos — coach, staff, medical, admin
+  if(['coach','staff','medical','admin'].includes(role)){
+    sections.push(section('Plantel & Eventos',[
+      card('⚽','Plantel','Lista de atletas do escalão. Clica num atleta para ver o perfil completo com estatísticas, documentos e histórico clínico.'),
+      card('📋','Treinos','Registo de presenças, notas técnicas e informações clínicas por sessão de treino.'),
+      card('🏆','Jogos','Ficha de jogo com convocados, resultado, relatório técnico e notas clínicas.'),
+      card('🎮','Dia de Jogo','Modo em direto para registar eventos do jogo (golos, cartões, substituições) em tempo real.'),
+    ]));
+  }
+
+  // Perfil próprio — non-admin
+  if(role!=='admin'){
+    sections.push(section('O Meu Espaço',[
+      card('👤','O Meu Perfil','Edita os teus dados pessoais, foto e informações de contacto. Também podes alterar a tua password aqui.'),
+      ...(role==='teammanager'?[card('📋','Team Manager','Controla os documentos de inscrição de cada atleta: CC, Modelo 2 FPF, Exame Médico e Foto. Atletas menores requerem também o CC do Encarregado de Educação.')]:[]),
+    ]));
+  }
+
+  // Admin
+  if(role==='admin'){
+    sections.push(section('Administração',[
+      card('👥','Gestão de Staff','Gere os perfis da equipa técnica de todos os escalões. Podes criar perfis, editar dados e criar/repor contas de acesso.'),
+      card('📋','Team Manager','Supervisiona os documentos de inscrição dos atletas de todos os escalões.'),
+      card('🔄','Sincronizar','Aprova os atletas que preencheram o formulário público e estão pendentes de validação.'),
+      card('🔗','Links públicos','Copia e partilha o link do formulário de registo de atletas e o link de declaração de indisponibilidade.'),
+    ]));
+  }
+
+  // Formulários públicos — hint para todos
+  sections.push(section('Formulários (acesso público)',[
+    card('📝','Registo de Atleta','Formulário para inscrição de novos atletas. Partilha o link via "Link do Formulário" na sidebar.'),
+    card('📆','Indisponibilidade','Formulário para declarar períodos de indisponibilidade. Partilha via "Link de Disponibilidade".'),
+    ...(role==='admin'||role==='coach'?[card('🧑‍💼','Registo de Staff','Formulário para membros da equipa técnica criarem o seu perfil e conta de acesso. Disponível via "Link do Staff".')]:[]),
+  ]));
+
+  document.getElementById('help-content').innerHTML=`
+    <div style="max-width:860px">
+      <p style="font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6">
+        Bem-vindo à plataforma de Gestão Desportiva do SC Vianense SAD. Aqui encontras um resumo das funcionalidades disponíveis para o teu perfil.
+      </p>
+      ${sections.join('')}
+    </div>`;
 }
 
 // ── UNAVAILABILITIES VIEW ─────────────────────────────────────────────────────
