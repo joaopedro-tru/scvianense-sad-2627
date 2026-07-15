@@ -933,6 +933,7 @@ body.pm #v-pf{padding:30px}
       <div><h1 id="myp-name">O Meu Perfil</h1><div class="sub" id="myp-sub"></div></div>
       <button class="btn btn-p" id="btn-edit-myprofile">✏️ Editar Perfil</button>
     </div>
+    <input type="file" id="myp-photo-input" accept="image/*" style="display:none">
     <div id="myprofile-content"></div>
     <!-- Password change -->
     <div class="card" style="margin-top:20px;max-width:440px" id="myp-pw-card">
@@ -2852,7 +2853,10 @@ function openStaffProfileModal(username, profileId){
   document.getElementById('sp-squad').disabled=lock;
 
   // Photo
-  setPhotoZoneExisting('sp-photo-circle','sp-photo-initials',profile?.photoUrl,null,profile?.name?spIni(profile.name):'?');
+  setPhotoZoneExisting('sp-photo-circle','sp-photo-initials',null,profile?.photoUrl,profile?.name?spIni(profile.name):'?');
+  // Reset file input to avoid stale selection from previous open
+  const spInput=document.getElementById('sp-photo-input');
+  if(spInput) spInput.value='';
   setupPhotoZone('sp-photo-circle','sp-photo-input','sp-photo-initials',null);
 
   document.getElementById('mo-sp').classList.add('open');
@@ -2928,7 +2932,10 @@ function renderMyProfile(){
   const a=profile.dob?Math.floor((Date.now()-new Date(profile.dob+'T00:00:00'))/(365.25*86400000)):null;
   el.innerHTML=`
     <div class="pdh">
-      <div class="pda">${profile.photoUrl?`<img src="${profile.photoUrl}">`:`<span style="font-size:32px;font-weight:700">${spIni(profile.name)}</span>`}</div>
+      <div class="pda" id="myp-photo-avatar" title="Clica para alterar a foto" style="cursor:pointer;position:relative;overflow:hidden">
+        ${profile.photoUrl?`<img src="${profile.photoUrl}">`:`<span style="font-size:32px;font-weight:700">${spIni(profile.name)}</span>`}
+        <div class="cam-overlay" style="opacity:0;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);font-size:22px;transition:.2s">📷</div>
+      </div>
       <div>
         <h2>${profile.name}</h2>
         <div class="bgs">
@@ -2952,6 +2959,38 @@ function renderMyProfile(){
         ${profile.notes?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Observações</div><div style="font-size:13px">${profile.notes}</div></div>`:''}
       </div>
     </div>`;
+
+  // ── Photo avatar hover + upload handler ─────────────────
+  const avatar=document.getElementById('myp-photo-avatar');
+  const overlay=avatar?.querySelector('.cam-overlay');
+  if(avatar&&overlay){
+    avatar.addEventListener('mouseenter',()=>overlay.style.opacity='1');
+    avatar.addEventListener('mouseleave',()=>overlay.style.opacity='0');
+    avatar.addEventListener('click',()=>document.getElementById('myp-photo-input').click());
+  }
+  const mypPhotoInput=document.getElementById('myp-photo-input');
+  if(mypPhotoInput){
+    mypPhotoInput.value='';
+    mypPhotoInput.onchange=async()=>{
+      const file=mypPhotoInput.files[0]; if(!file) return;
+      const btn=document.getElementById('btn-edit-myprofile');
+      const origText=btn?.textContent;
+      if(btn){ btn.disabled=true; btn.textContent='A guardar…'; }
+      try{
+        const compressed=await compressImage(file);
+        const photoUrl=await fileToBase64(compressed);
+        const existing=DB.getStaffProfile(u.user);
+        if(existing){
+          DB.setStaffProfile({...existing, photoUrl});
+          toast('✅ Foto atualizada!');
+          renderMyProfile();
+        } else {
+          toast('⚠️ Cria primeiro o teu perfil antes de alterar a foto.');
+        }
+      }catch(e){ toast('Erro ao guardar foto: '+e.message); }
+      finally{ if(btn){ btn.disabled=false; btn.textContent=origText; } }
+    };
+  }
 
   // ── Password change handler ──────────────────────────────
   const pwCard=document.getElementById('myp-pw-card');
