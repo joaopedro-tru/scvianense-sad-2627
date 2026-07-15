@@ -866,11 +866,6 @@ body.pm #v-pf{padding:30px}
     <div class="tb">
       <div><h1>Team Manager</h1><div class="sub">Gestão de documentos e pagamentos</div></div>
     </div>
-    <!-- tabs -->
-    <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border)">
-      <button class="tm-tab active" data-tm-tab="docs" style="background:none;border:none;border-bottom:2px solid var(--green);margin-bottom:-2px;padding:9px 20px;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--green);font-family:inherit">📄 Documentos</button>
-      <button class="tm-tab" data-tm-tab="pay" style="background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);font-family:inherit">💶 Pagamentos U23</button>
-    </div>
     <!-- docs panel -->
     <div id="tm-panel-docs">
       <div class="sf">
@@ -895,26 +890,6 @@ body.pm #v-pf{padding:30px}
             </tr>
           </thead>
           <tbody id="tm-docs-body"></tbody>
-        </table>
-      </div>
-    </div>
-    <!-- payments panel -->
-    <div id="tm-panel-pay" style="display:none">
-      <div class="sf">
-        <input class="si" id="tm-pay-search" placeholder="Pesquisar atleta..." style="max-width:220px">
-        <span id="tm-pay-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <table id="tm-pay-table" style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:var(--bg)">
-              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Tipo de Recibo</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Dezembro</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Maio</th>
-            </tr>
-          </thead>
-          <tbody id="tm-pay-body"></tbody>
         </table>
       </div>
     </div>
@@ -1506,7 +1481,9 @@ const USERS = [
   { user:'med-19',   email:'med-19@vianensesad.pt',    role:'medical', squad:'sub19' },
   { user:'med-23',   email:'med-23@vianensesad.pt',    role:'medical', squad:'sub23' },
   // ── Team Manager ──────────────────────────────────────────
-  { user:'tm',       email:'brunoarezes@vianensesad.pt',    role:'teammanager' },
+  { user:'tm-eqa',   email:'tm-eqa@vianensesad.pt',         role:'teammanager', squad:'eqa'   },
+  { user:'tm-19',    email:'tm-19@vianensesad.pt',          role:'teammanager', squad:'sub19' },
+  { user:'tm-23',    email:'brunoarezes@vianensesad.pt',    role:'teammanager', squad:'sub23' },
 ];
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
@@ -5232,31 +5209,17 @@ const TM_DOC_FIELDS=[
   {key:'exameMedico',label:'Exame Médico'},
   {key:'foto',label:'Foto'},
 ];
-const TM_PAY_TIPOS=[
-  {value:'',label:'— selecionar —'},
-  {value:'mensal',label:'Recibo Mensal'},
-  {value:'isolado',label:'Ato Isolado'},
-];
-
 function renderTM(){
-  // wire up tabs once
-  document.querySelectorAll('.tm-tab').forEach(btn=>{
-    btn.onclick=()=>{
-      const tab=btn.dataset.tmTab;
-      document.querySelectorAll('.tm-tab').forEach(b=>{
-        const active=b.dataset.tmTab===tab;
-        b.style.color=active?'var(--green)':'var(--muted)';
-        b.style.fontWeight=active?'700':'600';
-        b.style.borderBottomColor=active?'var(--green)':'transparent';
-        b.classList.toggle('active',active);
-      });
-      document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
-      document.getElementById('tm-panel-pay').style.display=tab==='pay'?'':'none';
-    };
-  });
-
-  // Docs tab filters
+  const u=currentUser();
+  // Pre-filter squad selector to TM's own squad (non-admin)
   const docsSquadSel=document.getElementById('tm-docs-squad');
+  if(u?.squad && u.role!=='admin'){
+    docsSquadSel.value=u.squad;
+    docsSquadSel.style.display='none'; // TM only sees their squad
+  } else {
+    docsSquadSel.style.display='';
+  }
+
   const docsSearch=document.getElementById('tm-docs-search');
   const renderDocs=()=>{
     const sq=docsSquadSel.value;
@@ -5309,65 +5272,6 @@ function renderTM(){
   docsSquadSel.onchange=renderDocs;
   docsSearch.oninput=renderDocs;
   renderDocs();
-
-  // Payments tab (U23 only)
-  const paySearch=document.getElementById('tm-pay-search');
-  const renderPay=()=>{
-    const q=(paySearch.value||'').toLowerCase();
-    let players=DB.players('sub23');
-    if(q) players=players.filter(p=>dn(p).toLowerCase().includes(q));
-    players.sort((a,b)=>dn(a).localeCompare(dn(b)));
-    const total=players.length;
-    const done=players.filter(p=>{
-      const pay=DB.getAthletePayment(p.id)||{};
-      return pay.tipo&&pay.dezPago&&pay.maioPago;
-    }).length;
-    document.getElementById('tm-pay-stats').textContent=`${done}/${total} em dia`;
-    const body=document.getElementById('tm-pay-body');
-    if(!players.length){ body.innerHTML=`<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas Sub-23.</td></tr>`; return; }
-    body.innerHTML=players.map(p=>{
-      const pay=DB.getAthletePayment(p.id)||{};
-      const tipoOpts=TM_PAY_TIPOS.map(o=>`<option value="${o.value}"${pay.tipo===o.value?' selected':''}>${o.label}</option>`).join('');
-      const dezOk=!!pay.dezPago; const maiOk=!!pay.maioPago;
-      const allOk=pay.tipo&&dezOk&&maiOk;
-      return `<tr style="border-bottom:1px solid var(--border);${allOk?'background:#f9fff9':''}">
-        <td style="padding:10px 14px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="av" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
-            <div>
-              <div style="font-weight:600;font-size:13px">${dn(p)}</div>
-              <div style="font-size:11px;color:var(--muted)">${p.number?'#'+p.number:''}</div>
-            </div>
-          </div>
-        </td>
-        <td style="padding:10px;text-align:center">
-          <select class="tm-pay-tipo" data-pid="${p.id}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;background:#fff">
-            ${tipoOpts}
-          </select>
-        </td>
-        <td style="text-align:center;padding:10px">
-          <button class="tm-pay-btn" data-pid="${p.id}" data-field="dezPago" data-val="${dezOk?'1':'0'}"
-            style="background:${dezOk?'#e8f5e9':'#fafafa'};border:1.5px solid ${dezOk?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 14px;cursor:pointer;font-size:14px">${dezOk?'✅':'⏳'}</button>
-        </td>
-        <td style="text-align:center;padding:10px">
-          <button class="tm-pay-btn" data-pid="${p.id}" data-field="maioPago" data-val="${maiOk?'1':'0'}"
-            style="background:${maiOk?'#e8f5e9':'#fafafa'};border:1.5px solid ${maiOk?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 14px;cursor:pointer;font-size:14px">${maiOk?'✅':'⏳'}</button>
-        </td>
-      </tr>`;
-    }).join('');
-    body.querySelectorAll('.tm-pay-tipo').forEach(sel=>{
-      sel.onchange=()=>{ DB.setAthletePayment(sel.dataset.pid,{tipo:sel.value}); renderPay(); };
-    });
-    body.querySelectorAll('.tm-pay-btn').forEach(btn=>{
-      btn.onclick=()=>{
-        const newVal=btn.dataset.val!=='1';
-        DB.setAthletePayment(btn.dataset.pid,{[btn.dataset.field]:newVal});
-        renderPay();
-      };
-    });
-  };
-  paySearch.oninput=renderPay;
-  renderPay();
 }
 
 function applyRoleUI(){
@@ -5422,9 +5326,15 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
+    if(u.squad){
+      const allSquads=['eqa','sub19','sub23'];
+      allSquads.filter(s=>s!==u.squad).forEach(other=>{
+        document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
+      });
+    }
     const foot=document.getElementById('sb-foot');
     const profile=DB.getStaffProfile(u.user);
-    if(foot) foot.textContent=`${profile?.name||'Team Manager'}`;
+    if(foot) foot.textContent=`${profile?.name||'Team Manager'} · ${SQUADS[u.squad]||''}`;
   } else if(u.role==='admin'){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
