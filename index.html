@@ -2628,11 +2628,12 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   let sfPhotoDataUrl=null;
   setupPhotoZone('sf-photo-circle','sf-photo-input','sf-photo-initials',null);
 
-  sel.addEventListener('change',()=>{
+  sel.addEventListener('change', async ()=>{
     const u=formUsers.find(x=>x.user===sel.value);
     const info=document.getElementById('sf-account-info');
     const fields=document.getElementById('sf-fields');
-    if(!u){ info.style.display='none'; fields.style.display='none'; return; }
+    const alreadyBanner=document.getElementById('sf-already');
+    if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; return; }
     const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
     const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
     const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'—';
@@ -2640,13 +2641,27 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     document.getElementById('sf-account-squad').textContent=squadLabel;
     document.getElementById('sf-account-email').textContent=u.email||'—';
     info.style.display='';
-    fields.style.display='';
-    // Show license field only for coaching roles
-    const licWrap=document.getElementById('sf-license-wrap');
-    const needsLic=['headcoach','adjunto','estagiario'].includes(role);
-    licWrap.style.display=needsLic?'':'none';
-    // Update initials placeholder
-    document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
+    // Check if profile already exists in Firestore
+    let alreadyExists=false;
+    if(firestoreDb){
+      try{
+        const doc=await firestoreDb.collection('staff_profiles').doc(u.user).get();
+        alreadyExists=doc.exists;
+      }catch(e){}
+    }
+    if(alreadyExists){
+      alreadyBanner.style.display='block';
+      fields.style.display='none';
+    } else {
+      alreadyBanner.style.display='none';
+      fields.style.display='';
+      // Show license field only for coaching roles
+      const licWrap=document.getElementById('sf-license-wrap');
+      const needsLic=['headcoach','adjunto','estagiario'].includes(role);
+      licWrap.style.display=needsLic?'':'none';
+      // Update initials placeholder
+      document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
+    }
   });
 
   document.getElementById('sf-form').addEventListener('submit', async e=>{
