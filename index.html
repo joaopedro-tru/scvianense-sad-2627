@@ -485,6 +485,13 @@ body.pm #v-pf{padding:30px}
     <div id="login-reset-wrap" style="margin-top:14px;display:none">
       <a id="login-reset-link" href="#" style="font-size:12px;color:var(--muted);text-decoration:none">Esqueci a password</a>
     </div>
+    <!-- Primeira configuração — aparece só quando a conta não existe ainda -->
+    <div id="login-setup-wrap" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid #e8e8e8;text-align:left">
+      <div style="font-size:12px;color:#856404;font-weight:600;margin-bottom:10px">⚙️ Primeira utilização — define a password</div>
+      <input type="password" id="setup-pw" placeholder="Nova password (mín. 6 caracteres)" autocomplete="new-password" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box;font-family:inherit">
+      <input type="password" id="setup-pw2" placeholder="Confirmar password" autocomplete="new-password" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:10px;box-sizing:border-box;font-family:inherit">
+      <button class="login-btn" id="setup-btn" style="background:#856404">Criar Conta</button>
+    </div>
   </div>
 </div>
 
@@ -5435,6 +5442,9 @@ document.addEventListener('DOMContentLoaded',()=>{
       }
     });
 
+    const setupWrap=document.getElementById('login-setup-wrap');
+    const setupBtn=document.getElementById('setup-btn');
+
     async function tryLoginFirebase(){
       const username=userIn.value.trim().toLowerCase();
       const password=pwIn.value;
@@ -5447,7 +5457,14 @@ document.addEventListener('DOMContentLoaded',()=>{
       }catch(err){
         let msg='Credenciais incorretas.';
         if(err.code==='auth/too-many-requests') msg='Demasiadas tentativas. Tenta mais tarde.';
-        if(err.code==='auth/user-not-found') msg='Conta ainda não configurada. Pede ao admin.';
+        if(err.code==='auth/user-not-found'||err.code==='auth/invalid-credential'){
+          // Conta não existe ainda — mostrar secção de criação
+          setupWrap.style.display='';
+          errEl.textContent='';
+          document.getElementById('setup-pw').focus();
+          loginBtn.disabled=false; loginBtn.textContent='Entrar';
+          return;
+        }
         if(err.code==='auth/wrong-password') msg='Password incorreta.';
         errEl.textContent=msg;
         pwIn.value=''; pwIn.focus();
@@ -5455,6 +5472,35 @@ document.addEventListener('DOMContentLoaded',()=>{
         loginBtn.disabled=false; loginBtn.textContent='Entrar';
       }
     }
+
+    setupBtn.addEventListener('click',async()=>{
+      const username=userIn.value.trim().toLowerCase();
+      const u=USERS.find(x=>x.user===username); if(!u) return;
+      const pw=document.getElementById('setup-pw').value;
+      const pw2=document.getElementById('setup-pw2').value;
+      if(pw.length<6){ errEl.textContent='Mínimo 6 caracteres.'; return; }
+      if(pw!==pw2){ errEl.textContent='As passwords não coincidem.'; return; }
+      setupBtn.disabled=true; setupBtn.textContent='A criar…';
+      try{
+        // Criar conta via REST API (não interrompe sessão)
+        const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({email:u.email,password:pw,returnSecureToken:false})
+        });
+        const data=await res.json();
+        if(data.error){
+          errEl.textContent='Erro: '+data.error.message;
+        } else {
+          setupWrap.style.display='none';
+          errEl.style.color='var(--ok)';
+          errEl.textContent='✅ Conta criada! A entrar…';
+          await firebaseAuth.signInWithEmailAndPassword(u.email,pw);
+        }
+      }catch(e){ errEl.textContent='Erro: '+e.message; }
+      finally{ setupBtn.disabled=false; setupBtn.textContent='Criar Conta'; }
+    });
+
     loginBtn.addEventListener('click',tryLoginFirebase);
     userIn.addEventListener('keydown',e=>{ if(e.key==='Enter')pwIn.focus(); });
     pwIn.addEventListener('keydown',e=>{ if(e.key==='Enter')tryLoginFirebase(); });
