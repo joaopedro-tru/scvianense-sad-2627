@@ -895,7 +895,12 @@ body.pm #v-pf{padding:30px}
   <!-- TEAM MANAGER MODULE -->
   <div class="view" id="v-tm">
     <div class="tb">
-      <div><h1>Team Manager</h1><div class="sub">Gestão de documentos e pagamentos</div></div>
+      <div><h1>Team Manager</h1><div class="sub" id="tm-sub">Gestão de documentos</div></div>
+    </div>
+    <!-- tabs -->
+    <div style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card);margin-bottom:0">
+      <button class="tm-tab active" data-tab="docs" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-1px">📋 Documentos</button>
+      <button class="tm-tab" data-tab="kit" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">👕 Equipamento</button>
     </div>
     <!-- docs panel -->
     <div id="tm-panel-docs">
@@ -922,6 +927,32 @@ body.pm #v-pf{padding:30px}
             </tr>
           </thead>
           <tbody id="tm-docs-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- kit panel -->
+    <div id="tm-panel-kit" style="display:none">
+      <div class="sf" style="align-items:center">
+        <select class="si" id="tm-kit-squad">
+          <option value="">Todos os escalões</option>
+          <option value="eqa">Equipa A</option>
+          <option value="sub19">Sub-19</option>
+          <option value="sub23">Sub-23</option>
+        </select>
+        <span id="tm-kit-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+        <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
+        <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:48px">#</th>
+              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:100px">Posição</th>
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:130px">Tamanho</th>
+            </tr>
+          </thead>
+          <tbody id="tm-kit-body"></tbody>
         </table>
       </div>
     </div>
@@ -5305,8 +5336,68 @@ function isMinor(p){
   const ms=Date.now()-new Date(p.dob).getTime();
   return ms/(365.25*24*3600*1000)<18;
 }
+const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
+
+function printKit(){
+  const sq=document.getElementById('tm-kit-squad').value;
+  const squadLabel=SQUADS[sq]||'Todos os escalões';
+  let players=DB.players().filter(p=>!sq||p.squad===sq);
+  players=sortByPos(players);
+
+  const POS_GROUP={GR:'Guarda-Redes',LD:'Defesas',DC:'Defesas',LE:'Defesas',MD:'Médios',MC:'Médios',MO:'Médios',ALD:'Avançados',ALE:'Avançados',ED:'Avançados',EE:'Avançados',PL:'Avançados',AV:'Avançados'};
+  let lastGroup='';
+  const rows=players.map((p,i)=>{
+    const d=DB.getAthleteDoc(p.id)||{};
+    const group=POS_GROUP[p.position]||'Outros';
+    let groupRow='';
+    if(group!==lastGroup){ lastGroup=group; groupRow=`<tr><td colspan="4" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">${group}</td></tr>`; }
+    return `${groupRow}<tr style="background:${i%2===0?'#fff':'#fafafa'}">
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${p.number||'—'}</td>
+      <td style="padding:8px 10px;border:1px solid #ddd">${dn(p)}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700;font-size:15px">${d.shirtSize||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const w=window.open('','_blank','width=800,height=600');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Equipamento — ${squadLabel}</title>
+  <style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h2{margin:0 0 4px;font-size:18px}p{font-size:12px;color:#666;margin:0 0 18px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd}th:first-child,th:nth-child(3),th:nth-child(4){text-align:center}@media print{body{padding:0}}</style>
+  </head><body>
+  <h2>SC Vianense SAD — Equipamento</h2>
+  <p>${squadLabel} · ${new Date().toLocaleDateString('pt-PT')}</p>
+  <table><thead><tr>
+    <th style="width:44px;text-align:center">#</th>
+    <th>Atleta</th>
+    <th style="width:110px;text-align:center">Posição</th>
+    <th style="width:90px;text-align:center">Tamanho</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+  </body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(),400);
+}
+
 function renderTM(){
   const u=currentUser();
+
+  // ── Tab switching ───────────────────────────────────────
+  document.querySelectorAll('.tm-tab').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.tm-tab').forEach(b=>{
+        b.style.borderBottomColor='transparent';
+        b.style.color='var(--muted)';
+        b.classList.remove('active');
+      });
+      btn.style.borderBottomColor='var(--primary)';
+      btn.style.color='var(--primary)';
+      btn.classList.add('active');
+      const tab=btn.dataset.tab;
+      document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
+      document.getElementById('tm-panel-kit').style.display=tab==='kit'?'':'none';
+      if(tab==='kit') renderKitTab();
+    };
+  });
+
   // Pre-filter squad selector to TM's own squad (non-admin)
   const docsSquadSel=document.getElementById('tm-docs-squad');
   if(u?.squad && u.role!=='admin'){
@@ -5372,6 +5463,81 @@ function renderTM(){
   docsSquadSel.onchange=renderDocs;
   docsSearch.oninput=renderDocs;
   renderDocs();
+
+  // Kit squad selector mirrors docs squad selector lock
+  const kitSquadSel=document.getElementById('tm-kit-squad');
+  if(u?.squad && u.role!=='admin'){
+    kitSquadSel.value=u.squad;
+    kitSquadSel.style.display='none';
+  } else {
+    kitSquadSel.style.display='';
+  }
+  kitSquadSel.onchange=renderKitTab;
+}
+
+function renderKitTab(){
+  const u=currentUser();
+  const kitSquadSel=document.getElementById('tm-kit-squad');
+  const sq=kitSquadSel.value;
+
+  let players=DB.players().filter(p=>!sq||p.squad===sq);
+  players=sortByPos(players);
+
+  const filled=players.filter(p=>{
+    const d=DB.getAthleteDoc(p.id)||{};
+    return !!d.shirtSize;
+  }).length;
+  document.getElementById('tm-kit-stats').textContent=`${filled}/${players.length} com tamanho`;
+
+  const body=document.getElementById('tm-kit-body');
+  if(!players.length){
+    body.innerHTML=`<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`;
+    return;
+  }
+
+  // Group by position category for visual separation
+  const POS_GROUP={GR:'Guarda-Redes',LD:'Defesas',DC:'Defesas',LE:'Defesas',MD:'Médios',MC:'Médios',MO:'Médios',ALD:'Avançados',ALE:'Avançados',ED:'Avançados',EE:'Avançados',PL:'Avançados',AV:'Avançados'};
+  let lastGroup='';
+
+  body.innerHTML=players.map(p=>{
+    const d=DB.getAthleteDoc(p.id)||{};
+    const group=POS_GROUP[p.position]||'Outros';
+    let groupRow='';
+    if(group!==lastGroup){
+      lastGroup=group;
+      groupRow=`<tr class="pos-group"><td colspan="4" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">${group}</td></tr>`;
+    }
+    const sizeOpts=SHIRT_SIZES.map(s=>`<option value="${s}"${d.shirtSize===s?' selected':''}>${s}</option>`).join('');
+    return `${groupRow}<tr style="border-bottom:1px solid var(--border)">
+      <td style="text-align:center;padding:10px;font-weight:700;color:var(--muted)">${p.number||'—'}</td>
+      <td style="padding:10px 14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="av" style="width:28px;height:28px;font-size:10px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${dn(p)}</div>
+            ${sq?'':`<div style="font-size:11px;color:var(--muted)">${SQUADS[p.squad]||p.squad}</div>`}
+          </div>
+        </div>
+      </td>
+      <td style="text-align:center;padding:10px;font-size:12px;color:var(--muted)">${POS[p.position]||'—'}</td>
+      <td style="text-align:center;padding:8px 10px">
+        <select data-kit-pid="${p.id}" style="padding:5px 8px;border:1.5px solid ${d.shirtSize?'var(--green)':'var(--border)'};border-radius:6px;font-size:13px;font-weight:600;background:${d.shirtSize?'#e8f5e9':'var(--card)'};color:var(--text);outline:none;cursor:pointer">
+          <option value="">—</option>${sizeOpts}
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('[data-kit-pid]').forEach(sel=>{
+    sel.onchange=()=>{
+      const pid=sel.dataset.kitPid;
+      DB.setAthleteDoc(pid,{shirtSize:sel.value||null});
+      sel.style.borderColor=sel.value?'var(--green)':'var(--border)';
+      sel.style.background=sel.value?'#e8f5e9':'var(--card)';
+      const filled2=DB.players().filter(p=>(!sq||p.squad===sq)&&(DB.getAthleteDoc(p.id)||{}).shirtSize).length;
+      document.getElementById('tm-kit-stats').textContent=`${filled2}/${players.length} com tamanho`;
+    };
+  });
 }
 
 // ── HELP VIEW ─────────────────────────────────────────────────────────────────
