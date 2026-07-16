@@ -2439,6 +2439,27 @@ function renderPlayer(){
   });
   const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
 
+  // GR stats (only for GR position players)
+  let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
+  if(p.position==='GR'){
+    allEvs.forEach(ev=>{
+      if(ev.type!=='game') return;
+      const mr=ev.matchReport||{};
+      const gs=mr.grStats||{};
+      const evts=gs.events||[];
+      if(!evts.length) return;
+      const isThis=gs.grId===pid||(!gs.grId&&(mr.lineup||[]).includes(pid));
+      if(!isThis) return;
+      grGames++;
+      evts.forEach(e=>{
+        if(e.key==='golo') grGoalsConceded++;
+        const cat=Object.entries(GR_ACTIONS).find(([,acts])=>acts.find(a=>a.key===e.key))?.[0];
+        if(cat==='def') grDefTotal++;
+        if(cat==='off') grOffTotal++;
+      });
+    });
+  }
+
   function statBox(label,val,sub=''){
     return `<div style="text-align:center;padding:10px 6px">
       <div style="font-size:22px;font-weight:700;color:var(--green);line-height:1">${val}</div>
@@ -2501,6 +2522,16 @@ function renderPlayer(){
           ${statBox('Vermelhos',reds,'')}
         </div>
       </div>
+      ${p.position==='GR'&&grGames>0?`
+      <div class="card" style="margin-top:16px">
+        <h3 style="margin-bottom:12px">🥅 GR — Resumo em Jogo</h3>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0">
+          ${statBox('Jogos',grGames,'com registo')}
+          ${statBox('Def.',grDefTotal,'ações')}
+          ${statBox('Of.',grOffTotal,'ações')}
+          ${statBox('Sofridos',grGoalsConceded,'golos')}
+        </div>
+      </div>`:''}
     </div>`;
   if(isAdmin()) bindUnavailHandlers();
 }
@@ -4025,10 +4056,12 @@ function renderLiveGRTab(ev){
   const liveHalf=getMatchHalf(clock);
   const grEvents=(grStats.events||[]).slice().sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
 
-  // GR from lineup
+  // GR from current field — auto-detect, manual override stored in grStats.grId
   const sq=getConvocados();
   const grPlayers=sq.filter(p=>p.position==='GR');
-  const selGR=grStats.grId||grPlayers[0]?.id||'';
+  const grOnField=getCurrentPlayers().find(p=>p.position==='GR');
+  const selGR=grStats.grId||(grOnField?.id)||grPlayers[0]?.id||'';
+  const selGRPlayer=sq.find(p=>p.id===selGR);
   const grOpts=grPlayers.length
     ? grPlayers.map(p=>`<option value="${p.id}"${p.id===selGR?' selected':''}>${dn(p)}</option>`).join('')
     : '<option value="">Sem GR convocado</option>';
@@ -4071,15 +4104,19 @@ function renderLiveGRTab(ev){
     : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Sem eventos registados.</p>';
 
   tc.innerHTML=`
-    <!-- GR selector + resumo -->
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <select id="lgr-sel" style="flex:1;min-width:150px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:var(--card);color:var(--text);outline:none">${grOpts}</select>
-      <div style="display:flex;gap:10px;font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex-shrink:0">
+    <!-- GR identifier -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:28px">🥅</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700">${selGRPlayer?dn(selGRPlayer):'Sem GR detetado'}</div>
+        <div style="font-size:11px;color:var(--muted)">${grOnField&&!grStats.grId?'Auto-detetado em campo':'GR registado'}</div>
+      </div>
+      <div style="display:flex;gap:8px;font-size:12px;flex-shrink:0">
         <span>🛡️ <strong>${totalDef}</strong></span>
-        <span>⚡ <strong>${totalOff}</strong></span>
         <span style="color:${golos?'#c0392b':'var(--muted)'}">⛔ <strong>${golos}</strong></span>
       </div>
     </div>
+    ${grPlayers.length>1?`<div style="margin-bottom:10px"><select id="lgr-sel" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:var(--card);color:var(--text);outline:none">${grOpts}</select></div>`:''}
     <!-- Live clock indicator -->
     <div style="margin-bottom:14px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;font-size:13px">
       ${clockInfo}
@@ -4100,13 +4137,13 @@ function renderLiveGRTab(ev){
       ${timeline}
     </div>`;
 
-  document.getElementById('lgr-sel').onchange=e=>{
+  document.getElementById('lgr-sel')?.addEventListener('change',e=>{
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
     curMr.grStats=curMr.grStats||{};
     curMr.grStats.grId=e.target.value;
     DB.updateEvent(liveGameId,{matchReport:curMr});
     renderLiveGRTab(DB.getEvent(liveGameId));
-  };
+  });
   tc.querySelectorAll('[data-lgr-cat]').forEach(btn=>btn.addEventListener('click',()=>{
     liveGRCat=btn.dataset.lgrCat;
     renderLiveGRTab(DB.getEvent(liveGameId));
@@ -4121,7 +4158,7 @@ function renderLiveGRTab(ev){
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
     curMr.grStats=curMr.grStats||{};
     curMr.grStats.events=curMr.grStats.events||[];
-    curMr.grStats.events.push({id:uid(),key,label,minute,half,ts:new Date().toISOString()});
+    curMr.grStats.events.push({id:uid(),key,label,minute,half,grId:selGR,ts:new Date().toISOString()});
     if(!curMr.grStats.grId&&selGR) curMr.grStats.grId=selGR;
     DB.updateEvent(liveGameId,{matchReport:curMr});
     renderLiveGRTab(DB.getEvent(liveGameId));
