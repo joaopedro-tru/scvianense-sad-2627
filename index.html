@@ -564,12 +564,12 @@ body.pm #v-pf{padding:30px}
       <div class="sg" id="d-stats"></div>
       <div class="g2col">
         <div class="card">
-          <div style="font-size:14px;font-weight:700;margin-bottom:14px">📅 Próximos Eventos</div>
-          <div id="d-upcoming"></div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px">🟡 Sub-19 <span style="font-size:11px;font-weight:400;color:var(--muted)">— últimos e próximos jogos</span></div>
+          <div id="d-games-19"></div>
         </div>
         <div class="card">
-          <div style="font-size:14px;font-weight:700;margin-bottom:14px">👤 Últimos Atletas</div>
-          <div id="d-recent"></div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔵 Sub-23 <span style="font-size:11px;font-weight:400;color:var(--muted)">— últimos e próximos jogos</span></div>
+          <div id="d-games-23"></div>
         </div>
       </div>
       <div class="card">
@@ -2188,23 +2188,66 @@ function renderDash(){
   document.getElementById('d-admin-content').style.display='';
   document.getElementById('d-coach-content').style.display='none';
   const ps=DB.players(), es=DB.events();
-  const seqa=ps.filter(p=>p.squad==='eqa').length, s19=ps.filter(p=>p.squad==='sub19').length, s23=ps.filter(p=>p.squad==='sub23').length;
+  const s19=ps.filter(p=>p.squad==='sub19').length, s23=ps.filter(p=>p.squad==='sub23').length;
   const today=now.toISOString().split('T')[0];
-  const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+
+  // Stats — focused on U19 + U23
+  const g19=es.filter(e=>e.type==='game'&&e.squad==='sub19');
+  const g23=es.filter(e=>e.type==='game'&&e.squad==='sub23');
+  const gResult=(games)=>{
+    const past=games.filter(g=>g.date<today);
+    const wins=past.filter(g=>{const mr=g.matchReport||{};const gf=(mr.events||[]).filter(e=>e.type==='goal').length,ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;return gf>ga;}).length;
+    return past.length>0?`${wins}V/${past.length-wins}D`:'—';
+  };
   document.getElementById('d-stats').innerHTML=`
-    <div class="sc"><div class="sl">Total Atletas</div><div class="sv">${ps.length}</div><div class="ss">todos os escalões</div></div>
-    <div class="sc"><div class="sl">Equipa A</div><div class="sv" style="color:#333">${seqa}</div><div class="ss">atletas</div></div>
-    <div class="sc"><div class="sl">Sub-19</div><div class="sv" style="color:#b8860b">${s19}</div><div class="ss">atletas</div></div>
-    <div class="sc"><div class="sl">Sub-23</div><div class="sv" style="color:var(--blue)">${s23}</div><div class="ss">atletas</div></div>
-    <div class="sc"><div class="sl">Jogos Agendados</div><div class="sv">${es.filter(e=>e.type==='game').length}</div><div class="ss">no calendário</div></div>`;
-  const uEl=document.getElementById('d-upcoming');
-  uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
-    upcoming.slice(0,5).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${SQUADS[e.squad]}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
-  const rEl=document.getElementById('d-recent');
-  const rec=[...ps].sort((a,b)=>(b.ca||'').localeCompare(a.ca||'')).slice(0,5);
-  rEl.innerHTML=rec.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum atleta adicionado ainda.</p>':
-    rec.map(p=>`<div class="ui" style="cursor:pointer" data-nav-player="${p.id}"><div class="av" style="width:34px;height:34px;font-size:13px;margin:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div><div><div style="font-size:13px;font-weight:600">${dn(p)}</div><div style="font-size:12px;color:var(--muted)">${SQUADS[p.squad]}${p.position?' · '+POS[p.position]:''}</div></div></div>`).join('');
-  rEl.querySelectorAll('[data-nav-player]').forEach(el=>el.addEventListener('click',()=>nav('player',{id:el.dataset.navPlayer})));
+    <div class="sc"><div class="sl">Sub-19</div><div class="sv" style="color:#b8860b">${s19}</div><div class="ss">atletas · ${gResult(g19)}</div></div>
+    <div class="sc"><div class="sl">Sub-23</div><div class="sv" style="color:var(--blue)">${s23}</div><div class="ss">atletas · ${gResult(g23)}</div></div>
+    <div class="sc"><div class="sl">Jogos U19</div><div class="sv">${g19.filter(g=>g.date>=today).length}</div><div class="ss">por disputar</div></div>
+    <div class="sc"><div class="sl">Jogos U23</div><div class="sv">${g23.filter(g=>g.date>=today).length}</div><div class="ss">por disputar</div></div>`;
+
+  // Game card helper
+  function dashGameCard(ev){
+    const d=new Date(ev.date+'T00:00:00');
+    const isPast=ev.date<today;
+    const isToday=ev.date===today;
+    const opponent=ev.opponent||'Adversário';
+    const ha=ev.homeAway==='away'?'✈️':'🏠';
+    let badge='';
+    if(isPast){
+      const mr=ev.matchReport||{};
+      const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
+      const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
+      const isHome=ev.homeAway!=='away';
+      const scoreStr=isHome?`${gf}–${ga}`:`${ga}–${gf}`;
+      const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
+      badge=`<div style="padding:4px 10px;border-radius:6px;background:${res.c};color:#fff;font-size:12px;font-weight:700;flex-shrink:0">${res.l} ${scoreStr}</div>`;
+    } else if(isToday){
+      badge=`<div style="padding:4px 10px;border-radius:6px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;flex-shrink:0">Hoje</div>`;
+    }
+    return `<div class="ui" style="cursor:pointer" onclick="nav('game',{id:'${ev.id}'})">
+      <div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ha} ${opponent}</div>
+        <div style="font-size:11px;color:var(--muted)">${evLabel(ev)}${ev.time?' · '+ev.time:''}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }
+
+  function renderSquadGames(games, elId){
+    const el=document.getElementById(elId);
+    const past=games.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).reverse();
+    const future=games.filter(g=>g.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
+    if(!past.length&&!future.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px 0">Sem jogos agendados.</p>'; return; }
+    let html='';
+    if(past.length) html+=past.map(dashGameCard).join('');
+    if(past.length&&future.length) html+=`<div style="border-top:2px dashed var(--border);margin:8px 0;position:relative"><span style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--card);padding:0 8px;font-size:10px;color:var(--muted);font-weight:600">HOJE</span></div>`;
+    if(future.length) html+=future.map(dashGameCard).join('');
+    el.innerHTML=html;
+  }
+
+  renderSquadGames(g19,'d-games-19');
+  renderSquadGames(g23,'d-games-23');
   bdayCards(ps,document.getElementById('d-birthdays'));
 }
 
