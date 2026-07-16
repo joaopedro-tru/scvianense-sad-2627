@@ -2041,7 +2041,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set();
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null;
 
 function evLabel(ev){
   if(ev.type==='game'){
@@ -2072,8 +2072,8 @@ function trainingLabel(ev){
 }
 
 function nav(v,opts={}){
+  if(clockInterval){clearInterval(clockInterval);clockInterval=null;}
   // Treinadores só acedem ao seu escalão
-
   const cs=coachSquad();
   if(cs && opts.squad && opts.squad!==cs && opts.squad!=='both'){ return; }
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -4303,25 +4303,103 @@ function renderSqGames(){
 }
 
 // ── GAME DETAIL (TABS: PRÉ-JOGO / PÓS-JOGO) ──────────────────────────────────
+// ── MATCH CLOCK HELPERS ───────────────────────────────────────────────────────
+function getMatchMinute(clock){
+  if(!clock||!clock.phase||clock.phase==='pre') return null;
+  const now=Date.now();
+  if(clock.phase==='1h'&&clock.half1Start)
+    return Math.floor((now-new Date(clock.half1Start).getTime())/60000)+1;
+  if(clock.phase==='ht'&&clock.half1Start&&clock.half1End)
+    return Math.max(45,Math.floor((new Date(clock.half1End)-new Date(clock.half1Start))/60000)+1);
+  if(clock.phase==='2h'&&clock.half2Start)
+    return 45+Math.floor((now-new Date(clock.half2Start).getTime())/60000)+1;
+  if(clock.phase==='finished'&&clock.half2Start&&clock.half2End)
+    return Math.max(90,45+Math.floor((new Date(clock.half2End)-new Date(clock.half2Start))/60000)+1);
+  return null;
+}
+function getMatchHalf(clock){
+  if(!clock) return 1;
+  return (clock.phase==='2h'||clock.phase==='finished')?2:1;
+}
+function clockPhaseLabel(clock){
+  if(!clock||!clock.phase||clock.phase==='pre') return 'Pré-Jogo';
+  if(clock.phase==='1h') return '1ª Parte';
+  if(clock.phase==='ht') return 'Intervalo';
+  if(clock.phase==='2h') return '2ª Parte';
+  if(clock.phase==='finished') return 'Terminado';
+  return '';
+}
+function renderClockBar(clock){
+  const phase=clock?.phase||'pre';
+  const min=getMatchMinute(clock);
+  const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='finished'?'FIM':(min?min+"'":'—');
+  const phaseLabel=clockPhaseLabel(clock);
+  const isRunning=(phase==='1h'||phase==='2h');
+  const clockColor=isRunning?'#2e7d32':(phase==='finished'?'var(--muted)':'var(--muted)');
+  const btnMap={
+    pre:{label:'▶ Iniciar 1ª Parte',bg:'#2e7d32',color:'#fff'},
+    '1h':{label:'⏸ Fim da 1ª Parte',bg:'#c0392b',color:'#fff'},
+    ht:{label:'▶ Iniciar 2ª Parte',bg:'#1565c0',color:'#fff'},
+    '2h':{label:'⏸ Fim da 2ª Parte',bg:'#c0392b',color:'#fff'},
+    finished:{label:null}
+  };
+  const btn=btnMap[phase]||btnMap.pre;
+  return `<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:32px;font-weight:900;color:${clockColor};font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1" id="gm-clock-min">${minDisplay}</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">${phaseLabel}</div>
+    </div>
+    ${btn.label?`<button id="gm-clock-btn" style="padding:10px 16px;border:none;border-radius:9px;background:${btn.bg};color:${btn.color};font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">${btn.label}</button>`:''}
+  </div>`;
+}
+
 function renderGame(){
+  if(clockInterval){clearInterval(clockInterval);clockInterval=null;}
   const ev=DB.getEvent(gameEventId); if(!ev){ nav('sq-games',{squad}); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
   const conv=ev.convocatoria||{players:{},formation:'',notes:'',concentrationTime:'',concentrationPlace:''};
   const mr=ev.matchReport||{events:[]};
+  const clock=mr.matchClock||{phase:'pre'};
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
+    ${renderClockBar(clock)}
     <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
       <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
       <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
+      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
+
+  // Clock button handler
+  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    const c=curMr.matchClock||{phase:'pre'};
+    const now=new Date().toISOString();
+    if(!c.phase||c.phase==='pre') curMr.matchClock={...c,phase:'1h',half1Start:now};
+    else if(c.phase==='1h')       curMr.matchClock={...c,phase:'ht',half1End:now};
+    else if(c.phase==='ht')       curMr.matchClock={...c,phase:'2h',half2Start:now};
+    else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    renderGame();
+  });
+
+  // Live clock tick (every 5s)
+  if(clock.phase==='1h'||clock.phase==='2h'){
+    clockInterval=setInterval(()=>{
+      const c=DB.getEvent(gameEventId)?.matchReport?.matchClock;
+      const minEl=document.getElementById('gm-clock-min');
+      if(minEl){ const m=getMatchMinute(c); if(m) minEl.textContent=m+"'"; }
+    },5000);
+  }
+
   if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
   else if(gameTab==='gr') renderGameGR(ev,sqPlayers,conv,mr);
+  else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
@@ -4382,88 +4460,279 @@ const GR_ACTIONS={
   ],
 };
 
+const GR_CAT_META={
+  def:{label:'Defensivo',color:'#1565c0'},
+  off:{label:'Ofensivo',color:'#2e7d32'},
+  rem:{label:'Remates',color:'#6a1b9a'},
+  fin:{label:'Finalização',color:'#b71c1c'},
+  atq:{label:'Ataques',color:'#e65100'},
+};
+function grEvIcon(key){
+  if(key==='golo') return '⛔';
+  if(key==='erroNaoForcado') return '⚠️';
+  const cat=Object.entries(GR_ACTIONS).find(([,acts])=>acts.find(a=>a.key===key))?.[0];
+  if(cat==='def') return '🛡️';
+  if(cat==='off') return '⚡';
+  if(cat==='rem') return '🎯';
+  if(cat==='fin') return '🏹';
+  return '📍';
+}
+
 function renderGameGR(ev, sqPlayers, conv, mr){
   const el=document.getElementById('gm-tab-content');
   const grStats=mr.grStats||{};
-  const stats=grStats.stats||{};
+  const clock=mr.matchClock||{phase:'pre'};
+  const grEvents=(grStats.events||[]).slice().sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
 
-  // GRs from convocatoria
   const grs=sqPlayers.filter(p=>p.position==='GR'&&(conv.players||{})[p.id]);
   const selGR=grStats.grId||grs[0]?.id||'';
-
   const grOpts=grs.length
     ? grs.map(p=>`<option value="${p.id}"${p.id===selGR?' selected':''}>${dn(p)}</option>`).join('')
-    : '<option value="">Sem GR convocado</option>';
+    : sqPlayers.filter(p=>p.position==='GR').map(p=>`<option value="${p.id}"${p.id===selGR?' selected':''}>${dn(p)}</option>`).join('')||'<option value="">Sem GR</option>';
 
-  // Counter builder
-  const counter=(key,label,warn)=>{
-    const v=stats[key]||0;
-    const accent=warn?(v>0?'#e74c3c':'#c0392b'):(v>0?'var(--primary)':'var(--muted)');
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px;font-weight:${v>0?'600':'400'};color:${warn&&v>0?'#c0392b':'var(--text)'};flex:1">${label}</span>
-      <div style="display:flex;align-items:center;gap:0;flex-shrink:0">
-        <button data-gr-dec="${key}" style="width:38px;height:38px;border:1.5px solid var(--border);border-radius:8px 0 0 8px;background:var(--bg);font-size:18px;cursor:pointer;line-height:1;color:var(--muted)">−</button>
-        <div style="width:44px;height:38px;border-top:1.5px solid var(--border);border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${accent};background:var(--card)">${v}</div>
-        <button data-gr-inc="${key}" style="width:38px;height:38px;border:1.5px solid var(--border);border-radius:0 8px 8px 0;background:${v>0?'var(--primary)':'var(--bg)'};font-size:18px;cursor:pointer;line-height:1;color:${v>0?'#fff':'var(--muted)'}">+</button>
-      </div>
-    </div>`;
-  };
+  const counts={}; grEvents.forEach(e=>counts[e.key]=(counts[e.key]||0)+1);
+  const totalDef=GR_ACTIONS.def.reduce((s,a)=>s+(counts[a.key]||0),0);
+  const totalOff=GR_ACTIONS.off.reduce((s,a)=>s+(counts[a.key]||0),0);
+  const golos=counts['golo']||0;
+  const activeCat=el.dataset.grCat||'def';
 
-  const section=(title,color,keys,cat)=>`
-    <div style="margin-bottom:18px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-      <div style="padding:10px 16px;background:${color};color:#fff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center">
-        <span>${title}</span>
-        <span style="font-weight:400;opacity:.85">${keys.reduce((s,a)=>s+(stats[a.key]||0),0)} ações</span>
-      </div>
-      <div style="padding:0 16px">
-        ${keys.map(a=>counter(a.key,a.label,a.warn)).join('')}
-      </div>
-    </div>`;
+  // Current live minute from clock
+  const liveMin=getMatchMinute(clock);
+  const liveHalf=getMatchHalf(clock);
+  const clockActive=(clock.phase==='1h'||clock.phase==='2h');
+  const clockInfo=clockActive
+    ? `<span style="color:#2e7d32;font-weight:700">⏱ ${liveMin}'</span> <span style="font-size:11px;color:var(--muted)">${liveHalf===1?'1ª Parte':'2ª Parte'}</span>`
+    : `<span style="color:var(--muted);font-size:12px">${clockPhaseLabel(clock)} — inicia o jogo no relógio acima</span>`;
 
-  const totalDef=GR_ACTIONS.def.reduce((s,a)=>s+(stats[a.key]||0),0);
-  const totalOff=GR_ACTIONS.off.reduce((s,a)=>s+(stats[a.key]||0),0);
-  const golos=stats.golo||0;
+  const catActions=GR_ACTIONS[activeCat]||[];
+  const actionBtns=catActions.map(a=>{
+    const n=counts[a.key]||0;
+    const isWarn=a.warn;
+    return `<button data-gr-act="${a.key}" data-gr-label="${a.label}" ${!clockActive?'disabled':''} style="
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+      padding:14px 8px;border:1.5px solid ${n>0?(isWarn?'#e74c3c':'var(--primary)'):'var(--border)'};
+      border-radius:10px;background:${!clockActive?'var(--bg)':n>0?(isWarn?'#fdecea':'#e8f0fe'):'var(--card)'};
+      cursor:${clockActive?'pointer':'not-allowed'};font-size:12px;font-weight:600;
+      color:${!clockActive?'var(--muted)':isWarn&&n>0?'#c0392b':n>0?'var(--primary)':'var(--text)'};
+      text-align:center;min-height:70px;opacity:${clockActive?1:.5};transition:.15s">
+      <span style="font-size:22px;font-weight:700;line-height:1">${n||'·'}</span>
+      <span style="font-size:11px;line-height:1.3">${a.label}</span>
+    </button>`;
+  }).join('');
+
+  const timeline=grEvents.length
+    ? grEvents.slice().reverse().map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px;flex-shrink:0">${grEvIcon(e.key)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${e.label}</div>
+          <div style="font-size:11px;color:var(--muted)">${e.minute?e.minute+'\''+(e.half===2?' (2ª parte)':' (1ª parte)'):''}</div>
+        </div>
+        <button data-gr-del="${e.id}" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--muted);padding:4px">🗑</button>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Sem eventos registados.</p>';
 
   el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-      <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Guarda-Redes</div>
-      <select id="gr-sel" style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:var(--card);color:var(--text);outline:none">${grOpts}</select>
-      <div style="display:flex;gap:12px;font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 14px">
-        <span>🛡️ <strong>${totalDef}</strong> def</span>
-        <span>⚡ <strong>${totalOff}</strong> of</span>
-        <span style="color:${golos?'#c0392b':'var(--muted)'}">⛔ <strong>${golos}</strong> golo${golos!==1?'s':''}</span>
+    <!-- GR selector + resumo -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <select id="gr-sel" style="flex:1;min-width:150px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:var(--card);color:var(--text);outline:none">${grOpts}</select>
+      <div style="display:flex;gap:10px;font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex-shrink:0">
+        <span>🛡️ <strong>${totalDef}</strong></span>
+        <span>⚡ <strong>${totalOff}</strong></span>
+        <span style="color:${golos?'#c0392b':'var(--muted)'}">⛔ <strong>${golos}</strong></span>
       </div>
     </div>
-    ${section('Ações Defensivas','#1565c0',GR_ACTIONS.def,'def')}
-    ${section('Ações Ofensivas','#2e7d32',GR_ACTIONS.off,'off')}
-    ${section('Tipo de Remate','#6a1b9a',GR_ACTIONS.rem,'rem')}
-    ${section('Finalização','#b71c1c',GR_ACTIONS.fin,'fin')}
-    ${section('Ataques por Corredor','#e65100',GR_ACTIONS.atq,'atq')}`;
 
-  // GR selector change
+    <!-- Live clock indicator -->
+    <div style="margin-bottom:14px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;font-size:13px">
+      ${clockInfo}
+    </div>
+
+    <!-- Category tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      ${Object.entries(GR_CAT_META).map(([cat,meta])=>`
+        <button data-gr-cat="${cat}" style="padding:7px 12px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;border:none;
+          background:${activeCat===cat?meta.color:'var(--bg)'};color:${activeCat===cat?'#fff':'var(--muted)'}">${meta.label}</button>`).join('')}
+    </div>
+
+    <!-- Action grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:20px">
+      ${actionBtns}
+    </div>
+
+    <!-- Timeline -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Registo cronológico (${grEvents.length})</div>
+      ${timeline}
+    </div>`;
+
   document.getElementById('gr-sel').onchange=e=>{
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
-    curMr.grStats=curMr.grStats||{stats:{}};
+    curMr.grStats=curMr.grStats||{};
     curMr.grStats.grId=e.target.value;
     const p=sqPlayers.find(x=>x.id===e.target.value);
     curMr.grStats.grName=p?dn(p):'';
     DB.updateEvent(gameEventId,{matchReport:curMr});
-    renderGame();
+    renderGameGR(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
   };
 
-  // Counter buttons
-  const saveGRStat=(key,delta)=>{
+  el.querySelectorAll('[data-gr-cat]').forEach(btn=>btn.addEventListener('click',()=>{
+    el.dataset.grCat=btn.dataset.grCat;
+    renderGameGR(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
+  }));
+
+  el.querySelectorAll('[data-gr-act]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!clockActive) return;
+    const key=btn.dataset.grAct;
+    const label=btn.dataset.grLabel;
+    const curClock=DB.getEvent(gameEventId).matchReport?.matchClock||{};
+    const minute=getMatchMinute(curClock)||0;
+    const half=getMatchHalf(curClock);
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
-    curMr.grStats=curMr.grStats||{stats:{}};
-    curMr.grStats.stats=curMr.grStats.stats||{};
-    const cur=curMr.grStats.stats[key]||0;
-    curMr.grStats.stats[key]=Math.max(0,cur+delta);
+    curMr.grStats=curMr.grStats||{};
+    curMr.grStats.events=curMr.grStats.events||[];
+    curMr.grStats.events.push({id:uid(),key,label,minute,half,ts:new Date().toISOString()});
     if(!curMr.grStats.grId&&selGR) curMr.grStats.grId=selGR;
     DB.updateEvent(gameEventId,{matchReport:curMr});
-    renderGameGR(DB.getEvent(gameEventId),sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
-  };
-  el.querySelectorAll('[data-gr-inc]').forEach(btn=>btn.addEventListener('click',()=>saveGRStat(btn.dataset.grInc,1)));
-  el.querySelectorAll('[data-gr-dec]').forEach(btn=>btn.addEventListener('click',()=>saveGRStat(btn.dataset.grDec,-1)));
+    const newEl=document.getElementById('gm-tab-content');
+    newEl.dataset.grCat=activeCat;
+    renderGameGR(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
+  }));
+
+  el.querySelectorAll('[data-gr-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    curMr.grStats.events=(curMr.grStats.events||[]).filter(e=>e.id!==btn.dataset.grDel);
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    const newEl=document.getElementById('gm-tab-content');
+    newEl.dataset.grCat=activeCat;
+    renderGameGR(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
+  }));
+}
+
+// ── ADJUNTO TAB ───────────────────────────────────────────────────────────────
+const ADJ_EVENT_TYPES=[
+  {key:'golo',       label:'Golo',         icon:'⚽', color:'#2e7d32'},
+  {key:'assist',     label:'Assistência',  icon:'🅰️', color:'#1565c0'},
+  {key:'yellow',     label:'Amarelo',      icon:'🟨', color:'#f9a825'},
+  {key:'red',        label:'Vermelho',     icon:'🟥', color:'#c0392b'},
+  {key:'sub',        label:'Substituição', icon:'🔄', color:'#6a1b9a'},
+  {key:'injury',     label:'Lesão',        icon:'🩹', color:'#e65100'},
+  {key:'note',       label:'Nota',         icon:'📝', color:'#455a64'},
+];
+function adjEvIcon(type){ return ADJ_EVENT_TYPES.find(t=>t.key===type)?.icon||'📍'; }
+function adjEvColor(type){ return ADJ_EVENT_TYPES.find(t=>t.key===type)?.color||'var(--muted)'; }
+function adjEvLabel(type){ return ADJ_EVENT_TYPES.find(t=>t.key===type)?.label||type; }
+
+function renderGameAdjunto(ev, sqPlayers, conv, mr){
+  const el=document.getElementById('gm-tab-content');
+  const clock=mr.matchClock||{phase:'pre'};
+  const adjEvents=(mr.adjEvents||[]).slice().sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
+  const clockActive=(clock.phase==='1h'||clock.phase==='2h');
+  const liveMin=getMatchMinute(clock);
+  const liveHalf=getMatchHalf(clock);
+
+  const convIds=Object.entries(conv.players||{}).filter(([,v])=>v).map(([id])=>id);
+  const convPlayers=sqPlayers.filter(p=>convIds.includes(p.id)).sort((a,b)=>{
+    if(a.position==='GR'&&b.position!=='GR') return 1;
+    if(a.position!=='GR'&&b.position==='GR') return -1;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+  const playerOpts=['<option value="">— Atleta —</option>',...convPlayers.map(p=>`<option value="${p.id}">${dn(p)}${p.position?' ('+p.position+')':''}</option>`)].join('');
+
+  const clockInfo=clockActive
+    ? `<span style="color:#2e7d32;font-weight:700">⏱ ${liveMin}'</span> <span style="font-size:11px;color:var(--muted)">${liveHalf===1?'1ª Parte':'2ª Parte'}</span>`
+    : `<span style="color:var(--muted);font-size:12px">${clockPhaseLabel(clock)} — inicia o jogo no relógio acima</span>`;
+
+  const typeBtns=ADJ_EVENT_TYPES.map(t=>`
+    <button data-adj-type="${t.key}" ${!clockActive?'disabled':''} style="display:flex;align-items:center;gap:6px;padding:10px 14px;
+      border:1.5px solid var(--border);border-radius:9px;background:var(--card);
+      cursor:${clockActive?'pointer':'not-allowed'};opacity:${clockActive?1:.5};
+      font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:calc(50% - 4px);justify-content:center;transition:.15s">
+      <span style="font-size:18px">${t.icon}</span> ${t.label}
+    </button>`).join('');
+
+  const timeline=adjEvents.length
+    ? adjEvents.slice().reverse().map(e=>{
+        const pName=e.playerName||(sqPlayers.find(p=>p.id===e.playerId)?dn(sqPlayers.find(p=>p.id===e.playerId)):'');
+        const p2Name=e.player2Name||(sqPlayers.find(p=>p.id===e.player2Id)?dn(sqPlayers.find(p=>p.id===e.player2Id)):'');
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:20px;flex-shrink:0;margin-top:1px">${adjEvIcon(e.type)}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:${adjEvColor(e.type)}">${adjEvLabel(e.type)}</div>
+            ${pName?`<div style="font-size:13px">${pName}${p2Name?' → '+p2Name:''}</div>`:''}
+            ${e.notes?`<div style="font-size:12px;color:var(--muted);font-style:italic">${e.notes}</div>`:''}
+            <div style="font-size:11px;color:var(--muted)">${e.minute?e.minute+'\''+(e.half===2?' (2ª parte)':' (1ª parte)'):''}</div>
+          </div>
+          <button data-adj-del="${e.id}" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--muted);padding:4px;flex-shrink:0">🗑</button>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Sem eventos registados.</p>';
+
+  el.innerHTML=`
+    <!-- Live clock indicator -->
+    <div style="margin-bottom:12px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;font-size:13px">
+      ${clockInfo}
+    </div>
+
+    <!-- Atleta (opcional) -->
+    <div style="margin-bottom:10px">
+      <select id="adj-player" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);outline:none">${playerOpts}</select>
+    </div>
+    <!-- 2º Atleta -->
+    <div id="adj-p2-row" style="margin-bottom:10px;display:none">
+      <select id="adj-player2" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);outline:none">
+        <option value="">— 2.º Atleta (opcional) —</option>
+        ${convPlayers.map(p=>`<option value="${p.id}">${dn(p)}${p.position?' ('+p.position+')':''}</option>`).join('')}
+      </select>
+    </div>
+    <!-- Nota (opcional) -->
+    <div style="margin-bottom:12px">
+      <input id="adj-notes" type="text" placeholder="Nota (opcional)" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);outline:none;box-sizing:border-box">
+    </div>
+
+    <!-- Type buttons -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+      ${typeBtns}
+    </div>
+
+    <!-- Timeline -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Registo cronológico (${adjEvents.length})</div>
+      ${timeline}
+    </div>`;
+
+  // Show 2nd player row for sub/golo/assist
+  const p2Row=document.getElementById('adj-p2-row');
+  el.querySelectorAll('[data-adj-type]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!clockActive) return;
+    const type=btn.dataset.adjType;
+    // Show/hide p2 row based on type
+    p2Row.style.display=(type==='sub'||type==='golo'||type==='assist')?'block':'none';
+    const playerId=document.getElementById('adj-player').value;
+    const player2Id=document.getElementById('adj-player2')?.value||'';
+    const notes=document.getElementById('adj-notes').value.trim();
+    const curClock=DB.getEvent(gameEventId).matchReport?.matchClock||{};
+    const minute=getMatchMinute(curClock)||0;
+    const half=getMatchHalf(curClock);
+    const pObj=sqPlayers.find(p=>p.id===playerId);
+    const p2Obj=sqPlayers.find(p=>p.id===player2Id);
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    curMr.adjEvents=curMr.adjEvents||[];
+    const entry={id:uid(),type,minute,half,ts:new Date().toISOString()};
+    if(playerId){ entry.playerId=playerId; entry.playerName=pObj?dn(pObj):''; }
+    if(player2Id){ entry.player2Id=player2Id; entry.player2Name=p2Obj?dn(p2Obj):''; }
+    if(notes) entry.notes=notes;
+    curMr.adjEvents.push(entry);
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    renderGameAdjunto(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
+  }));
+
+  el.querySelectorAll('[data-adj-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    curMr.adjEvents=(curMr.adjEvents||[]).filter(e=>e.id!==btn.dataset.adjDel);
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    renderGameAdjunto(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
+  }));
 }
 
 function renderGamePre(ev,sqPlayers,conv){
