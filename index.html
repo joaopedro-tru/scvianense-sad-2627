@@ -3506,7 +3506,8 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
     const dates=[];
     let cur=new Date(data.date+'T00:00:00');
     const end=new Date(repeatUntil+'T00:00:00');
-    while(cur<=end){ dates.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate()+7); }
+    const localDateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    while(cur<=end){ dates.push(localDateStr(cur)); cur.setDate(cur.getDate()+7); }
     dates.forEach(date=>DB.addEvent({...data,date}));
     closeEventModal(); renderCal(); if(view==='dashboard')renderDash();
     toast(`✅ ${dates.length} treino${dates.length!==1?'s':''} criados!`); return;
