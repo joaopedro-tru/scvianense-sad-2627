@@ -2419,7 +2419,7 @@ function renderPlayer(){
     if(ev.type==='training'){
       if(ev.attendance&&ev.attendance[pid]===true) trainAttended++;
     } else if(ev.type==='game'){
-      const conv=(ev.convocatoria?.players||[]).some(cp=>cp.id===pid);
+      const conv=!!(ev.convocatoria?.players?.[pid]);
       if(conv) gamesConv++;
       const mr=ev.matchReport||{};
       const evList=mr.events||[];
