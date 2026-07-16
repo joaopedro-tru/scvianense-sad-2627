@@ -2041,7 +2041,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null;
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null, liveTab='geral', liveGRCat='def';
 
 function evLabel(ev){
   if(ev.type==='game'){
@@ -3886,9 +3886,10 @@ function renderLiveLineup(ev){
 
 // ── LIVE RECORDING ────────────────────────────────────────────────────────────
 function renderLiveRecording(ev){
+  if(clockInterval){clearInterval(clockInterval);clockInterval=null;}
   const mr=ev.matchReport||{events:[]};
+  const clock=mr.matchClock||{phase:'pre'};
   const lineup=mr.lineup||[];
-  const evs=(mr.events||[]).sort((a,b)=>sortMin(b)-sortMin(a));
   const goals=(mr.events||[]).filter(e=>e.type==='goal').length;
   const conc=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
   const isHome=ev.homeAway!=='away';
@@ -3896,10 +3897,9 @@ function renderLiveRecording(ev){
   const teamA=isHome?'SCV':(ev.opponent||'Adv.').substring(0,12);
   const teamB=isHome?(ev.opponent||'Adv.').substring(0,12):'SCV';
   const lineupStr=lineup.length>0?`${lineup.length} titular${lineup.length!==1?'es':''}`:' 11 não def.';
-  const timeline=evs.length===0
-    ?'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Sem eventos registados</div>'
-    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
+
   document.getElementById('v-live-content').innerHTML=`
+    <!-- Scoreboard -->
     <div class="lv-header">
       <div class="lv-teams"><span>${teamA}</span><span>${teamB}</span></div>
       <div class="lv-score">${scoreA}<span style="font-size:28px;letter-spacing:0;opacity:.45"> — </span>${scoreB}</div>
@@ -3909,6 +3909,86 @@ function renderLiveRecording(ev){
         ${mr.finished?'<span style="background:rgba(255,255,255,.15);color:#a8f5c8;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600">✅ Finalizado</span>':''}
       </div>
     </div>
+
+    <!-- Clock bar -->
+    ${renderClockBar(clock)}
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      <button class="tab-btn${liveTab==='geral'?' tab-active':''}" data-live-tab="geral">📝 Geral</button>
+      <button class="tab-btn${liveTab==='gr'?' tab-active':''}" data-live-tab="gr">🥅 GR</button>
+    </div>
+
+    <div id="live-tab-content"></div>
+
+    <!-- Finish button -->
+    <div style="padding:4px 0 16px">
+      <button id="btn-finish-game" class="btn ${mr.finished?'btn-o':'btn-d'}" style="width:100%;padding:15px;font-size:15px;justify-content:center;border-radius:12px">
+        ${mr.finished?'🔄 Reabrir Jogo':'🏁 Finalizar Jogo'}
+      </button>
+    </div>`;
+
+  // Clock button
+  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+    const c=curMr.matchClock||{phase:'pre'};
+    const now=new Date().toISOString();
+    if(!c.phase||c.phase==='pre') curMr.matchClock={...c,phase:'1h',half1Start:now};
+    else if(c.phase==='1h')       curMr.matchClock={...c,phase:'ht',half1End:now};
+    else if(c.phase==='ht')       curMr.matchClock={...c,phase:'2h',half2Start:now};
+    else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
+    DB.updateEvent(liveGameId,{matchReport:curMr});
+    renderLiveRecording(DB.getEvent(liveGameId));
+  });
+
+  // Live clock tick
+  if(clock.phase==='1h'||clock.phase==='2h'){
+    clockInterval=setInterval(()=>{
+      const c=DB.getEvent(liveGameId)?.matchReport?.matchClock;
+      const minEl=document.getElementById('gm-clock-min');
+      if(minEl){ const m=getMatchMinute(c); if(m) minEl.textContent=m+"'"; }
+    },5000);
+  }
+
+  // Tab switching
+  document.querySelectorAll('[data-live-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+    liveTab=btn.dataset.liveTab;
+    renderLiveRecording(DB.getEvent(liveGameId));
+  }));
+
+  // Edit lineup
+  document.getElementById('btn-edit-lineup').addEventListener('click',()=>{
+    liveTempLineup=new Set(lineup);
+    liveStep='lineup';
+    renderLive();
+  });
+
+  // Finish / reopen
+  document.getElementById('btn-finish-game').addEventListener('click',()=>{
+    if(mr.finished){
+      if(!confirm('Reabrir o jogo para continuar a registar eventos?')) return;
+      const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+      delete cur.finished; delete cur.motm;
+      DB.updateEvent(liveGameId,{matchReport:cur});
+      toast('🔄 Jogo reaberto');
+      renderLiveRecording(DB.getEvent(liveGameId));
+    } else {
+      openLivePicker('finish');
+    }
+  });
+
+  // Render active tab
+  if(liveTab==='gr') renderLiveGRTab(DB.getEvent(liveGameId));
+  else renderLiveGeralTab(DB.getEvent(liveGameId));
+}
+
+function renderLiveGeralTab(ev){
+  const mr=ev.matchReport||{events:[]};
+  const evs=(mr.events||[]).sort((a,b)=>sortMin(b)-sortMin(a));
+  const timeline=evs.length===0
+    ?'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Sem eventos registados</div>'
+    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
+  document.getElementById('live-tab-content').innerHTML=`
     <div class="lv-btns">
       <div class="lv-btn" data-lv-type="goal"><span class="lv-icon">⚽</span>Golo</div>
       <div class="lv-btn danger" data-lv-type="goal_conceded"><span class="lv-icon">🥅</span>Sofrido</div>
@@ -3924,45 +4004,133 @@ function renderLiveRecording(ev){
         <span style="font-weight:400">${evs.length} registo${evs.length!==1?'s':''}</span>
       </div>
       ${timeline}
-    </div>
-    <div style="padding:16px">
-      <button id="btn-finish-game" class="btn ${mr.finished?'btn-o':'btn-d'}" style="width:100%;padding:15px;font-size:15px;justify-content:center;border-radius:12px">
-        ${mr.finished?'🔄 Reabrir Jogo':'🏁 Finalizar Jogo'}
-      </button>
     </div>`;
-
-  // Finish / reopen game
-  document.getElementById('btn-finish-game').addEventListener('click',()=>{
-    if(mr.finished){
-      if(!confirm('Reabrir o jogo para continuar a registar eventos?')) return;
-      const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
-      delete cur.finished; delete cur.motm;
-      DB.updateEvent(liveGameId,{matchReport:cur});
-      toast('🔄 Jogo reaberto');
-      renderLive();
-    } else {
-      openLivePicker('finish');
-    }
-  });
-
-  // Edit lineup button
-  document.getElementById('btn-edit-lineup').addEventListener('click',()=>{
-    liveTempLineup=new Set(lineup);
-    liveStep='lineup';
-    renderLive();
-  });
-
-  // Event buttons
-  document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>{
-    openLivePicker(btn.dataset.lvType);
-  }));
-
-  // Delete events
+  document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>openLivePicker(btn.dataset.lvType)));
   document.querySelectorAll('[data-del-lv]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!confirm('Remover este evento?')) return;
     const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
     cur.events=(cur.events||[]).filter(e=>e.id!==btn.dataset.delLv);
-    DB.updateEvent(liveGameId,{matchReport:cur}); renderLive();
+    DB.updateEvent(liveGameId,{matchReport:cur});
+    renderLiveGeralTab(DB.getEvent(liveGameId));
+  }));
+}
+
+function renderLiveGRTab(ev){
+  const tc=document.getElementById('live-tab-content');
+  const mr=ev.matchReport||{};
+  const clock=mr.matchClock||{phase:'pre'};
+  const grStats=mr.grStats||{};
+  const clockActive=(clock.phase==='1h'||clock.phase==='2h');
+  const liveMin=getMatchMinute(clock);
+  const liveHalf=getMatchHalf(clock);
+  const grEvents=(grStats.events||[]).slice().sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
+
+  // GR from lineup
+  const sq=getConvocados();
+  const grPlayers=sq.filter(p=>p.position==='GR');
+  const selGR=grStats.grId||grPlayers[0]?.id||'';
+  const grOpts=grPlayers.length
+    ? grPlayers.map(p=>`<option value="${p.id}"${p.id===selGR?' selected':''}>${dn(p)}</option>`).join('')
+    : '<option value="">Sem GR convocado</option>';
+
+  const counts={}; grEvents.forEach(e=>counts[e.key]=(counts[e.key]||0)+1);
+  const totalDef=GR_ACTIONS.def.reduce((s,a)=>s+(counts[a.key]||0),0);
+  const totalOff=GR_ACTIONS.off.reduce((s,a)=>s+(counts[a.key]||0),0);
+  const golos=counts['golo']||0;
+
+  const clockInfo=clockActive
+    ? `<span style="color:#2e7d32;font-weight:700">⏱ ${liveMin}'</span> <span style="font-size:11px;color:var(--muted)">${liveHalf===1?'1ª Parte':'2ª Parte'}</span>`
+    : `<span style="color:var(--muted);font-size:12px">${clockPhaseLabel(clock)} — inicia o jogo no relógio acima</span>`;
+
+  const catActions=GR_ACTIONS[liveGRCat]||[];
+  const actionBtns=catActions.map(a=>{
+    const n=counts[a.key]||0;
+    const isWarn=a.warn;
+    return `<button data-lgr-act="${a.key}" data-lgr-label="${a.label}" ${!clockActive?'disabled':''} style="
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+      padding:14px 8px;border:1.5px solid ${n>0?(isWarn?'#e74c3c':'var(--primary)'):'var(--border)'};
+      border-radius:10px;background:${!clockActive?'var(--bg)':n>0?(isWarn?'#fdecea':'#e8f0fe'):'var(--card)'};
+      cursor:${clockActive?'pointer':'not-allowed'};font-size:12px;font-weight:600;
+      color:${!clockActive?'var(--muted)':isWarn&&n>0?'#c0392b':n>0?'var(--primary)':'var(--text)'};
+      text-align:center;min-height:70px;opacity:${clockActive?1:.5};transition:.15s">
+      <span style="font-size:22px;font-weight:700;line-height:1">${n||'·'}</span>
+      <span style="font-size:11px;line-height:1.3">${a.label}</span>
+    </button>`;
+  }).join('');
+
+  const timeline=grEvents.length
+    ? grEvents.slice().reverse().map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px;flex-shrink:0">${grEvIcon(e.key)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${e.label}</div>
+          <div style="font-size:11px;color:var(--muted)">${e.minute?e.minute+'\''+(e.half===2?' (2ª parte)':' (1ª parte)'):''}</div>
+        </div>
+        <button data-lgr-del="${e.id}" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--muted);padding:4px">🗑</button>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Sem eventos registados.</p>';
+
+  tc.innerHTML=`
+    <!-- GR selector + resumo -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <select id="lgr-sel" style="flex:1;min-width:150px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:var(--card);color:var(--text);outline:none">${grOpts}</select>
+      <div style="display:flex;gap:10px;font-size:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex-shrink:0">
+        <span>🛡️ <strong>${totalDef}</strong></span>
+        <span>⚡ <strong>${totalOff}</strong></span>
+        <span style="color:${golos?'#c0392b':'var(--muted)'}">⛔ <strong>${golos}</strong></span>
+      </div>
+    </div>
+    <!-- Live clock indicator -->
+    <div style="margin-bottom:14px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;font-size:13px">
+      ${clockInfo}
+    </div>
+    <!-- Category tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      ${Object.entries(GR_CAT_META).map(([cat,meta])=>`
+        <button data-lgr-cat="${cat}" style="padding:7px 12px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;border:none;
+          background:${liveGRCat===cat?meta.color:'var(--bg)'};color:${liveGRCat===cat?'#fff':'var(--muted)'}">${meta.label}</button>`).join('')}
+    </div>
+    <!-- Action grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:20px">
+      ${actionBtns}
+    </div>
+    <!-- Timeline -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Registo (${grEvents.length})</div>
+      ${timeline}
+    </div>`;
+
+  document.getElementById('lgr-sel').onchange=e=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+    curMr.grStats=curMr.grStats||{};
+    curMr.grStats.grId=e.target.value;
+    DB.updateEvent(liveGameId,{matchReport:curMr});
+    renderLiveGRTab(DB.getEvent(liveGameId));
+  };
+  tc.querySelectorAll('[data-lgr-cat]').forEach(btn=>btn.addEventListener('click',()=>{
+    liveGRCat=btn.dataset.lgrCat;
+    renderLiveGRTab(DB.getEvent(liveGameId));
+  }));
+  tc.querySelectorAll('[data-lgr-act]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!clockActive) return;
+    const key=btn.dataset.lgrAct;
+    const label=btn.dataset.lgrLabel;
+    const curClock=DB.getEvent(liveGameId).matchReport?.matchClock||{};
+    const minute=getMatchMinute(curClock)||0;
+    const half=getMatchHalf(curClock);
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+    curMr.grStats=curMr.grStats||{};
+    curMr.grStats.events=curMr.grStats.events||[];
+    curMr.grStats.events.push({id:uid(),key,label,minute,half,ts:new Date().toISOString()});
+    if(!curMr.grStats.grId&&selGR) curMr.grStats.grId=selGR;
+    DB.updateEvent(liveGameId,{matchReport:curMr});
+    renderLiveGRTab(DB.getEvent(liveGameId));
+  }));
+  tc.querySelectorAll('[data-lgr-del]').forEach(btn=>btn.addEventListener('click',()=>{
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
+    curMr.grStats.events=(curMr.grStats.events||[]).filter(e=>e.id!==btn.dataset.lgrDel);
+    DB.updateEvent(liveGameId,{matchReport:curMr});
+    renderLiveGRTab(DB.getEvent(liveGameId));
   }));
 }
 
@@ -4022,13 +4190,14 @@ function openLivePicker(type){
     // ── MINUTE INPUT ────────────────────────────────────────────────────────
     if(step==='minute'){
       titleEl.textContent='⏱ Minuto do evento';
+      const autoMin=getMatchMinute(DB.getEvent(liveGameId)?.matchReport?.matchClock);
       bodyEl.innerHTML=`
         <div style="padding:8px 4px">
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Minuto</label>
-          <input id="lv-min-base" type="number" min="1" max="200" placeholder="Ex: 23"
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Minuto${autoMin?' (pré-preenchido pelo relógio)':''}</label>
+          <input id="lv-min-base" type="number" min="1" max="200" value="${autoMin||''}" placeholder="Ex: 23"
             style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
           <div id="lv-min-preview" style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;min-height:18px"></div>
-          <button id="lv-min-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center" disabled>Confirmar →</button>
+          <button id="lv-min-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center" ${autoMin?'':'disabled'}>Confirmar →</button>
         </div>`;
 
       const baseInp=document.getElementById('lv-min-base');
