@@ -6018,22 +6018,37 @@ function printKit(){
     </tr>`;
   }).join('');
 
-  const w=window.open('','_blank','width=800,height=600');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Equipamento — ${squadLabel}</title>
-  <style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h2{margin:0 0 4px;font-size:18px}p{font-size:12px;color:#666;margin:0 0 18px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd}th:first-child,th:nth-child(3),th:nth-child(4){text-align:center}@media print{body{padding:0}}</style>
-  </head><body>
-  <h2>SC Vianense SAD — Equipamento</h2>
-  <p>${squadLabel} · ${new Date().toLocaleDateString('pt-PT')}</p>
-  <table><thead><tr>
-    <th style="width:44px;text-align:center">#</th>
-    <th>Atleta</th>
-    <th style="width:110px;text-align:center">Posição</th>
-    <th style="width:90px;text-align:center">Tamanho</th>
-  </tr></thead><tbody>${rows}</tbody></table>
-  </body></html>`);
-  w.document.close();
-  w.focus();
-  setTimeout(()=>w.print(),400);
+  // PWA-safe: overlay dentro da app — sem window.open
+  document.getElementById('kit-print-overlay')?.remove();
+  const overlay=document.createElement('div');
+  overlay.id='kit-print-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch';
+  overlay.innerHTML=`
+    <style>
+      @media print{
+        .kit-no-print{display:none!important}
+        body>*:not(#kit-print-overlay){display:none!important}
+        #kit-print-overlay{position:static!important;overflow:visible!important}
+      }
+    </style>
+    <div class="kit-no-print" style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-bottom:1px solid #e0e0e0;position:sticky;top:0;background:#fff;z-index:1">
+      <button onclick="document.getElementById('kit-print-overlay').remove()" style="padding:9px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
+      <button onclick="window.print()" style="padding:9px 18px;background:#1a3d6e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+    </div>
+    <div style="padding:24px 20px;max-width:680px;margin:0 auto">
+      <h2 style="margin:0 0 4px;font-size:18px;font-family:Arial,sans-serif">SC Vianense SAD — Equipamento</h2>
+      <p style="font-size:12px;color:#666;margin:0 0 18px;font-family:Arial,sans-serif">${squadLabel} · ${new Date().toLocaleDateString('pt-PT')}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:Arial,sans-serif">
+        <thead><tr>
+          <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:44px">#</th>
+          <th style="background:#f0f0f0;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd">Atleta</th>
+          <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:110px">Posição</th>
+          <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:90px">Tamanho</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 
 function renderTM(){
