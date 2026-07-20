@@ -1199,6 +1199,13 @@ body.pm #v-pf{padding:30px}
             <option value="right">Direito</option><option value="left">Esquerdo</option><option value="both">Ambos</option>
           </select>
         </div>
+        <div class="fg"><label>Tamanho Equipamento</label>
+          <select id="f-shirt-size">
+            <option value="">—</option>
+            <option value="XS">XS</option><option value="S">S</option><option value="M">M</option>
+            <option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option><option value="3XL">3XL</option>
+          </select>
+        </div>
       </div>
       <div class="fr">
         <div class="fg"><label>Data de Inscrição na Equipa</label><input type="date" id="f-enrolled"></div>
@@ -1529,7 +1536,8 @@ const FB_CONFIG = {
 /// Passwords geridas pelo Firebase Authentication — não são armazenadas aqui.
 // Email padrão: [user]@vianensesad.pt  (configurável no Firebase Console)
 const USERS = [
-  { user:'admin',    email:'admin@vianensesad.pt',    role:'admin' },
+  { user:'admin',    email:'joaopedroferreira90@gmail.com',    role:'admin' },
+  { user:'admin2',   email:'u2lezon@gmail.com',               role:'admin' },
   { user:'sub19',    email:'ajgcm@sapo.pt',    role:'coach', squad:'sub19' },
   { user:'sub23',    email:'guibe99@gmail.com',    role:'coach', squad:'sub23' },
   { user:'eqa',      email:'eqa@vianensesad.pt',      role:'coach', squad:'eqa'   },
@@ -2538,6 +2546,7 @@ function renderPlayer(){
         ${row('Posição',[p.position,p.position2,p.position3].filter(Boolean).map(x=>POS[x]||x).join(' · ')||null)}
         ${row('Nº Camisola',p.number?`#${p.number}`:null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
+        ${row('Tamanho Equipamento',p.shirtSize||(DB.getAthleteDoc(pid)?.shirtSize)||null)}
         ${row('Escalão',SQUADS[p.squad])}
         ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
         ${row('Clube Anterior',p.previousClub)}
@@ -2608,6 +2617,7 @@ function openPlayerModal(p=null){
   f('f-h').value=p?.height||'';
   f('f-w').value=p?.weight||'';
   f('f-inj').value=p?.injuries||'';
+  f('f-shirt-size').value=p?.shirtSize||(DB.getAthleteDoc(p?.id||'')?.shirtSize)||'';
   // Reset file inputs
   f('f-photo-input').value='';
   if(f('f-cc-file')) document.getElementById('f-cc-file').value='';
@@ -2640,7 +2650,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
       squad:f('f-squad'),position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,number:f('f-num'),dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
-      injuries:f('f-inj'),
+      injuries:f('f-inj'),shirtSize:f('f-shirt-size')||null,
       // preserve existing URLs
       photoUrl:existing?.photoUrl||null,
       ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,
@@ -2657,6 +2667,8 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
 
     if(existing){ DB.updatePlayer(pid,data); toast('✅ Atleta atualizado!') }
     else { DB.addPlayer(data); toast('✅ Atleta adicionado!') }
+    // Sync shirtSize to athleteDoc so Equipment tab stays in sync
+    if(data.shirtSize) DB.setAthleteDoc(pid,{shirtSize:data.shirtSize});
 
     closePlayerModal();
     if(view==='squad')renderSquad();
