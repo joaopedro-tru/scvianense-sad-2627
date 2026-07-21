@@ -1457,7 +1457,7 @@ body.pm #v-pf{padding:30px}
             </div>
             <div class="fg" style="margin:0;width:80px">
               <label>Nº Pretendido</label>
-              <input type="number" id="f-jersey-number" min="31" max="99" placeholder="45">
+              <input type="number" id="f-jersey-number" min="1" max="99" placeholder="45">
             </div>
           </div>
         </div>
@@ -2922,7 +2922,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       injuries:f('f-inj'),shirtSize:f('f-shirt-size')||null,
       jerseyName:document.getElementById('f-jersey-name').value.toUpperCase()||null,
       jerseySize:document.getElementById('f-jersey-size').value||null,
-      jerseyNumber:(()=>{const n=parseInt(document.getElementById('f-jersey-number').value);return(n>=31&&n<=99)?n:null;})(),
+      jerseyNumber:(()=>{const n=parseInt(document.getElementById('f-jersey-number').value);return(n>=1&&n<=99)?n:null;})(),
       // preserve existing URLs
       photoUrl:existing?.photoUrl||null,
       ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,
@@ -6809,7 +6809,7 @@ function renderKitTab(){
         <input data-kit-jname="${p.id}" type="text" maxlength="12" value="${jname}" placeholder="APELIDO" style="width:100%;box-sizing:border-box;padding:4px 7px;border:1.5px solid ${jname?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;background:${jname?'#e8f5e9':'var(--card)'};color:var(--text);outline:none" oninput="this.value=this.value.toUpperCase()">
       </td>
       <td style="text-align:center;padding:8px 6px">
-        <input data-kit-jnum="${p.id}" type="number" min="31" max="99" value="${jnum}" placeholder="45" style="width:60px;padding:4px 6px;border:1.5px solid ${jnum!==''?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;text-align:center;background:${jnum!==''?'#e8f5e9':'var(--card)'};color:var(--text);outline:none">
+        <input data-kit-jnum="${p.id}" type="number" min="1" max="99" value="${jnum}" placeholder="45" style="width:60px;padding:4px 6px;border:1.5px solid ${jnum!==''?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;text-align:center;background:${jnum!==''?'#e8f5e9':'var(--card)'};color:var(--text);outline:none">
       </td>
     </tr>`;
   }).join('');
@@ -6838,7 +6838,7 @@ function renderKitTab(){
     inp.onblur=()=>{
       const pid=inp.dataset.kitJnum;
       const n=parseInt(inp.value);
-      const val=(n>=31&&n<=99)?n:null;
+      const val=(n>=1&&n<=99)?n:null;
       if(val===null) inp.value='';
       DB.setAthleteDoc(pid,{jerseyNumber:val});
       inp.style.borderColor=val!=null?'var(--green)':'var(--border)';
