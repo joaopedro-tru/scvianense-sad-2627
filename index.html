@@ -1504,9 +1504,13 @@ body.pm #v-pf{padding:30px}
         <!-- Ficha de Treino upload -->
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
           <input type="file" id="e-ficha-input" accept=".pdf" style="display:none" onchange="onFichaFileChange(this)">
+          <button type="button" id="e-ficha-existing-btn" style="display:none;padding:6px 12px;border:1.5px solid #1a56db;border-radius:7px;background:var(--card);color:#1a56db;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"
+            onclick="analyzeFichaFromUrl(this.dataset.url,this.dataset.name)">
+            🎯 Analisar ficha do treino
+          </button>
           <button type="button" onclick="document.getElementById('e-ficha-input').click()"
             style="padding:6px 12px;border:1.5px solid var(--border);border-radius:7px;background:var(--card);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">
-            📋 Carregar Ficha de Treino
+            📎 Outro PDF
           </button>
           <span id="e-ficha-name" style="font-size:12px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
           <span id="e-ai-status" style="display:none;font-size:11px;font-weight:600;color:#1a56db">✨ A analisar...</span>
@@ -3768,6 +3772,13 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-ai-status').style.display='none';
   document.getElementById('e-ai-mismatch').style.display='none';
   document.getElementById('e-ficha-input').value='';
+  // Show "Analisar ficha existente" button if event already has a PDF ficha
+  const _existBtn=document.getElementById('e-ficha-existing-btn');
+  if(_existBtn){
+    const _isFichaPdf=ev?.fichaTreinoUrl&&(ev.fichaTreinoFileName||ev.fichaTreinoUrl||'').toLowerCase().includes('.pdf');
+    _existBtn.style.display=_isFichaPdf?'':'none';
+    if(_isFichaPdf){ _existBtn.dataset.url=ev.fichaTreinoUrl; _existBtn.dataset.name=ev.fichaTreinoFileName||'Ficha de Treino'; }
+  }
   renderObjPicker('primary'); renderObjPicker('secondary');
   document.getElementById('e-ha-home').checked=ev?.homeAway!=='away';
   document.getElementById('e-ha-away').checked=ev?.homeAway==='away';
@@ -4009,6 +4020,8 @@ function renderTraining(){
         ${fichaZone}
         <input type="file" id="tr-ficha-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
         ${ev.fichaTreinoUrl?`<a href="${ev.fichaTreinoUrl}" target="_blank" class="btn btn-o btn-sm" style="margin-top:9px;width:100%;justify-content:center">Ver Ficha ↗</a>`:''}
+        ${isAdmin()?`<button type="button" onclick="reporLinkFicha('${trainingEventId}')" style="margin-top:8px;width:100%;padding:5px 8px;border:1px dashed var(--border);border-radius:6px;background:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit">🔗 Repor link da ficha (Storage)</button>`:''}
+
       </div>
       <div class="card" style="margin-top:14px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🥅 Treino de Guarda-Redes</h3>
@@ -6633,6 +6646,43 @@ async function onFichaFileChange(input){
   }catch(e){
     console.error(e);
     statusEl.textContent='⚠️ Erro ao ler o ficheiro.';
+  }
+}
+
+function reporLinkFicha(eventId){
+  const url=prompt('Cola aqui o URL de download do Firebase Storage:\n(Firebase Console → Storage → ficha/... → clica no ficheiro → "Download URL")');
+  if(!url||!url.startsWith('http')) return;
+  const name=url.split('%2F').pop()?.split('?')[0]||'Ficha de Treino';
+  DB.updateEvent(eventId,{fichaTreinoUrl:url,fichaTreinoFileName:decodeURIComponent(name)});
+  toast('✅ Link reposto! A recarregar...');
+  setTimeout(()=>renderTraining(),400);
+}
+
+async function analyzeFichaFromUrl(url, name){
+  const statusEl=document.getElementById('e-ai-status');
+  statusEl.style.display='inline'; statusEl.textContent='✨ A carregar ficha...';
+  document.getElementById('e-ficha-name').textContent=name||'Ficha de Treino';
+  try{
+    if(typeof pdfjsLib==='undefined') throw new Error('pdf.js não carregado');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error(`Erro ao aceder ao ficheiro (${resp.status})`);
+    const ab=await resp.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const content=await page.getTextContent();
+      text+=content.items.map(x=>x.str).join(' ')+'\n';
+    }
+    _fichaText=text;
+    statusEl.textContent='✨ A analisar com IA...';
+    const hasPrimary=!!_objPrimary.moment;
+    await analyzeTrainingAI(text, hasPrimary?{primary:_objPrimary,secondary:_objSecondary}:null);
+    statusEl.style.display='none';
+  }catch(e){
+    console.error('analyzeFichaFromUrl error:',e);
+    statusEl.textContent='⚠️ '+e.message;
   }
 }
 
