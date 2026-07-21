@@ -20,6 +20,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1494,7 +1498,35 @@ body.pm #v-pf{padding:30px}
         </div>
       </div>
       <div class="fg"><label>Local</label><input type="text" id="e-loc" placeholder="Estádio / Campo"></div>
-      <div class="fg" id="e-objectives-grp"><label>Objetivo(s) do Treino <span style="color:var(--muted);font-weight:400">(aparece no Plano Semanal)</span></label><textarea id="e-objectives" placeholder="Ex: Organização ofensiva, Pressão alta, Bola parada..."></textarea></div>
+      <div class="fg" id="e-objectives-grp">
+        <label>🎯 Objetivos Táticos <span style="color:var(--muted);font-weight:400">(Periodização Tática · aparece no Plano Semanal)</span></label>
+
+        <!-- Ficha de Treino upload -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input type="file" id="e-ficha-input" accept=".pdf" style="display:none" onchange="onFichaFileChange(this)">
+          <button type="button" onclick="document.getElementById('e-ficha-input').click()"
+            style="padding:6px 12px;border:1.5px solid var(--border);border-radius:7px;background:var(--card);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">
+            📋 Carregar Ficha de Treino
+          </button>
+          <span id="e-ficha-name" style="font-size:12px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <span id="e-ai-status" style="display:none;font-size:11px;font-weight:600;color:#1a56db">✨ A analisar...</span>
+        </div>
+        <div id="e-ai-mismatch" style="display:none;background:#fff3cd;border:1.5px solid #ffc107;border-radius:8px;padding:9px 12px;font-size:12px;color:#856404;margin-bottom:10px;line-height:1.4"></div>
+
+        <!-- Primary objective -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivo Principal</div>
+          <div id="e-obj-primary-moments" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px"></div>
+          <div id="e-obj-primary-subs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        </div>
+
+        <!-- Secondary objective -->
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivo Secundário <span style="text-transform:none;font-weight:400">(opcional)</span></div>
+          <div id="e-obj-secondary-moments" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px"></div>
+          <div id="e-obj-secondary-subs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        </div>
+      </div>
       <div class="fg"><label>Notas</label><textarea id="e-notes" placeholder="Informações adicionais..."></textarea></div>
       <div class="fa">
         <button type="button" class="btn btn-g" id="mo-e-cancel">Cancelar</button>
@@ -3626,7 +3658,20 @@ function showEventDetail(id){
   const ev=DB.getEvent(id); if(!ev)return;
   calEvent=ev;
   document.getElementById('edet-title').textContent=evLabel(ev);
-  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
+  const _edetObjHTML=(()=>{
+    if(ev.type!=='training') return '';
+    const p=ev.objectivePrimary, s=ev.objectiveSecondary;
+    if(!p?.moment&&!ev.objectives) return '';
+    if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
+      const tc=TACTICS_TAXONOMY;
+      let h=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">`;
+      h+=`<div><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[p.moment].label}</span>${p.subPrinciples?.length?`<div style="font-size:10px;color:${tc[p.moment].color};font-weight:600;margin-top:2px">${p.subPrinciples.join(' · ')}</div>`:''}</div>`;
+      if(s?.moment&&TACTICS_TAXONOMY[s.moment]) h+=`<div style="opacity:.75"><span style="display:inline-block;background:${tc[s.moment].color}25;color:${tc[s.moment].color};border:1px solid ${tc[s.moment].color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${tc[s.moment].label}</span>${s.subPrinciples?.length?`<div style="font-size:10px;color:${tc[s.moment].color};font-weight:600;margin-top:2px">${s.subPrinciples.join(' · ')}</div>`:''}</div>`;
+      return h+`</div>`;
+    }
+    return ev.objectives?`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="font-size:12px">${ev.objectives}</div>`:'';
+  })();
+  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${_edetObjHTML}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
   // Show/hide "Eliminar série" button based on event type
   document.getElementById('btn-del-series').style.display=ev.type==='training'?'':'none';
   document.getElementById('mo-edet').classList.add('open');
@@ -3714,8 +3759,16 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-date').value=ev?.date||date||new Date().toISOString().split('T')[0];
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-notes').value=ev?.notes||'';
-  document.getElementById('e-objectives').value=ev?.objectives||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
+  // Tactical objectives reset
+  _objPrimary=ev?.objectivePrimary?{...ev.objectivePrimary}:{moment:null,subPrinciples:[]};
+  _objSecondary=ev?.objectiveSecondary?{...ev.objectiveSecondary}:{moment:null,subPrinciples:[]};
+  _fichaText='';
+  document.getElementById('e-ficha-name').textContent='';
+  document.getElementById('e-ai-status').style.display='none';
+  document.getElementById('e-ai-mismatch').style.display='none';
+  document.getElementById('e-ficha-input').value='';
+  renderObjPicker('primary'); renderObjPicker('secondary');
   document.getElementById('e-ha-home').checked=ev?.homeAway!=='away';
   document.getElementById('e-ha-away').checked=ev?.homeAway==='away';
   const _effectiveType=ev?.type||defaults.type||'training';
@@ -3766,7 +3819,11 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   e.preventDefault();
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:f('e-type')==='training'?(f('e-objectives')||null):null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
+  const _isTraining=f('e-type')==='training';
+  const _p=_isTraining&&_objPrimary.moment?{..._objPrimary}:null;
+  const _s=_isTraining&&_objSecondary.moment?{..._objSecondary}:null;
+  const _objText=_p?[TACTICS_TAXONOMY[_p.moment].full,_p.subPrinciples.length?'('+_p.subPrinciples.join(', ')+')'  :''].filter(Boolean).join(' ') + (_s?(' · '+TACTICS_TAXONOMY[_s.moment].full+(_s.subPrinciples.length?' ('+_s.subPrinciples.join(', ')+')':'')):''): null;
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -6363,8 +6420,23 @@ function generateWeeklyPlan(){
         val=h?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`;
         if(ev.time) val+=`\n${ev.time}`;
         if(ev.competition) val+=`\n${ev.competition}`;
-      } else if(ev?.type==='training'&&ev?.objectives){
-        val=ev.objectives;
+      } else if(ev?.type==='training'&&(ev?.objectivePrimary?.moment||ev?.objectives)){
+        if(ev.objectivePrimary?.moment&&TACTICS_TAXONOMY[ev.objectivePrimary.moment]){
+          const p=ev.objectivePrimary, s=ev.objectiveSecondary;
+          const tc=TACTICS_TAXONOMY;
+          val=`<div style="padding:4px 5px">`;
+          val+=`<div style="margin-bottom:${s?.moment?'5px':'0'}"><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">${tc[p.moment].label}</span>`;
+          if(p.subPrinciples?.length) val+=`<div style="font-size:9px;color:${tc[p.moment].color};font-weight:600;margin-top:2px">${p.subPrinciples.join(' · ')}</div>`;
+          val+=`</div>`;
+          if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
+            val+=`<div><span style="display:inline-block;background:${tc[s.moment].color}30;color:${tc[s.moment].color};border:1px solid ${tc[s.moment].color};border-radius:4px;padding:2px 6px;font-size:10px;font-weight:600">${tc[s.moment].label}</span>`;
+            if(s.subPrinciples?.length) val+=`<div style="font-size:9px;color:${tc[s.moment].color};font-weight:600;margin-top:2px">${s.subPrinciples.join(' · ')}</div>`;
+            val+=`</div>`;
+          }
+          val+=`</div>`;
+          r+=`<td style="border:1px solid var(--border);padding:1px;vertical-align:top">${val}</td>`;
+          return;
+        } else { val=ev.objectives||''; }
       }
       r+=`<td style="border:1px solid var(--border);padding:1px;vertical-align:top">${objCell(period,di,val)}</td>`;
     });
@@ -6492,6 +6564,107 @@ function isMinor(p){
   return ms/(365.25*24*3600*1000)<18;
 }
 const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
+
+// ── PERIODIZAÇÃO TÁTICA — TAXONOMIA ───────────────────────────────────────────
+const TACTICS_TAXONOMY={
+  OO:{label:'Org. Ofensiva',  full:'Organização Ofensiva',  color:'#1a56db', subs:['Saída PB','MPB','Último Terço']},
+  OD:{label:'Org. Defensiva', full:'Organização Defensiva', color:'#c0392b', subs:['Bloco Alto','Bloco Médio','Bloco Baixo']},
+  TO:{label:'Trans. Ofensiva',full:'Transição Ofensiva',    color:'#1a8754', subs:['Ataque Rápido','Ataque Posicional']},
+  TD:{label:'Trans. Defensiva',full:'Transição Defensiva',  color:'#e65100', subs:['Reação à Perda','Ajuste de Posição']},
+  BP:{label:'Bola Parada',    full:'Bola Parada',           color:'#7c3aed', subs:['Ofensiva','Defensiva']},
+};
+let _objPrimary={moment:null,subPrinciples:[]};
+let _objSecondary={moment:null,subPrinciples:[]};
+let _fichaText='';
+
+function renderObjPicker(which){
+  const obj=which==='primary'?_objPrimary:_objSecondary;
+  const mEl=document.getElementById(`e-obj-${which}-moments`);
+  const sEl=document.getElementById(`e-obj-${which}-subs`);
+  if(!mEl) return;
+  mEl.innerHTML=Object.entries(TACTICS_TAXONOMY).map(([k,v])=>{
+    const sel=obj.moment===k;
+    return `<button type="button" onclick="selectObjMoment('${which}','${k}')"
+      style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
+  }).join('');
+  if(obj.moment){
+    const v=TACTICS_TAXONOMY[obj.moment];
+    sEl.innerHTML=v.subs.map(sub=>{
+      const sel=obj.subPrinciples.includes(sub);
+      return `<button type="button" onclick="toggleObjSub('${which}','${sub}')"
+        style="padding:3px 9px;border-radius:5px;border:1.5px solid ${sel?v.color:'var(--border)'};background:${sel?v.color+'20':'transparent'};color:${sel?v.color:'var(--muted)'};font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;font-family:inherit">${sub}</button>`;
+    }).join('');
+  } else { sEl.innerHTML=''; }
+}
+function selectObjMoment(which,key){
+  const obj=which==='primary'?_objPrimary:_objSecondary;
+  if(obj.moment===key){obj.moment=null;obj.subPrinciples=[];}
+  else{obj.moment=key;obj.subPrinciples=[];}
+  renderObjPicker(which);
+}
+function toggleObjSub(which,sub){
+  const obj=which==='primary'?_objPrimary:_objSecondary;
+  const i=obj.subPrinciples.indexOf(sub);
+  if(i>-1)obj.subPrinciples.splice(i,1); else obj.subPrinciples.push(sub);
+  renderObjPicker(which);
+}
+
+async function onFichaFileChange(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('e-ficha-name').textContent=file.name;
+  const statusEl=document.getElementById('e-ai-status');
+  statusEl.style.display='inline'; statusEl.textContent='✨ A ler ficha...';
+  try{
+    if(typeof pdfjsLib==='undefined') throw new Error('pdf.js não carregado');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const ab=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const content=await page.getTextContent();
+      text+=content.items.map(x=>x.str).join(' ')+'\n';
+    }
+    _fichaText=text;
+    statusEl.textContent='✨ A analisar com IA...';
+    const hasPrimary=!!_objPrimary.moment;
+    await analyzeTrainingAI(text, hasPrimary?{primary:_objPrimary,secondary:_objSecondary}:null);
+    statusEl.style.display='none';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent='⚠️ Erro ao ler o ficheiro.';
+  }
+}
+
+async function analyzeTrainingAI(pdfText, currentObjectives){
+  try{
+    const sq=document.getElementById('e-squad').value;
+    const date=document.getElementById('e-date').value;
+    const dow=date?['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][new Date(date+'T12:00:00').getDay()]:'';
+    const month=date?new Date(date+'T12:00:00').getMonth():new Date().getMonth();
+    const period=(month>=5&&month<=7)?'preparatório':'competição';
+    const fn=firebase.app().functions('europe-west1').httpsCallable('analyzeTraining');
+    const res=await fn({pdfText,currentObjectives,dayOfWeek:dow,squad:sq,period});
+    const d=res.data;
+    const mEl=document.getElementById('e-ai-mismatch');
+    if(d.mismatch&&d.mismatchReason){
+      mEl.style.display='block';
+      mEl.innerHTML=`⚠️ <b>Possível divergência:</b> ${d.mismatchReason}`;
+    } else { mEl.style.display='none'; }
+    if(!currentObjectives||d.mismatch){
+      if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]){
+        _objPrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+      }
+      if(d.secondary&&TACTICS_TAXONOMY[d.secondary?.moment]){
+        _objSecondary={moment:d.secondary.moment,subPrinciples:d.secondary.subPrinciples||[]};
+      } else { _objSecondary={moment:null,subPrinciples:[]}; }
+      renderObjPicker('primary'); renderObjPicker('secondary');
+    }
+  }catch(e){
+    console.error('AI analysis error:',e);
+    document.getElementById('e-ai-status').textContent='⚠️ Erro na análise IA.';
+  }
+}
 // Dados de camisola Sub-23 — Numeração SCV SAD 26/27
 const SUB23_JERSEY_SEED=[
   {name:'João Pais',       jerseyName:'J.PAIS',     jerseySize:'L',  jerseyNumber:4 },
