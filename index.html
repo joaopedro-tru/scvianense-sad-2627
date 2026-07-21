@@ -3554,6 +3554,7 @@ function importMesocicloJulho(){
   _MESO_JULHO.forEach(ev=>DB.addEvent({squad:'eqa',...ev,notes:ev.notes||'',objectives:''}));
 
   toast(`✅ Mesociclo importado: ${trainCount} treinos e ${gamesCount} jogos criados!`);
+  document.getElementById('btn-import-mesociclo').remove();
   renderCal();
   if(view==='dashboard') renderDash();
   if(view==='sq-trainings'&&squad==='eqa') renderSqTrainings();
@@ -6964,6 +6965,7 @@ function applySub23Import(){
     count++;
   });
   overlay.remove();
+  document.getElementById('btn-import-sub23')?.remove();
   toast(`✅ ${count} atletas Sub-23 atualizados!`);
   renderKitTab();
 }
