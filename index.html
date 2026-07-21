@@ -538,6 +538,7 @@ body.pm #v-pf{padding:30px}
     <hr class="nd">
     <div class="nsl" id="nsl-jersey">Equipamento</div>
     <div class="nl" id="nl-jersey" data-view="jersey-order"><span class="ic">🎽</span> Encomenda Camisolas</div>
+    <div class="nl" id="nl-jerseylink"><span class="ic">🔗</span> Link p/ Atletas</div>
     <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
     <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
     <div class="nsl" id="nsl-tm">Gestão Clube</div>
@@ -961,6 +962,109 @@ body.pm #v-pf{padding:30px}
           <tbody id="tm-kit-body"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- PUBLIC JERSEY FORM (no login required) -->
+  <div class="view" id="v-jersey-public" style="min-height:100vh;background:var(--bg);padding:0 0 60px">
+    <!-- Header -->
+    <div style="background:#0e2444;padding:20px 20px 18px;text-align:center">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#e8b84b;text-transform:uppercase;margin-bottom:4px">SC Vianense SAD · 2026/27</div>
+      <div style="font-size:20px;font-weight:800;color:#fff">Encomenda de Camisola</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Preenche os teus dados abaixo</div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="jpf-loading" style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:10px">⏳</div>
+      <div>A carregar lista de atletas…</div>
+    </div>
+
+    <!-- Error state -->
+    <div id="jpf-error" style="display:none;text-align:center;padding:40px 20px">
+      <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+      <div style="font-weight:600;margin-bottom:6px">Não foi possível carregar a lista</div>
+      <div id="jpf-error-msg" style="font-size:13px;color:var(--muted)"></div>
+    </div>
+
+    <!-- Form -->
+    <div id="jpf-form" style="display:none;max-width:480px;margin:0 auto;padding:20px 16px">
+
+      <!-- Step 1: Identify -->
+      <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">1 — Quem és?</div>
+      <div class="card" style="padding:16px 18px;margin-bottom:20px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Escalão</label>
+            <select id="jpf-squad" class="si" onchange="jpfLoadPlayers()" style="width:100%">
+              <option value="">— Selecionar —</option>
+              <option value="eqa">Equipa A</option>
+              <option value="sub23">Sub-23</option>
+              <option value="sub19">Sub-19</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Nome</label>
+            <select id="jpf-player" class="si" onchange="jpfPlayerSelected()" style="width:100%" disabled>
+              <option value="">— Escolhe o teu nome —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Order details (hidden until player selected) -->
+      <div id="jpf-details" style="display:none">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">2 — Dados da camisola</div>
+        <div class="card" style="padding:16px 18px;margin-bottom:20px">
+          <div style="display:flex;flex-direction:column;gap:18px">
+
+            <!-- Name on jersey -->
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">
+                Nome na camisola <span style="font-weight:400">(máx. 12 letras)</span>
+              </label>
+              <input type="text" id="jpf-name" maxlength="12" autocapitalize="characters" spellcheck="false"
+                placeholder="APELIDO"
+                oninput="this.value=this.value.toUpperCase()"
+                style="width:100%;box-sizing:border-box;padding:14px;border:2px solid var(--border);border-radius:10px;font-size:24px;font-weight:800;letter-spacing:3px;text-transform:uppercase;background:var(--card);color:var(--text);outline:none;font-family:inherit;text-align:center"
+                onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+
+            <!-- Size -->
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:8px">Tamanho</label>
+              <div id="jpf-size-pills" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Number picker -->
+        <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">3 — Número pretendido</div>
+        <div class="card" style="padding:16px 18px;margin-bottom:20px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Escolhe um número disponível. Os riscados já foram escolhidos por outro atleta.</div>
+          <div id="jpf-numbers" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px"></div>
+        </div>
+
+        <!-- Existing order notice -->
+        <div id="jpf-existing" style="display:none;background:#fff3cd;border:1.5px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#856404"></div>
+
+        <!-- Submit -->
+        <button onclick="jpfSubmit()"
+          style="width:100%;padding:16px;background:#0e2444;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">
+          ✅ Confirmar Encomenda
+        </button>
+        <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">Podes voltar a preencher se precisares de alterar a escolha.</p>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div id="jpf-success" style="display:none;text-align:center;padding:40px 20px;max-width:400px;margin:0 auto">
+      <div style="font-size:64px;margin-bottom:16px">✅</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#0e2444">Encomenda registada!</div>
+      <div id="jpf-success-detail" style="font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6"></div>
+      <button onclick="jpfNext()" style="padding:13px 28px;background:#0e2444;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+        ➕ Próximo atleta
+      </button>
     </div>
   </div>
 
@@ -2252,6 +2356,7 @@ function nav(v,opts={}){
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='weekly-plan'){ show('v-weekly-plan'); setActive('[data-view="weekly-plan"]'); }
+  else if(v==='jersey-public'){ show('v-jersey-public'); }
   else if(v==='jersey-order'){ show('v-jersey-order'); setActive('[data-view="jersey-order"]'); renderJerseyOrder() }
   else if(v==='myprofile'){ show('v-myprofile'); setActive('[data-view="myprofile"]'); renderMyProfile() }
   else if(v==='tm'){ show('v-tm'); setActive('[data-view="tm"]'); renderTM() }
@@ -5963,6 +6068,10 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
   const url=location.href.split('?')[0]+'?mode=public';
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado! Partilha com os atletas.')).catch(()=>prompt('Copia e partilha este link:',url));
 });
+document.getElementById('nl-jerseylink').addEventListener('click',()=>{
+  const url=location.href.split('?')[0]+'?mode=jersey';
+  navigator.clipboard.writeText(url).then(()=>toast('🎽 Link de camisolas copiado! Partilha no grupo.')).catch(()=>prompt('Copia e partilha este link com os atletas:',url));
+});
 
 // Close modals on overlay click
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open') }));
@@ -6381,6 +6490,8 @@ function isMinor(p){
   return ms/(365.25*24*3600*1000)<18;
 }
 const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
+// Números disponíveis na rouparia (sem linha preenchida na lista geral 26/27)
+const JERSEY_AVAILABLE=[2,15,26,31,32,33,34,35,36,37,38,39,40,41,43,44,45,46,47,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,71,72,73,74,75,76,77,78,79,80,82,83,84,85,87,91,92,94,95,96,97,99];
 
 function _kitOverlay(title, subtitle, tableHead, rows){
   document.getElementById('kit-print-overlay')?.remove();
@@ -6717,6 +6828,178 @@ function renderKitTab(){
   });
 }
 
+// ── PUBLIC JERSEY FORM (?mode=jersey) ─────────────────────────────────────────
+let _jpfPlayers=[];      // {id, name, squad, existing:{jerseyName,jerseySize,jerseyNumber}}
+let _jpfClaimed=new Set(); // numbers claimed by other athletes
+let _jpfSelSize='';
+let _jpfSelNum=null;
+
+async function jpfInit(){
+  if(!firestoreDb){ jpfShowError('Firestore não disponível.'); return; }
+  try {
+    // Load players + athleteDocs in parallel
+    const [playersSnap, adocsSnap] = await Promise.all([
+      firestoreDb.collection('players').get(),
+      firestoreDb.collection('athleteDocs').get()
+    ]);
+    // Build existing jersey map
+    const adocMap={};
+    adocsSnap.forEach(d=>{ const r=d.data(); if(r.playerId) adocMap[r.playerId]=r; });
+    // Build claimed numbers set
+    _jpfClaimed=new Set();
+    adocsSnap.forEach(d=>{ const n=d.data().jerseyNumber; if(n!=null) _jpfClaimed.add(n); });
+    // Build player list
+    _jpfPlayers=[];
+    playersSnap.forEach(d=>{
+      const p={id:d.id,...d.data()};
+      const ad=adocMap[d.id]||{};
+      p.existing={jerseyName:ad.jerseyName||'',jerseySize:ad.jerseySize||'',jerseyNumber:ad.jerseyNumber??null};
+      _jpfPlayers.push(p);
+    });
+    _jpfPlayers.sort((a,b)=>jpfName(a).localeCompare(jpfName(b)));
+    document.getElementById('jpf-loading').style.display='none';
+    document.getElementById('jpf-form').style.display='block';
+  } catch(e){
+    console.error(e);
+    jpfShowError('Erro ao carregar dados: '+e.message+'\n\nVerifica se o acesso anónimo está ativo no Firebase.');
+  }
+}
+
+function jpfName(p){ return p.alcunha||p.name||''; }
+function jpfShowError(msg){
+  document.getElementById('jpf-loading').style.display='none';
+  document.getElementById('jpf-error').style.display='block';
+  document.getElementById('jpf-error-msg').textContent=msg;
+}
+
+function jpfLoadPlayers(){
+  const sq=document.getElementById('jpf-squad').value;
+  const sel=document.getElementById('jpf-player');
+  sel.innerHTML='<option value="">— Escolhe o teu nome —</option>';
+  document.getElementById('jpf-details').style.display='none';
+  document.getElementById('jpf-existing').style.display='none';
+  if(!sq){ sel.disabled=true; return; }
+  const list=_jpfPlayers.filter(p=>p.squad===sq);
+  list.forEach(p=>{
+    const opt=document.createElement('option');
+    opt.value=p.id;
+    const done=p.existing.jerseyName&&p.existing.jerseySize&&p.existing.jerseyNumber!=null;
+    opt.textContent=(done?'✅ ':'')+jpfName(p);
+    sel.appendChild(opt);
+  });
+  sel.disabled=false;
+}
+
+function jpfPlayerSelected(){
+  const pid=document.getElementById('jpf-player').value;
+  if(!pid){ document.getElementById('jpf-details').style.display='none'; return; }
+  const p=_jpfPlayers.find(x=>x.id===pid);
+  if(!p) return;
+
+  // Pre-fill name suggestion
+  const nameSuggestion=(p.alcunha||p.name||'').toUpperCase().split(' ').slice(-1)[0].substring(0,12);
+  document.getElementById('jpf-name').value=p.existing.jerseyName||nameSuggestion;
+
+  // Size pills
+  _jpfSelSize=p.existing.jerseySize||'';
+  jpfRenderSizePills();
+
+  // Number grid (remove previously claimed by THIS player so they can reclaim)
+  const myNum=p.existing.jerseyNumber;
+  const claimedWithoutMe=new Set([..._jpfClaimed].filter(n=>n!==myNum));
+  _jpfSelNum=myNum;
+  jpfRenderNumbers(claimedWithoutMe);
+
+  // Existing order notice
+  const ex=p.existing;
+  const noticeEl=document.getElementById('jpf-existing');
+  if(ex.jerseyName||ex.jerseySize||ex.jerseyNumber!=null){
+    noticeEl.style.display='block';
+    noticeEl.innerHTML=`⚠️ Já tens uma encomenda registada: <b style="letter-spacing:1px">${ex.jerseyName||'—'}</b> · <b>${ex.jerseySize||'—'}</b> · <b>#${ex.jerseyNumber??'—'}</b><br><span style="font-size:11px">Podes alterar em baixo.</span>`;
+  } else {
+    noticeEl.style.display='none';
+  }
+
+  document.getElementById('jpf-details').style.display='block';
+}
+
+function jpfRenderSizePills(){
+  document.getElementById('jpf-size-pills').innerHTML=SHIRT_SIZES.map(s=>`
+    <button type="button" onclick="jpfPickSize('${s}')"
+      style="padding:11px 18px;border-radius:9px;border:2px solid ${s===_jpfSelSize?'#0e2444':'var(--border)'};background:${s===_jpfSelSize?'#0e2444':'var(--card)'};color:${s===_jpfSelSize?'#fff':'var(--text)'};font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+      ${s}
+    </button>`).join('');
+}
+function jpfPickSize(s){ _jpfSelSize=s; jpfRenderSizePills(); }
+
+function jpfRenderNumbers(claimed){
+  document.getElementById('jpf-numbers').innerHTML=JERSEY_AVAILABLE.map(n=>{
+    const isClaimed=claimed.has(n);
+    const isSelected=n===_jpfSelNum;
+    let bg,border,color,extra='';
+    if(isSelected){ bg='#0e2444'; border='#0e2444'; color='#fff'; }
+    else if(isClaimed){ bg='var(--bg)'; border='var(--border)'; color='var(--muted)'; extra='text-decoration:line-through;opacity:.45;cursor:not-allowed'; }
+    else { bg='var(--card)'; border='var(--border)'; color='var(--text)'; }
+    return `<button type="button" onclick="${isClaimed?'':'jpfPickNum('+n+')'}"
+      style="padding:8px 0;border-radius:7px;border:2px solid ${border};background:${bg};color:${color};font-size:13px;font-weight:700;cursor:${isClaimed?'not-allowed':'pointer'};font-family:inherit;${extra}">
+      ${n}
+    </button>`;
+  }).join('');
+}
+function jpfPickNum(n){ _jpfSelNum=n; const pid=document.getElementById('jpf-player').value; const p=_jpfPlayers.find(x=>x.id===pid); const myOld=p?.existing?.jerseyNumber; const set=new Set([..._jpfClaimed].filter(x=>x!==myOld)); jpfRenderNumbers(set); }
+
+async function jpfSubmit(){
+  const pid=document.getElementById('jpf-player').value;
+  if(!pid){ alert('Seleciona o teu nome primeiro.'); return; }
+  const jname=document.getElementById('jpf-name').value.toUpperCase().trim();
+  const jsize=_jpfSelSize;
+  const jnum=_jpfSelNum;
+  if(!jname){ alert('Introduz o nome para a camisola.'); return; }
+  if(!jsize){ alert('Seleciona um tamanho.'); return; }
+  if(jnum==null){ alert('Escolhe um número.'); return; }
+
+  const p=_jpfPlayers.find(x=>x.id===pid);
+  const btn=document.querySelector('#v-jersey-public button[onclick="jpfSubmit()"]');
+  if(btn){ btn.disabled=true; btn.textContent='A guardar…'; }
+
+  try {
+    // Find or create athleteDoc
+    const snap=await firestoreDb.collection('athleteDocs').where('playerId','==',pid).get();
+    if(snap.empty){
+      await firestoreDb.collection('athleteDocs').doc().set({playerId:pid,jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()});
+    } else {
+      await snap.docs[0].ref.update({jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()});
+    }
+    // Update local cache
+    if(p){
+      const oldNum=p.existing.jerseyNumber;
+      if(oldNum!=null&&oldNum!==jnum) _jpfClaimed.delete(oldNum);
+      p.existing={jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum};
+      _jpfClaimed.add(jnum);
+    }
+    // Show success
+    document.getElementById('jpf-form').style.display='none';
+    const succ=document.getElementById('jpf-success');
+    succ.style.display='block';
+    document.getElementById('jpf-success-detail').innerHTML=
+      `<b>${jpfName(p)||''}</b><br><span style="letter-spacing:2px;font-size:20px;font-weight:800;color:#0e2444">${jname}</span><br><b>${jsize}</b> · #<b>${jnum}</b>`;
+  } catch(e){
+    alert('Erro ao guardar: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='✅ Confirmar Encomenda'; }
+  }
+}
+
+function jpfNext(){
+  document.getElementById('jpf-success').style.display='none';
+  document.getElementById('jpf-form').style.display='block';
+  document.getElementById('jpf-player').value='';
+  document.getElementById('jpf-details').style.display='none';
+  document.getElementById('jpf-existing').style.display='none';
+  _jpfSelSize=''; _jpfSelNum=null;
+  // Refresh player list to show updated ✅
+  jpfLoadPlayers();
+}
+
 // ── JERSEY ORDER FORM ─────────────────────────────────────────────────────────
 let _joSelectedSize='';
 
@@ -7007,7 +7290,7 @@ function applyRoleUI(){
   const staffSection=[document.getElementById('nsl-staff'),document.getElementById('nl-staff'),document.getElementById('nl-stafflink')];
   const myProfileSection=[document.getElementById('nsl-myprofile'),document.getElementById('nl-myprofile')];
   const tmSection=[document.getElementById('nsl-tm'),document.getElementById('nl-tm')];
-  const jerseySection=[document.getElementById('nsl-jersey'),document.getElementById('nl-jersey')];
+  const jerseySection=[document.getElementById('nsl-jersey'),document.getElementById('nl-jersey'),document.getElementById('nl-jerseylink')];
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
@@ -7121,6 +7404,20 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(params.get('mode')==='availability'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('availability-form');
+    return;
+  }
+  if(params.get('mode')==='jersey'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm');
+    nav('jersey-public');
+    // Sign in anonymously so Firestore rules (request.auth != null) are satisfied
+    if(firebaseAuth){
+      firebaseAuth.signInAnonymously()
+        .then(()=>jpfInit())
+        .catch(e=>{ console.warn('Anon auth failed:',e); jpfInit(); });
+    } else {
+      jpfInit();
+    }
     return;
   }
 
