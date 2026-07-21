@@ -647,7 +647,10 @@ body.pm #v-pf{padding:30px}
   <div class="view" id="v-cal">
     <div class="tb">
       <div><h1>Calendário</h1><div class="sub">Treinos e jogos</div></div>
-      <button class="btn btn-p" id="btn-add-event">+ Adicionar Evento</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-p" id="btn-add-event">+ Adicionar Evento</button>
+        <button class="btn" id="btn-import-mesociclo" style="display:none;font-size:12px;padding:6px 12px;background:#e8f0fe;color:#1a56db;border:1.5px solid #c3d3f7">📥 Mesociclo Jul</button>
+      </div>
     </div>
     <div class="ft" id="cal-filters">
       <div class="ftb active" data-filter="all">Todos</div>
@@ -3500,6 +3503,63 @@ async function avSquadChange(){
   });
 })();
 
+// ── MESOCICLO JULHO 2026 — IMPORT ─────────────────────────────────────────────
+const _MESO_JULHO=[
+  // ── SEMANA 1 (29 Jun – 5 Jul) ──────────────────────────────────────────────
+  {type:'training',date:'2026-06-29',time:'10:00',location:'Estádio Dr. José de Matos',notes:'Testes Físicos + Treino'},
+  {type:'training',date:'2026-06-30',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-01',time:'10:00',location:'Estádio Dr. José de Matos'},
+  // ── SEMANA 2 (6–12 Jul) ────────────────────────────────────────────────────
+  {type:'training',date:'2026-07-06',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-07',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-08',time:'10:00',location:'Estádio Dr. José de Matos',notes:'Treino bi-diário (manhã)'},
+  {type:'training',date:'2026-07-08',time:'17:00',location:'Estádio Dr. José de Matos',notes:'Treino bi-diário (tarde)'},
+  {type:'training',date:'2026-07-09',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-10',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'game',   date:'2026-07-11',time:'10:30',location:'Sports Valley – Vizela',       opponent:'Vitória B',        homeAway:'away',competition:'JP-1 · Pré-época'},
+  // ── SEMANA 3 (13–19 Jul) ───────────────────────────────────────────────────
+  {type:'training',date:'2026-07-13',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-14',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'game',   date:'2026-07-15',time:'10:30',location:'Centro de Estágio – Melgaço',  opponent:'Gil Vicente FC',   homeAway:'away',competition:'JP-2 · Pré-época'},
+  {type:'training',date:'2026-07-16',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'training',date:'2026-07-17',time:'10:00',location:'Estádio Dr. José de Matos'},
+  {type:'game',   date:'2026-07-18',time:'10:30',location:'Cidade Desportiva de Braga',   opponent:'SC Braga B',       homeAway:'away',competition:'JP-3 · Pré-época'},
+  // ── SEMANA 4 (20–26 Jul) — Estágio Rosa Náutica ────────────────────────────
+  {type:'training',date:'2026-07-21',time:'10:00',location:'Centro de Estágios Rosa Náutica',notes:'Estágio'},
+  {type:'game',   date:'2026-07-22',time:'16:00',location:'Centro de Estágios Rosa Náutica',opponent:'Naval',          homeAway:'home',competition:'JP-3.1 · Pré-época'},
+  {type:'training',date:'2026-07-23',time:'10:00',location:'Centro de Estágios Rosa Náutica',notes:'Estágio'},
+  {type:'training',date:'2026-07-24',time:'10:00',location:'Estádio Dr. José de Matos Nº2'},
+  {type:'game',   date:'2026-07-25',time:'10:30',location:'Estádio Municipal Marco de Canavezes',opponent:'Marco 09', homeAway:'away',competition:'JP-4 · Pré-época'},
+  // ── SEMANA 5 (27 Jul – 2 Ago) ─────────────────────────────────────────────
+  {type:'training',date:'2026-07-27',time:'10:00',location:'Estádio Municipal Manuela Machado'},
+  {type:'training',date:'2026-07-28',time:'10:00',location:'Estádio Municipal Manuela Machado'},
+  {type:'game',   date:'2026-07-29',time:'10:30',location:'Lousada / Vila Aves',           opponent:'AFS',              homeAway:'away',competition:'JP-5 · Pré-época'},
+  {type:'training',date:'2026-07-30',time:'10:00',location:'Estádio Municipal Manuela Machado'},
+  {type:'training',date:'2026-07-31',time:'10:00',location:'Estádio Municipal Manuela Machado'},
+  {type:'game',   date:'2026-08-01',time:'10:30',location:'Estádio Municipal Manuela Machado',opponent:'AD Os Limianos',homeAway:'home',competition:'JP-6 · Troféu Passinhos'},
+  {type:'game',   date:'2026-08-01',time:'17:00',location:'Estádio Municipal Manuela Machado',opponent:'Gil Vicente U23',homeAway:'home',competition:'JP-7 · Troféu Passinhos'},
+];
+
+function importMesocicloJulho(){
+  const count=_MESO_JULHO.length;
+  const gamesCount=_MESO_JULHO.filter(e=>e.type==='game').length;
+  const trainCount=_MESO_JULHO.filter(e=>e.type==='training').length;
+  if(!confirm(`Importar Mesociclo Julho 2026 para a Equipa A?\n\n• ${trainCount} treinos\n• ${gamesCount} jogos (JP-1 a JP-7)\n• Período: 29 Jun – 1 Ago\n\nATENÇÃO: Todos os eventos existentes da Equipa A entre 29 Jun e 1 Ago 2026 serão eliminados antes da importação.`)) return;
+
+  // Delete existing eqa events in the period
+  const toDelete=DB.events('eqa').filter(e=>e.date>='2026-06-29'&&e.date<='2026-08-01');
+  toDelete.forEach(e=>DB.deleteEvent(e.id));
+
+  // Insert all new events
+  _MESO_JULHO.forEach(ev=>DB.addEvent({squad:'eqa',...ev,notes:ev.notes||'',objectives:''}));
+
+  toast(`✅ Mesociclo importado: ${trainCount} treinos e ${gamesCount} jogos criados!`);
+  renderCal();
+  if(view==='dashboard') renderDash();
+  if(view==='sq-trainings'&&squad==='eqa') renderSqTrainings();
+  if(view==='sq-games'&&squad==='eqa') renderSqGames();
+}
+
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function getGameOverlaps(events){
   const toMin=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;};
@@ -3697,6 +3757,7 @@ document.querySelectorAll('input[name="e-ha"]').forEach(r=>r.addEventListener('c
   else if(this.value==='away'&&locEl.value===HOME_STAD) locEl.value='';
 }));
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
+document.getElementById('btn-import-mesociclo').addEventListener('click',importMesocicloJulho);
 document.getElementById('mo-e-close').addEventListener('click',closeEventModal);
 document.getElementById('mo-e-cancel').addEventListener('click',closeEventModal);
 document.getElementById('mo-e-form').addEventListener('submit',e=>{
@@ -7331,6 +7392,8 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const importBtn=document.getElementById('btn-import-sub23');
     if(importBtn) importBtn.style.display='';
+    const mesoBtn=document.getElementById('btn-import-mesociclo');
+    if(mesoBtn) mesoBtn.style.display='';
   }
 }
 
