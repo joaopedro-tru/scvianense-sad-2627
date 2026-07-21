@@ -3553,8 +3553,9 @@ function importMesocicloJulho(){
   // Insert all new events
   _MESO_JULHO.forEach(ev=>DB.addEvent({squad:'eqa',...ev,notes:ev.notes||'',objectives:''}));
 
+  localStorage.setItem('scv_meso_jul_done','1');
   toast(`✅ Mesociclo importado: ${trainCount} treinos e ${gamesCount} jogos criados!`);
-  document.getElementById('btn-import-mesociclo').remove();
+  document.getElementById('btn-import-mesociclo')?.remove();
   renderCal();
   if(view==='dashboard') renderDash();
   if(view==='sq-trainings'&&squad==='eqa') renderSqTrainings();
@@ -6966,6 +6967,7 @@ function applySub23Import(){
   });
   overlay.remove();
   document.getElementById('btn-import-sub23')?.remove();
+  localStorage.setItem('scv_sub23_done','1');
   toast(`✅ ${count} atletas Sub-23 atualizados!`);
   renderKitTab();
 }
@@ -7393,9 +7395,9 @@ function applyRoleUI(){
     jerseySection.forEach(el=>el&&(el.style.display=''));
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const importBtn=document.getElementById('btn-import-sub23');
-    if(importBtn) importBtn.style.display='';
+    if(importBtn) importBtn.style.display=localStorage.getItem('scv_sub23_done')?'none':'';
     const mesoBtn=document.getElementById('btn-import-mesociclo');
-    if(mesoBtn) mesoBtn.style.display='';
+    if(mesoBtn) mesoBtn.style.display=localStorage.getItem('scv_meso_jul_done')?'none':'';
   }
 }
 
