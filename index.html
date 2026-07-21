@@ -1499,6 +1499,10 @@ body.pm #v-pf{padding:30px}
       </div>
       <div class="fg"><label>Local</label><input type="text" id="e-loc" placeholder="Estádio / Campo"></div>
       <div class="fg" id="e-objectives-grp">
+        <!-- Regime de Contração -->
+        <label>💪 Regime de Contração</label>
+        <div id="e-regime-picker" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+
         <label>🎯 Objetivos Táticos <span style="color:var(--muted);font-weight:400">(Periodização Tática · aparece no Plano Semanal)</span></label>
 
         <!-- Ficha de Treino upload -->
@@ -3764,6 +3768,12 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-notes').value=ev?.notes||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
+  // Regime de contração — usa guardado, ou defaults por escalão/dia
+  const _evSq=ev?.squad||defaults.squad||squad||'sub19';
+  const _evDate=ev?.date||date||new Date().toISOString().split('T')[0];
+  const _dow=new Date(_evDate+'T12:00:00').getDay();
+  _regimes=ev?.regimes?.length?[...ev.regimes]:(REGIME_DEFAULTS[_evSq]?.[_dow]||[]);
+  renderRegimePicker();
   // Tactical objectives reset
   _objPrimary=ev?.objectivePrimary?{...ev.objectivePrimary}:{moment:null,subPrinciples:[]};
   _objSecondary=ev?.objectiveSecondary?{...ev.objectiveSecondary}:{moment:null,subPrinciples:[]};
@@ -3834,7 +3844,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _p=_isTraining&&_objPrimary.moment?{..._objPrimary}:null;
   const _s=_isTraining&&_objSecondary.moment?{..._objSecondary}:null;
   const _objText=_p?[TACTICS_TAXONOMY[_p.moment].full,_p.subPrinciples.length?'('+_p.subPrinciples.join(', ')+')'  :''].filter(Boolean).join(' ') + (_s?(' · '+TACTICS_TAXONOMY[_s.moment].full+(_s.subPrinciples.length?' ('+_s.subPrinciples.join(', ')+')':'')):''): null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -4013,7 +4023,37 @@ function renderTraining(){
     <div>
       <div class="card" style="margin-bottom:18px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info</h3>
-        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time||'—')}${row('Local',ev.location||'—')}${row('Escalão',SQUADS[ev.squad])}
+        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time||'—')}${row('Local',ev.location||'—')}${row('Escalão',SQUADS[ev.squad])}${(()=>{
+          const dow=ev.date?new Date(ev.date+'T12:00:00').getDay():-1;
+          // Regime de contração — guardado no evento ou default por escalão/dia
+          const _regList=ev.regimes?.length?ev.regimes:(REGIME_DEFAULTS[ev.squad]?.[dow]||[]);
+          const regime=_regList.length?_regList.join(' · '):null;
+          // UT geral — nº sequencial de treinos do escalão até esta data (inclusive)
+          const _sqFilter=e=>e.type==='training'&&(e.squad===ev.squad||e.squad==='both'||(ev.squad==='both'));
+          const allTr=DB.events().filter(_sqFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+          const utNum=allTr.findIndex(e=>e.id===ev.id)+1;
+          // Referência ao próximo jogo (-1, -2, -3 …)
+          const evD=new Date(ev.date+'T00:00:00');
+          const nextGame=DB.events().filter(e=>e.type==='game'&&e.date>ev.date&&(e.squad===ev.squad||e.squad==='both'||ev.squad==='both')).sort((a,b)=>a.date.localeCompare(b.date))[0];
+          const daysRef=nextGame?-Math.round((new Date(nextGame.date+'T00:00:00')-evD)/(864e5)):null;
+          // Objetivos táticos
+          const p=ev.objectivePrimary, s=ev.objectiveSecondary;
+          const objRows=(()=>{
+            if(!p?.moment&&!ev.objectives) return '';
+            const tc=TACTICS_TAXONOMY;
+            if(p?.moment&&tc[p.moment]){
+              const pLabel=tc[p.moment].label+(p.subPrinciples?.length?' · '+p.subPrinciples.join(', '):'');
+              const sLabel=s?.moment&&tc[s.moment]?tc[s.moment].label+(s.subPrinciples?.length?' · '+s.subPrinciples.join(', '):''):'';
+              return `<div class="dr"><span class="dl">Obj. Principal</span><span class="dv" style="color:${tc[p.moment].color};font-weight:600">${pLabel}</span></div>`
+                    +(sLabel?`<div class="dr"><span class="dl">Obj. Secundário</span><span class="dv" style="color:${tc[s.moment].color}">${sLabel}</span></div>`:'');
+            }
+            return ev.objectives?row('Objetivos',ev.objectives):'';
+          })();
+          return (utNum>0?row('UT',utNum.toString()):'')+
+                 (daysRef!==null?row('Até ao jogo',daysRef.toString()):'')+
+                 (regime?row('Regime',regime):'')+
+                 objRows;
+        })()}
       </div>
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Ficha de Treino</h3>
@@ -6586,9 +6626,35 @@ const TACTICS_TAXONOMY={
   TD:{label:'Trans. Defensiva',full:'Transição Defensiva',  color:'#e65100', subs:['Reação à Perda','Ajuste de Posição']},
   BP:{label:'Bola Parada',    full:'Bola Parada',           color:'#7c3aed', subs:['Ofensiva','Defensiva']},
 };
+const REGIMES=[
+  {key:'Recuperação', color:'#1a8754'},
+  {key:'Tensão',      color:'#e6a817'},
+  {key:'Duração',     color:'#e65100'},
+  {key:'Velocidade',  color:'#c0392b'},
+];
+// Default regimes by squad + day of week (0=Sun…6=Sat)
+const REGIME_DEFAULTS={
+  sub19:{1:['Recuperação','Tensão'],3:['Duração'],4:['Velocidade']},
+  sub23:{2:['Recuperação'],3:['Tensão'],4:['Duração'],5:['Velocidade']},
+};
+let _regimes=[];
 let _objPrimary={moment:null,subPrinciples:[]};
 let _objSecondary={moment:null,subPrinciples:[]};
 let _fichaText='';
+
+function renderRegimePicker(){
+  const el=document.getElementById('e-regime-picker'); if(!el) return;
+  el.innerHTML=REGIMES.map(r=>{
+    const sel=_regimes.includes(r.key);
+    return `<button type="button" onclick="toggleRegime('${r.key}')"
+      style="padding:5px 12px;border-radius:6px;border:2px solid ${sel?r.color:'var(--border)'};background:${sel?r.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${r.key}</button>`;
+  }).join('');
+}
+function toggleRegime(key){
+  const i=_regimes.indexOf(key);
+  if(i>-1) _regimes.splice(i,1); else _regimes.push(key);
+  renderRegimePicker();
+}
 
 function renderObjPicker(which){
   const obj=which==='primary'?_objPrimary:_objSecondary;
