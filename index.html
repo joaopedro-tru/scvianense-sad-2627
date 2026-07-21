@@ -957,6 +957,7 @@ body.pm #v-pf{padding:30px}
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:100px">Tamanho</th>
               <th style="text-align:left;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:130px">Nome Camisola</th>
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">Nº Pretend.</th>
+              <th id="tm-kit-clear-th" style="display:none;width:36px;border-bottom:1px solid var(--border)"></th>
             </tr>
           </thead>
           <tbody id="tm-kit-body"></tbody>
@@ -970,7 +971,7 @@ body.pm #v-pf{padding:30px}
     <!-- Header -->
     <div style="background:#0e2444;padding:20px 20px 18px;text-align:center">
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#e8b84b;text-transform:uppercase;margin-bottom:4px">SC Vianense SAD · 2026/27</div>
-      <div style="font-size:20px;font-weight:800;color:#fff">Encomenda de Camisola</div>
+      <div style="font-size:20px;font-weight:800;color:#fff">Ficha de Camisola</div>
       <div id="jpf-header-sub" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Preenche os teus dados abaixo</div>
     </div>
 
@@ -1051,7 +1052,7 @@ body.pm #v-pf{padding:30px}
         <!-- Submit -->
         <button onclick="jpfSubmit()"
           style="width:100%;padding:16px;background:#0e2444;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">
-          ✅ Confirmar Encomenda
+          ✅ Confirmar
         </button>
         <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">Podes voltar a preencher se precisares de alterar a escolha.</p>
       </div>
@@ -1060,9 +1061,9 @@ body.pm #v-pf{padding:30px}
     <!-- Success -->
     <div id="jpf-success" style="display:none;text-align:center;padding:40px 20px;max-width:400px;margin:0 auto">
       <div style="font-size:64px;margin-bottom:16px">✅</div>
-      <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#0e2444">Encomenda registada!</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#0e2444">Ficha registada!</div>
       <div id="jpf-success-detail" style="font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6"></div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Obrigado! A tua encomenda foi guardada.</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Obrigado! Os teus dados foram guardados.</p>
       <button onclick="jpfNext()" style="padding:10px 22px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit">
         ✏️ Alterar resposta
       </button>
@@ -1354,7 +1355,7 @@ body.pm #v-pf{padding:30px}
           </select>
         </div>
         <div style="grid-column:1/-1;border-top:1px solid var(--border);margin:4px 0 2px;padding-top:10px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🎽 Encomenda de Camisola</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🎽 Ficha de Camisola</div>
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end">
             <div class="fg" style="margin:0">
               <label>Nome na Camisola <span style="font-size:10px;font-weight:400;color:var(--muted)">(máx. 12 letras)</span></label>
@@ -2722,7 +2723,7 @@ function renderPlayer(){
         ${row('Nº Camisola',p.number?`#${p.number}`:null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
         ${row('Tamanho Equipamento',p.shirtSize||(DB.getAthleteDoc(pid)?.shirtSize)||null)}
-        ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Encomenda de Camisola</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Pretendido',jnum!=null?`#${jnum}`:null)}`;})()}
+        ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Ficha de Camisola</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Pretendido',jnum!=null?`#${jnum}`:null)}`;})()}
         ${row('Escalão',SQUADS[p.squad])}
         ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
         ${row('Clube Anterior',p.previousClub)}
@@ -6521,7 +6522,7 @@ function exportRouparia(){
     const d=DB.getAthleteDoc(p.id)||{};
     return !!(p.jerseyName||d.jerseyName)&&!!(p.jerseySize||d.jerseySize)&&(p.jerseyNumber??d.jerseyNumber)!=null;
   });
-  if(!players.length){ toast('Nenhuma encomenda completa encontrada.'); return; }
+  if(!players.length){ toast('Nenhuma ficha completa encontrada.'); return; }
   players=sortByPos(players);
   const POS_GROUP={GR:'Guarda-Redes',LD:'Defesas',DC:'Defesas',LE:'Defesas',MD:'Médios',MC:'Médios',MO:'Médios',ALD:'Avançados',ALE:'Avançados',ED:'Avançados',EE:'Avançados',PL:'Avançados',AV:'Avançados'};
   // Count sizes for summary
@@ -6572,7 +6573,7 @@ function exportRouparia(){
     </div>
     <div style="padding:24px 20px;max-width:800px;margin:0 auto">
       <div style="background:#0e2444;color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:18px">
-        <div style="font-size:18px;font-weight:800;font-family:Arial,sans-serif">SC Vianense SAD — Encomenda de Camisolas</div>
+        <div style="font-size:18px;font-weight:800;font-family:Arial,sans-serif">SC Vianense SAD — Fichas de Camisola</div>
         <div style="font-size:12px;color:#e8b84b;margin-top:4px;font-family:Arial,sans-serif">${squadLabel} · Gerado em ${new Date().toLocaleDateString('pt-PT')} · ${players.length} atletas</div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:Arial,sans-serif;margin-bottom:16px">
@@ -6697,7 +6698,7 @@ function renderKitTab(){
     const d=DB.getAthleteDoc(p.id)||{};
     return !!(d.jerseyName&&d.jerseySize&&d.jerseyNumber);
   }).length;
-  document.getElementById('tm-kit-stats').textContent=`${filled}/${players.length} com encomenda completa`;
+  document.getElementById('tm-kit-stats').textContent=`${filled}/${players.length} com ficha completa`;
 
   const body=document.getElementById('tm-kit-body');
   if(!players.length){
@@ -6710,7 +6711,7 @@ function renderKitTab(){
 
   const refreshStats=()=>{
     const f=DB.players().filter(p=>(!sq||p.squad===sq)&&(()=>{const _d=DB.getAthleteDoc(p.id)||{};return !!(p.jerseyName||_d.jerseyName)&&!!(p.jerseySize||_d.jerseySize)&&!!(p.jerseyNumber??_d.jerseyNumber);})()).length;
-    document.getElementById('tm-kit-stats').textContent=`${f}/${players.length} com encomenda completa`;
+    document.getElementById('tm-kit-stats').textContent=`${f}/${players.length} com ficha completa`;
   };
 
   body.innerHTML=players.map(p=>{
@@ -6748,6 +6749,9 @@ function renderKitTab(){
       <td style="text-align:center;padding:8px 6px">
         <input data-kit-jnum="${p.id}" type="number" min="1" max="99" value="${jnum}" placeholder="45" style="width:60px;padding:4px 6px;border:1.5px solid ${jnum!==''?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;text-align:center;background:${jnum!==''?'#e8f5e9':'var(--card)'};color:var(--text);outline:none">
       </td>
+      <td class="kit-clear-col" style="display:none;text-align:center;padding:8px 4px">
+        <button data-kit-clear="${p.id}" title="Limpar ficha" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:2px 4px;border-radius:5px" onmouseover="this.style.opacity=1;this.style.background='#fee2e2'" onmouseout="this.style.opacity=.4;this.style.background='none'">🗑️</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -6783,6 +6787,21 @@ function renderKitTab(){
       refreshStats();
     };
   });
+  // Clear buttons (admin only — shown via applyRoleUI)
+  body.querySelectorAll('[data-kit-clear]').forEach(btn=>{
+    btn.onclick=()=>{
+      const pid=btn.dataset.kitClear;
+      const p=DB.players().find(x=>x.id===pid);
+      if(!confirm(`Limpar ficha de camisola de ${p?dn(p):'este atleta'}?`)) return;
+      DB.setAthleteDoc(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null});
+      DB.updatePlayer(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null});
+      renderKitTab();
+    };
+  });
+  // Show clear column for admin
+  const isAdmin=currentUser()?.role==='admin';
+  document.getElementById('tm-kit-clear-th').style.display=isAdmin?'':'none';
+  body.querySelectorAll('.kit-clear-col').forEach(td=>td.style.display=isAdmin?'':'none');
 }
 
 // ── SUB-23 JERSEY IMPORT ──────────────────────────────────────────────────────
@@ -6902,7 +6921,7 @@ async function jpfInit(lockedSquad=''){
     // Load players + athleteDocs in parallel
     const [playersSnap, adocsSnap] = await Promise.all([
       firestoreDb.collection('players').get(),
-      firestoreDb.collection('athleteDocs').get()
+      firestoreDb.collection('athlete_docs').get()
     ]);
     // Build existing jersey map
     const adocMap={};
@@ -6985,7 +7004,7 @@ function jpfPlayerSelected(){
   const noticeEl=document.getElementById('jpf-existing');
   if(ex.jerseyName||ex.jerseySize||ex.jerseyNumber!=null){
     noticeEl.style.display='block';
-    noticeEl.innerHTML=`⚠️ Já tens uma encomenda registada: <b style="letter-spacing:1px">${ex.jerseyName||'—'}</b> · <b>${ex.jerseySize||'—'}</b> · <b>#${ex.jerseyNumber??'—'}</b><br><span style="font-size:11px">Podes alterar em baixo.</span>`;
+    noticeEl.innerHTML=`⚠️ Já tens dados registados: <b style="letter-spacing:1px">${ex.jerseyName||'—'}</b> · <b>${ex.jerseySize||'—'}</b> · <b>#${ex.jerseyNumber??'—'}</b><br><span style="font-size:11px">Podes alterar em baixo.</span>`;
   } else {
     noticeEl.style.display='none';
   }
@@ -7033,13 +7052,13 @@ async function jpfSubmit(){
   if(btn){ btn.disabled=true; btn.textContent='A guardar…'; }
 
   try {
-    // Find or create athleteDoc
-    const snap=await firestoreDb.collection('athleteDocs').where('playerId','==',pid).get();
-    if(snap.empty){
-      await firestoreDb.collection('athleteDocs').doc().set({playerId:pid,jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()});
-    } else {
-      await snap.docs[0].ref.update({jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()});
-    }
+    // Find or create athleteDoc — align with DB layer (athlete_docs, doc ID kept consistent)
+    const existingRec=DB.getAthleteDoc(pid);
+    const docId=existingRec?.id||pid;
+    await firestoreDb.collection('athlete_docs').doc(docId).set(
+      {id:docId,playerId:pid,jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()},
+      {merge:true}
+    );
     // Update local cache
     if(p){
       const oldNum=p.existing.jerseyNumber;
@@ -7055,7 +7074,7 @@ async function jpfSubmit(){
       `<b>${jpfName(p)||''}</b><br><span style="letter-spacing:2px;font-size:20px;font-weight:800;color:#0e2444">${jname}</span><br><b>${jsize}</b> · #<b>${jnum}</b>`;
   } catch(e){
     alert('Erro ao guardar: '+e.message);
-    if(btn){ btn.disabled=false; btn.textContent='✅ Confirmar Encomenda'; }
+    if(btn){ btn.disabled=false; btn.textContent='✅ Confirmar'; }
   }
 }
 
