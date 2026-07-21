@@ -478,7 +478,7 @@ body.pm #v-pf{padding:30px}
     <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" class="login-logo" onerror="this.style.display='none'">
     <div class="login-club">SC Vianense SAD</div>
     <div class="login-sub">Gestão Desportiva · Acesso Restrito</div>
-    <input type="text" id="login-user" placeholder="Utilizador" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <input type="text" id="login-user" placeholder="Utilizador ou Email" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email">
     <input type="password" id="login-pw" placeholder="Password" autocomplete="current-password">
     <button class="login-btn" id="login-btn">Entrar</button>
     <div class="login-err" id="login-err"></div>
@@ -1359,6 +1359,7 @@ body.pm #v-pf{padding:30px}
         </div>
       </div>
       <div class="fg"><label>Local</label><input type="text" id="e-loc" placeholder="Estádio / Campo"></div>
+      <div class="fg" id="e-objectives-grp"><label>Objetivo(s) do Treino <span style="color:var(--muted);font-weight:400">(aparece no Plano Semanal)</span></label><textarea id="e-objectives" placeholder="Ex: Organização ofensiva, Pressão alta, Bola parada..."></textarea></div>
       <div class="fg"><label>Notas</label><textarea id="e-notes" placeholder="Informações adicionais..."></textarea></div>
       <div class="fa">
         <button type="button" class="btn btn-g" id="mo-e-cancel">Cancelar</button>
@@ -3504,12 +3505,15 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-date').value=ev?.date||date||new Date().toISOString().split('T')[0];
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-notes').value=ev?.notes||'';
+  document.getElementById('e-objectives').value=ev?.objectives||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
   document.getElementById('e-ha-home').checked=ev?.homeAway!=='away';
   document.getElementById('e-ha-away').checked=ev?.homeAway==='away';
   const _effectiveType=ev?.type||defaults.type||'training';
   const _isHomeGame=_effectiveType==='game'&&ev?.homeAway!=='away';
-  document.getElementById('e-loc').value=ev?.location||(_isHomeGame?'Estádio Dr José de Matos':'');
+  const _sq=ev?.squad||defaults.squad||squad||'sub19';
+  const _defaultLoc=_effectiveType==='training'?(_sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2'):(_isHomeGame?'Estádio Dr. José de Matos':'');
+  document.getElementById('e-loc').value=ev?.location||_defaultLoc;
   updateCompetitionOptions(ev?.squad||squad||'sub19', ev?.competition||'');
   document.getElementById('e-repeat').checked=false;
   document.getElementById('e-repeat-until').value='';
@@ -3530,6 +3534,7 @@ function toggleOpp(){
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
+  document.getElementById('e-objectives-grp').style.display=isGame?'none':'block';
   if(isGame){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
   if(isGame) updateCompetitionOptions(document.getElementById('e-squad').value, document.getElementById('e-comp').value);
 }
@@ -3551,7 +3556,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   e.preventDefault();
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:f('e-type')==='training'?(f('e-objectives')||null):null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -6065,6 +6070,7 @@ function generateWeeklyPlan(){
   weekPlanSquad=sq; weekPlanStart=dateStr;
   const dates=wpGetWeekDates(dateStr);
   const allEvs=DB.events();
+  const wpDefaultLoc=sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2';
 
   const dayEvs=dates.map(d=>{
     const ds=wpLocalStr(d);
@@ -6104,7 +6110,8 @@ function generateWeeklyPlan(){
     r+=`<tr><td style="background:var(--bg);font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:var(--muted);white-space:nowrap">LOCAL</td>`;
     dates.forEach((_,di)=>{
       const ev=slots[di][period];
-      r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'local',di,ev?.location||'')}</td>`;
+      const loc=ev?.location||(ev?wpDefaultLoc:'');
+      r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'local',di,loc)}</td>`;
     });
     r+='</tr>';
     // OBJETIVOS
@@ -6117,6 +6124,8 @@ function generateWeeklyPlan(){
         val=h?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`;
         if(ev.time) val+=`\n${ev.time}`;
         if(ev.competition) val+=`\n${ev.competition}`;
+      } else if(ev?.type==='training'&&ev?.objectives){
+        val=ev.objectives;
       }
       r+=`<td style="border:1px solid var(--border);padding:1px;vertical-align:top">${objCell(period,di,val)}</td>`;
     });
@@ -6779,16 +6788,19 @@ document.addEventListener('DOMContentLoaded',()=>{
       // se fbUser===null → login overlay já está visível, nada a fazer
     });
 
-    // Mostrar "Esqueci a password" quando utilizador digitar o username
+    // Resolve user by username OR email
+    function resolveUser(input){ const v=input.trim().toLowerCase(); return USERS.find(x=>x.user===v)||USERS.find(x=>x.email===v); }
+
+    // Mostrar "Esqueci a password" quando utilizador digitar o username ou email
     userIn.addEventListener('input',()=>{
-      const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase());
+      const u=resolveUser(userIn.value);
       resetWrap.style.display=u?'':'none';
     });
 
     resetLink.addEventListener('click',async e=>{
       e.preventDefault();
-      const u=USERS.find(x=>x.user===userIn.value.trim().toLowerCase());
-      if(!u){ errEl.textContent='Introduz o utilizador primeiro.'; return; }
+      const u=resolveUser(userIn.value);
+      if(!u){ errEl.textContent='Introduz o utilizador ou email primeiro.'; return; }
       try{
         await firebaseAuth.sendPasswordResetEmail(u.email);
         errEl.style.color='var(--ok)';
@@ -6803,10 +6815,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     const setupBtn=document.getElementById('setup-btn');
 
     async function tryLoginFirebase(){
-      const username=userIn.value.trim().toLowerCase();
       const password=pwIn.value;
-      const u=USERS.find(x=>x.user===username);
-      if(!u){ errEl.textContent='Utilizador não encontrado.'; pwIn.value=''; return; }
+      const u=resolveUser(userIn.value);
+      if(!u){ errEl.textContent='Utilizador ou email não encontrado.'; pwIn.value=''; return; }
       loginBtn.disabled=true; loginBtn.textContent='A entrar…';
       try{
         await firebaseAuth.signInWithEmailAndPassword(u.email, password);
@@ -6831,8 +6842,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
 
     setupBtn.addEventListener('click',async()=>{
-      const username=userIn.value.trim().toLowerCase();
-      const u=USERS.find(x=>x.user===username); if(!u) return;
+      const u=resolveUser(userIn.value); if(!u) return;
       const pw=document.getElementById('setup-pw').value;
       const pw2=document.getElementById('setup-pw2').value;
       if(pw.length<6){ errEl.textContent='Mínimo 6 caracteres.'; return; }
