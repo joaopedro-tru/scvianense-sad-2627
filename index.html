@@ -537,7 +537,6 @@ body.pm #v-pf{padding:30px}
     <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
     <hr class="nd">
     <div class="nsl" id="nsl-jersey">Equipamento</div>
-    <div class="nl" id="nl-jersey" data-view="jersey-order"><span class="ic">🎽</span> Encomenda Camisolas</div>
     <div class="nl" id="nl-jerseylink"><span class="ic">🔗</span> Link p/ Atletas</div>
     <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
     <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
@@ -1063,96 +1062,10 @@ body.pm #v-pf{padding:30px}
       <div style="font-size:64px;margin-bottom:16px">✅</div>
       <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#0e2444">Encomenda registada!</div>
       <div id="jpf-success-detail" style="font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6"></div>
-      <button onclick="jpfNext()" style="padding:13px 28px;background:#0e2444;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-        ➕ Próximo atleta
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Obrigado! A tua encomenda foi guardada.</p>
+      <button onclick="jpfNext()" style="padding:10px 22px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit">
+        ✏️ Alterar resposta
       </button>
-    </div>
-  </div>
-
-  <!-- JERSEY ORDER FORM -->
-  <div class="view" id="v-jersey-order">
-    <div class="tb">
-      <div class="page-title">🎽 Encomenda de Camisolas</div>
-    </div>
-    <div style="max-width:480px;margin:0 auto;padding:0 0 40px">
-
-      <!-- Squad + athlete selectors -->
-      <div class="card" style="margin-bottom:16px;padding:20px 22px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px">Identificação</div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <div>
-            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Escalão</label>
-            <select id="jo-squad" class="si" onchange="joLoadPlayers()" style="width:100%">
-              <option value="">— Selecionar escalão —</option>
-              <option value="eqa">Equipa A</option>
-              <option value="sub23">Sub-23</option>
-              <option value="sub19">Sub-19</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Atleta</label>
-            <select id="jo-player" class="si" onchange="joLoadExisting()" style="width:100%" disabled>
-              <option value="">— Selecionar atleta —</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Order form (hidden until athlete selected) -->
-      <div id="jo-form-wrap" style="display:none">
-        <div class="card" style="padding:20px 22px;margin-bottom:16px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:16px">Dados da Camisola</div>
-          <div style="display:flex;flex-direction:column;gap:16px">
-
-            <div>
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">
-                Nome na Camisola
-                <span style="font-weight:400;font-size:11px"> — máx. 12 letras, maiúsculas</span>
-              </label>
-              <input type="text" id="jo-name" maxlength="12" autocapitalize="characters" spellcheck="false"
-                placeholder="Ex: SILVA"
-                oninput="this.value=this.value.toUpperCase()"
-                style="width:100%;box-sizing:border-box;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:22px;font-weight:800;letter-spacing:3px;text-transform:uppercase;background:var(--card);color:var(--text);outline:none;font-family:inherit;text-align:center"
-                onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
-            </div>
-
-            <div>
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Tamanho</label>
-              <div id="jo-size-pills" style="display:flex;gap:8px;flex-wrap:wrap">
-                <!-- rendered by JS -->
-              </div>
-            </div>
-
-            <div>
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">
-                Número Pretendido
-                <span style="font-weight:400;font-size:11px"> — entre 31 e 99</span>
-              </label>
-              <input type="number" id="jo-number" min="31" max="99" placeholder="Ex: 45"
-                style="width:100%;box-sizing:border-box;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:28px;font-weight:800;background:var(--card);color:var(--text);outline:none;font-family:inherit;text-align:center"
-                onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
-            </div>
-          </div>
-        </div>
-
-        <!-- Existing order banner (if already filled) -->
-        <div id="jo-existing-banner" style="display:none;background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#2e7d32"></div>
-
-        <button id="jo-submit" onclick="joSubmit()"
-          style="width:100%;padding:16px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">
-          ✅ Confirmar Encomenda
-        </button>
-      </div>
-
-      <!-- Success state -->
-      <div id="jo-success" style="display:none;text-align:center;padding:32px 20px">
-        <div style="font-size:56px;margin-bottom:12px">✅</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px">Encomenda registada!</div>
-        <div id="jo-success-detail" style="font-size:14px;color:var(--muted);margin-bottom:24px"></div>
-        <button onclick="joReset()" style="padding:12px 28px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-          ➕ Próximo atleta
-        </button>
-      </div>
     </div>
   </div>
 
@@ -2358,7 +2271,6 @@ function nav(v,opts={}){
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='weekly-plan'){ show('v-weekly-plan'); setActive('[data-view="weekly-plan"]'); }
   else if(v==='jersey-public'){ show('v-jersey-public'); }
-  else if(v==='jersey-order'){ show('v-jersey-order'); setActive('[data-view="jersey-order"]'); renderJerseyOrder() }
   else if(v==='myprofile'){ show('v-myprofile'); setActive('[data-view="myprofile"]'); renderMyProfile() }
   else if(v==='tm'){ show('v-tm'); setActive('[data-view="tm"]'); renderTM() }
   else if(v==='unavailabilities'){ show('v-unavailabilities'); setActive('[data-view="unavailabilities"]'); renderUnavailabilities() }
@@ -7123,120 +7035,6 @@ function jpfNext(){
   jpfLoadPlayers();
 }
 
-// ── JERSEY ORDER FORM ─────────────────────────────────────────────────────────
-let _joSelectedSize='';
-
-function renderJerseyOrder(){
-  const u=currentUser();
-  const squadSel=document.getElementById('jo-squad');
-  // Auto-fill squad for non-admin users
-  if(u?.squad && u.role!=='admin'){
-    squadSel.value=u.squad;
-    squadSel.disabled=true;
-    joLoadPlayers();
-  } else {
-    squadSel.disabled=false;
-    if(!squadSel.value){ joReset(); }
-  }
-}
-
-function joLoadPlayers(){
-  const sq=document.getElementById('jo-squad').value;
-  const sel=document.getElementById('jo-player');
-  sel.innerHTML='<option value="">— Selecionar atleta —</option>';
-  document.getElementById('jo-form-wrap').style.display='none';
-  document.getElementById('jo-success').style.display='none';
-  if(!sq){ sel.disabled=true; return; }
-  const players=DB.players().filter(p=>p.squad===sq).sort((a,b)=>dn(a).localeCompare(dn(b)));
-  players.forEach(p=>{
-    const d=DB.getAthleteDoc(p.id)||{};
-    const done=!!(p.jerseyName||d.jerseyName)&&!!(p.jerseySize||d.jerseySize)&&(p.jerseyNumber??d.jerseyNumber)!=null;
-    const opt=document.createElement('option');
-    opt.value=p.id;
-    opt.textContent=`${done?'✅ ':''}${dn(p)}${p.number?` (#${p.number})`:''}`;
-    sel.appendChild(opt);
-  });
-  sel.disabled=false;
-}
-
-function joLoadExisting(){
-  const pid=document.getElementById('jo-player').value;
-  const wrap=document.getElementById('jo-form-wrap');
-  const banner=document.getElementById('jo-existing-banner');
-  if(!pid){ wrap.style.display='none'; return; }
-
-  const p=DB.players().find(x=>x.id===pid)||{};
-  const d=DB.getAthleteDoc(pid)||{};
-  const jname=(p.jerseyName||d.jerseyName||'').toUpperCase();
-  const jsize=p.jerseySize||d.jerseySize||'';
-  const jnum=p.jerseyNumber??d.jerseyNumber??'';
-
-  // Pre-fill fields
-  document.getElementById('jo-name').value=jname;
-  document.getElementById('jo-number').value=jnum;
-  _joSelectedSize=jsize;
-  joRenderSizePills(jsize);
-
-  // Show banner if already filled
-  if(jname||jsize||jnum!==''){
-    banner.style.display='block';
-    banner.innerHTML=`⚠️ <b>${dn(p)}</b> já tem uma encomenda registada${jname?` — <b style="letter-spacing:1px">${jname}</b>`:''}${jsize?` · <b>${jsize}</b>`:''}${jnum!==''?` · #<b>${jnum}</b>`:''}<br><span style="font-size:12px">Podes atualizar os dados em baixo.</span>`;
-  } else {
-    banner.style.display='none';
-  }
-
-  wrap.style.display='block';
-  document.getElementById('jo-success').style.display='none';
-}
-
-function joRenderSizePills(selected){
-  const container=document.getElementById('jo-size-pills');
-  container.innerHTML=SHIRT_SIZES.map(s=>`
-    <button type="button" onclick="joSelectSize('${s}')"
-      style="padding:10px 16px;border-radius:8px;border:2px solid ${s===selected?'var(--primary)':'var(--border)'};background:${s===selected?'var(--primary)':'var(--card)'};color:${s===selected?'#fff':'var(--text)'};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s">
-      ${s}
-    </button>`).join('');
-}
-
-function joSelectSize(s){
-  _joSelectedSize=s;
-  joRenderSizePills(s);
-}
-
-function joSubmit(){
-  const pid=document.getElementById('jo-player').value;
-  if(!pid){ toast('Seleciona um atleta primeiro.'); return; }
-  const jname=document.getElementById('jo-name').value.toUpperCase().trim();
-  const jsize=_joSelectedSize;
-  const jnum=parseInt(document.getElementById('jo-number').value);
-  if(!jname){ toast('Introduz o nome para a camisola.'); document.getElementById('jo-name').focus(); return; }
-  if(!jsize){ toast('Seleciona um tamanho.'); return; }
-  if(!(jnum>=31&&jnum<=99)){ toast('Número deve estar entre 31 e 99.'); document.getElementById('jo-number').focus(); return; }
-
-  const p=DB.players().find(x=>x.id===pid)||{};
-  DB.setAthleteDoc(pid,{jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum});
-  // Also update player doc
-  DB.updatePlayer(pid,{jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum});
-
-  // Show success
-  document.getElementById('jo-form-wrap').style.display='none';
-  const succ=document.getElementById('jo-success');
-  succ.style.display='block';
-  document.getElementById('jo-success-detail').innerHTML=
-    `<b>${dn(p)}</b><br><span style="letter-spacing:2px;font-size:16px;font-weight:700">${jname}</span> · <b>${jsize}</b> · <b>#${jnum}</b>`;
-
-  // Refresh player dropdown to show ✅
-  joLoadPlayers();
-}
-
-function joReset(){
-  document.getElementById('jo-player').value='';
-  document.getElementById('jo-player').disabled=!document.getElementById('jo-squad').value;
-  document.getElementById('jo-form-wrap').style.display='none';
-  document.getElementById('jo-success').style.display='none';
-  _joSelectedSize='';
-}
-
 // ── HELP VIEW ─────────────────────────────────────────────────────────────────
 function renderHelp(){
   const u=currentUser();
@@ -7413,7 +7211,7 @@ function applyRoleUI(){
   const staffSection=[document.getElementById('nsl-staff'),document.getElementById('nl-staff'),document.getElementById('nl-stafflink')];
   const myProfileSection=[document.getElementById('nsl-myprofile'),document.getElementById('nl-myprofile')];
   const tmSection=[document.getElementById('nsl-tm'),document.getElementById('nl-tm')];
-  const jerseySection=[document.getElementById('nsl-jersey'),document.getElementById('nl-jersey'),document.getElementById('nl-jerseylink')];
+  const jerseySection=[document.getElementById('nsl-jersey'),document.getElementById('nl-jerseylink')];
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
