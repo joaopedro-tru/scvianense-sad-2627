@@ -971,7 +971,7 @@ body.pm #v-pf{padding:30px}
     <div style="background:#0e2444;padding:20px 20px 18px;text-align:center">
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#e8b84b;text-transform:uppercase;margin-bottom:4px">SC Vianense SAD · 2026/27</div>
       <div style="font-size:20px;font-weight:800;color:#fff">Encomenda de Camisola</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Preenche os teus dados abaixo</div>
+      <div id="jpf-header-sub" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Preenche os teus dados abaixo</div>
     </div>
 
     <!-- Loading state -->
@@ -994,7 +994,7 @@ body.pm #v-pf{padding:30px}
       <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">1 — Quem és?</div>
       <div class="card" style="padding:16px 18px;margin-bottom:20px">
         <div style="display:flex;flex-direction:column;gap:12px">
-          <div>
+          <div id="jpf-squad-wrap">
             <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Escalão</label>
             <select id="jpf-squad" class="si" onchange="jpfLoadPlayers()" style="width:100%">
               <option value="">— Selecionar —</option>
@@ -5981,10 +5981,35 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
   const url=location.href.split('?')[0]+'?mode=public';
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado! Partilha com os atletas.')).catch(()=>prompt('Copia e partilha este link:',url));
 });
-document.getElementById('nl-jerseylink').addEventListener('click',()=>{
-  const url=location.href.split('?')[0]+'?mode=jersey';
-  navigator.clipboard.writeText(url).then(()=>toast('🎽 Link de camisolas copiado! Partilha no grupo.')).catch(()=>prompt('Copia e partilha este link com os atletas:',url));
+document.getElementById('nl-jerseylink').addEventListener('click',(e)=>{
+  // Toggle squad picker popup
+  const existing=document.getElementById('jpf-link-popup');
+  if(existing){ existing.remove(); return; }
+  const pop=document.createElement('div');
+  pop.id='jpf-link-popup';
+  const rect=e.currentTarget.getBoundingClientRect();
+  pop.style.cssText=`position:fixed;z-index:9999;left:${rect.right+8}px;top:${rect.top-4}px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px;min-width:210px`;
+  pop.innerHTML=`
+    <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">Copiar link por escalão</div>
+    ${[['eqa','Equipa A'],['sub23','Sub-23'],['sub19','Sub-19'],['','Todos os escalões']].map(([v,label])=>`
+      <div onclick="jpfCopyLink('${v}')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'">
+        🔗 ${label}
+      </div>`).join('')}`;
+  document.body.appendChild(pop);
+  setTimeout(()=>{
+    document.addEventListener('click',function close(ev){ if(!pop.contains(ev.target)){ pop.remove(); document.removeEventListener('click',close); } });
+  },100);
 });
+
+function jpfCopyLink(squad){
+  document.getElementById('jpf-link-popup')?.remove();
+  const base=location.href.split('?')[0]+'?mode=jersey';
+  const url=squad?base+'&squad='+squad:base;
+  const label=squad?({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[squad]||squad):'geral';
+  navigator.clipboard.writeText(url)
+    .then(()=>toast(`🎽 Link ${label} copiado! Partilha no grupo.`))
+    .catch(()=>prompt('Copia e partilha este link:',url));
+}
 
 // Close modals on overlay click
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open') }));
@@ -6869,7 +6894,9 @@ let _jpfClaimed=new Set(); // numbers claimed by other athletes
 let _jpfSelSize='';
 let _jpfSelNum=null;
 
-async function jpfInit(){
+const _JPF_SQUAD_LABELS={eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'};
+
+async function jpfInit(lockedSquad=''){
   if(!firestoreDb){ jpfShowError('Firestore não disponível.'); return; }
   try {
     // Load players + athleteDocs in parallel
@@ -6894,6 +6921,14 @@ async function jpfInit(){
     _jpfPlayers.sort((a,b)=>jpfName(a).localeCompare(jpfName(b)));
     document.getElementById('jpf-loading').style.display='none';
     document.getElementById('jpf-form').style.display='block';
+    // Apply squad lock if URL had &squad=
+    if(lockedSquad && _JPF_SQUAD_LABELS[lockedSquad]){
+      const label=_JPF_SQUAD_LABELS[lockedSquad];
+      document.getElementById('jpf-squad').value=lockedSquad;
+      document.getElementById('jpf-squad-wrap').style.display='none';
+      document.getElementById('jpf-header-sub').textContent=label+' · Preenche os teus dados abaixo';
+      jpfLoadPlayers();
+    }
   } catch(e){
     console.error(e);
     jpfShowError('Erro ao carregar dados: '+e.message+'\n\nVerifica se o acesso anónimo está ativo no Firebase.');
@@ -7333,13 +7368,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm');
     nav('jersey-public');
+    const _jpfSquadParam=params.get('squad')||'';
     // Sign in anonymously so Firestore rules (request.auth != null) are satisfied
     if(firebaseAuth){
       firebaseAuth.signInAnonymously()
-        .then(()=>jpfInit())
-        .catch(e=>{ console.warn('Anon auth failed:',e); jpfInit(); });
+        .then(()=>jpfInit(_jpfSquadParam))
+        .catch(e=>{ console.warn('Anon auth failed:',e); jpfInit(_jpfSquadParam); });
     } else {
-      jpfInit();
+      jpfInit(_jpfSquadParam);
     }
     return;
   }
