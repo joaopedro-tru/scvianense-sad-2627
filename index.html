@@ -946,6 +946,7 @@ body.pm #v-pf{padding:30px}
         <span id="tm-kit-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
         <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
         <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
+        <button class="btn btn-o btn-sm" id="btn-import-sub23" onclick="previewSub23Import()" style="display:none;border-color:var(--primary);color:var(--primary)">📥 Importar Sub-23</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
         <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -6490,6 +6491,25 @@ function isMinor(p){
   return ms/(365.25*24*3600*1000)<18;
 }
 const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
+// Dados de camisola Sub-23 — Numeração SCV SAD 26/27
+const SUB23_JERSEY_SEED=[
+  {name:'João Pais',       jerseyName:'J.PAIS',     jerseySize:'L',  jerseyNumber:4 },
+  {name:'Rui Lavarinhas',  jerseyName:'LAVARINHAS', jerseySize:'M',  jerseyNumber:5 },
+  {name:'Duarte Bravo',    jerseyName:'D.BRAVO',    jerseySize:'M',  jerseyNumber:6 },
+  {name:'Bruno Santos',    jerseyName:'BRUNO',      jerseySize:'M',  jerseyNumber:18},
+  {name:'Hugo Carvalho',   jerseyName:'HUGO',       jerseySize:'L',  jerseyNumber:24},
+  {name:'Lucas Bravo',     jerseyName:'L.BRAVO',    jerseySize:'S',  jerseyNumber:25},
+  {name:'Guilherme Pereira',jerseyName:'GUI',       jerseySize:'XL', jerseyNumber:27},
+  {name:'João Antunes',    jerseyName:'ANTUNES',    jerseySize:'XL', jerseyNumber:28},
+  {name:'Eduardo Garduzi', jerseyName:'DUDU',       jerseySize:'L',  jerseyNumber:29},
+  {name:'João Rainha',     jerseyName:'JOTA',       jerseySize:'M',  jerseyNumber:42},
+  {name:'Gonçalo Coutada', jerseyName:'COUTADA',    jerseySize:'M',  jerseyNumber:81},
+  {name:'Pedro Vieira',    jerseyName:'VIEIRA',     jerseySize:'M',  jerseyNumber:86},
+  {name:'Diogo Gomes',     jerseyName:'GOMES',      jerseySize:'M',  jerseyNumber:89},
+  {name:'Eduardo Ribeiro', jerseyName:'EDUARDO R.', jerseySize:'L',  jerseyNumber:93},
+  {name:'Tiago Lima',      jerseyName:'LIMA',       jerseySize:'XL', jerseyNumber:98},
+];
+
 // Números disponíveis na rouparia (sem linha preenchida na lista geral 26/27)
 const JERSEY_AVAILABLE=[2,15,26,31,32,33,34,35,36,37,38,39,40,41,43,44,45,46,47,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,71,72,73,74,75,76,77,78,79,80,82,83,84,85,87,91,92,94,95,96,97,99];
 
@@ -6826,6 +6846,109 @@ function renderKitTab(){
       refreshStats();
     };
   });
+}
+
+// ── SUB-23 JERSEY IMPORT ──────────────────────────────────────────────────────
+function _normName(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z\s]/g,'').trim();
+}
+function _matchSub23(seed, sub23players){
+  const sn=_normName(seed.name);
+  const parts=sn.split(/\s+/);
+  const last=parts[parts.length-1];
+  // 1. exact
+  let m=sub23players.find(p=>_normName(p.name)===sn||_normName(p.alcunha||'')===sn);
+  if(m) return {player:m,conf:'exact'};
+  // 2. last name exact
+  m=sub23players.find(p=>_normName(p.name).split(/\s+/).pop()===last);
+  if(m) return {player:m,conf:'last'};
+  // 3. contains last name
+  m=sub23players.find(p=>_normName(p.name).includes(last));
+  if(m) return {player:m,conf:'partial'};
+  // 4. first name + first part of last
+  if(parts.length>=2){
+    const first=parts[0]; const lastP=last.substring(0,4);
+    m=sub23players.find(p=>{ const n=_normName(p.name); return n.includes(first)&&n.includes(lastP); });
+    if(m) return {player:m,conf:'partial'};
+  }
+  return {player:null,conf:'none'};
+}
+
+function previewSub23Import(){
+  const sub23=DB.players().filter(p=>p.squad==='sub23');
+  const matches=SUB23_JERSEY_SEED.map(seed=>({seed,..._matchSub23(seed,sub23)}));
+
+  const rows=matches.map((m,i)=>{
+    const confIcon=m.conf==='exact'?'✅':m.conf==='last'?'🔶':m.conf==='partial'?'⚠️':'❌';
+    const playerName=m.player?dn(m.player):'<span style="color:var(--red)">Não encontrado</span>';
+    return `<tr style="border-bottom:1px solid var(--border);${!m.player?'opacity:.5':''}">
+      <td style="padding:8px 10px;font-weight:600">${m.seed.name}</td>
+      <td style="padding:8px 10px;text-align:center;letter-spacing:1px;font-weight:700">${m.seed.jerseyName}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700">${m.seed.jerseySize}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700">#${m.seed.jerseyNumber}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:16px">${confIcon}</td>
+      <td style="padding:8px 10px">${playerName}</td>
+    </tr>`;
+  }).join('');
+
+  const found=matches.filter(m=>m.player).length;
+  const overlay=document.createElement('div');
+  overlay.id='sub23-import-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML=`
+    <div style="background:var(--card);border-radius:14px;max-width:780px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+      <div style="padding:20px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:800">📥 Importar dados Sub-23</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Correspondências encontradas: ${found}/${SUB23_JERSEY_SEED.length} · ✅ Exacto &nbsp;🔶 Apelido &nbsp;⚠️ Parcial &nbsp;❌ Não encontrado</div>
+        </div>
+        <button onclick="document.getElementById('sub23-import-overlay').remove()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">Fechar</button>
+        <button onclick="applySub23Import()" style="padding:7px 16px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ Aplicar ${found} atletas</button>
+      </div>
+      <div style="padding:16px 22px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Nome (PDF)</th>
+              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Camisola</th>
+              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Tam.</th>
+              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Nº</th>
+              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)"></th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta na App</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  // Store matches for apply step
+  overlay._matches=matches;
+  document.body.appendChild(overlay);
+}
+
+function applySub23Import(){
+  const overlay=document.getElementById('sub23-import-overlay');
+  if(!overlay) return;
+  const matches=overlay._matches||[];
+  let count=0;
+  matches.forEach(m=>{
+    if(!m.player) return;
+    const pid=m.player.id;
+    DB.setAthleteDoc(pid,{
+      jerseyName:m.seed.jerseyName,
+      jerseySize:m.seed.jerseySize,
+      jerseyNumber:m.seed.jerseyNumber,
+    });
+    DB.updatePlayer(pid,{
+      jerseyName:m.seed.jerseyName,
+      jerseySize:m.seed.jerseySize,
+      jerseyNumber:m.seed.jerseyNumber,
+    });
+    count++;
+  });
+  overlay.remove();
+  toast(`✅ ${count} atletas Sub-23 atualizados!`);
+  renderKitTab();
 }
 
 // ── PUBLIC JERSEY FORM (?mode=jersey) ─────────────────────────────────────────
@@ -7354,6 +7477,8 @@ function applyRoleUI(){
     tmSection.forEach(el=>el&&(el.style.display=''));
     jerseySection.forEach(el=>el&&(el.style.display=''));
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
+    const importBtn=document.getElementById('btn-import-sub23');
+    if(importBtn) importBtn.style.display='';
   }
 }
 
