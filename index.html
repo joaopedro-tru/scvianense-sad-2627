@@ -3219,6 +3219,9 @@ async function renderStaff(){
   const el=document.getElementById('staff-content');
   el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar...</div>';
 
+  // Sync fresh data from Firestore before rendering
+  await DB.syncStaffProfilesFromFirestore();
+
   let pending=[];
   if(firestoreDb){
     try{
