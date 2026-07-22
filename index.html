@@ -6536,10 +6536,12 @@ async function checkPendingBadge(){
 
 // ── ACCOUNT SETUP (admin cria/repõe password de qualquer conta) ──────────────
 function openAccountSetup(username){
-  // Usa getAppUsers() para ter o email mais recente (pode ter sido atualizado pelo perfil)
   const u=getAppUsers().find(x=>x.user===username); if(!u) return;
+  // Prefere email pessoal do perfil de staff (fonte mais atualizada)
+  const sp=DB.staffProfiles(null).find(p=>p.username===username);
+  const displayEmail=(sp?.email||'').trim().toLowerCase()||u.email;
   const mo=document.getElementById('mo-acct');
-  document.getElementById('mo-acct-desc').textContent=`Conta: ${username} · ${u.email}`;
+  document.getElementById('mo-acct-desc').textContent=`Conta: ${username} (${displayEmail})`;
   document.getElementById('mo-acct-pw').value='';
   document.getElementById('mo-acct-pw2').value='';
   document.getElementById('mo-acct-err').textContent='';
@@ -6556,8 +6558,9 @@ function openAccountSetup(username){
     if(!FB_READY||!FB_CONFIG.apiKey){ errEl.textContent='Firebase não configurado.'; return; }
     const btn=document.getElementById('mo-acct-save');
     btn.disabled=true; btn.textContent='A processar…';
-    // Re-ler o email mais recente (pode ter mudado desde que o modal abriu)
-    const currentEmail=getAppUsers().find(x=>x.user===username)?.email||u.email;
+    // Prefere email pessoal do perfil de staff; fallback para app_users
+    const spNow=DB.staffProfiles(null).find(p=>p.username===username);
+    const currentEmail=(spNow?.email||'').trim().toLowerCase()||getAppUsers().find(x=>x.user===username)?.email||u.email;
     try{
       const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST',
