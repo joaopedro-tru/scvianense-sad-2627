@@ -1040,6 +1040,7 @@ body.pm #v-pf{padding:30px}
         <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
         <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
       </div>
+      <div id="tm-kit-available" style="margin-bottom:10px;font-size:12px;color:var(--muted)"></div>
       <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
         <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
           <thead>
@@ -1049,7 +1050,7 @@ body.pm #v-pf{padding:30px}
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:80px">Posição</th>
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:100px">Tamanho</th>
               <th style="text-align:left;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:130px">Nome Camisola</th>
-              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">Nº Pretend.</th>
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">Nº Camisola</th>
               <th id="tm-kit-clear-th" style="display:none;width:36px;border-bottom:1px solid var(--border)"></th>
             </tr>
           </thead>
@@ -7169,10 +7170,21 @@ function renderKitTab(){
   let players=DB.players().filter(p=>!sq||p.squad===sq);
   players=sortByPos(players);
 
-  // Build set of duplicated jersey numbers
+  // Build set of assigned and duplicated jersey numbers
   const _numCount={};
   players.forEach(p=>{ const d=DB.getAthleteDoc(p.id)||{}; const n=p.jerseyNumber??d.jerseyNumber; if(n!=null){ _numCount[n]=(_numCount[n]||0)+1; } });
   const _dupNums=new Set(Object.keys(_numCount).filter(n=>_numCount[n]>1).map(Number));
+  const _assignedNums=new Set(Object.keys(_numCount).map(Number));
+
+  // Render available numbers
+  const _availEl=document.getElementById('tm-kit-available');
+  if(_availEl){
+    const avail=[];
+    for(let n=1;n<=99;n++) if(!_assignedNums.has(n)) avail.push(n);
+    _availEl.innerHTML=avail.length
+      ? `<span style="font-weight:600;color:var(--text)">Números disponíveis:</span> `+avail.map(n=>`<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;margin:1px">${n}</span>`).join('')
+      : `<span style="color:var(--muted);font-style:italic">Sem números disponíveis.</span>`;
+  }
 
   const filled=players.filter(p=>{
     const d=DB.getAthleteDoc(p.id)||{};
@@ -7209,7 +7221,7 @@ function renderKitTab(){
     const isDup=jnum!==''&&_dupNums.has(Number(jnum));
     const rowBg=isDup?'#fff3e0':(complete?'#f0fff4':'inherit');
     return `${groupRow}<tr style="border-bottom:1px solid var(--border);background:${rowBg}" ${isDup?'title="Número duplicado — discutir com atleta"':''}>
-      <td style="text-align:center;padding:10px;font-weight:700;color:var(--muted)">${p.number||'—'}</td>
+      <td style="text-align:center;padding:10px;font-weight:700;color:${jnum!==''?'var(--text)':'var(--muted)'}">${jnum!==''?jnum:'—'}</td>
       <td style="padding:10px 14px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="av" style="width:28px;height:28px;font-size:10px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
@@ -7300,22 +7312,36 @@ function refreshKitDuplicates(){
     }
   });
   // Update row backgrounds (orange=dup, green=complete, inherit=incomplete)
+  // Also update left-column number display
   body.querySelectorAll('tr:not(.pos-group)').forEach(tr=>{
     const jnumInp=tr.querySelector('[data-kit-jnum]');
     if(!jnumInp) return;
     const n=parseInt(jnumInp.value);
-    const isDup=n>=1&&n<=99&&numRows[n]&&numRows[n].length>1;
+    const hasNum=n>=1&&n<=99;
+    const isDup=hasNum&&numRows[n]&&numRows[n].length>1;
+    // Update left column
+    const numCell=tr.querySelector('td:first-child');
+    if(numCell){ numCell.textContent=hasNum?n:'—'; numCell.style.color=hasNum?'var(--text)':'var(--muted)'; }
     if(isDup){
       tr.style.background='#fff3e0';
       tr.title='Número duplicado — discutir com atleta';
     } else {
       const jname=(tr.querySelector('[data-kit-jname]')?.value||'').trim();
       const size=tr.querySelector('[data-kit-size]')?.value||'';
-      const hasNum=n>=1&&n<=99;
       tr.style.background=(jname&&size&&hasNum)?'#f0fff4':'inherit';
       tr.title='';
     }
   });
+  // Refresh available numbers
+  const assignedNums=new Set(Object.keys(numRows).map(Number));
+  const availEl=document.getElementById('tm-kit-available');
+  if(availEl){
+    const avail=[];
+    for(let n=1;n<=99;n++) if(!assignedNums.has(n)) avail.push(n);
+    availEl.innerHTML=avail.length
+      ? `<span style="font-weight:600;color:var(--text)">Números disponíveis:</span> `+avail.map(n=>`<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;margin:1px">${n}</span>`).join('')
+      : `<span style="color:var(--muted);font-style:italic">Sem números disponíveis.</span>`;
+  }
 }
 
 // ── HELP VIEW ─────────────────────────────────────────────────────────────────
