@@ -1331,7 +1331,6 @@ body.pm #v-pf{padding:30px}
         </div>
       </div>
       <div class="fr">
-        <div class="fg"><label>Nº Camisola</label><input type="number" id="f-num" min="1" max="99"></div>
         <div class="fg"><label>Pé Dominante</label>
           <select id="f-foot">
             <option value="right">Direito</option><option value="left">Esquerdo</option><option value="both">Ambos</option>
@@ -1345,7 +1344,7 @@ body.pm #v-pf{padding:30px}
           </select>
         </div>
         <div style="grid-column:1/-1;border-top:1px solid var(--border);margin:4px 0 2px;padding-top:10px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🎽 Ficha de Camisola</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🎽 Equipamento</div>
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end">
             <div class="fg" style="margin:0">
               <label>Nome na Camisola <span style="font-size:10px;font-weight:400;color:var(--muted)">(máx. 12 letras)</span></label>
@@ -1360,7 +1359,7 @@ body.pm #v-pf{padding:30px}
               </select>
             </div>
             <div class="fg" style="margin:0;width:80px">
-              <label>Nº Pretendido</label>
+              <label>Nº Camisola</label>
               <input type="number" id="f-jersey-number" min="1" max="99" placeholder="45">
             </div>
           </div>
@@ -2827,13 +2826,11 @@ function renderPlayer(){
       </div>
       <div class="card"><h3>Dados Desportivos</h3>
         ${row('Posição',[p.position,p.position2,p.position3].filter(Boolean).map(x=>POS[x]||x).join(' · ')||null)}
-        ${row('Nº Camisola',p.number?`#${p.number}`:null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
-        ${row('Tamanho Equipamento',p.shirtSize||(DB.getAthleteDoc(pid)?.shirtSize)||null)}
-        ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Ficha de Camisola</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Pretendido',jnum!=null?`#${jnum}`:null)}`;})()}
         ${row('Escalão',SQUADS[p.squad])}
-        ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
         ${row('Clube Anterior',p.previousClub)}
+        ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
+        ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Equipamento</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Camisola',jnum!=null?`#${jnum}`:null)}`;})()}
       </div>
       <div class="card"><h3>Dados Médicos / Físicos</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr">
@@ -2891,7 +2888,7 @@ function openPlayerModal(p=null){
   f('f-pos').value=p?.position||'';
   f('f-pos2').value=p?.position2||'';
   f('f-pos3').value=p?.position3||'';
-  f('f-num').value=p?.number||'';
+  // f-num removed — jersey number managed via Equipamento section
   f('f-foot').value=p?.dominantFoot||'right';
   f('f-enrolled').value=p?.enrolledAt||new Date().toISOString().split('T')[0];
   const isRenewal=p?.previousClub==='Renovação';
@@ -2937,7 +2934,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       id:pid,
       name:f('f-name'),alcunha:f('f-alias').trim()||null,dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
-      squad:f('f-squad'),position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,number:f('f-num'),dominantFoot:f('f-foot'),
+      squad:f('f-squad'),position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
       injuries:f('f-inj'),shirtSize:f('f-shirt-size')||null,
       jerseyName:document.getElementById('f-jersey-name').value.toUpperCase()||null,
