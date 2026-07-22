@@ -424,6 +424,7 @@ body.pm #v-pf{padding:30px}
   .chc{padding:5px 2px;font-size:9px}
   .ce-title{font-size:9px}
   .ce-meta{display:none}
+  .ce.gm .ce-meta{display:block;font-size:8px}
   .ce{padding:2px 3px;margin-bottom:1px}
 
   /* Calendar nav */
@@ -3780,8 +3781,16 @@ function renderCal(){
     const isConflict=_conflictDates.has(ds);
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
     cells+=`<div class="cd${other?' om':''}${isT?' td':''}${isConflict?' cd-conflict':''}" data-date="${ds}">${numEl}${dayEvs.map(ev=>{
-      const meta=[ev.time,ev.location].filter(Boolean).join(' · ');
-      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"><div class="ce-title">${evLabel(ev)}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
+      let chipTitle, meta;
+      if(ev.type==='game'){
+        const icon=ev.homeAway==='away'?'✈️':'🏠';
+        chipTitle=`${icon} ${ev.opponent||'Jogo'}`;
+        meta=[ev.time, SQUADS[ev.squad]].filter(Boolean).join(' · ');
+      } else {
+        chipTitle=`🏃 ${SQUADS[ev.squad]||'Treino'}`;
+        meta=[ev.time,ev.location].filter(Boolean).join(' · ');
+      }
+      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"><div class="ce-title">${chipTitle}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
     }).join('')}</div>`;
   }
   document.getElementById('cal-body').innerHTML=cells;
