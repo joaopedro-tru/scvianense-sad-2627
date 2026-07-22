@@ -7668,10 +7668,17 @@ function seedLiga3Games(){
     {date:'2027-01-24', homeAway:'home', opponent:'Vitória SC B',      notes:'J17'},
     {date:'2027-01-30', homeAway:'away', opponent:'Leça FC',           notes:'J18'},
   ];
-  const existing = DB.events();
+  const targetDates = new Set(games.map(g=>g.date));
+  // Remove existing eqa games on these dates that have no opponent (inserted manually without data)
+  DB.events().forEach(e=>{
+    if(e.type==='game' && e.squad==='eqa' && targetDates.has(e.date) && !e.opponent){
+      DB.deleteEvent(e.id);
+    }
+  });
+  // Add each game if not already present with this opponent
   let added = 0;
   games.forEach(g=>{
-    const dup = existing.some(e=>e.type==='game'&&e.date===g.date&&e.opponent===g.opponent&&e.squad==='eqa');
+    const dup = DB.events().some(e=>e.type==='game'&&e.date===g.date&&e.opponent===g.opponent&&e.squad==='eqa');
     if(!dup){
       DB.addEvent({type:'game', squad:'eqa', time:'15:00', competition:COMP, ...g});
       added++;
