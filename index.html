@@ -3969,6 +3969,9 @@ function renderTraining(){
   document.getElementById('tr-title').textContent=trainingLabel(ev);
   document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
 
+  const trialPlayers=ev.trialPlayers||[];
+  const totalPresCount=allPl.filter(p=>att[p.id]===true).length + trialPlayers.length;
+
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
     const present=att[p.id]===true;
@@ -3981,6 +3984,36 @@ function renderTraining(){
       <button class="att-btn${present?' present':''}" data-att-pid="${p.id}">${present?'✓ Presente':'— Ausente'}</button>
     </div>`;
   }).join('');
+
+  const trialRows=trialPlayers.map(tp=>`
+    <div class="att-row">
+      <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0;background:#e65100;color:#fff">${ini(tp.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${tp.name}</div>
+        <div style="font-size:11px;color:#e65100;font-weight:600">À Experiência${tp.position?' · '+tp.position:''}${tp.notes?' · '+tp.notes:''}</div>
+      </div>
+      <button data-del-trial="${tp.id}" title="Remover" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:2px 6px;border-radius:5px" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.4">✕</button>
+    </div>`).join('');
+
+  const trialSection=`
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#e65100">🧪 À Experiência</div>
+        <button class="btn btn-o btn-sm" id="btn-show-trial-form">+ Adicionar</button>
+      </div>
+      ${trialRows||'<p style="font-size:12px;color:var(--muted);margin:0">Nenhum atleta à experiência registado.</p>'}
+      <div id="trial-form" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border:1.5px solid #e65100;border-radius:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <input id="trial-name" type="text" placeholder="Nome completo" style="padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--card);color:var(--text);outline:none">
+          <input id="trial-pos" type="text" placeholder="Posição (ex: MC)" style="padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--card);color:var(--text);outline:none">
+        </div>
+        <input id="trial-notes" type="text" placeholder="Notas (clube, quem indicou...)" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--card);color:var(--text);outline:none;box-sizing:border-box;margin-bottom:8px">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-p btn-sm" id="btn-add-trial">Registar</button>
+          <button class="btn btn-g btn-sm" id="btn-cancel-trial">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
 
   const otherAvail=otherAvailAll.filter(p=>!extras.includes(p.id));
   const extraSection=otherAvail.length?`
@@ -4079,16 +4112,28 @@ function renderTraining(){
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">👥 Presenças</h3>
-        <span class="att-summary">${presCount} / ${allPl.length} presentes</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="att-summary">${totalPresCount} / ${allPl.length + trialPlayers.length} presentes</span>
+          <button class="btn btn-o btn-sm" id="btn-all-present" title="Marcar todos como presentes">✓ Todos</button>
+        </div>
       </div>
       ${unavailAlert}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
       ${extraSection}
+      ${trialSection}
       ${staffSection}
     </div>
   </div>
   ${fichaPreview}
   ${buildClinicalSection(trainingEventId, allPl)}`;
+
+  // Mark ALL present
+  document.getElementById('btn-all-present')?.addEventListener('click',()=>{
+    const a=DB.getEvent(trainingEventId).attendance||{};
+    allPl.forEach(p=>{ a[p.id]=true; });
+    DB.updateEvent(trainingEventId,{attendance:a});
+    renderTraining();
+  });
 
   // Toggle attendance
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -4097,6 +4142,31 @@ function renderTraining(){
     a[pid]=a[pid]!==true;
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
+  }));
+
+  // Trial players
+  document.getElementById('btn-show-trial-form')?.addEventListener('click',()=>{
+    const f=document.getElementById('trial-form');
+    f.style.display=f.style.display==='none'?'block':'none';
+    if(f.style.display==='block') document.getElementById('trial-name').focus();
+  });
+  document.getElementById('btn-cancel-trial')?.addEventListener('click',()=>{
+    document.getElementById('trial-form').style.display='none';
+  });
+  document.getElementById('btn-add-trial')?.addEventListener('click',()=>{
+    const name=document.getElementById('trial-name').value.trim();
+    if(!name){ toast('⚠️ Indica o nome do atleta'); return; }
+    const pos=document.getElementById('trial-pos').value.trim();
+    const notes=document.getElementById('trial-notes').value.trim();
+    const tp=[...(DB.getEvent(trainingEventId).trialPlayers||[])];
+    tp.push({id:'trial_'+uid(),name,position:pos||null,notes:notes||null,date:ev.date,squad:ev.squad});
+    DB.updateEvent(trainingEventId,{trialPlayers:tp});
+    toast('✅ Atleta à experiência registado!'); renderTraining();
+  });
+  document.querySelectorAll('[data-del-trial]').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!confirm('Remover este registo?')) return;
+    const tp=(DB.getEvent(trainingEventId).trialPlayers||[]).filter(x=>x.id!==btn.dataset.delTrial);
+    DB.updateEvent(trainingEventId,{trialPlayers:tp}); renderTraining();
   }));
   // Staff attendance toggle
   document.querySelectorAll('[data-statt-user]').forEach(btn=>btn.addEventListener('click',()=>{
