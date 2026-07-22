@@ -7267,7 +7267,10 @@ function renderKitTab(){
       const val=(n>=1&&n<=99)?n:null;
       if(val===null) inp.value='';
       DB.setAthleteDoc(pid,{jerseyNumber:val});
-      renderKitTab();
+      inp.style.borderColor=val!=null?'var(--green)':'var(--border)';
+      inp.style.background=val!=null?'#e8f5e9':'var(--card)';
+      refreshStats();
+      refreshKitDuplicates();
     };
   });
   // Clear buttons (admin only — shown via applyRoleUI)
@@ -7285,6 +7288,37 @@ function renderKitTab(){
   const isAdmin=currentUser()?.role==='admin';
   document.getElementById('tm-kit-clear-th').style.display=isAdmin?'':'none';
   body.querySelectorAll('.kit-clear-col').forEach(td=>td.style.display=isAdmin?'':'none');
+}
+
+function refreshKitDuplicates(){
+  const body=document.getElementById('tm-kit-body');
+  if(!body) return;
+  // Count jersey numbers from current DOM inputs
+  const numRows={};
+  body.querySelectorAll('[data-kit-jnum]').forEach(inp=>{
+    const n=parseInt(inp.value);
+    if(n>=1&&n<=99){
+      const tr=inp.closest('tr');
+      if(tr){ if(!numRows[n]) numRows[n]=[]; numRows[n].push({tr,inp}); }
+    }
+  });
+  // Update row backgrounds (orange=dup, green=complete, inherit=incomplete)
+  body.querySelectorAll('tr:not(.pos-group)').forEach(tr=>{
+    const jnumInp=tr.querySelector('[data-kit-jnum]');
+    if(!jnumInp) return;
+    const n=parseInt(jnumInp.value);
+    const isDup=n>=1&&n<=99&&numRows[n]&&numRows[n].length>1;
+    if(isDup){
+      tr.style.background='#fff3e0';
+      tr.title='Número duplicado — discutir com atleta';
+    } else {
+      const jname=(tr.querySelector('[data-kit-jname]')?.value||'').trim();
+      const size=tr.querySelector('[data-kit-size]')?.value||'';
+      const hasNum=n>=1&&n<=99;
+      tr.style.background=(jname&&size&&hasNum)?'#f0fff4':'inherit';
+      tr.title='';
+    }
+  });
 }
 
 // ── HELP VIEW ─────────────────────────────────────────────────────────────────
