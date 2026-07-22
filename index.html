@@ -1953,6 +1953,34 @@ const DB = {
     }catch(e){ console.warn('syncStaffProfiles:',e); }
   },
 
+  // ── Trial Players (atletas à experiência — globais por escalão) ───────────────
+  _ftp(){ return firestoreDb?.collection('trial_players') },
+  _tp(){ try{ return JSON.parse(localStorage.getItem('scv_tp')||'[]'); }catch{ return []; } },
+  _stp(arr){ localStorage.setItem('scv_tp',JSON.stringify(arr)); },
+  getTrialPlayers(squad){
+    const all=this._tp().filter(r=>!r.removedDate);
+    return squad?all.filter(r=>r.squad===squad||r.squad==='both'):all;
+  },
+  getTrialPlayer(id){ return this._tp().find(x=>x.id===id); },
+  async addTrialPlayer(tp){
+    tp.id='trial_'+uid(); tp.addedDate=new Date().toISOString();
+    const arr=this._tp(); arr.push(tp); this._stp(arr);
+    if(this._ftp()) await this._ftp().doc(tp.id).set(tp).catch(e=>console.error('FS addTrialPlayer:',e));
+    return tp;
+  },
+  async removeTrialPlayer(id){
+    const arr=this._tp(); const i=arr.findIndex(x=>x.id===id);
+    if(i>-1){ arr[i]={...arr[i],removedDate:new Date().toISOString()}; this._stp(arr);
+      if(this._ftp()) await this._ftp().doc(id).set(arr[i]).catch(e=>console.error('FS removeTrialPlayer:',e)); }
+  },
+  async syncTrialFromFirestore(){
+    if(!this._ftp()) return;
+    try{
+      const snap=await this._ftp().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._stp(arr);
+    }catch(e){ console.warn('syncTrial:',e); }
+  },
+
   // ── ATHLETE DOCS ─────────────────────────────────────────
   _fadocs(){ return firestoreDb?.collection('athlete_docs') },
   _adocs(){ try{ return JSON.parse(localStorage.getItem('scv_adocs')||'[]'); }catch{ return []; } },
@@ -3969,8 +3997,9 @@ function renderTraining(){
   document.getElementById('tr-title').textContent=trainingLabel(ev);
   document.getElementById('tr-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
 
-  const trialPlayers=ev.trialPlayers||[];
-  const totalPresCount=allPl.filter(p=>att[p.id]===true).length + trialPlayers.length;
+  const trialPlayers=DB.getTrialPlayers(ev.squad==='both'?null:ev.squad);
+  const trialAtt=ev.trialAttendance||{};
+  const totalPresCount=allPl.filter(p=>att[p.id]===true).length + trialPlayers.filter(tp=>trialAtt[tp.id]!==false).length;
 
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
@@ -3985,15 +4014,18 @@ function renderTraining(){
     </div>`;
   }).join('');
 
-  const trialRows=trialPlayers.map(tp=>`
-    <div class="att-row">
+  const trialRows=trialPlayers.map(tp=>{
+    const present=trialAtt[tp.id]!==false; // default: presente
+    return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0;background:#e65100;color:#fff">${ini(tp.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${tp.name}</div>
         <div style="font-size:11px;color:#e65100;font-weight:600">À Experiência${tp.position?' · '+tp.position:''}${tp.notes?' · '+tp.notes:''}</div>
       </div>
-      <button data-del-trial="${tp.id}" title="Remover" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:.4;padding:2px 6px;border-radius:5px" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.4">✕</button>
-    </div>`).join('');
+      <button class="att-btn${present?' present':''}" data-trial-att="${tp.id}">${present?'✓ Presente':'— Ausente'}</button>
+      ${isAdmin()||staffRole()?`<button data-del-trial="${tp.id}" title="Terminar experiência" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.35;padding:2px 6px;margin-left:4px;border-radius:5px" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.35">✕</button>`:''}
+    </div>`;
+  }).join('');
 
   const trialSection=`
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
@@ -4144,7 +4176,14 @@ function renderTraining(){
     renderTraining();
   }));
 
-  // Trial players
+  // Trial player attendance toggle
+  document.querySelectorAll('[data-trial-att]').forEach(btn=>btn.addEventListener('click',()=>{
+    const id=btn.dataset.trialAtt;
+    const ta={...((DB.getEvent(trainingEventId).trialAttendance)||{})};
+    ta[id]=ta[id]===false; // toggle: default true → false → true
+    DB.updateEvent(trainingEventId,{trialAttendance:ta}); renderTraining();
+  }));
+  // Trial players — add / remove globally
   document.getElementById('btn-show-trial-form')?.addEventListener('click',()=>{
     const f=document.getElementById('trial-form');
     f.style.display=f.style.display==='none'?'block':'none';
@@ -4153,20 +4192,18 @@ function renderTraining(){
   document.getElementById('btn-cancel-trial')?.addEventListener('click',()=>{
     document.getElementById('trial-form').style.display='none';
   });
-  document.getElementById('btn-add-trial')?.addEventListener('click',()=>{
+  document.getElementById('btn-add-trial')?.addEventListener('click',async()=>{
     const name=document.getElementById('trial-name').value.trim();
     if(!name){ toast('⚠️ Indica o nome do atleta'); return; }
     const pos=document.getElementById('trial-pos').value.trim();
     const notes=document.getElementById('trial-notes').value.trim();
-    const tp=[...(DB.getEvent(trainingEventId).trialPlayers||[])];
-    tp.push({id:'trial_'+uid(),name,position:pos||null,notes:notes||null,date:ev.date,squad:ev.squad});
-    DB.updateEvent(trainingEventId,{trialPlayers:tp});
+    await DB.addTrialPlayer({name,position:pos||null,notes:notes||null,squad:ev.squad,addedBy:currentUser()?.user||''});
     toast('✅ Atleta à experiência registado!'); renderTraining();
   });
-  document.querySelectorAll('[data-del-trial]').forEach(btn=>btn.addEventListener('click',()=>{
-    if(!confirm('Remover este registo?')) return;
-    const tp=(DB.getEvent(trainingEventId).trialPlayers||[]).filter(x=>x.id!==btn.dataset.delTrial);
-    DB.updateEvent(trainingEventId,{trialPlayers:tp}); renderTraining();
+  document.querySelectorAll('[data-del-trial]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const tp=DB.getTrialPlayer(btn.dataset.delTrial);
+    if(!confirm(`Terminar experiência de ${tp?.name||'este atleta'}?\nOs registos de treinos anteriores são mantidos.`)) return;
+    await DB.removeTrialPlayer(btn.dataset.delTrial); renderTraining();
   }));
   // Staff attendance toggle
   document.querySelectorAll('[data-statt-user]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -7778,6 +7815,7 @@ function initCoordApp(){
       await DB.syncStaffProfilesFromFirestore();
       await DB.syncAthleteDocsFromFirestore();
       await DB.syncAthletePaymentsFromFirestore();
+      await DB.syncTrialFromFirestore();
       if(isAdmin()) await syncPendingAthletes(true);
       if(isAdmin()) checkPendingBadge();
     } else {
