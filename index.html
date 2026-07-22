@@ -7160,7 +7160,11 @@ function renderTM(){
       const tab=btn.dataset.tab;
       document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
       document.getElementById('tm-panel-kit').style.display=tab==='kit'?'':'none';
-      if(tab==='kit') renderKitTab();
+      if(tab==='kit'){
+        // Always re-sync athlete_docs before rendering kit tab
+        // (athletes may have filled the public form after the last login sync)
+        DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
+      }
     };
   });
 
@@ -7524,7 +7528,7 @@ async function jpfSubmit(){
     const existingRec=DB.getAthleteDoc(pid);
     const docId=existingRec?.id||pid;
     await firestoreDb.collection('athlete_docs').doc(docId).set(
-      {id:docId,playerId:pid,jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date()},
+      {id:docId,playerId:pid,jerseyName:jname,jerseySize:jsize,jerseyNumber:jnum,jerseyTs:new Date().toISOString()},
       {merge:true}
     );
     // Update local cache
