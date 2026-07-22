@@ -7268,7 +7268,7 @@ function renderKitTab(){
       const val=(n>=1&&n<=99)?n:null;
       if(val===null) inp.value='';
       DB.setAthleteDoc(pid,{jerseyNumber:val});
-      DB.updatePlayer(pid,{number:val});
+      DB.updatePlayer(pid,{number:val,jerseyNumber:val});
       inp.style.borderColor=val!=null?'var(--green)':'var(--border)';
       inp.style.background=val!=null?'#e8f5e9':'var(--card)';
       refreshStats();
