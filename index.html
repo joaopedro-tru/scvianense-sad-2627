@@ -1040,7 +1040,6 @@ body.pm #v-pf{padding:30px}
         <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
         <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
       </div>
-      <div id="tm-kit-available" style="margin-bottom:10px;font-size:12px;color:var(--muted)"></div>
       <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
         <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
           <thead>
@@ -7176,18 +7175,6 @@ function renderKitTab(){
   const _numCount={};
   players.forEach(p=>{ const d=DB.getAthleteDoc(p.id)||{}; const n=p.jerseyNumber??d.jerseyNumber; if(n!=null){ _numCount[n]=(_numCount[n]||0)+1; } });
   const _dupNums=new Set(Object.keys(_numCount).filter(n=>_numCount[n]>1).map(Number));
-  const _assignedNums=new Set(Object.keys(_numCount).map(Number));
-
-  // Render available numbers
-  const _availEl=document.getElementById('tm-kit-available');
-  if(_availEl){
-    const avail=[];
-    for(let n=1;n<=99;n++) if(!_assignedNums.has(n)) avail.push(n);
-    _availEl.innerHTML=avail.length
-      ? `<span style="font-weight:600;color:var(--text)">Números disponíveis:</span> `+avail.map(n=>`<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;margin:1px">${n}</span>`).join('')
-      : `<span style="color:var(--muted);font-style:italic">Sem números disponíveis.</span>`;
-  }
-
   const filled=players.filter(p=>{
     const d=DB.getAthleteDoc(p.id)||{};
     return !!(d.jerseyName&&d.jerseySize&&d.jerseyNumber);
@@ -7335,16 +7322,6 @@ function refreshKitDuplicates(){
       tr.title='';
     }
   });
-  // Refresh available numbers
-  const assignedNums=new Set(Object.keys(numRows).map(Number));
-  const availEl=document.getElementById('tm-kit-available');
-  if(availEl){
-    const avail=[];
-    for(let n=1;n<=99;n++) if(!assignedNums.has(n)) avail.push(n);
-    availEl.innerHTML=avail.length
-      ? `<span style="font-weight:600;color:var(--text)">Números disponíveis:</span> `+avail.map(n=>`<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;margin:1px">${n}</span>`).join('')
-      : `<span style="color:var(--muted);font-style:italic">Sem números disponíveis.</span>`;
-  }
 }
 
 // ── HELP VIEW ─────────────────────────────────────────────────────────────────
