@@ -2941,6 +2941,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       jerseyName:document.getElementById('f-jersey-name').value.toUpperCase()||null,
       jerseySize:document.getElementById('f-jersey-size').value||null,
       jerseyNumber:(()=>{const n=parseInt(document.getElementById('f-jersey-number').value);return(n>=1&&n<=99)?n:null;})(),
+      number:(()=>{const n=parseInt(document.getElementById('f-jersey-number').value);return(n>=1&&n<=99)?n:null;})(),
       // preserve existing URLs
       photoUrl:existing?.photoUrl||null,
       ccUrl:existing?.ccUrl||null, ccFileName:existing?.ccFileName||null,
@@ -6428,6 +6429,7 @@ async function syncPendingAthletes(silent=false){
             jerseySize:p.pending_jersey_size||null,
             jerseyNumber:p.pending_jersey_number||null,
           });
+          if(p.pending_jersey_number) DB.updatePlayer(p.id,{number:p.pending_jersey_number});
         }
         added++;
       }
@@ -7276,6 +7278,7 @@ function renderKitTab(){
       const val=(n>=1&&n<=99)?n:null;
       if(val===null) inp.value='';
       DB.setAthleteDoc(pid,{jerseyNumber:val});
+      DB.updatePlayer(pid,{number:val});
       inp.style.borderColor=val!=null?'var(--green)':'var(--border)';
       inp.style.background=val!=null?'#e8f5e9':'var(--card)';
       refreshStats();
@@ -7289,7 +7292,7 @@ function renderKitTab(){
       const p=DB.players().find(x=>x.id===pid);
       if(!confirm(`Limpar ficha de camisola de ${p?dn(p):'este atleta'}?`)) return;
       DB.setAthleteDoc(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null});
-      DB.updatePlayer(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null});
+      DB.updatePlayer(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null,number:null});
       renderKitTab();
     };
   });
