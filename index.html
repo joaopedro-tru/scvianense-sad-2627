@@ -7169,7 +7169,15 @@ function renderKitTab(){
   const sq=kitSquadSel.value;
 
   let players=DB.players().filter(p=>!sq||p.squad===sq);
-  players=sortByPos(players);
+  // GR primeiro, depois ordenar por número de camisola
+  players.sort((a,b)=>{
+    const aGR=a.position==='GR', bGR=b.position==='GR';
+    if(aGR!==bGR) return aGR?-1:1;
+    const da=DB.getAthleteDoc(a.id)||{}, db=DB.getAthleteDoc(b.id)||{};
+    const na=a.jerseyNumber??da.jerseyNumber??999;
+    const nb=b.jerseyNumber??db.jerseyNumber??999;
+    return na-nb;
+  });
 
   // Build set of assigned and duplicated jersey numbers
   const _numCount={};
@@ -7187,21 +7195,21 @@ function renderKitTab(){
     return;
   }
 
-  const POS_GROUP={GR:'Guarda-Redes',LD:'Defesas',DC:'Defesas',LE:'Defesas',MD:'Médios',MC:'Médios',MO:'Médios',ALD:'Avançados',ALE:'Avançados',ED:'Avançados',EE:'Avançados',PL:'Avançados',AV:'Avançados'};
-  let lastGroup='';
-
   const refreshStats=()=>{
     const f=DB.players().filter(p=>(!sq||p.squad===sq)&&(()=>{const _d=DB.getAthleteDoc(p.id)||{};return !!(p.jerseyName||_d.jerseyName)&&!!(p.jerseySize||_d.jerseySize)&&!!(p.jerseyNumber??_d.jerseyNumber);})()).length;
     document.getElementById('tm-kit-stats').textContent=`${f}/${players.length} com ficha completa`;
   };
 
+  let _kitSepShown=false;
   body.innerHTML=players.map(p=>{
     const d=DB.getAthleteDoc(p.id)||{};
-    const group=POS_GROUP[p.position]||'Outros';
+    const isGR=p.position==='GR';
     let groupRow='';
-    if(group!==lastGroup){
-      lastGroup=group;
-      groupRow=`<tr class="pos-group"><td colspan="6" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">${group}</td></tr>`;
+    if(!isGR&&!_kitSepShown){
+      _kitSepShown=true;
+      groupRow=`<tr class="pos-group"><td colspan="6" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Campo</td></tr>`;
+    } else if(isGR&&!_kitSepShown){
+      groupRow=`<tr class="pos-group"><td colspan="6" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Guarda-Redes</td></tr>`;
     }
     const sizeOpts=SHIRT_SIZES.map(s=>`<option value="${s}"${(p.jerseySize||d.jerseySize)===s?' selected':''}>${s}</option>`).join('');
     const jname=p.jerseyName||d.jerseyName||'';
