@@ -6536,10 +6536,11 @@ async function checkPendingBadge(){
 
 // ── ACCOUNT SETUP (admin cria/repõe password de qualquer conta) ──────────────
 function openAccountSetup(username){
-  const u=getAppUsers().find(x=>x.user===username); if(!u) return;
-  // Prefere email pessoal do perfil de staff (fonte mais atualizada)
+  // Prefere email do perfil de staff; fallback para app_users; último recurso: email interno
   const sp=DB.staffProfiles(null).find(p=>p.username===username);
-  const displayEmail=(sp?.email||'').trim().toLowerCase()||u.email;
+  const u=getAppUsers().find(x=>x.user===username);
+  const displayEmail=(sp?.email||'').trim().toLowerCase()||(u?.email)||`${username}@vianensesad.pt`;
+  if(!u && !sp){ toast('Utilizador não encontrado.'); return; }
   const mo=document.getElementById('mo-acct');
   document.getElementById('mo-acct-desc').textContent=`Conta: ${username} (${displayEmail})`;
   document.getElementById('mo-acct-pw').value='';
@@ -6560,7 +6561,7 @@ function openAccountSetup(username){
     btn.disabled=true; btn.textContent='A processar…';
     // Prefere email pessoal do perfil de staff; fallback para app_users
     const spNow=DB.staffProfiles(null).find(p=>p.username===username);
-    const currentEmail=(spNow?.email||'').trim().toLowerCase()||getAppUsers().find(x=>x.user===username)?.email||u.email;
+    const currentEmail=(spNow?.email||'').trim().toLowerCase()||getAppUsers().find(x=>x.user===username)?.email||`${username}@vianensesad.pt`;
     try{
       const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST',
