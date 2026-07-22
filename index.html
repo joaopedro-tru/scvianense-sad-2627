@@ -551,6 +551,7 @@ body.pm #v-pf{padding:30px}
     <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
   </nav>
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
+  <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
   <div id="sb-foot">SC Vianense SAD © 2026</div>
 </aside>
@@ -1544,6 +1545,16 @@ body.pm #v-pf{padding:30px}
   </div>
 </div>
 
+<!-- MODAL: GERIR CONTAS -->
+<div class="mo" id="mo-accounts">
+  <div class="md" style="max-width:560px">
+    <div class="mh"><h2>⚙️ Gerir Contas de Acesso</h2><button class="mc" id="mo-accounts-close">✕</button></div>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 16px">Altera o email de login de cada utilizador. O Firebase Auth é atualizado automaticamente.</p>
+    <div id="accounts-list" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="fa" style="margin-top:16px"><button class="btn btn-g" id="mo-accounts-cancel">Fechar</button></div>
+  </div>
+</div>
+
 <!-- MODAL: EVENT DETAIL -->
 <div class="mo" id="mo-edet">
   <div class="md" style="max-width:420px">
@@ -1776,6 +1787,44 @@ const USERS = [
   { user:'tm-19',    email:'goncalojmrego@gmail.com',        role:'teammanager', squad:'sub19' },
   { user:'tm-23',    email:'brunoarezes@vianensesad.pt',    role:'teammanager', squad:'sub23' },
 ];
+
+// ── DYNAMIC APP_USERS ─────────────────────────────────────────────────────────
+// Runtime mirror of `app_users` Firestore collection. Starts null (unloaded).
+let _appUsers = null;
+
+function getAppUsers(){
+  if(_appUsers && _appUsers.length) return _appUsers;
+  // Try localStorage cache written by loadAppUsers()
+  try{ const c=JSON.parse(localStorage.getItem('scv_au')||'null'); if(c&&c.length) return c; }catch(e){}
+  return USERS; // hardcoded fallback
+}
+
+async function loadAppUsers(){
+  if(!firestoreDb) return;
+  try{
+    const snap=await firestoreDb.collection('app_users').get();
+    if(!snap.empty){
+      const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      _appUsers=arr;
+      localStorage.setItem('scv_au',JSON.stringify(arr));
+    }
+  }catch(e){ console.warn('loadAppUsers:',e); }
+}
+
+async function seedAppUsersIfNeeded(){
+  if(!firestoreDb||!isAdmin()) return;
+  try{
+    const snap=await firestoreDb.collection('app_users').limit(1).get();
+    if(!snap.empty) return; // already seeded
+    const batch=firestoreDb.batch();
+    USERS.forEach(u=>{ const ref=firestoreDb.collection('app_users').doc(u.user); batch.set(ref,{...u}); });
+    await batch.commit();
+    _appUsers=[...USERS];
+    localStorage.setItem('scv_au',JSON.stringify(_appUsers));
+    console.log('✅ app_users seeded from USERS');
+  }catch(e){ console.warn('seedAppUsersIfNeeded:',e); }
+}
+
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
 function isAdmin(){ return currentUser()?.role==='admin'; }
@@ -1800,6 +1849,8 @@ if (FB_READY) {
     // Sessão dura apenas enquanto o tab estiver aberto (como sessionStorage)
     firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
     console.log('✅ Firebase pronto (Auth + Storage + Firestore)');
+    // Pre-load app_users so resolveUser() works before login completes
+    loadAppUsers();
   } catch(e) { console.warn('Firebase init failed:', e); }
 }
 
@@ -6245,6 +6296,9 @@ document.getElementById('btn-new-game').addEventListener('click',()=>openEventMo
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
 document.getElementById('nl-staff').addEventListener('click',()=>nav('staff'));
+document.getElementById('nl-accounts').addEventListener('click',()=>openAccountsModal());
+document.getElementById('mo-accounts-close').addEventListener('click',closeAccountsModal);
+document.getElementById('mo-accounts-cancel').addEventListener('click',closeAccountsModal);
 document.querySelectorAll('.nl[data-view]').forEach(el=>{
   el.addEventListener('click',()=>{
     const v=el.dataset.view, sq=el.dataset.squad;
@@ -7785,6 +7839,8 @@ function applyRoleUI(){
     tmSection.forEach(el=>el&&(el.style.display=''));
     jerseySection.forEach(el=>el&&(el.style.display=''));
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
+    const accountsEl=document.getElementById('nl-accounts');
+    if(accountsEl) accountsEl.style.display='';
     const importBtn=document.getElementById('btn-import-sub23');
     if(importBtn) importBtn.style.display=localStorage.getItem('scv_sub23_done')?'none':'';
     const mesoBtn=document.getElementById('btn-import-mesociclo');
@@ -7811,6 +7867,7 @@ function initCoordApp(){
       await DB.syncAthleteDocsFromFirestore();
       await DB.syncAthletePaymentsFromFirestore();
       await DB.syncTrialFromFirestore();
+      if(isAdmin()){ await seedAppUsersIfNeeded(); await loadAppUsers(); }
       if(isAdmin()) await syncPendingAthletes(true);
       if(isAdmin()) checkPendingBadge();
     } else {
@@ -7820,6 +7877,74 @@ function initCoordApp(){
     // Admin → dashboard | Treinador → dashboard personalizado
     nav('dashboard');
   })();
+}
+
+// ── GERIR CONTAS MODAL ────────────────────────────────────────────────────────
+async function openAccountsModal(){
+  const mo=document.getElementById('mo-accounts');
+  mo.classList.add('open');
+  const list=document.getElementById('accounts-list');
+  list.innerHTML='<p style="color:var(--muted);padding:16px;text-align:center">A carregar…</p>';
+
+  // Refresh from Firestore
+  if(firestoreDb){
+    try{
+      const snap=await firestoreDb.collection('app_users').get();
+      if(!snap.empty){
+        const arr=[]; snap.forEach(d=>arr.push(d.data()));
+        _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+      }
+    }catch(e){ console.warn('openAccountsModal fetch:',e); }
+  }
+
+  const users=getAppUsers().slice().sort((a,b)=>a.user.localeCompare(b.user));
+  const ROLE_LABELS={admin:'Admin',coach:'Treinador',staff:'Staff',medical:'Clínica',teammanager:'Team Manager'};
+  list.innerHTML=users.map(u=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">
+          <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px">${u.user}</code>
+          <span style="color:var(--muted);font-size:11px;margin-left:4px">${ROLE_LABELS[u.role]||u.role}${u.squad?' · '+u.squad:''}</span>
+        </div>
+        <input type="email" value="${u.email||''}" data-user="${u.user}"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box"
+          placeholder="email@exemplo.com">
+      </div>
+      <button onclick="saveAccountEmail('${u.user}',this)"
+        style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
+        Guardar
+      </button>
+    </div>`).join('');
+}
+
+function closeAccountsModal(){
+  document.getElementById('mo-accounts').classList.remove('open');
+}
+
+async function saveAccountEmail(userId, btn){
+  const row=btn.closest('div[style]');
+  const input=row.querySelector('input[type="email"]');
+  const newEmail=(input?.value||'').trim().toLowerCase();
+  if(!newEmail||!newEmail.includes('@')){ toast('❌ Email inválido'); return; }
+  const u=getAppUsers().find(x=>x.user===userId);
+  if(!u) return;
+  if(u.email===newEmail){ toast('Sem alterações'); return; }
+
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const fn=firebase.app().functions('europe-west1').httpsCallable('updateUserEmail');
+    const res=await fn({userId, newEmail});
+    if(res.data?.success){
+      const arr=getAppUsers().map(x=>x.user===userId?{...x,email:newEmail}:x);
+      _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+      toast('✅ Email atualizado');
+      btn.textContent='✓';
+      setTimeout(()=>{ btn.disabled=false; btn.textContent='Guardar'; },2500);
+    }
+  }catch(e){
+    toast('❌ '+(e.message||'Erro ao atualizar'));
+    btn.disabled=false; btn.textContent='Guardar';
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -7870,7 +7995,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Observador de sessão — dispara automaticamente se sessão já existe
     firebaseAuth.onAuthStateChanged(fbUser=>{
       if(fbUser){
-        const u=USERS.find(x=>x.email===fbUser.email);
+        const u=getAppUsers().find(x=>x.email===fbUser.email);
         if(u){
           sessionStorage.setItem(AUTH_KEY, JSON.stringify({
             role:u.role, squad:u.squad||null, user:u.user,
@@ -7887,7 +8012,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     // Resolve user by username OR email
-    function resolveUser(input){ const v=input.trim().toLowerCase(); return USERS.find(x=>x.user===v)||USERS.find(x=>x.email===v); }
+    function resolveUser(input){ const v=input.trim().toLowerCase(); const au=getAppUsers(); return au.find(x=>x.user===v)||au.find(x=>x.email===v); }
 
     // Mostrar "Esqueci a password" quando utilizador digitar o username ou email
     userIn.addEventListener('input',()=>{
