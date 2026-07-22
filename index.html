@@ -7242,9 +7242,11 @@ function renderKitTab(){
   body.querySelectorAll('[data-kit-size]').forEach(sel=>{
     sel.onchange=()=>{
       const pid=sel.dataset.kitSize;
-      DB.setAthleteDoc(pid,{jerseySize:sel.value||null});
-      sel.style.borderColor=sel.value?'var(--green)':'var(--border)';
-      sel.style.background=sel.value?'#e8f5e9':'var(--card)';
+      const val=sel.value||null;
+      DB.setAthleteDoc(pid,{jerseySize:val});
+      DB.updatePlayer(pid,{jerseySize:val});
+      sel.style.borderColor=val?'var(--green)':'var(--border)';
+      sel.style.background=val?'#e8f5e9':'var(--card)';
       refreshStats();
     };
   });
@@ -7253,6 +7255,7 @@ function renderKitTab(){
       const pid=inp.dataset.kitJname;
       const val=inp.value.toUpperCase().trim()||null;
       DB.setAthleteDoc(pid,{jerseyName:val});
+      DB.updatePlayer(pid,{jerseyName:val});
       inp.style.borderColor=val?'var(--green)':'var(--border)';
       inp.style.background=val?'#e8f5e9':'var(--card)';
       refreshStats();
