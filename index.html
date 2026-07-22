@@ -4097,10 +4097,6 @@ function renderTraining(){
           const _sqFilter=e=>e.type==='training'&&(e.squad===ev.squad||e.squad==='both'||(ev.squad==='both'));
           const allTr=DB.events().filter(_sqFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
           const utNum=allTr.findIndex(e=>e.id===ev.id)+1;
-          // Referência ao próximo jogo (-1, -2, -3 …)
-          const evD=new Date(ev.date+'T00:00:00');
-          const nextGame=DB.events().filter(e=>e.type==='game'&&e.date>ev.date&&(e.squad===ev.squad||e.squad==='both'||ev.squad==='both')).sort((a,b)=>a.date.localeCompare(b.date))[0];
-          const daysRef=nextGame?-Math.round((new Date(nextGame.date+'T00:00:00')-evD)/(864e5)):null;
           // Objetivos táticos
           const p=ev.objectivePrimary, s=ev.objectiveSecondary;
           const objRows=(()=>{
@@ -4115,7 +4111,6 @@ function renderTraining(){
             return ev.objectives?row('Objetivos',ev.objectives):'';
           })();
           return (utNum>0?row('UT',utNum.toString()):'')+
-                 (daysRef!==null?row('Até ao jogo',daysRef.toString()):'')+
                  (regime?row('Regime',regime):'')+
                  objRows;
         })()}
