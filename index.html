@@ -7669,12 +7669,12 @@ function seedLiga3Games(){
     {date:'2027-01-30', homeAway:'away', opponent:'Leça FC',           notes:'J18'},
   ];
   const targetDates = new Set(games.map(g=>g.date));
-  // Remove existing eqa games on these dates that have no opponent (inserted manually without data)
-  DB.events().forEach(e=>{
-    if(e.type==='game' && e.squad==='eqa' && targetDates.has(e.date) && !e.opponent){
-      DB.deleteEvent(e.id);
-    }
-  });
+  // Collect IDs to delete first (eqa games on these dates with no/empty opponent)
+  const toDelete = DB.events().filter(e=>
+    e.type==='game' && e.squad==='eqa' &&
+    targetDates.has(e.date) && !(e.opponent||'').trim()
+  ).map(e=>e.id);
+  toDelete.forEach(id=>DB.deleteEvent(id));
   // Add each game if not already present with this opponent
   let added = 0;
   games.forEach(g=>{
