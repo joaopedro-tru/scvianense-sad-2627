@@ -6946,41 +6946,29 @@ function printKit(){
     const nb=b.jerseyNumber??db.jerseyNumber??999;
     return na-nb;
   });
-  const grs=players.filter(p=>p.position==='GR');
-  const field=players.filter(p=>p.position!=='GR');
-  let rows='';
-  // All GRs in one combined row
-  if(grs.length){
-    const grItems=grs.map(p=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      const jname=p.jerseyName||d.jerseyName||'—';
-      const jsize=p.jerseySize||d.jerseySize||'—';
-      const jnum=p.jerseyNumber??d.jerseyNumber;
-      return `<span style="display:inline-block;border:1px solid #c5d3f0;border-radius:6px;padding:5px 11px;margin:3px;font-size:12px;font-family:Arial,sans-serif;background:#fff"><b>${jnum!=null?'#'+jnum:'—'}</b> · ${dn(p)} · ${jsize} · <span style="letter-spacing:.5px;font-weight:700">${jname}</span></span>`;
-    }).join('');
-    rows+=`<tr><td colspan="6" style="padding:10px 12px;border:1px solid #ddd;background:#eef4ff">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;margin-bottom:7px;font-family:Arial,sans-serif">🧤 Guarda-Redes</div>
-      <div>${grItems}</div>
-    </td></tr>`;
-  }
-  // Field players individually
-  if(field.length){
-    rows+=`<tr><td colspan="6" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Campo</td></tr>`;
-    rows+=field.map((p,i)=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      const jname=p.jerseyName||d.jerseyName||'';
-      const jsize=p.jerseySize||d.jerseySize||'';
-      const jnum=p.jerseyNumber??d.jerseyNumber??'';
-      return `<tr style="background:${i%2===0?'#fff':'#fafafa'}">
-        <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?jnum:'—'}</td>
-        <td style="padding:8px 10px;border:1px solid #ddd">${dn(p)}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jsize||'—'}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700;letter-spacing:.5px">${jname||'—'}</td>
-        <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?`#${jnum}`:'—'}</td>
-      </tr>`;
-    }).join('');
-  }
+  let _sepShown=false;
+  const rows=players.map((p,i)=>{
+    const d=DB.getAthleteDoc(p.id)||{};
+    const jname=p.jerseyName||d.jerseyName||'';
+    const jsize=p.jerseySize||d.jerseySize||'';
+    const jnum=p.jerseyNumber??d.jerseyNumber??'';
+    const isGR=p.position==='GR';
+    let groupRow='';
+    if(isGR&&i===0){
+      groupRow=`<tr><td colspan="6" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Guarda-Redes</td></tr>`;
+    } else if(!isGR&&!_sepShown){
+      _sepShown=true;
+      groupRow=`<tr><td colspan="6" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Campo</td></tr>`;
+    }
+    return `${groupRow}<tr style="background:${i%2===0?'#fff':'#fafafa'}">
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?jnum:'—'}</td>
+      <td style="padding:8px 10px;border:1px solid #ddd">${dn(p)}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jsize||'—'}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700;letter-spacing:.5px">${jname||'—'}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?`#${jnum}`:'—'}</td>
+    </tr>`;
+  }).join('');
   const head=`<tr>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:40px">#</th>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd">Atleta</th>
@@ -7010,45 +6998,34 @@ function exportRouparia(){
     const nb=b.jerseyNumber??db.jerseyNumber??999;
     return na-nb;
   });
-  const grs=players.filter(p=>p.position==='GR');
-  const field=players.filter(p=>p.position!=='GR');
-  const sizeCounts={};
-  let rows='';
-  // All GRs in one combined row
-  if(grs.length){
-    const grItems=grs.map(p=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      const jname=(p.jerseyName||d.jerseyName||'—').toUpperCase();
-      const jsize=p.jerseySize||d.jerseySize||'—';
-      const jnum=p.jerseyNumber??d.jerseyNumber;
-      if(jsize&&jsize!=='—') sizeCounts[jsize]=(sizeCounts[jsize]||0)+1;
-      return `<span style="display:inline-block;border:1px solid #e8b84b;border-radius:6px;padding:6px 12px;margin:3px;font-size:12px;font-family:Arial,sans-serif;background:#fff"><b style="color:#0e2444">${jnum!=null?'#'+jnum:'—'}</b> · ${dn(p)}<span style="font-size:11px;color:#999;margin-left:4px">${sq?'':`(${SQUADS[p.squad]||p.squad})`}</span> · <b style="color:#1a56db">${jsize}</b> · <span style="letter-spacing:1px;font-weight:700">${jname}</span></span>`;
-    }).join('');
-    rows+=`<tr><td colspan="6" style="padding:10px 14px;border:1px solid #dde3f0;background:#0e2444">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#e8b84b;margin-bottom:8px;font-family:Arial,sans-serif">🧤 Guarda-Redes</div>
-      <div>${grItems}</div>
-    </td></tr>`;
-  }
-  // Field players individually
-  if(field.length){
-    rows+=`<tr><td colspan="6" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Campo</td></tr>`;
-    rows+=field.map((p,i)=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      const jname=(p.jerseyName||d.jerseyName||'').toUpperCase();
-      const jsize=p.jerseySize||d.jerseySize||'';
-      const jnum=p.jerseyNumber??d.jerseyNumber??'';
-      if(jsize) sizeCounts[jsize]=(sizeCounts[jsize]||0)+1;
-      return `<tr style="background:${i%2===0?'#fff':'#f8faff'}">
-        <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;color:#666">${jnum!==''?jnum:'—'}</td>
-        <td style="padding:9px 12px;border:1px solid #dde3f0;font-weight:600">${dn(p)}<span style="font-size:11px;color:#999;margin-left:6px">${sq?'':`(${SQUADS[p.squad]||p.squad})`}</span></td>
-        <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
-        <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:15px;color:#1a56db">${jsize}</td>
-        <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;letter-spacing:1.5px;font-size:13px">${jname}</td>
-        <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:16px;color:#0e2444">${jnum!==''?`#${jnum}`:'—'}</td>
-      </tr>`;
-    }).join('');
-  }
-  const summaryRow=Object.entries(sizeCounts).sort(([a],[b])=>SHIRT_SIZES.indexOf(a)-SHIRT_SIZES.indexOf(b)).map(([s,c])=>`<span style="display:inline-block;background:#e8f0fe;border:1px solid #c5d3f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;margin:2px"><b>${s}</b> × ${c}</span>`).join('');
+  const sizeCountsGR={},sizeCountsField={};
+  let _sepShown=false;
+  const rows=players.map((p,i)=>{
+    const d=DB.getAthleteDoc(p.id)||{};
+    const jname=(p.jerseyName||d.jerseyName||'').toUpperCase();
+    const jsize=p.jerseySize||d.jerseySize||'';
+    const jnum=p.jerseyNumber??d.jerseyNumber??'';
+    if(jsize){ if(p.position==='GR') sizeCountsGR[jsize]=(sizeCountsGR[jsize]||0)+1; else sizeCountsField[jsize]=(sizeCountsField[jsize]||0)+1; }
+    const isGR=p.position==='GR';
+    let groupRow='';
+    if(isGR&&i===0){
+      groupRow=`<tr><td colspan="6" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Guarda-Redes</td></tr>`;
+    } else if(!isGR&&!_sepShown){
+      _sepShown=true;
+      groupRow=`<tr><td colspan="6" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Campo</td></tr>`;
+    }
+    return `${groupRow}<tr style="background:${i%2===0?'#fff':'#f8faff'}">
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;color:#666">${jnum!==''?jnum:'—'}</td>
+      <td style="padding:9px 12px;border:1px solid #dde3f0;font-weight:600">${dn(p)}<span style="font-size:11px;color:#999;margin-left:6px">${sq?'':`(${SQUADS[p.squad]||p.squad})`}</span></td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:15px;color:#1a56db">${jsize}</td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;letter-spacing:1.5px;font-size:13px">${jname}</td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:16px;color:#0e2444">${jnum!==''?`#${jnum}`:'—'}</td>
+    </tr>`;
+  }).join('');
+  const fmtSizes=(counts)=>Object.entries(counts).sort(([a],[b])=>SHIRT_SIZES.indexOf(a)-SHIRT_SIZES.indexOf(b)).map(([s,c])=>`<span style="display:inline-block;background:#e8f0fe;border:1px solid #c5d3f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;margin:2px"><b>${s}</b> × ${c}</span>`).join('');
+  const summaryGR=fmtSizes(sizeCountsGR);
+  const summaryField=fmtSizes(sizeCountsField);
   const head=`<tr>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:40px">#</th>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444">Atleta</th>
@@ -7075,7 +7052,7 @@ function exportRouparia(){
     </div>
     <div style="padding:24px 20px;max-width:800px;margin:0 auto">
       <div style="background:#0e2444;color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:18px">
-        <div style="font-size:18px;font-weight:800;font-family:Arial,sans-serif">SC Vianense SAD — Fichas de Camisola</div>
+        <div style="font-size:18px;font-weight:800;font-family:Arial,sans-serif">SC Vianense SAD — Equipamentos</div>
         <div style="font-size:12px;color:#e8b84b;margin-top:4px;font-family:Arial,sans-serif">${squadLabel} · Gerado em ${new Date().toLocaleDateString('pt-PT')} · ${players.length} atletas</div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:Arial,sans-serif;margin-bottom:16px">
@@ -7083,8 +7060,9 @@ function exportRouparia(){
         <tbody>${rows}</tbody>
       </table>
       <div style="background:#f5f8ff;border:1px solid #dde3f0;border-radius:8px;padding:14px 16px;font-family:Arial,sans-serif">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:8px">Resumo de Tamanhos</div>
-        <div>${summaryRow}</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:10px">Resumo de Tamanhos</div>
+        ${summaryGR?`<div style="margin-bottom:8px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;margin-right:6px">GR</span>${summaryGR}</div>`:''}
+        ${summaryField?`<div><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;margin-right:6px">Campo</span>${summaryField}</div>`:''}
       </div>
     </div>`;
   document.body.appendChild(overlay);
