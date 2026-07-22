@@ -482,11 +482,18 @@ body.pm #v-pf{padding:30px}
     inset:0!important;
     width:100%!important;
     max-width:100%!important;
-    padding:8mm 10mm!important;
+    padding:6mm 8mm!important;
     background:#fff!important;
     color:#000!important;
     overflow:visible!important;
   }
+
+  /* Preserve background colors and text colors */
+  body.printing-cal *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+
   /* Hide interactive controls */
   body.printing-cal .tb,
   body.printing-cal .ft,
@@ -496,35 +503,39 @@ body.pm #v-pf{padding:30px}
   body.printing-cal #btn-add-event,
   body.printing-cal [data-del-event]{ display:none!important }
 
+  /* Hide events list below calendar — print shows only the grid */
+  body.printing-cal .el{ display:none!important }
+  body.printing-cal .conflict-banner{ display:none!important }
+
   /* Print header via pseudo-element */
   body.printing-cal #v-cal::before{
     content: var(--print-cal-header, "SC Vianense SAD · Calendário");
     display:block;
-    font-size:13pt;
+    font-size:12pt;
     font-weight:700;
-    margin-bottom:6mm;
-    padding-bottom:3mm;
+    margin-bottom:4mm;
+    padding-bottom:2mm;
     border-bottom:2px solid #0e2444;
     color:#0e2444;
     visibility:visible;
   }
 
-  body.printing-cal .cg{ margin:0!important; box-shadow:none!important }
-  body.printing-cal .chr{ background:#0e2444!important; color:#fff!important }
-  body.printing-cal .chc{ color:#fff!important; font-size:8pt!important }
-  body.printing-cal .cd{ border:1px solid #ccc!important; min-height:16mm!important; padding:2px!important }
-  body.printing-cal .cdn{ font-size:8pt!important }
-  body.printing-cal .ce{ font-size:7pt!important; padding:1px 3px!important; margin:1px 0!important }
-  body.printing-cal .ce-meta{ display:none!important }
-  body.printing-cal .om{ opacity:.4!important }
+  /* Calendar grid — maximise the page */
+  body.printing-cal .cg{ margin:0!important; box-shadow:none!important; width:100%!important }
+  body.printing-cal .chr{ background:#0e2444!important; color:#fff!important; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important }
+  body.printing-cal .chc{ color:#fff!important; font-size:8pt!important; padding:5px 3px!important }
+  body.printing-cal .cd{ border:1px solid #ccc!important; min-height:22mm!important; padding:3px 4px!important; vertical-align:top }
+  body.printing-cal .cdn{ font-size:8pt!important; font-weight:700; margin-bottom:2px }
+  body.printing-cal .om{ opacity:.35!important }
 
-  /* Events list below calendar */
-  body.printing-cal .el h3{ font-size:11pt!important; margin:4mm 0 2mm!important }
-  body.printing-cal .ei{ font-size:8pt!important; padding:2mm 0!important }
-  body.printing-cal .esb{ font-size:7pt!important }
-  body.printing-cal .conflict-banner{ display:none!important }
+  /* Event chips — show time, preserve colors */
+  body.printing-cal .ce{ font-size:7pt!important; padding:2px 4px!important; margin:1px 0!important; border-radius:3px!important; line-height:1.3!important }
+  body.printing-cal .ce.tr{ background:#d4edda!important; color:#155724!important }
+  body.printing-cal .ce.gm{ background:#cce5ff!important; color:#004085!important }
+  body.printing-cal .ce-title{ font-size:7pt!important; font-weight:600!important }
+  body.printing-cal .ce-meta{ display:block!important; font-size:6.5pt!important; opacity:.85; margin-top:1px }
 
-  @page{ size:A4 landscape; margin:10mm }
+  @page{ size:A4 landscape; margin:8mm }
 }
 </style>
 </head>
