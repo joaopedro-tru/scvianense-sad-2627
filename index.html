@@ -7645,6 +7645,41 @@ function applyRoleUI(){
   }
 }
 
+// ── LIGA 3 SEED ───────────────────────────────────────────────────────────────
+function seedLiga3Games(){
+  const COMP = 'Liga 3 Placard Série A 26/27';
+  const games = [
+    {date:'2026-08-09', homeAway:'away', opponent:'Fafe',              notes:'J1'},
+    {date:'2026-08-16', homeAway:'home', opponent:'Trofense',          notes:'J2'},
+    {date:'2026-08-23', homeAway:'away', opponent:'AD Marco 09',       notes:'J3'},
+    {date:'2026-09-06', homeAway:'home', opponent:'Paços de Ferreira', notes:'J4'},
+    {date:'2026-09-13', homeAway:'away', opponent:'Varzim',            notes:'J5'},
+    {date:'2026-10-11', homeAway:'home', opponent:'USC Paredes',       notes:'J6'},
+    {date:'2026-10-25', homeAway:'home', opponent:'S. João Ver',       notes:'J7'},
+    {date:'2026-11-01', homeAway:'away', opponent:'Vitória SC B',      notes:'J8'},
+    {date:'2026-11-08', homeAway:'home', opponent:'Leça FC',           notes:'J9'},
+    {date:'2026-11-28', homeAway:'home', opponent:'Fafe',              notes:'J10'},
+    {date:'2026-12-06', homeAway:'away', opponent:'Trofense',          notes:'J11'},
+    {date:'2026-12-13', homeAway:'home', opponent:'AD Marco 09',       notes:'J12'},
+    {date:'2026-12-20', homeAway:'away', opponent:'Paços de Ferreira', notes:'J13'},
+    {date:'2027-01-03', homeAway:'home', opponent:'Varzim',            notes:'J14'},
+    {date:'2027-01-10', homeAway:'away', opponent:'USC Paredes',       notes:'J15'},
+    {date:'2027-01-17', homeAway:'away', opponent:'S. João Ver',       notes:'J16'},
+    {date:'2027-01-24', homeAway:'home', opponent:'Vitória SC B',      notes:'J17'},
+    {date:'2027-01-30', homeAway:'away', opponent:'Leça FC',           notes:'J18'},
+  ];
+  const existing = DB.events();
+  let added = 0;
+  games.forEach(g=>{
+    const dup = existing.some(e=>e.type==='game'&&e.date===g.date&&e.opponent===g.opponent&&e.squad==='eqa');
+    if(!dup){
+      DB.addEvent({type:'game', squad:'eqa', time:'15:00', competition:COMP, ...g});
+      added++;
+    }
+  });
+  if(added>0) console.log(`Liga 3: ${added} jogo(s) adicionado(s).`);
+}
+
 function initCoordApp(){
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('sync-overlay').style.display='flex';
@@ -7670,6 +7705,7 @@ function initCoordApp(){
     } else {
       seedIfEmpty();
     }
+    seedLiga3Games();
     document.getElementById('sync-overlay').style.display='none';
     // Admin → dashboard | Treinador → dashboard personalizado
     nav('dashboard');
