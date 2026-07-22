@@ -2344,6 +2344,15 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 // ── ROUTING ───────────────────────────────────────────────────────────────────
 let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
 
+const COMP_ABBR=[
+  [/Liga 3 Placard[^,]*/i,       'Liga 3'],
+  [/Jogo de Prepara[çc][aã]o/i,  'JP'],
+  [/Camp\. Dist\.? Juniores "A" AFVC/i, 'CDJ "A"'],
+  [/Camp\. Dist\.? 2ª Div AFVC/i,'2ª Div'],
+  [/2ª Div(?:is[aã]o)? AFVC/i,   '2ª Div'],
+];
+function abrevComp(c){ if(!c)return ''; for(const[re,ab]of COMP_ABBR){if(re.test(c))return ab;} return c; }
+
 function evLabel(ev){
   if(ev.type==='game'){
     const icon=ev.homeAway==='away'?'✈️':'🏠';
@@ -3784,8 +3793,9 @@ function renderCal(){
       let chipTitle, meta;
       if(ev.type==='game'){
         const icon=ev.homeAway==='away'?'✈️':'🏠';
+        const compShort=abrevComp(ev.competition);
         chipTitle=`${icon} ${ev.opponent||'Jogo'}`;
-        meta=[ev.time, SQUADS[ev.squad]].filter(Boolean).join(' · ');
+        meta=[ev.time, compShort||SQUADS[ev.squad]].filter(Boolean).join(' · ');
       } else {
         chipTitle=`🏃 ${SQUADS[ev.squad]||'Treino'}`;
         meta=[ev.time,ev.location].filter(Boolean).join(' · ');
