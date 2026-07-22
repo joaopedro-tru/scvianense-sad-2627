@@ -465,6 +465,67 @@ body.pm #v-pf{padding:30px}
   .mc-cols{gap:4px}
   .mc-col{gap:3px}
 }
+
+/* ── CALENDAR PRINT ──────────────────────────────────────────────────────── */
+@media print{
+  body.printing-cal *{ visibility:hidden }
+  body.printing-cal .sb,
+  body.printing-cal .mo,
+  body.printing-cal #login-overlay,
+  body.printing-cal #sync-overlay{ display:none!important }
+
+  body.printing-cal #v-cal,
+  body.printing-cal #v-cal *{ visibility:visible }
+
+  body.printing-cal #v-cal{
+    position:fixed!important;
+    inset:0!important;
+    width:100%!important;
+    max-width:100%!important;
+    padding:8mm 10mm!important;
+    background:#fff!important;
+    color:#000!important;
+    overflow:visible!important;
+  }
+  /* Hide interactive controls */
+  body.printing-cal .tb,
+  body.printing-cal .ft,
+  body.printing-cal .cc,
+  body.printing-cal #btn-cal-back,
+  body.printing-cal #btn-cal-pdf,
+  body.printing-cal #btn-add-event,
+  body.printing-cal [data-del-event]{ display:none!important }
+
+  /* Print header via pseudo-element */
+  body.printing-cal #v-cal::before{
+    content: var(--print-cal-header, "SC Vianense SAD · Calendário");
+    display:block;
+    font-size:13pt;
+    font-weight:700;
+    margin-bottom:6mm;
+    padding-bottom:3mm;
+    border-bottom:2px solid #0e2444;
+    color:#0e2444;
+    visibility:visible;
+  }
+
+  body.printing-cal .cg{ margin:0!important; box-shadow:none!important }
+  body.printing-cal .chr{ background:#0e2444!important; color:#fff!important }
+  body.printing-cal .chc{ color:#fff!important; font-size:8pt!important }
+  body.printing-cal .cd{ border:1px solid #ccc!important; min-height:16mm!important; padding:2px!important }
+  body.printing-cal .cdn{ font-size:8pt!important }
+  body.printing-cal .ce{ font-size:7pt!important; padding:1px 3px!important; margin:1px 0!important }
+  body.printing-cal .ce-meta{ display:none!important }
+  body.printing-cal .om{ opacity:.4!important }
+
+  /* Events list below calendar */
+  body.printing-cal .el h3{ font-size:11pt!important; margin:4mm 0 2mm!important }
+  body.printing-cal .ei{ font-size:8pt!important; padding:2mm 0!important }
+  body.printing-cal .esb{ font-size:7pt!important }
+  body.printing-cal .conflict-banner{ display:none!important }
+
+  @page{ size:A4 landscape; margin:10mm }
+}
 </style>
 </head>
 <body>
@@ -651,10 +712,14 @@ body.pm #v-pf{padding:30px}
   <!-- CALENDAR -->
   <div class="view" id="v-cal">
     <div class="tb">
-      <div><h1>Calendário</h1><div class="sub">Treinos e jogos</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="btn-cal-back" onclick="nav('dashboard')" title="Voltar ao início"
+          style="display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text);padding:2px 4px;line-height:1">‹</button>
+        <div><h1>Calendário</h1><div class="sub">Treinos e jogos</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-p" id="btn-add-event">+ Adicionar Evento</button>
-        <button class="btn" id="btn-import-mesociclo" style="display:none;font-size:12px;padding:6px 12px;background:#e8f0fe;color:#1a56db;border:1.5px solid #c3d3f7">📥 Mesociclo Jul</button>
+        <button class="btn btn-o btn-sm" id="btn-cal-pdf" title="Exportar calendário em PDF" style="font-size:13px">📄 PDF</button>
       </div>
     </div>
     <div class="ft" id="cal-filters">
@@ -953,7 +1018,6 @@ body.pm #v-pf{padding:30px}
         <span id="tm-kit-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
         <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
         <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
-        <button class="btn btn-o btn-sm" id="btn-import-sub23" onclick="previewSub23Import()" style="display:none;border-color:var(--primary);color:var(--primary)">📥 Importar Sub-23</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
         <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -3058,11 +3122,11 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   const sel=document.getElementById('sf-user');
   if(!sel) return;
 
-  const ROLE_ORDER=['headcoach','adjunto','estagiario','grcoach','condicionamento','analista','fisio','enfermeiro','massagista','delegado','teammanager','outro'];
-  const ROLE_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',analista:'Analista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'};
+  const ROLE_ORDER=['headcoach','adjunto','estagiario','grcoach','condicionamento','analista','fisio','enfermeiro','massagista','delegado','teammanager','outro','medical'];
+  const ROLE_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',analista:'Analista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',medical:'Clínica / Saúde',outro:'Outro'};
   const SQUAD_ORDER=['eqa','sub19','sub23'];
   const SQUAD_LABEL={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
-  function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null); }
+  function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':u.role==='medical'?'medical':null); }
 
   // All non-admin accounts (source of truth for all handlers below)
   const allFormUsers=getAppUsers().filter(u=>u.role!=='admin');
@@ -3075,7 +3139,8 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     if(firestoreDb){
       try{
         const snap=await firestoreDb.collection('staff_profiles').get();
-        snap.forEach(d=>existingIds.add(d.id));
+        // doc IDs are random UIDs; the username is in the `username` field
+        snap.forEach(d=>{ const usr=d.data().username; if(usr) existingIds.add(usr); });
       }catch(e){}
     }
     const pending=allFormUsers.filter(u=>!existingIds.has(u.user));
@@ -3654,64 +3719,32 @@ async function avSquadChange(){
   });
 })();
 
-// ── MESOCICLO JULHO 2026 — IMPORT ─────────────────────────────────────────────
-const _MESO_JULHO=[
-  // ── SEMANA 1 (29 Jun – 5 Jul) ──────────────────────────────────────────────
-  {type:'training',date:'2026-06-29',time:'10:00',location:'Estádio Dr. José de Matos',notes:'Testes Físicos + Treino'},
-  {type:'training',date:'2026-06-30',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-01',time:'10:00',location:'Estádio Dr. José de Matos'},
-  // ── SEMANA 2 (6–12 Jul) ────────────────────────────────────────────────────
-  {type:'training',date:'2026-07-06',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-07',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-08',time:'10:00',location:'Estádio Dr. José de Matos',notes:'Treino bi-diário (manhã)'},
-  {type:'training',date:'2026-07-08',time:'17:00',location:'Estádio Dr. José de Matos',notes:'Treino bi-diário (tarde)'},
-  {type:'training',date:'2026-07-09',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-10',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'game',   date:'2026-07-11',time:'10:30',location:'Sports Valley – Vizela',       opponent:'Vitória B',        homeAway:'away',competition:'JP-1 · Pré-época'},
-  // ── SEMANA 3 (13–19 Jul) ───────────────────────────────────────────────────
-  {type:'training',date:'2026-07-13',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-14',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'game',   date:'2026-07-15',time:'10:30',location:'Centro de Estágio – Melgaço',  opponent:'Gil Vicente FC',   homeAway:'away',competition:'JP-2 · Pré-época'},
-  {type:'training',date:'2026-07-16',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'training',date:'2026-07-17',time:'10:00',location:'Estádio Dr. José de Matos'},
-  {type:'game',   date:'2026-07-18',time:'10:30',location:'Cidade Desportiva de Braga',   opponent:'SC Braga B',       homeAway:'away',competition:'JP-3 · Pré-época'},
-  // ── SEMANA 4 (20–26 Jul) — Estágio Rosa Náutica ────────────────────────────
-  {type:'training',date:'2026-07-21',time:'10:00',location:'Centro de Estágios Rosa Náutica',notes:'Estágio'},
-  {type:'game',   date:'2026-07-22',time:'16:00',location:'Centro de Estágios Rosa Náutica',opponent:'Naval',          homeAway:'home',competition:'JP-3.1 · Pré-época'},
-  {type:'training',date:'2026-07-23',time:'10:00',location:'Centro de Estágios Rosa Náutica',notes:'Estágio'},
-  {type:'training',date:'2026-07-24',time:'10:00',location:'Estádio Dr. José de Matos Nº2'},
-  {type:'game',   date:'2026-07-25',time:'10:30',location:'Estádio Municipal Marco de Canavezes',opponent:'Marco 09', homeAway:'away',competition:'JP-4 · Pré-época'},
-  // ── SEMANA 5 (27 Jul – 2 Ago) ─────────────────────────────────────────────
-  {type:'training',date:'2026-07-27',time:'10:00',location:'Estádio Municipal Manuela Machado'},
-  {type:'training',date:'2026-07-28',time:'10:00',location:'Estádio Municipal Manuela Machado'},
-  {type:'game',   date:'2026-07-29',time:'10:30',location:'Lousada / Vila Aves',           opponent:'AFS',              homeAway:'away',competition:'JP-5 · Pré-época'},
-  {type:'training',date:'2026-07-30',time:'10:00',location:'Estádio Municipal Manuela Machado'},
-  {type:'training',date:'2026-07-31',time:'10:00',location:'Estádio Municipal Manuela Machado'},
-  {type:'game',   date:'2026-08-01',time:'10:30',location:'Estádio Municipal Manuela Machado',opponent:'AD Os Limianos',homeAway:'home',competition:'JP-6 · Troféu Passinhos'},
-  {type:'game',   date:'2026-08-01',time:'17:00',location:'Estádio Municipal Manuela Machado',opponent:'Gil Vicente U23',homeAway:'home',competition:'JP-7 · Troféu Passinhos'},
-];
-
-function importMesocicloJulho(){
-  const count=_MESO_JULHO.length;
-  const gamesCount=_MESO_JULHO.filter(e=>e.type==='game').length;
-  const trainCount=_MESO_JULHO.filter(e=>e.type==='training').length;
-  if(!confirm(`Importar Mesociclo Julho 2026 para a Equipa A?\n\n• ${trainCount} treinos\n• ${gamesCount} jogos (JP-1 a JP-7)\n• Período: 29 Jun – 1 Ago\n\nATENÇÃO: Todos os eventos existentes da Equipa A entre 29 Jun e 1 Ago 2026 serão eliminados antes da importação.`)) return;
-
-  // Delete existing eqa events in the period
-  const toDelete=DB.events('eqa').filter(e=>e.date>='2026-06-29'&&e.date<='2026-08-01');
-  toDelete.forEach(e=>DB.deleteEvent(e.id));
-
-  // Insert all new events
-  _MESO_JULHO.forEach(ev=>DB.addEvent({squad:'eqa',...ev,notes:ev.notes||'',objectives:''}));
-
-  localStorage.setItem('scv_meso_jul_done','1');
-  toast(`✅ Mesociclo importado: ${trainCount} treinos e ${gamesCount} jogos criados!`);
-  document.getElementById('btn-import-mesociclo')?.remove();
-  renderCal();
-  if(view==='dashboard') renderDash();
-  if(view==='sq-trainings'&&squad==='eqa') renderSqTrainings();
-  if(view==='sq-games'&&squad==='eqa') renderSqGames();
+// ── CALENDAR PDF EXPORT ───────────────────────────────────────────────────────
+function exportCalPDF(){
+  // Capture current filter label
+  const filterLabel = calFilter==='all'?'Todos os escalões':
+    calFilter==='eqa'?'Equipa A':calFilter==='sub19'?'Sub-19':'Sub-23';
+  // Set title for print header
+  document.title=`Calendário ${MONTHS[calMonth]} ${calYear} — SC Vianense SAD`;
+  document.body.classList.add('printing-cal');
+  // Store month/filter for CSS header
+  document.documentElement.style.setProperty('--print-cal-header',
+    `"SC Vianense SAD · Calendário · ${MONTHS[calMonth]} ${calYear} · ${filterLabel}"`);
+  window.print();
+  // Restore after dialog closes
+  setTimeout(()=>{
+    document.body.classList.remove('printing-cal');
+    document.title='SC Vianense SAD';
+  }, 1000);
 }
+
+// Show back button in standalone (PWA) mode
+(function detectStandalone(){
+  if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+    const btn=document.getElementById('btn-cal-back');
+    if(btn) btn.style.display='';
+  }
+})();
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function getGameOverlaps(events){
@@ -3944,7 +3977,7 @@ document.querySelectorAll('input[name="e-ha"]').forEach(r=>r.addEventListener('c
   else if(this.value==='away'&&locEl.value===HOME_STAD) locEl.value='';
 }));
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
-document.getElementById('btn-import-mesociclo').addEventListener('click',importMesocicloJulho);
+document.getElementById('btn-cal-pdf').addEventListener('click',exportCalPDF);
 document.getElementById('mo-e-close').addEventListener('click',closeEventModal);
 document.getElementById('mo-e-cancel').addEventListener('click',closeEventModal);
 document.getElementById('mo-e-form').addEventListener('submit',e=>{
@@ -6969,24 +7002,6 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
     document.getElementById('e-ai-status').textContent='⚠️ Erro na análise IA.';
   }
 }
-// Dados de camisola Sub-23 — Numeração SCV SAD 26/27
-const SUB23_JERSEY_SEED=[
-  {name:'João Pais',       jerseyName:'J.PAIS',     jerseySize:'L',  jerseyNumber:4 },
-  {name:'Rui Lavarinhas',  jerseyName:'LAVARINHAS', jerseySize:'M',  jerseyNumber:5 },
-  {name:'Duarte Bravo',    jerseyName:'D.BRAVO',    jerseySize:'M',  jerseyNumber:6 },
-  {name:'Bruno Santos',    jerseyName:'BRUNO',      jerseySize:'M',  jerseyNumber:18},
-  {name:'Hugo Carvalho',   jerseyName:'HUGO',       jerseySize:'L',  jerseyNumber:24},
-  {name:'Lucas Bravo',     jerseyName:'L.BRAVO',    jerseySize:'S',  jerseyNumber:25},
-  {name:'Guilherme Pereira',jerseyName:'GUI',       jerseySize:'XL', jerseyNumber:27},
-  {name:'João Antunes',    jerseyName:'ANTUNES',    jerseySize:'XL', jerseyNumber:28},
-  {name:'Eduardo Garduzi', jerseyName:'DUDU',       jerseySize:'L',  jerseyNumber:29},
-  {name:'João Rainha',     jerseyName:'JOTA',       jerseySize:'M',  jerseyNumber:42},
-  {name:'Gonçalo Coutada', jerseyName:'COUTADA',    jerseySize:'M',  jerseyNumber:81},
-  {name:'Pedro Vieira',    jerseyName:'VIEIRA',     jerseySize:'M',  jerseyNumber:86},
-  {name:'Diogo Gomes',     jerseyName:'GOMES',      jerseySize:'M',  jerseyNumber:89},
-  {name:'Eduardo Ribeiro', jerseyName:'EDUARDO R.', jerseySize:'L',  jerseyNumber:93},
-  {name:'Tiago Lima',      jerseyName:'LIMA',       jerseySize:'XL', jerseyNumber:98},
-];
 
 // Números disponíveis na rouparia (sem linha preenchida na lista geral 26/27)
 const JERSEY_AVAILABLE=[2,15,26,31,32,33,34,35,36,37,38,39,40,41,43,44,45,46,47,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,71,72,73,74,75,76,77,78,79,80,82,83,84,85,87,91,92,94,95,96,97,99];
@@ -7344,110 +7359,21 @@ function renderKitTab(){
   body.querySelectorAll('.kit-clear-col').forEach(td=>td.style.display=isAdmin?'':'none');
 }
 
-// ── SUB-23 JERSEY IMPORT ──────────────────────────────────────────────────────
+// ── PUBLIC JERSEY FORM helper ─────────────────────────────────────────────────
 function _normName(s){
   return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z\s]/g,'').trim();
 }
-function _matchSub23(seed, sub23players){
-  const sn=_normName(seed.name);
-  const parts=sn.split(/\s+/);
-  const last=parts[parts.length-1];
-  // 1. exact
-  let m=sub23players.find(p=>_normName(p.name)===sn||_normName(p.alcunha||'')===sn);
-  if(m) return {player:m,conf:'exact'};
-  // 2. last name exact
-  m=sub23players.find(p=>_normName(p.name).split(/\s+/).pop()===last);
-  if(m) return {player:m,conf:'last'};
-  // 3. contains last name
-  m=sub23players.find(p=>_normName(p.name).includes(last));
-  if(m) return {player:m,conf:'partial'};
-  // 4. first name + first part of last
-  if(parts.length>=2){
-    const first=parts[0]; const lastP=last.substring(0,4);
-    m=sub23players.find(p=>{ const n=_normName(p.name); return n.includes(first)&&n.includes(lastP); });
-    if(m) return {player:m,conf:'partial'};
-  }
-  return {player:null,conf:'none'};
-}
+// placeholder to avoid reference errors if called elsewhere
+function _matchSub23(){ return {player:null,conf:'none'}; }
+function previewSub23Import(){ toast('Importação já concluída.'); }
+function applySub23Import(){ }
 
-function previewSub23Import(){
-  const sub23=DB.players().filter(p=>p.squad==='sub23');
-  const matches=SUB23_JERSEY_SEED.map(seed=>({seed,..._matchSub23(seed,sub23)}));
+// ── PUBLIC JERSEY FORM helper (kept for _normName usage) ──────────────────────
+// (removed: _matchSub23 full impl, previewSub23Import, applySub23Import — already imported)
+// placeholder to avoid lint only
+void 0;
 
-  const rows=matches.map((m,i)=>{
-    const confIcon=m.conf==='exact'?'✅':m.conf==='last'?'🔶':m.conf==='partial'?'⚠️':'❌';
-    const playerName=m.player?dn(m.player):'<span style="color:var(--red)">Não encontrado</span>';
-    return `<tr style="border-bottom:1px solid var(--border);${!m.player?'opacity:.5':''}">
-      <td style="padding:8px 10px;font-weight:600">${m.seed.name}</td>
-      <td style="padding:8px 10px;text-align:center;letter-spacing:1px;font-weight:700">${m.seed.jerseyName}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700">${m.seed.jerseySize}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700">#${m.seed.jerseyNumber}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:16px">${confIcon}</td>
-      <td style="padding:8px 10px">${playerName}</td>
-    </tr>`;
-  }).join('');
-
-  const found=matches.filter(m=>m.player).length;
-  const overlay=document.createElement('div');
-  overlay.id='sub23-import-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.innerHTML=`
-    <div style="background:var(--card);border-radius:14px;max-width:780px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">
-      <div style="padding:20px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
-        <div style="flex:1">
-          <div style="font-size:16px;font-weight:800">📥 Importar dados Sub-23</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Correspondências encontradas: ${found}/${SUB23_JERSEY_SEED.length} · ✅ Exacto &nbsp;🔶 Apelido &nbsp;⚠️ Parcial &nbsp;❌ Não encontrado</div>
-        </div>
-        <button onclick="document.getElementById('sub23-import-overlay').remove()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">Fechar</button>
-        <button onclick="applySub23Import()" style="padding:7px 16px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ Aplicar ${found} atletas</button>
-      </div>
-      <div style="padding:16px 22px">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:var(--bg)">
-              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Nome (PDF)</th>
-              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Camisola</th>
-              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Tam.</th>
-              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Nº</th>
-              <th style="padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)"></th>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta na App</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
-  // Store matches for apply step
-  overlay._matches=matches;
-  document.body.appendChild(overlay);
-}
-
-function applySub23Import(){
-  const overlay=document.getElementById('sub23-import-overlay');
-  if(!overlay) return;
-  const matches=overlay._matches||[];
-  let count=0;
-  matches.forEach(m=>{
-    if(!m.player) return;
-    const pid=m.player.id;
-    DB.setAthleteDoc(pid,{
-      jerseyName:m.seed.jerseyName,
-      jerseySize:m.seed.jerseySize,
-      jerseyNumber:m.seed.jerseyNumber,
-    });
-    DB.updatePlayer(pid,{
-      jerseyName:m.seed.jerseyName,
-      jerseySize:m.seed.jerseySize,
-      jerseyNumber:m.seed.jerseyNumber,
-    });
-    count++;
-  });
-  overlay.remove();
-  document.getElementById('btn-import-sub23')?.remove();
-  localStorage.setItem('scv_sub23_done','1');
-  toast(`✅ ${count} atletas Sub-23 atualizados!`);
-  renderKitTab();
-}
+// ── (end removed sub-23 import) ───────────────────────────────────────────────
 
 // ── PUBLIC JERSEY FORM (?mode=jersey) ─────────────────────────────────────────
 let _jpfPlayers=[];      // {id, name, squad, existing:{jerseyName,jerseySize,jerseyNumber}}
@@ -7873,10 +7799,6 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
-    const importBtn=document.getElementById('btn-import-sub23');
-    if(importBtn) importBtn.style.display=localStorage.getItem('scv_sub23_done')?'none':'';
-    const mesoBtn=document.getElementById('btn-import-mesociclo');
-    if(mesoBtn) mesoBtn.style.display=localStorage.getItem('scv_meso_jul_done')?'none':'';
   }
 }
 
