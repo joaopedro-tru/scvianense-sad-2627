@@ -3055,57 +3055,84 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 
 // ── STAFF FORM (public) ───────────────────────────────────────────────────────
 (function initStaffForm(){
-  // Populate user selector — only non-admin accounts
   const sel=document.getElementById('sf-user');
   if(!sel) return;
-  const formUsers=USERS.filter(u=>u.role!=='admin');
-  formUsers.forEach(u=>{
-    const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
-    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
-    const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'';
-    const opt=document.createElement('option');
-    opt.value=u.user;
-    opt.textContent=`${roleLabel}${squadLabel?' — '+squadLabel:''}  (${u.user})`;
-    sel.appendChild(opt);
-  });
+
+  const ROLE_ORDER=['headcoach','adjunto','estagiario','grcoach','condicionamento','analista','fisio','enfermeiro','massagista','delegado','teammanager','outro'];
+  const ROLE_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',analista:'Analista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'};
+  const SQUAD_ORDER=['eqa','sub19','sub23'];
+  const SQUAD_LABEL={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
+  function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null); }
+
+  // All non-admin accounts (source of truth for all handlers below)
+  const allFormUsers=getAppUsers().filter(u=>u.role!=='admin');
+
+  // Fetch existing profiles and populate dropdown
+  async function populateSel(){
+    sel.innerHTML='<option value="">A carregar…</option>';
+    sel.disabled=true;
+    let existingIds=new Set();
+    if(firestoreDb){
+      try{
+        const snap=await firestoreDb.collection('staff_profiles').get();
+        snap.forEach(d=>existingIds.add(d.id));
+      }catch(e){}
+    }
+    const pending=allFormUsers.filter(u=>!existingIds.has(u.user));
+    sel.innerHTML='<option value="">— selecionar —</option>';
+    sel.disabled=false;
+    SQUAD_ORDER.forEach(sq=>{
+      const group=pending.filter(u=>u.squad===sq);
+      if(!group.length) return;
+      const og=document.createElement('optgroup');
+      og.label=SQUAD_LABEL[sq]||sq;
+      group
+        .sort((a,b)=>{
+          const ai=ROLE_ORDER.indexOf(userRole(a)); const bi=ROLE_ORDER.indexOf(userRole(b));
+          return (ai<0?99:ai)-(bi<0?99:bi);
+        })
+        .forEach(u=>{
+          const opt=document.createElement('option');
+          opt.value=u.user;
+          opt.textContent=`${ROLE_LABEL[userRole(u)]||userRole(u)||u.role}  (${u.user})`;
+          og.appendChild(opt);
+        });
+      sel.appendChild(og);
+    });
+    // Users with no squad
+    pending.filter(u=>!u.squad).forEach(u=>{
+      const opt=document.createElement('option');
+      opt.value=u.user;
+      opt.textContent=`${ROLE_LABEL[userRole(u)]||userRole(u)||u.role}  (${u.user})`;
+      sel.appendChild(opt);
+    });
+    if(sel.options.length<=1){
+      const opt=document.createElement('option'); opt.disabled=true;
+      opt.textContent='✓ Todos os perfis já criados'; sel.appendChild(opt);
+    }
+  }
+  populateSel();
 
   let sfPhotoDataUrl=null;
   setupPhotoZone('sf-photo-circle','sf-photo-input','sf-photo-initials',null);
 
-  sel.addEventListener('change', async ()=>{
-    const u=formUsers.find(x=>x.user===sel.value);
+  sel.addEventListener('change', ()=>{
+    const u=allFormUsers.find(x=>x.user===sel.value);
     const info=document.getElementById('sf-account-info');
     const fields=document.getElementById('sf-fields');
     const alreadyBanner=document.getElementById('sf-already');
     if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; return; }
-    const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
-    const roleLabel={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'}[role]||role||u.role;
-    const squadLabel={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'}[u.squad]||'—';
-    document.getElementById('sf-account-role').textContent=roleLabel;
-    document.getElementById('sf-account-squad').textContent=squadLabel;
+    const role=userRole(u);
+    document.getElementById('sf-account-role').textContent=ROLE_LABEL[role]||role||u.role;
+    document.getElementById('sf-account-squad').textContent=SQUAD_LABEL[u.squad]||'—';
     document.getElementById('sf-account-email').textContent=u.email||'—';
     info.style.display='';
-    // Check if profile already exists in Firestore
-    let alreadyExists=false;
-    if(firestoreDb){
-      try{
-        const doc=await firestoreDb.collection('staff_profiles').doc(u.user).get();
-        alreadyExists=doc.exists;
-      }catch(e){}
-    }
-    if(alreadyExists){
-      alreadyBanner.style.display='block';
-      fields.style.display='none';
-    } else {
-      alreadyBanner.style.display='none';
-      fields.style.display='';
-      // Show license field only for coaching roles
-      const licWrap=document.getElementById('sf-license-wrap');
-      const needsLic=['headcoach','adjunto','estagiario'].includes(role);
-      licWrap.style.display=needsLic?'':'none';
-      // Update initials placeholder
-      document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
-    }
+    // Profile was already filtered out of dropdown, so if selected it's pending
+    alreadyBanner.style.display='none';
+    fields.style.display='';
+    const licWrap=document.getElementById('sf-license-wrap');
+    licWrap.style.display=['headcoach','adjunto','estagiario'].includes(role)?'':'none';
+    document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
   });
 
   document.getElementById('sf-form').addEventListener('submit', async e=>{
@@ -3114,7 +3141,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     const errEl=document.getElementById('sf-err');
     errEl.textContent='';
     const username=document.getElementById('sf-user').value;
-    const u=formUsers.find(x=>x.user===username);
+    const u=allFormUsers.find(x=>x.user===username);
     if(!u){ errEl.textContent='Seleciona a tua conta.'; return; }
     const name=document.getElementById('sf-name').value.trim();
     const pw=document.getElementById('sf-pw').value;
@@ -3153,7 +3180,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
       }
 
       // 3. Criar staff profile directamente no Firestore
-      const role=u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':null);
+      const role=userRole(u);
       const profile={
         id:uid(), username:u.user, name,
         dob:document.getElementById('sf-dob').value||null,
@@ -3171,6 +3198,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
       document.getElementById('sf-account-info').style.display='none';
       document.getElementById('sf-fields').style.display='none';
       document.getElementById('sf-success').style.display='block';
+      populateSel(); // Remove newly-created account from dropdown
     }catch(err){
       console.error('Staff form error:',err);
       errEl.textContent='Erro: '+err.message;
