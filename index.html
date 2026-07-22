@@ -3650,21 +3650,51 @@ async function avSquadChange(){
 
 // ── CALENDAR PDF EXPORT ───────────────────────────────────────────────────────
 function exportCalPDF(){
-  // Capture current filter label
   const filterLabel = calFilter==='all'?'Todos os escalões':
     calFilter==='eqa'?'Equipa A':calFilter==='sub19'?'Sub-19':'Sub-23';
-  // Set title for print header
-  document.title=`Calendário ${MONTHS[calMonth]} ${calYear} — SC Vianense SAD`;
-  document.body.classList.add('printing-cal');
-  // Store month/filter for CSS header
-  document.documentElement.style.setProperty('--print-cal-header',
-    `"SC Vianense SAD · Calendário · ${MONTHS[calMonth]} ${calYear} · ${filterLabel}"`);
-  window.print();
-  // Restore after dialog closes
-  setTimeout(()=>{
-    document.body.classList.remove('printing-cal');
-    document.title='SC Vianense SAD';
-  }, 1000);
+  const calGrid = document.querySelector('.cg');
+  if(!calGrid){ toast('Calendário não disponível.'); return; }
+  const gridHTML = calGrid.outerHTML;
+  document.getElementById('kit-print-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'kit-print-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch';
+  overlay.innerHTML = `
+    <style>
+      @media print{
+        .kit-no-print{display:none!important}
+        body>*:not(#kit-print-overlay){display:none!important}
+        #kit-print-overlay{position:static!important;overflow:visible!important}
+        *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      }
+      @page{size:A4 landscape;margin:8mm}
+      #cal-po .cg{box-shadow:none!important;margin:0!important;width:100%!important;border-radius:0!important}
+      #cal-po .chr{background:#0e2444!important;color:#fff!important}
+      #cal-po .chc{color:#fff!important;font-size:9px!important;padding:6px 3px!important;text-align:center}
+      #cal-po .cd{border:1px solid #ccc!important;min-height:22mm!important;padding:3px 4px!important}
+      #cal-po .cdn{font-size:8pt!important;font-weight:700!important;margin-bottom:2px!important}
+      #cal-po .om{opacity:.35!important}
+      #cal-po .ce{font-size:7pt!important;padding:2px 4px!important;margin:1px 0!important;border-radius:3px!important;line-height:1.3!important;cursor:default!important}
+      #cal-po .ce.tr{background:#d4edda!important;color:#155724!important}
+      #cal-po .ce.gm{background:#cce5ff!important;color:#004085!important}
+      #cal-po .ce-title{font-size:7pt!important;font-weight:600!important}
+      #cal-po .ce-meta{display:block!important;font-size:6.5pt!important;opacity:.85!important;margin-top:1px!important}
+      #cal-po .td{background:#fffbf0!important}
+    </style>
+    <div class="kit-no-print" style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-bottom:1px solid #e0e0e0;position:sticky;top:0;background:#fff;z-index:1">
+      <button onclick="document.getElementById('kit-print-overlay').remove()" style="padding:9px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
+      <button onclick="window.print()" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+    </div>
+    <div style="padding:14px 18px;max-width:100%">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #0e2444">
+        <div style="font-size:17px;font-weight:800;font-family:Arial,sans-serif;color:#0e2444">SC Vianense SAD — Calendário</div>
+        <div style="font-size:12px;color:#666;font-family:Arial,sans-serif">${MONTHS[calMonth]} ${calYear} · ${filterLabel}</div>
+      </div>
+      <div id="cal-po">${gridHTML}</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Disable clicks on cloned grid
+  overlay.querySelectorAll('.cd,.ce').forEach(el=>{ el.onclick=null; el.style.cursor='default'; });
 }
 
 // Show back button in standalone (PWA) mode
