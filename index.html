@@ -3222,6 +3222,25 @@ async function renderStaff(){
   // Sync fresh data from Firestore before rendering
   await DB.syncStaffProfilesFromFirestore();
 
+  // Sync personal emails from staff profiles → app_users (covers existing profiles)
+  if(firestoreDb){
+    const batch=firestoreDb.batch();
+    let batchCount=0;
+    DB.staffProfiles(null).forEach(profile=>{
+      const personalEmail=(profile.email||'').trim().toLowerCase();
+      if(!personalEmail) return;
+      const appUser=getAppUsers().find(x=>x.user===profile.username);
+      if(appUser && personalEmail!==appUser.email){
+        batch.update(firestoreDb.collection('app_users').doc(profile.username),{email:personalEmail});
+        batchCount++;
+        // Update local cache too
+        const arr=getAppUsers().map(x=>x.user===profile.username?{...x,email:personalEmail}:x);
+        _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+      }
+    });
+    if(batchCount>0) batch.commit().catch(e=>console.warn('email sync batch:',e));
+  }
+
   let pending=[];
   if(firestoreDb){
     try{
@@ -3358,6 +3377,17 @@ document.getElementById('mo-sp-save').addEventListener('click',async()=>{
 
   if(id){ DB.updateStaffProfile(id,data); toast('✅ Perfil atualizado!'); }
   else { DB.addStaffProfile(data); toast('✅ Perfil criado!'); }
+
+  // Se foi indicado email pessoal, sincronizar para app_users para que o Auth o use
+  const personalEmail=(data.email||'').trim().toLowerCase();
+  if(personalEmail){
+    const appUser=getAppUsers().find(x=>x.user===username);
+    if(appUser && personalEmail!==appUser.email){
+      if(firestoreDb) firestoreDb.collection('app_users').doc(username).update({email:personalEmail}).catch(e=>console.warn('app_users email sync:',e));
+      const arr=getAppUsers().map(x=>x.user===username?{...x,email:personalEmail}:x);
+      _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+    }
+  }
 
   btn.disabled=false;
   closeStaffProfileModal();
@@ -6506,9 +6536,10 @@ async function checkPendingBadge(){
 
 // ── ACCOUNT SETUP (admin cria/repõe password de qualquer conta) ──────────────
 function openAccountSetup(username){
-  const u=USERS.find(x=>x.user===username); if(!u) return;
+  // Usa getAppUsers() para ter o email mais recente (pode ter sido atualizado pelo perfil)
+  const u=getAppUsers().find(x=>x.user===username); if(!u) return;
   const mo=document.getElementById('mo-acct');
-  document.getElementById('mo-acct-desc').textContent=`Conta: ${username} (${u.email})`;
+  document.getElementById('mo-acct-desc').textContent=`Conta: ${username} · ${u.email}`;
   document.getElementById('mo-acct-pw').value='';
   document.getElementById('mo-acct-pw2').value='';
   document.getElementById('mo-acct-err').textContent='';
@@ -6525,27 +6556,27 @@ function openAccountSetup(username){
     if(!FB_READY||!FB_CONFIG.apiKey){ errEl.textContent='Firebase não configurado.'; return; }
     const btn=document.getElementById('mo-acct-save');
     btn.disabled=true; btn.textContent='A processar…';
+    // Re-ler o email mais recente (pode ter mudado desde que o modal abriu)
+    const currentEmail=getAppUsers().find(x=>x.user===username)?.email||u.email;
     try{
-      // Tentar criar a conta via REST API (não afecta a sessão admin actual)
       const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:u.email,password:pw,returnSecureToken:false})
+        body:JSON.stringify({email:currentEmail,password:pw,returnSecureToken:false})
       });
       const data=await res.json();
       if(data.error){
-        // Se a conta já existe, resetar via sendPasswordResetEmail
         if(data.error.message==='EMAIL_EXISTS'){
-          await firebaseAuth.sendPasswordResetEmail(u.email);
+          await firebaseAuth.sendPasswordResetEmail(currentEmail);
           errEl.style.color='var(--ok)';
-          errEl.textContent='Conta já existe — email de redefinição enviado para '+u.email;
+          errEl.textContent='Conta já existe — email de recuperação enviado para '+currentEmail;
         } else {
           errEl.textContent='Erro: '+data.error.message;
         }
       } else {
         errEl.style.color='var(--ok)';
-        errEl.textContent='✅ Conta criada com sucesso!';
-        setTimeout(()=>mo.classList.remove('open'),2000);
+        errEl.textContent='✅ Conta criada! Email de acesso: '+currentEmail;
+        setTimeout(()=>mo.classList.remove('open'),2500);
       }
     }catch(e){ errEl.textContent='Erro de rede: '+e.message; }
     finally{ btn.disabled=false; btn.textContent='Criar / Repor Conta'; }
