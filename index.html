@@ -1811,14 +1811,16 @@ async function loadAppUsers(){
 async function seedAppUsersIfNeeded(){
   if(!firestoreDb||!isAdmin()) return;
   try{
-    const snap=await firestoreDb.collection('app_users').limit(1).get();
-    if(!snap.empty) return; // already seeded
-    const batch=firestoreDb.batch();
-    USERS.forEach(u=>{ const ref=firestoreDb.collection('app_users').doc(u.user); batch.set(ref,{...u}); });
-    await batch.commit();
-    _appUsers=[...USERS];
-    localStorage.setItem('scv_au',JSON.stringify(_appUsers));
-    console.log('✅ app_users seeded from USERS');
+    // Upsert: para cada utilizador em USERS, cria o doc em Firestore se não existir
+    const snap=await firestoreDb.collection('app_users').get();
+    const existing=new Set(); snap.forEach(d=>existing.add(d.id));
+    const missing=USERS.filter(u=>!existing.has(u.user));
+    if(missing.length){
+      const batch=firestoreDb.batch();
+      missing.forEach(u=>{ batch.set(firestoreDb.collection('app_users').doc(u.user),{...u}); });
+      await batch.commit();
+      console.log(`✅ app_users: ${missing.length} utilizador(es) adicionado(s) ao Firestore.`);
+    }
   }catch(e){ console.warn('seedAppUsersIfNeeded:',e); }
 }
 
@@ -3075,14 +3077,18 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     sel.innerHTML='<option value="">A carregar…</option>';
     sel.disabled=true;
 
-    // Always fetch app_users from Firestore for the most up-to-date list
+    // Merge Firestore app_users with hardcoded USERS (Firestore overrides, USERS fills gaps)
     if(firestoreDb){
       try{
         const auSnap=await firestoreDb.collection('app_users').get();
         if(!auSnap.empty){
-          const arr=[]; auSnap.forEach(d=>arr.push(d.data()));
-          allFormUsers=arr.filter(u=>u.role!=='admin');
-          _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+          const fsArr=[]; auSnap.forEach(d=>fsArr.push(d.data()));
+          // Start with USERS as base, override/add entries from Firestore
+          const merged=Object.values(
+            [...USERS, ...fsArr].reduce((acc,u)=>{ acc[u.user]={...acc[u.user]||{},...u}; return acc; },{})
+          );
+          allFormUsers=merged.filter(u=>u.role!=='admin');
+          _appUsers=merged; localStorage.setItem('scv_au',JSON.stringify(merged));
         }
       }catch(e){}
     }
@@ -3091,7 +3097,8 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     if(firestoreDb){
       try{
         const snap=await firestoreDb.collection('staff_profiles').get();
-        snap.forEach(d=>{ const usr=d.data().username; if(usr) existingIds.add(usr); });
+        // Só excluir perfis completos (com name) — docs parciais/fantasma não bloqueiam
+        snap.forEach(d=>{ const data=d.data(); if(data.username && data.name) existingIds.add(data.username); });
       }catch(e){}
     }
     const pending=allFormUsers.filter(u=>!existingIds.has(u.user));
@@ -3184,7 +3191,10 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         throw new Error(authData.error.message);
       }
 
-      // 2. Guardar foto se existir
+      // 2. Sign in com as credenciais criadas (para Firestore aceitar escrita autenticada)
+      await firebaseAuth.signInWithEmailAndPassword(u.email, pw);
+
+      // 3. Guardar foto se existir
       let photoUrl=null;
       const photoInput=document.getElementById('sf-photo-input');
       if(photoInput.files[0]&&storage){
@@ -3195,7 +3205,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         photoUrl=await ref.getDownloadURL();
       }
 
-      // 3. Criar staff profile directamente no Firestore
+      // 4. Criar staff profile no Firestore (agora autenticado)
       const role=userRole(u);
       const profile={
         id:uid(), username:u.user, name,
@@ -3208,7 +3218,14 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         photoUrl, email:u.email,
         createdAt:new Date().toISOString()
       };
-      if(firestoreDb) await firestoreDb.collection('staff_profiles').doc(profile.id).set(profile);
+      if(firestoreDb){
+        // Apagar docs fantasma do mesmo username antes de criar o perfil completo
+        const oldSnap=await firestoreDb.collection('staff_profiles').where('username','==',u.user).get();
+        const batch=firestoreDb.batch();
+        oldSnap.forEach(d=>batch.delete(d.ref));
+        batch.set(firestoreDb.collection('staff_profiles').doc(profile.id),profile);
+        await batch.commit();
+      }
 
       document.getElementById('sf-form').reset();
       document.getElementById('sf-account-info').style.display='none';
