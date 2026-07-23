@@ -3134,7 +3134,17 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
       opt.textContent='✓ Todos os perfis já criados'; sel.appendChild(opt);
     }
   }
-  populateSel();
+  populateSel().then(()=>{
+    // Se veio com ?u=username, auto-seleccionar e esconder dropdown
+    const presetUser=new URLSearchParams(location.search).get('u');
+    if(presetUser){
+      sel.value=presetUser;
+      sel.dispatchEvent(new Event('change'));
+      // Esconder o grupo de selecção — utilizador já está definido
+      const fgWrap=sel.closest('.fg');
+      if(fgWrap) fgWrap.style.display='none';
+    }
+  });
 
   let sfPhotoDataUrl=null;
   setupPhotoZone('sf-photo-circle','sf-photo-input','sf-photo-initials',null);
@@ -3175,12 +3185,12 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 
     btn.disabled=true; btn.innerHTML='<span class="spin"></span> A criar…';
     try{
-      // 1. Criar conta Firebase Auth via REST API
       if(!FB_READY||!FB_CONFIG.apiKey) throw new Error('Firebase não configurado.');
+
+      // 1. Criar conta Firebase Auth com o email configurado pelo admin
       const authRes=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:u.email,password:pw,returnSecureToken:false})
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:u.email, password:pw, returnSecureToken:false})
       });
       const authData=await authRes.json();
       if(authData.error){
@@ -3191,7 +3201,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         throw new Error(authData.error.message);
       }
 
-      // 2. Sign in com as credenciais criadas (para Firestore aceitar escrita autenticada)
+      // 2. Sign in para Firestore aceitar escritas autenticadas
       await firebaseAuth.signInWithEmailAndPassword(u.email, pw);
 
       // 3. Guardar foto se existir
@@ -3205,7 +3215,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         photoUrl=await ref.getDownloadURL();
       }
 
-      // 4. Criar staff profile no Firestore (agora autenticado)
+      // 4. Criar perfil no Firestore (limpa docs fantasma primeiro)
       const role=userRole(u);
       const profile={
         id:uid(), username:u.user, name,
@@ -3219,11 +3229,10 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         createdAt:new Date().toISOString()
       };
       if(firestoreDb){
-        // Apagar docs fantasma do mesmo username antes de criar o perfil completo
         const oldSnap=await firestoreDb.collection('staff_profiles').where('username','==',u.user).get();
         const batch=firestoreDb.batch();
         oldSnap.forEach(d=>batch.delete(d.ref));
-        batch.set(firestoreDb.collection('staff_profiles').doc(profile.id),profile);
+        batch.set(firestoreDb.collection('staff_profiles').doc(profile.id), profile);
         await batch.commit();
       }
 
@@ -3231,7 +3240,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
       document.getElementById('sf-account-info').style.display='none';
       document.getElementById('sf-fields').style.display='none';
       document.getElementById('sf-success').style.display='block';
-      populateSel(); // Remove newly-created account from dropdown
+      populateSel();
     }catch(err){
       console.error('Staff form error:',err);
       errEl.textContent='Erro: '+err.message;
@@ -3310,6 +3319,7 @@ async function renderStaff(){
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
+          ${!profile?`<button class="btn btn-g btn-sm" onclick="copyStaffLink('${u.user}')" title="Copiar link pessoal do formulário">🔗</button>`:''}
           <button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>
         </div>
       </div>`;
@@ -3320,19 +3330,12 @@ async function renderStaff(){
     </div>`;
   }).join('');
 
-  const pendingSection=pending.length?`
-    <div class="card">
-      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📥 Formulários Recebidos (${pending.length})</h3>
-      ${pending.map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${s.name||'—'}</div>
-          <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[s.staffRole]||s.staffRole||'—'} · ${s.squad||'—'} · ${s.phone||'—'}${s.license?' · '+s.license:''}</div>
-          ${s.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${s.notes}</div>`:''}
-        </div>
-      </div>`).join('')}
-    </div>`:'';
+  el.innerHTML=`<div class="ds">${squadCards}</div>`;
+}
 
-  el.innerHTML=`<div class="ds">${squadCards}${pendingSection}</div>`;
+function copyStaffLink(username){
+  const url=`${location.origin}${location.pathname}?mode=staff-form&u=${username}`;
+  navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado!')).catch(()=>{ prompt('Copia este link:',url); });
 }
 
 // ── STAFF PROFILE MODAL ───────────────────────────────────────────────────────
