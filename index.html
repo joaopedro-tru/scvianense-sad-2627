@@ -605,7 +605,6 @@ body.pm #v-pf{padding:30px}
     <div class="nsl">Agenda</div>
     <div class="nl" data-view="calendar"><span class="ic">📅</span> Calendário</div>
     <div class="nl" data-view="matchday"><span class="ic">🎮</span> Dia de Jogo</div>
-    <div class="nl" data-view="weekly-plan"><span class="ic">📋</span> Plano Semanal</div>
     <hr class="nd">
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
@@ -617,6 +616,7 @@ body.pm #v-pf{padding:30px}
     <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
     <div class="nsl" id="nsl-tm">Gestão Clube</div>
     <div class="nl" id="nl-tm" data-view="tm"><span class="ic">📋</span> Team Manager</div>
+    <div class="nl" id="nl-weekly-plan" data-view="weekly-plan"><span class="ic">🗓️</span> Plano Semanal</div>
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
     <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
@@ -7669,11 +7669,13 @@ function applyRoleUI(){
   const staffSection=[document.getElementById('nsl-staff'),document.getElementById('nl-staff'),document.getElementById('nl-stafflink')];
   const myProfileSection=[document.getElementById('nsl-myprofile'),document.getElementById('nl-myprofile')];
   const tmSection=[document.getElementById('nsl-tm'),document.getElementById('nl-tm')];
+  const nlWeeklyPlan=document.getElementById('nl-weekly-plan');
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
+    if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -7688,6 +7690,7 @@ function applyRoleUI(){
     document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
+    if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -7703,6 +7706,7 @@ function applyRoleUI(){
     document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
+    if(nlWeeklyPlan) nlWeeklyPlan.style.display='none';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -7716,6 +7720,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
+    if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
     if(u.squad){
       const allSquads=['eqa','sub19','sub23'];
       allSquads.filter(s=>s!==u.squad).forEach(other=>{
@@ -7728,6 +7733,7 @@ function applyRoleUI(){
   } else if(u.role==='admin'){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
+    if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
