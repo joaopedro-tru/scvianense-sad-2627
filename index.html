@@ -3067,18 +3067,30 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   const SQUAD_LABEL={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
   function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':u.role==='medical'?'medical':null); }
 
-  // All non-admin accounts (source of truth for all handlers below)
-  const allFormUsers=getAppUsers().filter(u=>u.role!=='admin');
+  // All non-admin accounts — populated async from Firestore (source of truth)
+  let allFormUsers=getAppUsers().filter(u=>u.role!=='admin');
 
   // Fetch existing profiles and populate dropdown
   async function populateSel(){
     sel.innerHTML='<option value="">A carregar…</option>';
     sel.disabled=true;
+
+    // Always fetch app_users from Firestore for the most up-to-date list
+    if(firestoreDb){
+      try{
+        const auSnap=await firestoreDb.collection('app_users').get();
+        if(!auSnap.empty){
+          const arr=[]; auSnap.forEach(d=>arr.push(d.data()));
+          allFormUsers=arr.filter(u=>u.role!=='admin');
+          _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+        }
+      }catch(e){}
+    }
+
     let existingIds=new Set();
     if(firestoreDb){
       try{
         const snap=await firestoreDb.collection('staff_profiles').get();
-        // doc IDs are random UIDs; the username is in the `username` field
         snap.forEach(d=>{ const usr=d.data().username; if(usr) existingIds.add(usr); });
       }catch(e){}
     }
