@@ -6680,66 +6680,68 @@ function generateWeeklyPlan(){
     return {am, pm};
   });
 
+  // Only split manhã/tarde if at least one day has two sessions
+  const hasBiDaily=slots.some(s=>s.am&&s.pm);
+
   const micro=document.getElementById('wp-micro').value;
   const meso=document.getElementById('wp-meso').value;
 
   const cell=(period,field,di,val='')=>`<input type="text" data-wp="${period}-${field}-${di}" value="${val.replace(/"/g,'&quot;')}" placeholder="—"
     style="width:100%;border:none;font-size:11px;background:transparent;color:var(--text);font-family:inherit;padding:3px 4px;box-sizing:border-box">`;
 
-  const objCell=(period,di,val='')=>`<textarea data-wp="${period}-obj-${di}" rows="5"
+  const obsCell=(period,di,val='')=>`<textarea data-wp="${period}-obs-${di}" rows="5"
     style="width:100%;border:none;font-size:11px;background:transparent;color:var(--text);resize:vertical;font-family:inherit;padding:3px 4px;line-height:1.5;box-sizing:border-box">${val}</textarea>`;
+
+  const getObsVal=(ev)=>{
+    if(!ev) return 'FOLGA';
+    if(ev.type==='game'){
+      const h=ev.homeAway!=='away';
+      let v=h?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`;
+      if(ev.competition) v+=`\n${ev.competition}`;
+      return v;
+    }
+    if(ev.type==='training'){
+      const p=ev.objectivePrimary, s=ev.objectiveSecondary;
+      if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
+        const tc=TACTICS_TAXONOMY;
+        let t=tc[p.moment].full;
+        if(p.subPrinciples?.length) t+='\n'+p.subPrinciples.join(', ');
+        if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
+          t+='\n\n'+tc[s.moment].full;
+          if(s.subPrinciples?.length) t+='\n'+s.subPrinciples.join(', ');
+        }
+        return t;
+      }
+      return ev.objectives||'';
+    }
+    return '';
+  };
+
+  const getObsBg=(ev)=>{
+    if(!ev) return '#f0f0f0';
+    if(ev.type==='game') return '#e6f4ea';
+    return 'var(--bg)';
+  };
 
   const th=(txt,sub='')=>`<th style="background:var(--green);color:#fff;font-weight:700;text-align:center;padding:7px 4px;border:1px solid var(--border);font-size:11px">
     ${txt}${sub?`<div style="font-size:9px;font-weight:400;opacity:.85">${sub}</div>`:''}
   </th>`;
 
   const section=(label,period)=>{
-    let r=`<tr><td colspan="8" style="background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px;border:1px solid var(--border);letter-spacing:1.5px">${label}</td></tr>`;
+    const getEv=(di)=>period==='main'?(slots[di].am||slots[di].pm||null):slots[di][period];
+    let r='';
+    if(label) r+=`<tr><td colspan="8" style="background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px;border:1px solid var(--border);letter-spacing:1.5px">${label}</td></tr>`;
     // HORA
     r+=`<tr><td style="background:var(--bg);font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:var(--muted);white-space:nowrap">HORA</td>`;
-    dates.forEach((_,di)=>{
-      const ev=slots[di][period];
-      r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'hora',di,ev?.time||'')}</td>`;
-    });
+    dates.forEach((_,di)=>{ const ev=getEv(di); r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'hora',di,ev?.time||'')}</td>`; });
     r+='</tr>';
     // LOCAL
     r+=`<tr><td style="background:var(--bg);font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:var(--muted);white-space:nowrap">LOCAL</td>`;
-    dates.forEach((_,di)=>{
-      const ev=slots[di][period];
-      const loc=ev?.location||(ev?wpDefaultLoc:'');
-      r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'local',di,loc)}</td>`;
-    });
+    dates.forEach((_,di)=>{ const ev=getEv(di); const loc=ev?.location||(ev?wpDefaultLoc:''); r+=`<td style="border:1px solid var(--border);padding:1px">${cell(period,'local',di,loc)}</td>`; });
     r+='</tr>';
-    // OBJETIVOS
-    r+=`<tr><td style="background:var(--bg);font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:var(--muted);vertical-align:top;white-space:nowrap">OBJETIVO(S)</td>`;
-    dates.forEach((_,di)=>{
-      const ev=slots[di][period];
-      let val='';
-      if(ev?.type==='game'){
-        const h=ev.homeAway!=='away';
-        val=h?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`;
-        if(ev.time) val+=`\n${ev.time}`;
-        if(ev.competition) val+=`\n${ev.competition}`;
-      } else if(ev?.type==='training'&&(ev?.objectivePrimary?.moment||ev?.objectives)){
-        if(ev.objectivePrimary?.moment&&TACTICS_TAXONOMY[ev.objectivePrimary.moment]){
-          const p=ev.objectivePrimary, s=ev.objectiveSecondary;
-          const tc=TACTICS_TAXONOMY;
-          val=`<div style="padding:4px 5px">`;
-          val+=`<div style="margin-bottom:${s?.moment?'5px':'0'}"><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">${tc[p.moment].label}</span>`;
-          if(p.subPrinciples?.length) val+=`<div style="font-size:9px;color:${tc[p.moment].color};font-weight:600;margin-top:2px">${p.subPrinciples.join(' · ')}</div>`;
-          val+=`</div>`;
-          if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
-            val+=`<div><span style="display:inline-block;background:${tc[s.moment].color}30;color:${tc[s.moment].color};border:1px solid ${tc[s.moment].color};border-radius:4px;padding:2px 6px;font-size:10px;font-weight:600">${tc[s.moment].label}</span>`;
-            if(s.subPrinciples?.length) val+=`<div style="font-size:9px;color:${tc[s.moment].color};font-weight:600;margin-top:2px">${s.subPrinciples.join(' · ')}</div>`;
-            val+=`</div>`;
-          }
-          val+=`</div>`;
-          r+=`<td style="border:1px solid var(--border);padding:1px;vertical-align:top">${val}</td>`;
-          return;
-        } else { val=ev.objectives||''; }
-      }
-      r+=`<td style="border:1px solid var(--border);padding:1px;vertical-align:top">${objCell(period,di,val)}</td>`;
-    });
+    // OBSERVAÇÕES
+    r+=`<tr><td style="background:var(--bg);font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:var(--muted);vertical-align:top;white-space:nowrap">OBSERVAÇÕES</td>`;
+    dates.forEach((_,di)=>{ const ev=getEv(di); r+=`<td style="border:1px solid var(--border);padding:1px;background:${getObsBg(ev)};vertical-align:top">${obsCell(period,di,getObsVal(ev))}</td>`; });
     r+='</tr>';
     return r;
   };
@@ -6757,8 +6759,12 @@ function generateWeeklyPlan(){
       <td style="width:60px;background:var(--bg);border:1px solid var(--border)"></td>`;
   dates.forEach((d,i)=>{ html+=th(WP_DAYS_PT[i].split('-')[0],wpFmt(d)); });
   html+=`</tr></thead><tbody>`;
-  html+=section('MANHÃ','am');
-  html+=section('TARDE/NOITE','pm');
+  if(hasBiDaily){
+    html+=section('MANHÃ','am');
+    html+=section('TARDE/NOITE','pm');
+  } else {
+    html+=section('','main');
+  }
   html+=`</tbody></table>`;
 
   document.getElementById('wp-table-wrap').innerHTML=html;
@@ -6776,29 +6782,41 @@ function printWeeklyPlan(){
   if(!dateStr){toast('⚠️ Gera o plano primeiro');return;}
 
   const dates=wpGetWeekDates(dateStr);
+  const allEvs=DB.events();
   const micro=document.getElementById('wp-micro').value;
   const meso=document.getElementById('wp-meso').value;
   const sqLabel={eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[sq]||sq;
   const dateRange=`${wpFmt(dates[0])} a ${wpFmt(dates[6])}`;
   const yr=dates[0].getFullYear();
   const season=`${yr}/${yr+1}`;
-
   const colW=`${(100/7).toFixed(2)}%`;
 
+  const dayEvs=dates.map(d=>{ const ds=wpLocalStr(d); return allEvs.filter(e=>e.date===ds&&(e.squad===sq||!e.squad)); });
+  const slots=dayEvs.map(evs=>{
+    const am=evs.find(e=>e.time&&e.time<'13:00')||evs.find(e=>!e.time&&e.type==='training');
+    const pm=evs.find(e=>e.time&&e.time>='13:00')||evs.find(e=>!am&&e);
+    return {am,pm};
+  });
+  const hasBiDaily=slots.some(s=>s.am&&s.pm);
+  const getEvForPrint=(period,di)=>period==='main'?(slots[di].am||slots[di].pm||null):slots[di][period];
+  const getObsBg=(ev)=>{ if(!ev) return '#f0f0f0'; if(ev.type==='game') return '#e6f4ea'; return '#ffffff'; };
+
   const pSection=(label,period)=>{
-    const secHdr=`<tr><td colspan="7" style="background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px;border:1px solid #ccc;letter-spacing:2px">${label}</td></tr>`;
+    const secHdr=label?`<tr><td colspan="7" style="background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px;border:1px solid #ccc;letter-spacing:2px">${label}</td></tr>`:'';
     let horaRow=`<tr>`;
     let localRow=`<tr>`;
-    let objRow=`<tr>`;
+    let obsRow=`<tr style="height:90px">`;
     dates.forEach((_,di)=>{
       const hora=wpGetVal(period,'hora',di);
       const local=wpGetVal(period,'local',di);
-      const obj=wpGetVal(period,'obj',di);
+      const obs=wpGetVal(period,'obs',di);
+      const ev=getEvForPrint(period,di);
+      const bg=getObsBg(ev);
       horaRow+=`<td style="border:1px solid #ccc;padding:5px 6px;text-align:center;font-size:10px;font-weight:600">${hora||'—'}</td>`;
       localRow+=`<td style="border:1px solid #ccc;padding:5px 6px;text-align:center;font-size:10px">${local||''}</td>`;
-      objRow+=`<td style="border:1px solid #ccc;padding:6px;font-size:10px;vertical-align:top;min-height:80px;white-space:pre-line;line-height:1.5">${obj||''}</td>`;
+      obsRow+=`<td style="border:1px solid #ccc;padding:6px;font-size:10px;vertical-align:top;min-height:80px;white-space:pre-line;line-height:1.5;background:${bg}">${obs||''}</td>`;
     });
-    return secHdr+horaRow+`</tr>`+localRow+`</tr>`+`<tr style="height:90px">`+objRow.slice(4)+`</tr>`;
+    return secHdr+horaRow+`</tr>`+localRow+`</tr>`+obsRow+`</tr>`;
   };
 
   let dayHeaders=`<tr style="background:#1a3d6e;color:#fff">`;
@@ -6842,8 +6860,7 @@ function printWeeklyPlan(){
       <table style="width:100%;border-collapse:collapse;table-layout:fixed">
         <thead>${dayHeaders}</thead>
         <tbody>
-          ${pSection('MANHÃ','am')}
-          ${pSection('TARDE/NOITE','pm')}
+          ${hasBiDaily ? pSection('MANHÃ','am')+pSection('TARDE/NOITE','pm') : pSection('','main')}
         </tbody>
       </table>
     </div>`;
