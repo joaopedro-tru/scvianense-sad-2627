@@ -6812,7 +6812,7 @@ function printWeeklyPlan(){
   const hasBiDaily=slots.some(s=>s.am&&s.pm);
   const getEvForPrint=(period,di)=>period==='main'?(slots[di].am||slots[di].pm||null):slots[di][period];
 
-  // Uma única célula por dia: hora+local em linha compacta, observações abaixo
+  // Uma única célula por dia — hora+local em barra visível, conteúdo abaixo
   const pCell=(period,di)=>{
     const hora=wpGetVal(period,'hora',di);
     const local=wpGetVal(period,'local',di);
@@ -6821,28 +6821,56 @@ function printWeeklyPlan(){
     const isFolga=!ev;
     const isGame=ev?.type==='game';
 
+    // ── FOLGA ──────────────────────────────────────────────────────────────────
     if(isFolga){
       return `<td style="background:#f5f5f5;text-align:center;vertical-align:middle;border:1px solid #ddd">
-        <div style="color:#c0c0c0;font-size:12px;font-style:italic;font-weight:600;letter-spacing:.5px">FOLGA</div>
+        <div style="color:#c8c8c8;font-size:11px;font-style:italic;font-weight:700;letter-spacing:1px">FOLGA</div>
       </td>`;
     }
-    const topBg=isGame?'#c8e6c9':'#f0f4f8';
-    const topColor=isGame?'#1b5e20':'#555';
-    const border=isGame?'#a5d6a7':'#dde3ed';
-    const cellBg=isGame?'#f1f8f2':'#ffffff';
-    const topLine=(hora||local)?`<div style="font-size:8px;color:${topColor};padding:3px 6px 3px;background:${topBg};border-bottom:1px solid ${border};">${[hora,local].filter(Boolean).join('&nbsp;·&nbsp;')}</div>`:'';
+
+    // ── Barra hora + local ──────────────────────────────────────────────────────
+    const barBg   =isGame?'#c8e6c9':'#e8edf5';
+    const barBord =isGame?'#a5d6a7':'#c8d2e0';
+    const cellBg  =isGame?'#f1f8f2':'#ffffff';
+    const horaHtml=hora?`<span style="font-weight:800;font-size:9px;color:${isGame?'#1b5e20':'#1a3d6e'}">${hora}</span>`:'';
+    const localHtml=local?`<span style="font-size:8.5px;color:#444;margin-left:5px">${local}</span>`:'';
+    const topBar=`<div style="padding:4px 7px;background:${barBg};border-bottom:1.5px solid ${barBord};display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden">${horaHtml}${horaHtml&&localHtml?`<span style="color:#bbb;font-size:9px">·</span>`:''}${localHtml}</div>`;
+
+    // ── Corpo ───────────────────────────────────────────────────────────────────
     let body='';
     if(isGame){
       const lines=obs.split('\n');
-      body=`<div style="padding:5px 6px">
-        <div style="font-size:8px;font-weight:800;background:#1b5e20;color:#fff;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;letter-spacing:.8px">JOGO</div>
-        <div style="font-size:10px;font-weight:700;line-height:1.4;color:#1a1a1a">${lines[0]||''}</div>
-        ${lines.slice(1).map(l=>`<div style="font-size:9px;color:#4a4a4a;margin-top:3px">${l}</div>`).join('')}
+      body=`<div style="padding:5px 7px">
+        <div style="font-size:8px;font-weight:800;background:#1b5e20;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:5px;letter-spacing:.8px">JOGO</div>
+        <div style="font-size:10px;font-weight:700;line-height:1.4;color:#111">${lines[0]||''}</div>
+        ${lines.slice(1).map(l=>`<div style="font-size:9px;color:#555;margin-top:3px">${l}</div>`).join('')}
       </div>`;
     } else {
-      body=`<div style="padding:5px 6px;font-size:9.5px;line-height:1.65;color:#1a1a1a;white-space:pre-line">${obs}</div>`;
+      // Treino — preferir objetivos táticos do evento; cair para obs do textarea
+      const p=ev?.objectivePrimary, s=ev?.objectiveSecondary;
+      const tc=TACTICS_TAXONOMY;
+      const hasObj=p?.moment&&tc[p.moment];
+      let objHtml='';
+      if(hasObj){
+        objHtml+=`<div style="margin-bottom:4px">
+          <span style="background:${tc[p.moment].color};color:#fff;font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px">${tc[p.moment].label}</span>
+          ${p.subPrinciples?.length?`<div style="font-size:7.5px;color:${tc[p.moment].color};font-weight:600;margin-top:2px;padding-left:2px">${p.subPrinciples.join(' · ')}</div>`:''}
+        </div>`;
+        if(s?.moment&&tc[s.moment]){
+          objHtml+=`<div>
+            <span style="border:1.5px solid ${tc[s.moment].color};color:${tc[s.moment].color};font-size:8px;font-weight:600;padding:1px 6px;border-radius:3px">${tc[s.moment].label}</span>
+            ${s.subPrinciples?.length?`<div style="font-size:7.5px;color:${tc[s.moment].color};font-weight:600;margin-top:2px;padding-left:2px">${s.subPrinciples.join(' · ')}</div>`:''}
+          </div>`;
+        }
+      } else if(obs&&obs!=='FOLGA'){
+        objHtml=`<div style="font-size:9px;line-height:1.6;color:#333;white-space:pre-line">${obs}</div>`;
+      }
+      body=`<div style="padding:5px 7px">
+        <div style="font-size:8px;font-weight:800;background:#1a3d6e;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:${hasObj||objHtml?'6px':'0'};letter-spacing:.8px">TREINO</div>
+        ${objHtml}
+      </div>`;
     }
-    return `<td style="background:${cellBg};border:1px solid #ddd;vertical-align:top">${topLine}${body}</td>`;
+    return `<td style="background:${cellBg};border:1px solid #ddd;vertical-align:top">${topBar}${body}</td>`;
   };
 
   const pSection=(label,period)=>{
@@ -6863,7 +6891,7 @@ function printWeeklyPlan(){
   dayHeaders+=`</tr>`;
 
   const microMesoStr=(micro||meso)?`${micro?`MC ${micro}`:''}${micro&&meso?' · ':''}${meso?`MSC ${meso}`:''}`:'';
-  const obsH=hasBiDaily?'70mm':'148mm';
+  const obsH=hasBiDaily?'42mm':'72mm';
   const today=new Date().toLocaleDateString('pt-PT');
 
   document.getElementById('wp-print-overlay')?.remove();
