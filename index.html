@@ -6963,6 +6963,13 @@ async function wpExecPrint(){
     // Force 1060px width regardless of viewport (important on mobile)
     const prevW=wpp.style.width, prevMax=wpp.style.maxWidth, prevM=wpp.style.margin;
     wpp.style.cssText+=';width:1060px!important;max-width:none!important;margin:0 auto!important';
+    // Equalise hora/local bar heights to the tallest bar in the row
+    const bars=[...wpp.querySelectorAll('.wp-hora-bar')];
+    bars.forEach(b=>b.style.minHeight='');
+    if(bars.length){
+      const maxH=Math.max(...bars.map(b=>b.getBoundingClientRect().height));
+      bars.forEach(b=>b.style.minHeight=Math.ceil(maxH)+'px');
+    }
     // Lazy-load html2canvas
     if(!window.html2canvas) await new Promise((res,rej)=>{
       const s=document.createElement('script');
@@ -6978,6 +6985,7 @@ async function wpExecPrint(){
     const canvas=await html2canvas(wpp,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
     // Restore original styles
     wpp.style.width=prevW; wpp.style.maxWidth=prevMax; wpp.style.margin=prevM;
+    bars.forEach(b=>b.style.minHeight='');
     // Build PDF (A4 landscape 297×210mm, 6mm margins → 285×198mm usable)
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -6987,12 +6995,28 @@ async function wpExecPrint(){
     if(ih>ph){ih=ph; iw=ph*aspect;}
     pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',6,6,iw,ih);
     // Open as blob URL — works for save/share on all devices
+    const fname=`Plano_${_wpDateRange.replace(/\//g,'-')}.pdf`;
     const blob=pdf.output('blob');
+    // Web Share API — iOS PWA, Android (shows native share sheet)
+    if(navigator.share && navigator.canShare){
+      const file=new File([blob],fname,{type:'application/pdf'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:'Plano Semanal SC Vianense SAD'});
+        return;
+      }
+    }
+    // Desktop fallback: open in new tab
     const url=URL.createObjectURL(blob);
-    window.open(url,'_blank');
+    const opened=window.open(url,'_blank');
+    if(!opened){
+      // Last resort if popup blocked: <a download>
+      const a=document.createElement('a');
+      a.href=url; a.download=fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
   }catch(e){
-    console.error('PDF error:',e);
-    toast('❌ Erro ao gerar PDF');
+    if(e.name!=='AbortError'){console.error('PDF error:',e); toast('❌ Erro ao gerar PDF');}
   }finally{
     if(btn){btn.disabled=false;btn.textContent='📄 Guardar PDF';}
   }
