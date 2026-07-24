@@ -1187,7 +1187,7 @@ body.pm #v-pf{padding:30px}
           <input type="number" id="wp-meso" class="si" min="1" placeholder="Ex: 5">
         </div>
         <div style="flex-shrink:0">
-          <button class="btn btn-p" onclick="generateWeeklyPlan()">⚙️ Gerar Plano</button>
+          <button class="btn btn-p" onclick="printWeeklyPlan()">🖨️ Gerar Plano</button>
         </div>
       </div>
     </div>
@@ -6797,7 +6797,7 @@ function wpGetVal(period,field,di){
 function printWeeklyPlan(){
   const sq=document.getElementById('wp-squad').value;
   const dateStr=document.getElementById('wp-week').value;
-  if(!dateStr){toast('⚠️ Gera o plano primeiro');return;}
+  if(!dateStr){toast('⚠️ Seleciona uma semana');return;}
 
   const dates=wpGetWeekDates(dateStr);
   const allEvs=DB.events();
@@ -6808,6 +6808,7 @@ function printWeeklyPlan(){
   const yr=dates[0].getFullYear();
   const season=`${yr}/${yr+1}`;
   const colW=`${(100/7).toFixed(2)}%`;
+  const wpDefaultLoc=sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2';
 
   const dayEvs=dates.map(d=>{ const ds=wpLocalStr(d); return allEvs.filter(e=>e.date===ds&&(e.squad===sq||!e.squad)); });
   const slots=dayEvs.map(evs=>{
@@ -6820,10 +6821,12 @@ function printWeeklyPlan(){
 
   // Uma única célula por dia — hora+local em barra visível, conteúdo abaixo
   const pCell=(period,di)=>{
-    const hora=wpGetVal(period,'hora',di);
-    const local=wpGetVal(period,'local',di);
-    const obs=wpGetVal(period,'obs',di);
     const ev=getEvForPrint(period,di);
+    const hora=ev?.time||'';
+    const local=ev?.location||(ev?wpDefaultLoc:'');
+    const obs=ev?.type==='game'
+      ?((ev.homeAway!=='away'?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`)+(ev.competition?'\n'+ev.competition:''))
+      :(ev?.objectives||'');
     const isFolga=!ev;
     const isGame=ev?.type==='game';
 
