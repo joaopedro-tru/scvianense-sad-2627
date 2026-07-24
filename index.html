@@ -6912,7 +6912,7 @@ function printWeeklyPlan(){
   document.getElementById('wp-print-style')?.remove();
   const ps=document.createElement('style');
   ps.id='wp-print-style';
-  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}.wp-no-print{display:none!important}body>*:not(#wp-print-overlay){display:none!important}html,body{height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}}`;
+  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}.wp-no-print{display:none!important}body>*:not(#wp-print-overlay){display:none!important}html{width:297mm!important;height:auto!important;overflow:hidden!important}body{width:297mm!important;min-width:297mm!important;height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}.wp-hora-bar{height:50px!important;overflow:hidden!important}}`;
   document.head.appendChild(ps);
   const overlay=document.createElement('div');
   overlay.id='wp-print-overlay';
@@ -6955,12 +6955,6 @@ function printWeeklyPlan(){
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  // Equalise hora/local bar heights: measure actual rendered heights, set all to the tallest
-  const _bars=[...overlay.querySelectorAll('.wp-hora-bar')];
-  if(_bars.length){
-    const _maxH=Math.max(..._bars.map(b=>b.getBoundingClientRect().height));
-    _bars.forEach(b=>b.style.setProperty('min-height',Math.ceil(_maxH)+'px','important'));
-  }
 }
 
 // ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
