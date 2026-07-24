@@ -6903,7 +6903,7 @@ function printWeeklyPlan(){
   document.getElementById('wp-print-style')?.remove();
   const ps=document.createElement('style');
   ps.id='wp-print-style';
-  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}.wp-no-print{display:none!important}body>*:not(#wp-print-overlay){display:none!important}html,body{height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}.wp-hora-bar{height:40px!important;overflow:hidden!important}}`;
+  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}.wp-no-print{display:none!important}body>*:not(#wp-print-overlay){display:none!important}html,body{height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}.wp-hora-bar{min-height:32px!important}}`;
   document.head.appendChild(ps);
   const overlay=document.createElement('div');
   overlay.id='wp-print-overlay';
