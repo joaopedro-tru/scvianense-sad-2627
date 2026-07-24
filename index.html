@@ -6491,7 +6491,21 @@ async function uploadFile(file, refId, type){
   });
 }
 
-// Sincroniza da cloud para o localStorage local
+// Subscreve uma coleção Firestore em tempo real.
+// Resolve com a função unsubscribe após o PRIMEIRO snapshot chegar,
+// o que permite usar em Promise.all no startup sem bloquear para sempre.
+// Chamadas subsequentes do listener mantêm o localStorage sempre atualizado.
+function listenAndWait(colRef, onData){
+  return new Promise((resolve)=>{
+    let resolved=false;
+    const unsub=colRef.onSnapshot(
+      snap=>{ onData(snap); if(!resolved){ resolved=true; resolve(unsub); } },
+      err=>{ console.warn('Listener error:',colRef.path||'',err); if(!resolved){ resolved=true; resolve(null); } }
+    );
+  });
+}
+
+// Sincroniza da cloud para o localStorage local (one-shot, mantido para compatibilidade)
 async function syncFromFirestore(showToast=false){
   if(!firestoreDb) return;
   try {
@@ -6501,8 +6515,6 @@ async function syncFromFirestore(showToast=false){
     ]);
     const players=[]; pSnap.forEach(d=>players.push(d.data()));
     const events=[];  eSnap.forEach(d=>events.push(d.data()));
-    // Só sobrescreve o localStorage se o Firestore tiver dados
-    // (evita apagar dados locais caso a cloud esteja vazia por erro)
     if(players.length>0 || events.length>0){
       localStorage.setItem('scv_p',JSON.stringify(players));
       localStorage.setItem('scv_e',JSON.stringify(events));
@@ -7820,23 +7832,46 @@ function initCoordApp(){
   applyRoleUI();
   (async()=>{
     if(firestoreDb){
+      // 1. Migração primeiro (pode escrever dados que os listeners vão ler)
       await migrateLocalToFirestore();
-      await syncFromFirestore();
-      await DB.syncClinicalFromFirestore();
-      await DB.syncUnavailFromFirestore();
-      await DB.syncStaffProfilesFromFirestore();
-      await DB.syncAthleteDocsFromFirestore();
-      await DB.syncAthletePaymentsFromFirestore();
-      await DB.syncTrialFromFirestore();
-      if(isAdmin()){ await seedAppUsersIfNeeded(); await loadAppUsers(); }
-      if(isAdmin()) await syncPendingAthletes(true);
-      if(isAdmin()) checkPendingBadge();
+      // 2a. Listeners em tempo real — aguardam o 1º snapshot antes de continuar
+      //     Ficam ativos enquanto a app estiver aberta: qualquer escrita por outro
+      //     utilizador atualiza o localStorage automaticamente, sem re-sync manual.
+      const listeners=await Promise.all([
+        listenAndWait(firestoreDb.collection('players'), snap=>{
+          const arr=[]; snap.forEach(d=>arr.push(d.data()));
+          if(arr.length>0) localStorage.setItem('scv_p',JSON.stringify(arr));
+        }),
+        listenAndWait(firestoreDb.collection('events'), snap=>{
+          const arr=[]; snap.forEach(d=>arr.push(d.data()));
+          if(arr.length>0) localStorage.setItem('scv_e',JSON.stringify(arr));
+        }),
+        listenAndWait(firestoreDb.collection('unavailability'), snap=>{
+          const arr=[]; snap.forEach(d=>arr.push(d.data()));
+          DB._sunavail(arr);
+        }),
+      ]);
+      window._fsListeners=(window._fsListeners||[]).concat(listeners.filter(Boolean));
+      // 2b. One-shot reads para coleções estáticas (raramente mudam)
+      await Promise.all([
+        DB.syncClinicalFromFirestore(),
+        DB.syncStaffProfilesFromFirestore(),
+        DB.syncAthleteDocsFromFirestore(),
+        DB.syncAthletePaymentsFromFirestore(),
+        DB.syncTrialFromFirestore(),
+      ]);
+      // 3. Operações admin
+      if(isAdmin()){
+        await seedAppUsersIfNeeded();
+        await loadAppUsers();
+        await syncPendingAthletes(true);
+        checkPendingBadge();
+      }
     } else {
       seedIfEmpty();
     }
     seedLiga3Games();
     document.getElementById('sync-overlay').style.display='none';
-    // Admin → dashboard | Treinador → dashboard personalizado
     nav('dashboard');
   })();
 }
