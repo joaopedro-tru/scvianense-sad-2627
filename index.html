@@ -2400,7 +2400,13 @@ function nav(v,opts={}){
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
-  else if(v==='weekly-plan'){ show('v-weekly-plan'); setActive('[data-view="weekly-plan"]'); }
+  else if(v==='weekly-plan'){
+    show('v-weekly-plan'); setActive('[data-view="weekly-plan"]');
+    const wpW=document.getElementById('wp-week');
+    if(wpW&&!wpW.value) wpW.value=new Date().toISOString().slice(0,10);
+    const wpS=document.getElementById('wp-squad');
+    if(wpS&&!wpS.value) wpS.value='eqa';
+  }
   else if(v==='myprofile'){ show('v-myprofile'); setActive('[data-view="myprofile"]'); renderMyProfile() }
   else if(v==='tm'){ show('v-tm'); setActive('[data-view="tm"]'); renderTM() }
   else if(v==='unavailabilities'){ show('v-unavailabilities'); setActive('[data-view="unavailabilities"]'); renderUnavailabilities() }
@@ -6903,22 +6909,17 @@ function printWeeklyPlan(){
   document.getElementById('wp-print-style')?.remove();
   const ps=document.createElement('style');
   ps.id='wp-print-style';
-  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}.wp-no-print{display:none!important}body>*:not(#wp-print-overlay){display:none!important}html,body{height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}.wp-hora-bar{min-height:32px!important}}`;
+  ps.textContent=`@media print{@page{size:A4 landscape;margin:6mm}body>*:not(#wp-print-overlay){display:none!important}html,body{height:auto!important;overflow:hidden!important;min-height:0!important}#wp-print-overlay{visibility:visible!important;position:static!important;background:#fff!important;height:auto!important;overflow:hidden!important}#wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.wp-obs-cell td{height:${obsH}!important;vertical-align:top}}`;
   document.head.appendChild(ps);
   const overlay=document.createElement('div');
   overlay.id='wp-print-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:#6b7280;z-index:9999;overflow:auto';
+  overlay.style.cssText='position:fixed;inset:0;z-index:9999;visibility:hidden';
   overlay.innerHTML=`
     <style>
       #wpp *{font-family:Arial,sans-serif;box-sizing:border-box}
       #wpp table{width:100%;border-collapse:collapse;table-layout:fixed}
     </style>
-    <div class="wp-no-print" style="padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:1;box-shadow:0 1px 6px #0002">
-      <button onclick="document.getElementById('wp-print-overlay')?.remove();document.getElementById('wp-print-style')?.remove()" style="padding:7px 14px;border:1.5px solid #ccc;border-radius:7px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
-      <span style="font-size:11px;color:#e67e22;font-weight:600">⚠️ Na caixa de impressão seleciona <b>Paisagem (Landscape)</b></span>
-      <button onclick="window.print()" style="margin-left:auto;padding:7px 16px;background:#1a3d6e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
-    </div>
-    <div id="wpp" style="width:1060px;max-width:calc(100vw - 20px);margin:20px auto 36px;background:#fff;padding:12px 14px;box-shadow:0 4px 24px #0004;border-radius:4px">
+    <div id="wpp" style="background:#fff;padding:12px 14px">
       <!-- Header -->
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:9px">
@@ -6946,6 +6947,17 @@ function printWeeklyPlan(){
       </div>
     </div>`;
   document.body.appendChild(overlay);
+  // Equalise hora/local bar heights: measure actual rendered heights, set all to the tallest
+  const _bars=[...overlay.querySelectorAll('.wp-hora-bar')];
+  if(_bars.length){
+    const _maxH=Math.max(..._bars.map(b=>b.getBoundingClientRect().height));
+    _bars.forEach(b=>b.style.setProperty('min-height',Math.ceil(_maxH)+'px','important'));
+  }
+  window.addEventListener('afterprint',()=>{
+    document.getElementById('wp-print-overlay')?.remove();
+    document.getElementById('wp-print-style')?.remove();
+  },{once:true});
+  window.print();
 }
 
 // ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
