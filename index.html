@@ -6811,80 +6811,111 @@ function printWeeklyPlan(){
   });
   const hasBiDaily=slots.some(s=>s.am&&s.pm);
   const getEvForPrint=(period,di)=>period==='main'?(slots[di].am||slots[di].pm||null):slots[di][period];
-  const getObsBg=(ev)=>{ if(!ev) return '#f0f0f0'; if(ev.type==='game') return '#e6f4ea'; return '#ffffff'; };
 
-  const pSection=(label,period)=>{
-    const secHdr=label?`<tr><td colspan="7" style="background:#1a3d6e;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px;letter-spacing:2px">${label}</td></tr>`:'';
-    let horaRow=`<tr>`;
-    let localRow=`<tr>`;
-    let obsRow=`<tr class="wp-obs-cell">`;
-    dates.forEach((_,di)=>{
-      const hora=wpGetVal(period,'hora',di);
-      const local=wpGetVal(period,'local',di);
-      const obs=wpGetVal(period,'obs',di);
-      const ev=getEvForPrint(period,di);
-      const bg=getObsBg(ev);
-      horaRow+=`<td style="padding:3px 4px;text-align:center;font-size:10px;font-weight:700;background:#f7f7f7">${hora||'—'}</td>`;
-      localRow+=`<td style="padding:3px 4px;text-align:center;font-size:9px;color:#444;background:#fafafa">${local||''}</td>`;
-      obsRow+=`<td style="padding:5px 6px;font-size:9.5px;vertical-align:top;white-space:pre-line;line-height:1.55;background:${bg}">${obs||''}</td>`;
-    });
-    return secHdr+horaRow+`</tr>`+localRow+`</tr>`+obsRow+`</tr>`;
+  // Uma única célula por dia: hora+local em linha compacta, observações abaixo
+  const pCell=(period,di)=>{
+    const hora=wpGetVal(period,'hora',di);
+    const local=wpGetVal(period,'local',di);
+    const obs=wpGetVal(period,'obs',di);
+    const ev=getEvForPrint(period,di);
+    const isFolga=!ev;
+    const isGame=ev?.type==='game';
+
+    if(isFolga){
+      return `<td style="background:#f5f5f5;text-align:center;vertical-align:middle;border:1px solid #ddd">
+        <div style="color:#c0c0c0;font-size:12px;font-style:italic;font-weight:600;letter-spacing:.5px">FOLGA</div>
+      </td>`;
+    }
+    const topBg=isGame?'#c8e6c9':'#f0f4f8';
+    const topColor=isGame?'#1b5e20':'#555';
+    const border=isGame?'#a5d6a7':'#dde3ed';
+    const cellBg=isGame?'#f1f8f2':'#ffffff';
+    const topLine=(hora||local)?`<div style="font-size:8px;color:${topColor};padding:3px 6px 3px;background:${topBg};border-bottom:1px solid ${border};">${[hora,local].filter(Boolean).join('&nbsp;·&nbsp;')}</div>`:'';
+    let body='';
+    if(isGame){
+      const lines=obs.split('\n');
+      body=`<div style="padding:5px 6px">
+        <div style="font-size:8px;font-weight:800;background:#1b5e20;color:#fff;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;letter-spacing:.8px">JOGO</div>
+        <div style="font-size:10px;font-weight:700;line-height:1.4;color:#1a1a1a">${lines[0]||''}</div>
+        ${lines.slice(1).map(l=>`<div style="font-size:9px;color:#4a4a4a;margin-top:3px">${l}</div>`).join('')}
+      </div>`;
+    } else {
+      body=`<div style="padding:5px 6px;font-size:9.5px;line-height:1.65;color:#1a1a1a;white-space:pre-line">${obs}</div>`;
+    }
+    return `<td style="background:${cellBg};border:1px solid #ddd;vertical-align:top">${topLine}${body}</td>`;
   };
 
-  let dayHeaders=`<tr style="background:#1a3d6e;color:#fff">`;
-  dates.forEach((d,i)=>{ dayHeaders+=`<th style="width:${colW};font-weight:700;text-align:center;padding:6px 4px;font-size:10px">${WP_DAYS_PT[i].split('-')[0].charAt(0).toUpperCase()+WP_DAYS_PT[i].split('-')[0].slice(1)}<br><span style="font-size:8.5px;font-weight:400;opacity:.9">${wpFmt(d)}</span></th>`; });
+  const pSection=(label,period)=>{
+    const secHdr=label?`<tr><td colspan="7" style="background:#0e2444;color:#fff;font-size:8.5px;font-weight:700;text-align:center;padding:5px 4px;letter-spacing:2.5px;border:1px solid #0e2444">${label}</td></tr>`:'';
+    let row=`<tr class="wp-obs-cell">`;
+    dates.forEach((_,di)=>{ row+=pCell(period,di); });
+    return secHdr+row+`</tr>`;
+  };
+
+  let dayHeaders=`<tr>`;
+  dates.forEach((d,i)=>{
+    const isWE=i>=5;
+    const bg=isWE?'#0e2444':'#1a3d6e';
+    const dayName=WP_DAYS_PT[i].split('-')[0];
+    const cap=dayName.charAt(0).toUpperCase()+dayName.slice(1);
+    dayHeaders+=`<th style="width:${colW};background:${bg};color:#fff;font-weight:700;text-align:center;padding:8px 4px;border:1px solid #0e2444;font-size:11px;letter-spacing:.3px">${cap}<br><span style="font-size:8.5px;font-weight:400;opacity:.8;letter-spacing:0">${wpFmt(d)}</span></th>`;
+  });
   dayHeaders+=`</tr>`;
 
-  const microMesoLine=(micro||meso)?`<div style="text-align:center;font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:10px;color:#444">${micro?`MICROCICLO ${micro}`:''}${micro&&meso?' · ':''}${meso?`MESOCICLO ${meso}`:''}</div>`:'';
-
-  const obsH=hasBiDaily?'62mm':'130mm';
+  const microMesoStr=(micro||meso)?`${micro?`MC ${micro}`:''}${micro&&meso?' · ':''}${meso?`MSC ${meso}`:''}`:'';
+  const obsH=hasBiDaily?'70mm':'148mm';
+  const today=new Date().toLocaleDateString('pt-PT');
 
   document.getElementById('wp-print-overlay')?.remove();
   const overlay=document.createElement('div');
   overlay.id='wp-print-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:#9aa0a6;z-index:9999;overflow:auto';
+  overlay.style.cssText='position:fixed;inset:0;background:#6b7280;z-index:9999;overflow:auto';
   overlay.innerHTML=`
     <style>
-      #wp-page-content *{font-family:Arial,sans-serif;box-sizing:border-box}
-      #wp-page-content table{width:100%;border-collapse:collapse;table-layout:fixed}
-      #wp-page-content td,#wp-page-content th{border:1px solid #bbb}
+      #wpp *{font-family:Arial,sans-serif;box-sizing:border-box}
+      #wpp table{width:100%;border-collapse:collapse;table-layout:fixed}
       @media print{
-        @page{size:A4 landscape;margin:5mm}
+        @page{size:A4 landscape;margin:6mm}
         .wp-no-print{display:none!important}
         body>*:not(#wp-print-overlay){display:none!important}
         #wp-print-overlay{position:static!important;overflow:visible!important;background:#fff!important}
-        #wp-page-content{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}
+        #wpp{width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}
         *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-        .wp-obs-cell{height:${obsH}!important}
+        .wp-obs-cell td{height:${obsH}!important;vertical-align:top}
       }
     </style>
-    <div class="wp-no-print" style="padding:8px 16px;display:flex;gap:8px;justify-content:flex-end;border-bottom:1px solid #ccc;position:sticky;top:0;background:#fff;z-index:1;box-shadow:0 1px 4px #0002">
+    <div class="wp-no-print" style="padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:1;box-shadow:0 1px 6px #0002">
       <button onclick="document.getElementById('wp-print-overlay').remove()" style="padding:7px 14px;border:1.5px solid #ccc;border-radius:7px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
-      <button onclick="window.print()" style="padding:7px 14px;background:#1a3d6e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+      <span style="font-size:11px;color:#e67e22;font-weight:600">⚠️ Na caixa de impressão seleciona <b>Paisagem (Landscape)</b></span>
+      <button onclick="window.print()" style="margin-left:auto;padding:7px 16px;background:#1a3d6e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
     </div>
-    <div id="wp-page-content" style="width:1060px;max-width:calc(100vw - 16px);margin:16px auto 32px;background:#fff;padding:10px 12px;box-shadow:0 3px 18px #0003;border-radius:3px">
+    <div id="wpp" style="width:1060px;max-width:calc(100vw - 20px);margin:20px auto 36px;background:#fff;padding:12px 14px;box-shadow:0 4px 24px #0004;border-radius:4px">
       <!-- Header -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div>
-          <div style="font-size:15px;font-weight:800;color:#1a3d6e;letter-spacing:-.2px">SC Vianense SAD</div>
-          <div style="font-size:9px;color:#888;margin-top:1px">${sqLabel} · Época ${season}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:38px;height:38px;background:#1a3d6e;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:11px;letter-spacing:-.5px;flex-shrink:0">SCV</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#1a3d6e;letter-spacing:-.3px">SC Vianense SAD</div>
+            <div style="font-size:9px;color:#888;margin-top:2px">${sqLabel} · Época ${season}</div>
+          </div>
         </div>
-        <div style="text-align:center">
-          ${microMesoLine?`<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#444">${micro?`MICROCICLO ${micro}`:''}${micro&&meso?' · ':''}${meso?`MESOCICLO ${meso}`:''}</div>`:''}
-        </div>
+        ${microMesoStr?`<div style="background:#f0f4f8;border-radius:6px;padding:5px 14px;font-size:10px;font-weight:700;color:#1a3d6e;letter-spacing:1.2px">${microMesoStr}</div>`:''}
         <div style="text-align:right">
-          <div style="font-size:12px;font-weight:700;color:#1a3d6e">Planeamento Semanal</div>
-          <div style="font-size:9px;color:#666;margin-top:1px">${dateRange}</div>
+          <div style="font-size:13px;font-weight:800;color:#1a3d6e;letter-spacing:.5px;text-transform:uppercase">Planeamento Semanal</div>
+          <div style="font-size:9px;color:#888;margin-top:2px">${dateRange}</div>
         </div>
       </div>
-      <div style="border-top:2.5px solid #1a3d6e;margin-bottom:7px"></div>
+      <div style="height:3px;background:linear-gradient(90deg,#1a3d6e,#4a7fc1);border-radius:2px;margin-bottom:8px"></div>
       <!-- Table -->
       <table>
         <thead>${dayHeaders}</thead>
-        <tbody>
-          ${hasBiDaily ? pSection('MANHÃ','am')+pSection('TARDE/NOITE','pm') : pSection('','main')}
-        </tbody>
+        <tbody>${hasBiDaily?pSection('MANHÃ','am')+pSection('TARDE / NOITE','pm'):pSection('','main')}</tbody>
       </table>
+      <!-- Footer -->
+      <div style="margin-top:7px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:7.5px;color:#aaa;font-style:italic">* Plano sujeito a alterações</div>
+        <div style="font-size:7.5px;color:#ccc">Gerado em ${today}</div>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
 }
