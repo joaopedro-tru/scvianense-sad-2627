@@ -6862,28 +6862,8 @@ function printWeeklyPlan(){
         ${lines.slice(1).map(l=>`<div style="font-size:9px;color:#555;margin-top:3px">${l}</div>`).join('')}
       </div>`;
     } else {
-      // Treino — preferir objetivos táticos do evento; cair para obs do textarea
-      const p=ev?.objectivePrimary, s=ev?.objectiveSecondary;
-      const tc=TACTICS_TAXONOMY;
-      const hasObj=p?.moment&&tc[p.moment];
-      let objHtml='';
-      if(hasObj){
-        objHtml+=`<div style="margin-bottom:4px">
-          <span style="background:${tc[p.moment].color};color:#fff;font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px">${tc[p.moment].label}</span>
-          ${p.subPrinciples?.length?`<div style="font-size:7.5px;color:${tc[p.moment].color};font-weight:600;margin-top:2px;padding-left:2px">${p.subPrinciples.join(' · ')}</div>`:''}
-        </div>`;
-        if(s?.moment&&tc[s.moment]){
-          objHtml+=`<div>
-            <span style="border:1.5px solid ${tc[s.moment].color};color:${tc[s.moment].color};font-size:8px;font-weight:600;padding:1px 6px;border-radius:3px">${tc[s.moment].label}</span>
-            ${s.subPrinciples?.length?`<div style="font-size:7.5px;color:${tc[s.moment].color};font-weight:600;margin-top:2px;padding-left:2px">${s.subPrinciples.join(' · ')}</div>`:''}
-          </div>`;
-        }
-      } else if(obs&&obs!=='FOLGA'){
-        objHtml=`<div style="font-size:9px;line-height:1.6;color:#333;white-space:pre-line">${obs}</div>`;
-      }
       body=`<div style="padding:5px 7px">
-        <div style="font-size:8px;font-weight:800;background:#1a3d6e;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:${hasObj||objHtml?'6px':'0'};letter-spacing:.8px">TREINO</div>
-        ${objHtml}
+        <div style="font-size:8px;font-weight:800;background:#1a3d6e;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;letter-spacing:.8px">TREINO</div>
       </div>`;
     }
     return `<td style="background:${cellBg};border:1px solid #ddd;vertical-align:top">${topBar}${body}</td>`;
