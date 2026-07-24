@@ -6657,6 +6657,7 @@ function openAccountSetup(username){
 }
 
 // ── WEEKLY PLAN ───────────────────────────────────────────────────────────────
+let _wpObsH='72mm';
 const WP_DAYS_PT=['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
 
 function wpGetWeekDates(anyDateStr){
@@ -6907,6 +6908,7 @@ function printWeeklyPlan(){
 
   const microMesoStr=(micro||meso)?`${micro?`MC ${micro}`:''}${micro&&meso?' · ':''}${meso?`MSC ${meso}`:''}`:'';
   const obsH=hasBiDaily?'42mm':'72mm';
+  _wpObsH=obsH;
 
   document.getElementById('wp-print-overlay')?.remove();
   document.getElementById('wp-print-style')?.remove();
@@ -6925,7 +6927,7 @@ function printWeeklyPlan(){
     <div class="wp-no-print" style="padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:1;box-shadow:0 1px 6px #0002">
       <button onclick="document.getElementById('wp-print-overlay')?.remove();document.getElementById('wp-print-style')?.remove()" style="padding:7px 14px;border:1.5px solid #ccc;border-radius:7px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
       <span style="font-size:11px;color:#e67e22;font-weight:600">⚠️ Na caixa de impressão seleciona <b>Paisagem (Landscape)</b></span>
-      <button onclick="window.print()" style="margin-left:auto;padding:7px 16px;background:#1a3d6e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+      <button onclick="wpExecPrint()" style="margin-left:auto;padding:7px 16px;background:#1a3d6e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
     </div>
     <div id="wpp" style="width:1060px;max-width:calc(100vw - 20px);margin:20px auto 36px;background:#fff;padding:12px 14px;box-shadow:0 4px 24px #0004;border-radius:4px">
       <!-- Header -->
@@ -6955,6 +6957,30 @@ function printWeeklyPlan(){
       </div>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+function wpExecPrint(){
+  const wpp=document.getElementById('wpp');
+  if(!wpp){window.print();return;}
+  const win=window.open('','_blank');
+  if(!win){window.print();return;}
+  win.document.write('<!DOCTYPE html><html><head>'
+    +'<meta charset="utf-8">'
+    +'<meta name="viewport" content="width=1060">'
+    +'<style>'
+    +'@page{size:A4 landscape;margin:6mm}'
+    +'*{font-family:Arial,sans-serif;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+    +'body{margin:0;padding:12px 14px}'
+    +'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    +'.wp-hora-bar{height:50px;overflow:hidden}'
+    +'.wp-obs-cell td{height:'+_wpObsH+';vertical-align:top}'
+    +'#wpp{width:100%!important;max-width:none!important;margin:0!important;box-shadow:none!important;border-radius:0!important}'
+    +'</style>'
+    +'</head><body>'
+    +wpp.outerHTML
+    +'<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},120)});<\/script>'
+    +'</body></html>');
+  win.document.close();
 }
 
 // ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
