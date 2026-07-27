@@ -673,6 +673,7 @@ body.pm #v-pf{padding:30px}
           <div id="d-games-23"></div>
         </div>
       </div>
+      <div id="d-admin-load"></div>
       <div class="card">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
         <div id="d-birthdays"></div>
@@ -2526,18 +2527,14 @@ function bdayCards(ps,containerEl){
     }).join('');
 }
 
-function renderStaffLoadCharts(cs){
-  const el=document.getElementById('d-staff-load');
-  if(!el) return;
-  el.innerHTML='';
+// Shared helper — returns gym + treino cards HTML for a squad ('' if no data)
+function _squadLoadCards(cs){
   const now=new Date();
   const today=now.toISOString().split('T')[0];
   const cutoff5w=new Date(now-35*24*3600*1000).toISOString().split('T')[0];
   const allEvs=DB.events(cs);
-  // Gym
   const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
   const gym5w=gymEvs.filter(e=>e.date>=cutoff5w);
-  // Training — only 6 tactical moments
   const DASH_MOM=['OO','OD','TO','TD','BPO','BPD'];
   const trainEvs=allEvs.filter(e=>e.type==='training'&&e.momentSummary&&e.date<=today);
   const train5w=trainEvs.filter(e=>e.date>=cutoff5w);
@@ -2557,9 +2554,9 @@ function renderStaffLoadCharts(cs){
     })});
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
-  const gd5=gymAgg(gym5w), gdS=gymAgg(gymEvs);
-  const td5=trainAgg(train5w), tdS=trainAgg(trainEvs);
-  if(!gd5.length&&!gdS.length&&!td5.length&&!tdS.length) return;
+  const gd5=gymAgg(gym5w),gdS=gymAgg(gymEvs);
+  const td5=trainAgg(train5w),tdS=trainAgg(trainEvs);
+  if(!gd5.length&&!gdS.length&&!td5.length&&!tdS.length) return '';
   function miniSVG(entries,colorFn,sz=72){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
@@ -2581,7 +2578,7 @@ function renderStaffLoadCharts(cs){
     }).join('');
     return `<svg viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" style="flex-shrink:0">${paths}</svg>`;
   }
-  function donutBlock(entries,colorFn,labelFn,unit,period){
+  function donutBlock(entries,colorFn,labelFn,unit,period,sz=72){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
     const legend=entries.slice(0,7).map(([k,v])=>{
@@ -2594,7 +2591,7 @@ function renderStaffLoadCharts(cs){
     }).join('');
     return `<div style="min-width:0">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px">${period}</div>
-      <div style="display:flex;align-items:center;gap:10px">${miniSVG(entries,colorFn)}<div style="flex:1;min-width:0">${legend}</div></div>
+      <div style="display:flex;align-items:center;gap:10px">${miniSVG(entries,colorFn,sz)}<div style="flex:1;min-width:0">${legend}</div></div>
       <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${total} ${unit}</div>
     </div>`;
   }
@@ -2606,16 +2603,37 @@ function renderStaffLoadCharts(cs){
   const gS=donutBlock(gdS,gColorFn,k=>k,'séries','Época');
   const t5=donutBlock(td5,tColorFn,tLabelFn,'min','Últimas 5 semanas');
   const tS=donutBlock(tdS,tColorFn,tLabelFn,'min','Época');
-  const gymCard=(g5||gS)?`<div class="card" style="flex:1;min-width:220px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:14px">🏋️ Carga — Ginásio</div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
+  const gymCard=(g5||gS)?`<div class="card" style="flex:1;min-width:200px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🏋️ Ginásio</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
   </div>`:'';
-  const trainCard=(t5||tS)?`<div class="card" style="flex:1;min-width:220px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:14px">📋 Carga — Momentos de Jogo</div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">${t5}${divider(t5,tS)}${tS}</div>
+  const trainCard=(t5||tS)?`<div class="card" style="flex:1;min-width:200px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">📋 Momentos de Jogo</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${t5}${divider(t5,tS)}${tS}</div>
   </div>`:'';
-  if(gymCard||trainCard)
-    el.innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">${gymCard}${trainCard}</div>`;
+  return (gymCard||trainCard)?`<div style="display:flex;gap:12px;flex-wrap:wrap">${gymCard}${trainCard}</div>`:'';
+}
+function renderStaffLoadCharts(cs){
+  const el=document.getElementById('d-staff-load');
+  if(!el) return;
+  const html=_squadLoadCards(cs);
+  el.innerHTML=html?`<div style="margin-bottom:14px">${html}</div>`:'';
+}
+function renderAdminLoadCharts(){
+  const el=document.getElementById('d-admin-load');
+  if(!el) return;
+  const META={sub19:{icon:'🟡',color:'#b8860b'},sub23:{icon:'🔵',color:'var(--blue)'},eqa:{icon:'⚫',color:'#444'}};
+  const sections=['sub19','sub23','eqa'].map(cs=>{
+    const html=_squadLoadCards(cs);
+    if(!html) return '';
+    const m=META[cs];
+    return `<div><div style="font-size:12px;font-weight:700;color:${m.color};margin-bottom:10px">${m.icon} ${SQUADS[cs]}</div>${html}</div>`;
+  }).filter(Boolean);
+  if(!sections.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="card" style="margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:16px">📊 Carga de Trabalho</div>
+    <div style="display:flex;flex-direction:column;gap:18px">${sections.join('<div style="height:1px;background:var(--border)"></div>')}</div>
+  </div>`;
 }
 
 function renderDash(){
@@ -2720,6 +2738,7 @@ function renderDash(){
 
   renderSquadGames(g19,'d-games-19');
   renderSquadGames(g23,'d-games-23');
+  renderAdminLoadCharts();
   bdayCards(ps,document.getElementById('d-birthdays'));
 }
 
