@@ -681,6 +681,7 @@ body.pm #v-pf{padding:30px}
     <!-- COACH DASHBOARD -->
     <div id="d-coach-content" style="display:none">
       <div class="sg" id="d-coach-stats"></div>
+      <div id="d-staff-load"></div>
       <div class="g2col">
         <div class="card">
           <div style="font-size:14px;font-weight:700;margin-bottom:14px">📅 Próximos Eventos</div>
@@ -1262,7 +1263,10 @@ body.pm #v-pf{padding:30px}
   <div class="view" id="v-sq-gym">
     <div class="tb">
       <div><h1 id="sqgym-title">Ginásio</h1><div class="sub" id="sqgym-sub"></div></div>
-      <button class="btn btn-p btn-sm" id="btn-new-gym">+ Nova Sessão</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-o btn-sm" id="btn-gym-analytics">📊 Análise</button>
+        <button class="btn btn-p btn-sm" id="btn-new-gym">+ Nova Sessão</button>
+      </div>
     </div>
     <div class="cc">
       <button class="btn btn-o btn-sm" id="sqgym-prev">← Anterior</button>
@@ -1625,6 +1629,20 @@ body.pm #v-pf{padding:30px}
       <button class="btn btn-d" id="btn-confirm-del-series">🗑️ Eliminar série</button>
       <button class="btn btn-g" id="mo-del-series-cancel">Cancelar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: GYM ANALYTICS (full-screen) -->
+<div class="mo mo-fs" id="mo-gym-analytics">
+  <div class="md">
+    <div class="gym-mh">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#7c3aed">📊 Análise de Carga — Ginásio</div>
+        <div id="gym-analytics-meta" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <button class="mc" id="mo-gym-analytics-close">✕</button>
+    </div>
+    <div class="gym-mb" id="gym-analytics-body"></div>
   </div>
 </div>
 
@@ -2508,6 +2526,98 @@ function bdayCards(ps,containerEl){
     }).join('');
 }
 
+function renderStaffLoadCharts(cs){
+  const el=document.getElementById('d-staff-load');
+  if(!el) return;
+  el.innerHTML='';
+  const now=new Date();
+  const today=now.toISOString().split('T')[0];
+  const cutoff5w=new Date(now-35*24*3600*1000).toISOString().split('T')[0];
+  const allEvs=DB.events(cs);
+  // Gym
+  const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
+  const gym5w=gymEvs.filter(e=>e.date>=cutoff5w);
+  // Training — only 6 tactical moments
+  const DASH_MOM=['OO','OD','TO','TD','BPO','BPD'];
+  const trainEvs=allEvs.filter(e=>e.type==='training'&&e.momentSummary&&e.date<=today);
+  const train5w=trainEvs.filter(e=>e.date>=cutoff5w);
+  function gymAgg(evs){
+    const acc={};
+    evs.forEach(ev=>{(ev.gymPlan?.exercises||[]).forEach(ex=>{
+      if(!ex.categoria||!GYM_CATEGORIES[ex.categoria]) return;
+      acc[ex.categoria]=(acc[ex.categoria]||0)+(parseInt(ex.series)||1);
+    })});
+    return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+  }
+  function trainAgg(evs){
+    const acc={};
+    evs.forEach(ev=>{DASH_MOM.forEach(m=>{
+      const v=(ev.momentSummary||{})[m]||0;
+      if(v>0) acc[m]=(acc[m]||0)+v;
+    })});
+    return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+  }
+  const gd5=gymAgg(gym5w), gdS=gymAgg(gymEvs);
+  const td5=trainAgg(train5w), tdS=trainAgg(trainEvs);
+  if(!gd5.length&&!gdS.length&&!td5.length&&!tdS.length) return;
+  function miniSVG(entries,colorFn,sz=72){
+    if(!entries.length) return '';
+    const total=entries.reduce((s,[,v])=>s+v,0);
+    const CX=sz/2,CY=sz/2,R=sz*0.42,IR=sz*0.265;
+    let ang=-Math.PI/2;
+    const single=entries.length===1;
+    const paths=entries.map(([key,val])=>{
+      const color=colorFn(key);
+      const sweep=val/total*2*Math.PI;
+      const a2=ang+sweep*(single?0.9999:1);
+      const la=sweep>Math.PI?1:0;
+      const x1=CX+R*Math.cos(ang),y1=CY+R*Math.sin(ang);
+      const x2=CX+R*Math.cos(a2),y2=CY+R*Math.sin(a2);
+      const ix1=CX+IR*Math.cos(a2),iy1=CY+IR*Math.sin(a2);
+      const ix2=CX+IR*Math.cos(ang),iy2=CY+IR*Math.sin(ang);
+      const d=`M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R},0,${la},1,${x2.toFixed(1)},${y2.toFixed(1)} L${ix1.toFixed(1)},${iy1.toFixed(1)} A${IR},${IR},0,${la},0,${ix2.toFixed(1)},${iy2.toFixed(1)} Z`;
+      ang+=sweep;
+      return `<path d="${d}" fill="${color}" stroke="var(--card)" stroke-width="1.5"/>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" style="flex-shrink:0">${paths}</svg>`;
+  }
+  function donutBlock(entries,colorFn,labelFn,unit,period){
+    if(!entries.length) return '';
+    const total=entries.reduce((s,[,v])=>s+v,0);
+    const legend=entries.slice(0,7).map(([k,v])=>{
+      const pct=Math.round(v/total*100);
+      return `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+        <div style="width:7px;height:7px;border-radius:1px;background:${colorFn(k)};flex-shrink:0"></div>
+        <span style="font-size:10px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${labelFn(k)}</span>
+        <span style="font-size:10px;font-weight:700">${pct}%</span>
+      </div>`;
+    }).join('');
+    return `<div style="min-width:0">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px">${period}</div>
+      <div style="display:flex;align-items:center;gap:10px">${miniSVG(entries,colorFn)}<div style="flex:1;min-width:0">${legend}</div></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${total} ${unit}</div>
+    </div>`;
+  }
+  function divider(a,b){return a&&b?'<div style="width:1px;background:var(--border);align-self:stretch"></div>':'';}
+  const gColorFn=k=>GYM_CATEGORIES[k]?.color||'#94a3b8';
+  const tColorFn=k=>TACTICS_TAXONOMY[k]?.color||'#64748b';
+  const tLabelFn=k=>TACTICS_TAXONOMY[k]?.label||k;
+  const g5=donutBlock(gd5,gColorFn,k=>k,'séries','Últimas 5 semanas');
+  const gS=donutBlock(gdS,gColorFn,k=>k,'séries','Época');
+  const t5=donutBlock(td5,tColorFn,tLabelFn,'min','Últimas 5 semanas');
+  const tS=donutBlock(tdS,tColorFn,tLabelFn,'min','Época');
+  const gymCard=(g5||gS)?`<div class="card" style="flex:1;min-width:220px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">🏋️ Carga — Ginásio</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
+  </div>`:'';
+  const trainCard=(t5||tS)?`<div class="card" style="flex:1;min-width:220px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">📋 Carga — Momentos de Jogo</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">${t5}${divider(t5,tS)}${tS}</div>
+  </div>`:'';
+  if(gymCard||trainCard)
+    el.innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">${gymCard}${trainCard}</div>`;
+}
+
 function renderDash(){
   const now=new Date();
   document.getElementById('d-date').textContent=`${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
@@ -2542,6 +2652,7 @@ function renderDash(){
     uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
       upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
     bdayCards(ps,document.getElementById('d-coach-birthdays'));
+    renderStaffLoadCharts(cs);
     return;
   }
 
@@ -3977,8 +4088,112 @@ document.getElementById('btn-edit-event').addEventListener('click',()=>{ documen
 document.getElementById('mo-edet-close').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 document.getElementById('mo-edet-cancel').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 
+// ── GYM ANALYTICS ────────────────────────────────────────────────────────────
+function openGymAnalyticsModal(){
+  const gymEvs=DB.events(squad).filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('gym-analytics-meta').textContent=`${SQUADS[squad]} · ${gymEvs.length} sessão${gymEvs.length!==1?'ões':''} com plano registado`;
+
+  if(!gymEvs.length){
+    document.getElementById('gym-analytics-body').innerHTML='<p style="color:var(--muted)">Sem sessões com plano registado ainda.</p>';
+    document.getElementById('mo-gym-analytics').classList.add('open');
+    return;
+  }
+
+  // Agrega dados
+  const catSets={};   // {categoria: totalSets}
+  const exMap={};     // {nome: {sessions:Set, totalSets, rpeSamples, reps}}
+
+  gymEvs.forEach(ev=>{
+    (ev.gymPlan.exercises||[]).forEach(ex=>{
+      if(!ex.exercicio) return;
+      const name=ex.exercicio;
+      const sets=parseInt(ex.series)||1;
+      const cat=ex.categoria||'Sem categoria';
+      // Categoria
+      catSets[cat]=(catSets[cat]||0)+sets;
+      // Exercício
+      if(!exMap[name]) exMap[name]={sessions:new Set(),totalSets:0,rpeSamples:[],repSamples:[],categories:new Set()};
+      exMap[name].sessions.add(ev.id||ev.date);
+      exMap[name].totalSets+=sets;
+      if(ex.rpe) exMap[name].rpeSamples.push(ex.rpe);
+      if(ex.reps) exMap[name].repSamples.push(ex.reps);
+      if(ex.categoria) exMap[name].categories.add(ex.categoria);
+    });
+  });
+
+  // Donut chart por categoria
+  const catEntries=Object.entries(catSets).sort(([,a],[,b])=>b-a);
+  const totalSetsAll=catEntries.reduce((s,[,v])=>s+v,0);
+  const single=catEntries.length===1;
+  let ang=-Math.PI/2;
+  const CX=60,CY=60,R=48,IR=30;
+  const svgPaths=catEntries.map(([cat,sets])=>{
+    const cc=GYM_CATEGORIES[cat]?.color||'#94a3b8';
+    const sweep=sets/totalSetsAll*2*Math.PI;
+    const a2=ang+sweep*(single?0.9999:1);
+    const la=sweep>Math.PI?1:0;
+    const x1=CX+R*Math.cos(ang),y1=CY+R*Math.sin(ang);
+    const x2=CX+R*Math.cos(a2),y2=CY+R*Math.sin(a2);
+    const ix1=CX+IR*Math.cos(a2),iy1=CY+IR*Math.sin(a2);
+    const ix2=CX+IR*Math.cos(ang),iy2=CY+IR*Math.sin(ang);
+    const d=`M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R},0,${la},1,${x2.toFixed(1)},${y2.toFixed(1)} L${ix1.toFixed(1)},${iy1.toFixed(1)} A${IR},${IR},0,${la},0,${ix2.toFixed(1)},${iy2.toFixed(1)} Z`;
+    ang+=sweep;
+    return `<path d="${d}" fill="${cc}" stroke="var(--card)" stroke-width="2"/>`;
+  }).join('');
+
+  const catLegend=catEntries.map(([cat,sets])=>{
+    const cc=GYM_CATEGORIES[cat]?.color||'#94a3b8';
+    const pct=Math.round(sets/totalSetsAll*100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${cc};flex-shrink:0"></div>
+      <span style="flex:1;font-size:13px">${cat}</span>
+      <span style="font-size:12px;font-weight:700">${sets} séries</span>
+      <span style="font-size:11px;color:var(--muted);width:36px;text-align:right">${pct}%</span>
+    </div>`;
+  }).join('');
+
+  // Tabela de frequência de exercícios
+  const exRows=Object.entries(exMap).sort(([,a],[,b])=>b.sessions.size-a.sessions.size).map(([name,d])=>{
+    const cats=[...d.categories];
+    const catBadges=cats.map(c=>{
+      const cc=GYM_CATEGORIES[c]?.color||'#94a3b8';
+      return `<span style="background:${cc}22;color:${cc};border:1px solid ${cc}55;border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700">${c}</span>`;
+    }).join(' ');
+    const avgRpe=d.rpeSamples.length?d.rpeSamples[Math.floor(d.rpeSamples.length/2)]:'—';
+    const typReps=d.repSamples.length?d.repSamples[0]:'—';
+    return `<tr>
+      <td style="font-weight:600;font-size:13px">${name}</td>
+      <td style="text-align:center;font-weight:700;font-size:14px;color:#7c3aed">${d.sessions.size}</td>
+      <td style="text-align:center">${d.totalSets}</td>
+      <td style="font-size:11px;color:var(--muted)">${typReps}</td>
+      <td style="font-size:11px;color:var(--muted)">${avgRpe}</td>
+      <td>${catBadges}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('gym-analytics-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center">
+      <svg viewBox="0 0 120 120" width="120" height="120" style="flex-shrink:0">
+        ${svgPaths}
+        <text x="60" y="57" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text)" font-family="-apple-system,sans-serif">${totalSetsAll}</text>
+        <text x="60" y="69" text-anchor="middle" font-size="8" fill="#999" font-family="-apple-system,sans-serif">séries</text>
+      </svg>
+      <div>${catLegend}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Frequência de Exercícios</div>
+      <div style="overflow-x:auto"><table class="gym-table gym-table-ro" style="min-width:500px">
+        <thead><tr><th>Exercício</th><th style="text-align:center">Sessões</th><th style="text-align:center">Séries total</th><th>Reps habitual</th><th>RPE habitual</th><th>Categoria</th></tr></thead>
+        <tbody>${exRows}</tbody>
+      </table></div>
+    </div>`;
+
+  document.getElementById('mo-gym-analytics').classList.add('open');
+}
+
 // ── GYM PLAN MODAL CLOSE ─────────────────────────────────────────────────────
 document.getElementById('mo-gym-close').addEventListener('click',()=>document.getElementById('mo-gym-plan').classList.remove('open'));
+document.getElementById('mo-gym-analytics-close').addEventListener('click',()=>document.getElementById('mo-gym-analytics').classList.remove('open'));
 
 // ── DELETE TRAINING SERIES ────────────────────────────────────────────────────
 document.getElementById('mo-del-series-close').addEventListener('click',()=>document.getElementById('mo-del-series').classList.remove('open'));
@@ -5366,6 +5581,7 @@ function renderSqGym(){
 document.getElementById('sqgym-prev').addEventListener('click',()=>{ sqgymMonth--; if(sqgymMonth<0){sqgymMonth=11;sqgymYear--;} renderSqGym(); });
 document.getElementById('sqgym-next').addEventListener('click',()=>{ sqgymMonth++; if(sqgymMonth>11){sqgymMonth=0;sqgymYear++;} renderSqGym(); });
 document.getElementById('btn-new-gym').addEventListener('click',()=>openEventModal(null,null,{type:'gym',squad}));
+document.getElementById('btn-gym-analytics').addEventListener('click', openGymAnalyticsModal);
 
 // ── SQUAD GAMES LIST ──────────────────────────────────────────────────────────
 function renderSqGames(){
@@ -7235,9 +7451,21 @@ const TACTICS_TAXONOMY={
   TD:  {label:'Trans. Defensiva',full:'Transição Defensiva',           color:'#e65100', subs:['RAP','Ajuste de Posição']},
   TOTD:{label:'Trans. Of./Def.', full:'Transição Ofensiva/Defensiva',  color:'#d97706', subs:['RAP','MPB','Ataque Rápido','Recuperação Def.']},
   BP:  {label:'Bola Parada',     full:'Bola Parada',                   color:'#7c3aed', subs:['Ofensiva','Defensiva']},
+  BPO: {label:'BP Ofensiva',     full:'Bola Parada Ofensiva',          color:'#7c3aed', subs:['Canto Off.','Livre Direto','Livre Indireto']},
+  BPD: {label:'BP Defensiva',    full:'Bola Parada Defensiva',         color:'#5b21b6', subs:['Canto Def.','Livre Contra','Penálti Def.']},
   SJ:  {label:'Sit. de Jogo',    full:'Situação de Jogo',              color:'#475569', subs:['Torneio','Jogo Formal','GR+GR']},
   PF:  {label:'Prep. Física',    full:'Preparação Física',             color:'#f97316', subs:['Ativação','Força','Resistência','Velocidade','Flexibilidade']},
 };
+const GYM_CATEGORIES={
+  'Empurrar':  {color:'#3b82f6'},
+  'Puxar':     {color:'#8b5cf6'},
+  'Agachar':   {color:'#10b981'},
+  'Dobradiça': {color:'#f59e0b'},
+  'Core':      {color:'#ef4444'},
+  'Unilateral':{color:'#06b6d4'},
+  'Rotação':   {color:'#f97316'},
+};
+const GYM_CAT_OPTS=Object.keys(GYM_CATEGORIES);
 const REGIMES=[
   {key:'Recuperação', color:'#1a8754'},
   {key:'Tensão',      color:'#e6a817'},
@@ -7260,9 +7488,12 @@ let _fichaText='';
 function gymExRowHTML(ex){
   ex=ex||{};
   const v=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const catColor=ex.categoria&&GYM_CATEGORIES[ex.categoria]?GYM_CATEGORIES[ex.categoria].color:'var(--border)';
+  const catOpts=GYM_CAT_OPTS.map(c=>`<option value="${c}"${ex.categoria===c?' selected':''}>${c}</option>`).join('');
   return `<tr class="gym-ex-row">
     <td><input class="gym-inp gym-bloco" value="${v(ex.bloco)}" placeholder="A1" style="width:44px"></td>
     <td><input class="gym-inp gym-exercicio" value="${v(ex.exercicio)}" placeholder="Exercício..." style="min-width:130px"></td>
+    <td><select class="gym-inp gym-categoria" style="width:102px;border-color:${catColor};font-weight:600" onchange="this.style.borderColor=GYM_CATEGORIES[this.value]?.color||'var(--border)'"><option value="">—</option>${catOpts}</select></td>
     <td><input class="gym-inp gym-series" value="${v(ex.series)}" placeholder="3" style="width:44px"></td>
     <td><input class="gym-inp gym-reps" value="${v(ex.reps)}" placeholder="5–6" style="width:68px"></td>
     <td><input class="gym-inp gym-rm" value="${v(ex.rm)}" placeholder="70%" style="width:54px"></td>
@@ -7282,20 +7513,32 @@ function openGymPlanModal(){
   // Meta subtitle
   const evDate=ev.date?new Date(ev.date+'T00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
   document.getElementById('gym-modal-meta').textContent=evDate+(ev.time?' · '+ev.time:'');
+  // Auto-fill next game if plan doesn't have it yet
+  if(!plan.jogoSeguinte){
+    const nextGame=DB.events(ev.squad||squad).filter(e=>e.type==='game'&&e.date>ev.date).sort((a,b)=>a.date.localeCompare(b.date))[0];
+    if(nextGame){
+      const gDate=new Date(nextGame.date+'T00:00').toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'});
+      plan.jogoSeguinte=(nextGame.opponent||nextGame.title||'Jogo')+' — '+gDate;
+    }
+  }
   const body=document.getElementById('gym-modal-body');
   const footer=document.getElementById('gym-modal-footer');
   if(!canEdit){
     // Read-only
-    const tRows=exs.length?exs.map(ex=>`<tr>
-      <td style="font-weight:700;color:#7c3aed;white-space:nowrap">${esc(ex.bloco)}</td>
-      <td style="font-weight:600">${esc(ex.exercicio)}</td>
-      <td style="text-align:center">${esc(ex.series)}</td>
-      <td style="white-space:nowrap">${esc(ex.reps)}</td>
-      <td style="white-space:nowrap">${ex.rm||'—'}</td>
-      <td style="white-space:nowrap">${esc(ex.rpe)}</td>
-      <td style="white-space:nowrap">${esc(ex.recuperacao)}</td>
-      <td style="color:var(--muted);font-size:11px">${esc(ex.notas)}</td>
-    </tr>`).join(''):'<tr><td colspan="8" style="padding:12px;color:var(--muted);text-align:center">Sem exercícios registados.</td></tr>';
+    const tRows=exs.length?exs.map(ex=>{
+      const cc=ex.categoria&&GYM_CATEGORIES[ex.categoria]?GYM_CATEGORIES[ex.categoria].color:'#94a3b8';
+      return `<tr>
+        <td style="font-weight:700;color:#7c3aed;white-space:nowrap">${esc(ex.bloco)}</td>
+        <td style="font-weight:600">${esc(ex.exercicio)}</td>
+        <td><span style="background:${cc}22;color:${cc};border:1px solid ${cc}55;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">${esc(ex.categoria)||'—'}</span></td>
+        <td style="text-align:center">${esc(ex.series)}</td>
+        <td style="white-space:nowrap">${esc(ex.reps)}</td>
+        <td style="white-space:nowrap">${ex.rm||'—'}</td>
+        <td style="white-space:nowrap">${esc(ex.rpe)}</td>
+        <td style="white-space:nowrap">${esc(ex.recuperacao)}</td>
+        <td style="color:var(--muted);font-size:11px">${esc(ex.notas)}</td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="9" style="padding:12px;color:var(--muted);text-align:center">Sem exercícios registados.</td></tr>';
     body.innerHTML=`
       ${plan.descricao?`<div style="font-size:15px;font-weight:700">${esc(plan.descricao)}</div>`:''}
       ${plan.objetivo?`<div style="font-size:13px;color:var(--muted)">🎯 ${esc(plan.objetivo)}</div>`:''}
@@ -7306,7 +7549,7 @@ function openGymPlanModal(){
         ${plan.jogoSeguinte?`<span style="font-size:12px"><strong>Jogo seguinte:</strong> ${esc(plan.jogoSeguinte)}</span>`:''}
       </div>
       <div style="overflow-x:auto;flex:1"><table class="gym-table gym-table-ro">
-        <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas</th></tr></thead>
+        <thead><tr><th>Bloco</th><th>Exercício</th><th>Categoria</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas</th></tr></thead>
         <tbody>${tRows}</tbody>
       </table></div>
       ${plan.orientacoes?`<div style="padding:12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-line">${esc(plan.orientacoes)}</div>`:''}`;
@@ -7325,11 +7568,12 @@ function openGymPlanModal(){
       </div>
       <div style="overflow-x:auto;flex:1;display:flex;flex-direction:column">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Exercícios</div>
-        <div style="overflow:auto;flex:1"><table class="gym-table" style="min-width:700px">
-          <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas de execução</th><th></th></tr></thead>
+        <div style="overflow:auto;flex:1"><table class="gym-table" style="min-width:820px">
+          <thead><tr><th>Bloco</th><th>Exercício</th><th>Categoria</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas de execução</th><th></th></tr></thead>
           <tbody id="gym-ex-tbody">${rowsHTML}</tbody>
         </table></div>
         <button type="button" id="btn-add-gym-ex" class="btn btn-o btn-sm" style="margin-top:8px;align-self:flex-start">+ Exercício</button>
+
       </div>
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Orientações da Sessão</div>
@@ -7348,14 +7592,15 @@ function openGymPlanModal(){
 async function saveGymPlan(){
   const v=id=>document.getElementById(id)?.value?.trim()||'';
   const exercises=[...document.querySelectorAll('.gym-ex-row')].map(row=>({
-    bloco:    row.querySelector('.gym-bloco').value.trim(),
-    exercicio:row.querySelector('.gym-exercicio').value.trim(),
-    series:   row.querySelector('.gym-series').value.trim(),
-    reps:     row.querySelector('.gym-reps').value.trim(),
-    rm:       row.querySelector('.gym-rm').value.trim(),
-    rpe:      row.querySelector('.gym-rpe').value.trim(),
+    bloco:     row.querySelector('.gym-bloco').value.trim(),
+    exercicio: row.querySelector('.gym-exercicio').value.trim(),
+    categoria: row.querySelector('.gym-categoria').value.trim(),
+    series:    row.querySelector('.gym-series').value.trim(),
+    reps:      row.querySelector('.gym-reps').value.trim(),
+    rm:        row.querySelector('.gym-rm').value.trim(),
+    rpe:       row.querySelector('.gym-rpe').value.trim(),
     recuperacao:row.querySelector('.gym-rec').value.trim(),
-    notas:    row.querySelector('.gym-notas').value.trim(),
+    notas:     row.querySelector('.gym-notas').value.trim(),
   })).filter(ex=>ex.exercicio);
   const plan={
     descricao:    v('gym-descricao'),
