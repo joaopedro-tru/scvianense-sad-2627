@@ -9060,32 +9060,34 @@ function seedGymPlan20260728(){
   // Limpa chaves antigas (corridas falhadas anteriores)
   localStorage.removeItem('scv_seed_gym_20260728');
   localStorage.removeItem('scv_seed_gym_20260728_v2');
-  // Apenas verifica existência no DB — sem localStorage guard
-  const dup=DB.events('eqa').some(e=>e.type==='gym'&&e.date==='2026-07-28');
-  if(dup) return;
-  DB.addEvent({
-    type:'gym', squad:'eqa', date:'2026-07-28', time:'',
-    title:'Ginásio — Força pós-treino de tensão',
-    gymPlan:{
-      descricao:'Força geral pós-treino de tensão | Véspera do jogo vs. AFS',
-      objetivo:'Exposição à força com baixa fadiga',
-      duracao:'30–35 min',
-      contexto:'Após treino de tensão',
-      rpeGlobal:'5–6/10',
-      jogoSeguinte:'AFS — 29/07/2026',
-      orientacoes:'• Nenhuma série próxima da falha. Interromper se a velocidade de execução cair claramente.\n• Se o treino de tensão for muito exigente, retirar 1 série do Bulgarian Split Squat aos jogadores mais utilizados.\n• Evitar Nordic Hamstring, RDL pesado, agachamento com volume elevado e pliometria adicional nesta sessão.',
-      exercises:[
-        {bloco:'A1',exercicio:'Barbell Hip Thrust',series:'2',reps:'4–5',rm:'60–65%',rpe:'5–6',recuperacao:'2 min',notas:'Subida rápida; descida controlada; sem falha'},
-        {bloco:'A2',exercicio:'Bench Press',series:'3',reps:'4–5',rm:'70–75%',rpe:'6–7',recuperacao:'90–120 s',notas:'Manter 3–4 repetições em reserva'},
-        {bloco:'B1',exercicio:'Bulgarian Split Squat',series:'2',reps:'4/perna',rm:'55–65%',rpe:'5–6',recuperacao:'90–120 s',notas:'Amplitude confortável; controlo postural'},
-        {bloco:'B2',exercicio:'Remada',series:'3',reps:'5–6',rm:'65–70%',rpe:'6–7',recuperacao:'90 s',notas:'Tronco estável; sem compensações'},
-        {bloco:'C1',exercicio:'Sóleo sentado',series:'2',reps:'6–8',rm:'60–70%',rpe:'6',recuperacao:'60–90 s',notas:'Pausa curta no topo; movimento controlado'},
-        {bloco:'C2',exercicio:'Copenhagen isométrico',series:'2',reps:'15–20 s/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Versão curta; alinhamento da bacia'},
-        {bloco:'D', exercicio:'Pallof Press',series:'2',reps:'6/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Evitar rotação; expirar na extensão'},
-      ],
-      updatedAt:new Date().toISOString(),
-    }
-  });
+  // Verifica se já existe evento de ginásio em 28/07 para eqa
+  const existing=DB.events('eqa').find(e=>e.type==='gym'&&e.date==='2026-07-28');
+  // Se existe E já tem plano com exercícios, não faz nada
+  if(existing?.gymPlan?.exercises?.length) return;
+  const gymPlan={
+    descricao:'Força geral pós-treino de tensão | Véspera do jogo vs. AFS',
+    objetivo:'Exposição à força com baixa fadiga',
+    duracao:'30–35 min',
+    contexto:'Após treino de tensão',
+    rpeGlobal:'5–6/10',
+    jogoSeguinte:'AFS — 29/07/2026',
+    orientacoes:'• Nenhuma série próxima da falha. Interromper se a velocidade de execução cair claramente.\n• Se o treino de tensão for muito exigente, retirar 1 série do Bulgarian Split Squat aos jogadores mais utilizados.\n• Evitar Nordic Hamstring, RDL pesado, agachamento com volume elevado e pliometria adicional nesta sessão.',
+    exercises:[
+      {bloco:'A1',exercicio:'Barbell Hip Thrust',series:'2',reps:'4–5',rm:'60–65%',rpe:'5–6',recuperacao:'2 min',notas:'Subida rápida; descida controlada; sem falha'},
+      {bloco:'A2',exercicio:'Bench Press',series:'3',reps:'4–5',rm:'70–75%',rpe:'6–7',recuperacao:'90–120 s',notas:'Manter 3–4 repetições em reserva'},
+      {bloco:'B1',exercicio:'Bulgarian Split Squat',series:'2',reps:'4/perna',rm:'55–65%',rpe:'5–6',recuperacao:'90–120 s',notas:'Amplitude confortável; controlo postural'},
+      {bloco:'B2',exercicio:'Remada',series:'3',reps:'5–6',rm:'65–70%',rpe:'6–7',recuperacao:'90 s',notas:'Tronco estável; sem compensações'},
+      {bloco:'C1',exercicio:'Sóleo sentado',series:'2',reps:'6–8',rm:'60–70%',rpe:'6',recuperacao:'60–90 s',notas:'Pausa curta no topo; movimento controlado'},
+      {bloco:'C2',exercicio:'Copenhagen isométrico',series:'2',reps:'15–20 s/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Versão curta; alinhamento da bacia'},
+      {bloco:'D', exercicio:'Pallof Press',series:'2',reps:'6/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Evitar rotação; expirar na extensão'},
+    ],
+    updatedAt:new Date().toISOString(),
+  };
+  if(existing){
+    DB.updateEvent(existing.id,{gymPlan});
+  } else {
+    DB.addEvent({type:'gym',squad:'eqa',date:'2026-07-28',time:'',title:'Ginásio — Força pós-treino de tensão',gymPlan});
+  }
   console.log('Seed: plano de ginásio 28/07/2026 adicionado.');
 }
 
