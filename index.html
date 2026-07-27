@@ -9057,12 +9057,12 @@ function seedLiga3Games(){
 }
 
 function seedGymPlan20260728(){
-  const KEY='scv_seed_gym_20260728_v2';
-  if(localStorage.getItem(KEY)) return;
-  const dup=DB.events('eqa').some(e=>e.type==='gym'&&e.date==='2026-07-28');
-  if(dup){ localStorage.setItem(KEY,'1'); return; }
-  // também limpa chave antiga caso exista
+  // Limpa chaves antigas (corridas falhadas anteriores)
   localStorage.removeItem('scv_seed_gym_20260728');
+  localStorage.removeItem('scv_seed_gym_20260728_v2');
+  // Apenas verifica existência no DB — sem localStorage guard
+  const dup=DB.events('eqa').some(e=>e.type==='gym'&&e.date==='2026-07-28');
+  if(dup) return;
   DB.addEvent({
     type:'gym', squad:'eqa', date:'2026-07-28', time:'',
     title:'Ginásio — Força pós-treino de tensão',
@@ -9086,7 +9086,6 @@ function seedGymPlan20260728(){
       updatedAt:new Date().toISOString(),
     }
   });
-  localStorage.setItem(KEY,'1');
   console.log('Seed: plano de ginásio 28/07/2026 adicionado.');
 }
 
