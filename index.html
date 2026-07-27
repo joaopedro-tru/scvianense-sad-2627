@@ -153,6 +153,17 @@ select.si{cursor:pointer}
 .ce.tr{background:#d4edda;color:#155724}
 .ce.gym{background:#f3e8ff;color:#5b21b6}
 .ce.gm{background:#cce5ff;color:#004085}
+/* GYM PLAN BUILDER */
+.gym-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:3px}
+.gym-field{width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit;background:var(--bg);color:var(--text);transition:border-color .15s}
+.gym-field:focus{border-color:var(--green-l)}
+.gym-table{width:100%;border-collapse:collapse;font-size:12px}
+.gym-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:5px 6px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;background:var(--bg)}
+.gym-table td{padding:3px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
+.gym-inp{width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;background:var(--card);color:var(--text);outline:none;transition:border-color .15s}
+.gym-inp:focus{border-color:var(--green-l)}
+.gym-table-ro td{padding:7px 8px;font-size:12px}
+.gym-table-ro th{padding:7px 8px}
 
 /* EVENT LIST */
 .el{margin-top:26px}
@@ -4350,11 +4361,64 @@ function renderTraining(){
                  objRows+momentSummaryHTML;
         })()}
       </div>
-      ${ev.type==='gym'?`
-      <div class="card" style="margin-top:0">
-        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c3aed;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">🏋️ Plano de Treino</h3>
-        <p style="font-size:12px;color:var(--muted);margin:0">O template de plano de ginásio está em desenvolvimento.<br>Em breve o preparador físico poderá registar o plano diretamente aqui.</p>
-      </div>`:`
+      ${ev.type==='gym'?(()=>{
+        const plan=ev.gymPlan||{};
+        const exs=plan.exercises||[];
+        const canEdit=isAdmin()||isStaff();
+        const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        const hdr=`<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c3aed;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🏋️ Plano de Ginásio</h3>`;
+        if(!canEdit){
+          if(!exs.length) return `<div class="card" style="margin-top:0">${hdr}<p style="font-size:12px;color:var(--muted)">Sem plano de ginásio registado para esta sessão.</p></div>`;
+          const tRows=exs.map(ex=>`<tr>
+            <td style="font-weight:700;color:#7c3aed;white-space:nowrap">${esc(ex.bloco)}</td>
+            <td style="font-weight:600">${esc(ex.exercicio)}</td>
+            <td style="text-align:center">${esc(ex.series)}</td>
+            <td style="white-space:nowrap">${esc(ex.reps)}</td>
+            <td style="white-space:nowrap">${esc(ex.rm)||'—'}</td>
+            <td style="white-space:nowrap">${esc(ex.rpe)}</td>
+            <td style="white-space:nowrap">${esc(ex.recuperacao)}</td>
+            <td style="color:var(--muted);font-size:11px">${esc(ex.notas)}</td>
+          </tr>`).join('');
+          return `<div class="card" style="margin-top:0">${hdr}
+            ${plan.descricao?`<div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(plan.descricao)}</div>`:''}
+            ${plan.objetivo?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">🎯 ${esc(plan.objetivo)}</div>`:''}
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+              ${plan.duracao?`<span style="font-size:11px"><strong>Duração:</strong> ${esc(plan.duracao)}</span>`:''}
+              ${plan.contexto?`<span style="font-size:11px"><strong>Contexto:</strong> ${esc(plan.contexto)}</span>`:''}
+              ${plan.rpeGlobal?`<span style="font-size:11px"><strong>RPE:</strong> ${esc(plan.rpeGlobal)}</span>`:''}
+              ${plan.jogoSeguinte?`<span style="font-size:11px"><strong>Jogo seguinte:</strong> ${esc(plan.jogoSeguinte)}</span>`:''}
+            </div>
+            <div style="overflow-x:auto"><table class="gym-table gym-table-ro">
+              <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas</th></tr></thead>
+              <tbody>${tRows}</tbody>
+            </table></div>
+            ${plan.orientacoes?`<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-line">${esc(plan.orientacoes)}</div>`:''}
+          </div>`;
+        }
+        // Editable form
+        const rowsHTML=exs.length?exs.map(gymExRowHTML).join(''):gymExRowHTML();
+        return `<div class="card" style="margin-top:0">${hdr}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+            <div><label class="gym-lbl">Descrição da sessão</label><input id="gym-descricao" class="gym-field" placeholder="Força geral pós-treino..." value="${esc(plan.descricao)}"></div>
+            <div><label class="gym-lbl">Objetivo</label><input id="gym-objetivo" class="gym-field" placeholder="Exposição à força com baixa fadiga" value="${esc(plan.objetivo)}"></div>
+            <div><label class="gym-lbl">Duração</label><input id="gym-duracao" class="gym-field" placeholder="30–35 min" value="${esc(plan.duracao)}"></div>
+            <div><label class="gym-lbl">Contexto</label><input id="gym-contexto" class="gym-field" placeholder="Após treino de tensão / Pré-jogo" value="${esc(plan.contexto)}"></div>
+            <div><label class="gym-lbl">RPE Global alvo</label><input id="gym-rpe-global" class="gym-field" placeholder="5–6/10" value="${esc(plan.rpeGlobal)}"></div>
+            <div><label class="gym-lbl">Jogo seguinte</label><input id="gym-jogo" class="gym-field" placeholder="Oponente — DD/MM/AAAA" value="${esc(plan.jogoSeguinte)}"></div>
+          </div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Exercícios</div>
+          <div style="overflow-x:auto;margin-bottom:8px">
+            <table class="gym-table">
+              <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas de execução</th><th></th></tr></thead>
+              <tbody id="gym-ex-tbody">${rowsHTML}</tbody>
+            </table>
+          </div>
+          <button type="button" id="btn-add-gym-ex" class="btn btn-o btn-sm" style="margin-bottom:14px">+ Exercício</button>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Orientações da Sessão</div>
+          <textarea id="gym-orientacoes" rows="4" placeholder="Notas, restrições, ajustes para jogadores..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)">${esc(plan.orientacoes)}</textarea>
+          <button type="button" class="btn btn-p btn-sm" id="btn-save-gymplan" style="margin-top:10px">Guardar Plano</button>
+        </div>`;
+      })()+`\n      `:`
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Ficha de Treino</h3>
         ${fichaZone}
@@ -4518,6 +4582,14 @@ function renderTraining(){
       }catch(err){ toast('❌ Erro ao carregar ficha GR: '+err.message); renderTraining(); }
     });
   }
+
+  // Gym plan — add exercise row
+  document.getElementById('btn-add-gym-ex')?.addEventListener('click',()=>{
+    document.getElementById('gym-ex-tbody').insertAdjacentHTML('beforeend',gymExRowHTML());
+  });
+
+  // Gym plan — save
+  document.getElementById('btn-save-gymplan')?.addEventListener('click', saveGymPlan);
 
   // GR notes save
   const btnGrNotes=document.getElementById('btn-save-grnotes');
@@ -7205,6 +7277,50 @@ let _objSecondary={moment:null,subPrinciples:[]};
 let _fichaExercises=[];   // exercícios extraídos da IA
 let _momentSummary={};    // {OO:18, TOTD:16, SJ:19}
 let _fichaText='';
+
+// ── GYM PLAN HELPERS ─────────────────────────────────────────────────────────
+function gymExRowHTML(ex){
+  ex=ex||{};
+  const v=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<tr class="gym-ex-row">
+    <td><input class="gym-inp gym-bloco" value="${v(ex.bloco)}" placeholder="A1" style="width:44px"></td>
+    <td><input class="gym-inp gym-exercicio" value="${v(ex.exercicio)}" placeholder="Exercício..." style="min-width:130px"></td>
+    <td><input class="gym-inp gym-series" value="${v(ex.series)}" placeholder="3" style="width:44px"></td>
+    <td><input class="gym-inp gym-reps" value="${v(ex.reps)}" placeholder="5–6" style="width:68px"></td>
+    <td><input class="gym-inp gym-rm" value="${v(ex.rm)}" placeholder="70%" style="width:54px"></td>
+    <td><input class="gym-inp gym-rpe" value="${v(ex.rpe)}" placeholder="6–7" style="width:50px"></td>
+    <td><input class="gym-inp gym-rec" value="${v(ex.recuperacao)}" placeholder="90s" style="width:68px"></td>
+    <td><input class="gym-inp gym-notas" value="${v(ex.notas)}" placeholder="Notas de execução..." style="min-width:140px"></td>
+    <td><button type="button" onclick="this.closest('tr').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 8px;font-size:18px;line-height:1">×</button></td>
+  </tr>`;
+}
+
+async function saveGymPlan(){
+  const v=id=>document.getElementById(id)?.value?.trim()||'';
+  const exercises=[...document.querySelectorAll('.gym-ex-row')].map(row=>({
+    bloco:    row.querySelector('.gym-bloco').value.trim(),
+    exercicio:row.querySelector('.gym-exercicio').value.trim(),
+    series:   row.querySelector('.gym-series').value.trim(),
+    reps:     row.querySelector('.gym-reps').value.trim(),
+    rm:       row.querySelector('.gym-rm').value.trim(),
+    rpe:      row.querySelector('.gym-rpe').value.trim(),
+    recuperacao:row.querySelector('.gym-rec').value.trim(),
+    notas:    row.querySelector('.gym-notas').value.trim(),
+  })).filter(ex=>ex.exercicio);
+  const plan={
+    descricao:    v('gym-descricao'),
+    objetivo:     v('gym-objetivo'),
+    duracao:      v('gym-duracao'),
+    contexto:     v('gym-contexto'),
+    rpeGlobal:    v('gym-rpe-global'),
+    jogoSeguinte: v('gym-jogo'),
+    orientacoes:  v('gym-orientacoes'),
+    exercises,
+    updatedAt: new Date().toISOString(),
+  };
+  DB.updateEvent(trainingEventId,{gymPlan:plan});
+  toast('✅ Plano de ginásio guardado!');
+}
 
 function renderRegimePicker(){
   const el=document.getElementById('e-regime-picker'); if(!el) return;
