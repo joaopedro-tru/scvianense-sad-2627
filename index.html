@@ -151,6 +151,7 @@ select.si{cursor:pointer}
 .ce-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ce-meta{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ce.tr{background:#d4edda;color:#155724}
+.ce.gym{background:#f3e8ff;color:#5b21b6}
 .ce.gm{background:#cce5ff;color:#004085}
 
 /* EVENT LIST */
@@ -162,7 +163,7 @@ select.si{cursor:pointer}
 .ev-sep{display:flex;align-items:center;gap:10px;margin:16px 0 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
 .ev-sep::before,.ev-sep::after{content:'';flex:1;height:1px;background:var(--border)}
 .etd{width:11px;height:11px;border-radius:50%;flex-shrink:0}
-.etd.tr{background:#27ae60}.etd.gm{background:var(--blue)}
+.etd.tr{background:#27ae60}.etd.gym{background:#7c3aed}.etd.gm{background:var(--blue)}
 .einfo{flex:1}
 .etitle{font-size:13.5px;font-weight:600}
 .emeta{font-size:12px;color:var(--muted);margin-top:2px}
@@ -532,6 +533,7 @@ body.pm #v-pf{padding:30px}
   /* Event chips — show time, preserve colors */
   body.printing-cal .ce{ font-size:7pt!important; padding:2px 4px!important; margin:1px 0!important; border-radius:3px!important; line-height:1.3!important }
   body.printing-cal .ce.tr{ background:#d4edda!important; color:#155724!important }
+  body.printing-cal .ce.gym{ background:#f3e8ff!important; color:#5b21b6!important }
   body.printing-cal .ce.gm{ background:#cce5ff!important; color:#004085!important }
   body.printing-cal .ce-title{ font-size:7pt!important; font-weight:600!important }
   body.printing-cal .ce-meta{ display:block!important; font-size:6.5pt!important; opacity:.85; margin-top:1px }
@@ -594,12 +596,15 @@ body.pm #v-pf{padding:30px}
     <div class="nsl">Plantéis</div>
     <div class="nl" data-view="squad" data-squad="eqa"><span class="ic">⚫</span> Equipa A</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="eqa"><span class="ic">📋</span> Treinos</div>
+    <div class="nl nl-sub" data-view="sq-gym" data-squad="eqa"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="eqa"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub19"><span class="ic">🟡</span> Sub-19</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub19"><span class="ic">📋</span> Treinos</div>
+    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub19"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub19"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub23"><span class="ic">🔵</span> Sub-23</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub23"><span class="ic">📋</span> Treinos</div>
+    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub23"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub23"><span class="ic">⚽</span> Jogos</div>
     <hr class="nd">
     <div class="nsl">Agenda</div>
@@ -1236,6 +1241,27 @@ body.pm #v-pf{padding:30px}
     </div>
   </div>
 
+  <!-- SQUAD GYM LIST -->
+  <div class="view" id="v-sq-gym">
+    <div class="tb">
+      <div><h1 id="sqgym-title">Ginásio</h1><div class="sub" id="sqgym-sub"></div></div>
+      <button class="btn btn-p btn-sm" id="btn-new-gym">+ Nova Sessão</button>
+    </div>
+    <div class="cc">
+      <button class="btn btn-o btn-sm" id="sqgym-prev">← Anterior</button>
+      <h2 id="sqgym-label"></h2>
+      <button class="btn btn-o btn-sm" id="sqgym-next">Seguinte →</button>
+    </div>
+    <div class="cg">
+      <div class="chr">
+        <div class="chc">SEG</div><div class="chc">TER</div><div class="chc">QUA</div>
+        <div class="chc">QUI</div><div class="chc">SEX</div><div class="chc">SÁB</div>
+        <div class="chc">DOM</div>
+      </div>
+      <div class="cb" id="sqgym-body"></div>
+    </div>
+  </div>
+
   <!-- SQUAD GAMES LIST -->
   <div class="view" id="v-sq-games">
     <div class="tb">
@@ -1450,7 +1476,7 @@ body.pm #v-pf{padding:30px}
       <input type="hidden" id="e-id">
       <div class="fr">
         <div class="fg"><label>Tipo *</label>
-          <select id="e-type" required><option value="training">Treino</option><option value="game">Jogo</option></select>
+          <select id="e-type" required><option value="training">Treino</option><option value="gym">Ginásio</option><option value="game">Jogo</option></select>
         </div>
         <div class="fg"><label>Escalão *</label>
           <select id="e-squad" required>
@@ -2325,7 +2351,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
 
 const COMP_ABBR=[
   [/Liga 3 Placard[^,]*/i,       'Liga 3'],
@@ -2343,10 +2369,12 @@ function evLabel(ev){
     const comp=ev.competition?` · ${ev.competition}`:'';
     return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${comp}`;
   }
+  if(ev.type==='gym') return ev.squad==='both'?'🏋️ Ginásio':`🏋️ Ginásio ${SQUADS[ev.squad]}`;
   return ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`;
 }
 
 function trainingLabel(ev){
+  if(ev.type==='gym') return `🏋️ Ginásio`;
   // Determina o escalão de referência (usa variável global squad se treino for 'both')
   const sq=ev.squad==='both'?squad:ev.squad;
   // Número do treino na época (todos os treinos deste escalão ordenados por data)
@@ -2378,6 +2406,7 @@ function nav(v,opts={}){
   else if(v==='calendar'){ show('v-cal'); setActive('[data-view="calendar"]'); renderCal() }
   else if(v==='training'){ if(opts.id)trainingEventId=opts.id; show('v-training'); renderTraining() }
   else if(v==='sq-trainings'){ squad=opts.squad||squad; show('v-sq-trainings'); setActive(`[data-view="sq-trainings"][data-squad="${squad}"]`); renderSqTrainings() }
+  else if(v==='sq-gym'){ squad=opts.squad||squad; show('v-sq-gym'); setActive(`[data-view="sq-gym"][data-squad="${squad}"]`); renderSqGym() }
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
   else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
@@ -3738,6 +3767,7 @@ function exportCalPDF(){
       #cal-po .om{opacity:.35!important}
       #cal-po .ce{font-size:7pt!important;padding:2px 4px!important;margin:1px 0!important;border-radius:3px!important;line-height:1.3!important;cursor:default!important}
       #cal-po .ce.tr{background:#d4edda!important;color:#155724!important}
+      #cal-po .ce.gym{background:#f3e8ff!important;color:#5b21b6!important}
       #cal-po .ce.gm{background:#cce5ff!important;color:#004085!important}
       #cal-po .ce-title{font-size:7pt!important;font-weight:600!important}
       #cal-po .ce-meta{display:block!important;font-size:6.5pt!important;opacity:.85!important;margin-top:1px!important}
@@ -3815,11 +3845,15 @@ function renderCal(){
         const compShort=abrevComp(ev.competition);
         chipTitle=`${icon} ${ev.opponent||'Jogo'}`;
         meta=[ev.time, compShort||SQUADS[ev.squad]].filter(Boolean).join(' · ');
+      } else if(ev.type==='gym'){
+        chipTitle=`🏋️ ${SQUADS[ev.squad]||'Ginásio'}`;
+        meta=[ev.time,ev.location].filter(Boolean).join(' · ');
       } else {
         chipTitle=`🏃 ${SQUADS[ev.squad]||'Treino'}`;
         meta=[ev.time,ev.location].filter(Boolean).join(' · ');
       }
-      return `<div class="ce ${ev.type==='game'?'gm':'tr'}" data-eid="${ev.id}"><div class="ce-title">${chipTitle}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
+      const chipClass=ev.type==='game'?'gm':ev.type==='gym'?'gym':'tr';
+      return `<div class="ce ${chipClass}" data-eid="${ev.id}"><div class="ce-title">${chipTitle}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
     }).join('')}</div>`;
   }
   document.getElementById('cal-body').innerHTML=cells;
@@ -3832,7 +3866,7 @@ function renderCal(){
   // Build conflict banners
   const conflictHTML=_overlaps.map(([a,b])=>`<div class="conflict-banner"><div class="cb-icon">⚠️</div><div class="cb-body"><div class="cb-title">Conflito de estádio — ${fmtDate(a.date)}</div><div class="cb-row">🏠 ${evLabel(a)} · ${a.time||'hora?'} (até ~${(()=>{const[h,m]=a.time.split(':').map(Number);const e=new Date(0,0,0,h,m+120);return String(e.getHours()).padStart(2,'0')+':'+String(e.getMinutes()).padStart(2,'0')})()})</div><div class="cb-row">🏠 ${evLabel(b)} · ${b.time||'hora?'}</div><div class="cb-row" style="margin-top:4px;font-size:11px;opacity:.8">📍 ${a.location}</div></div></div>`).join('');
   lEl.innerHTML=(conflictHTML?conflictHTML:'')+(monthEvs.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos neste mês.</p>':
-    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join(''));
+    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':ev.type==='gym'?'gym':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join(''));
   lEl.querySelectorAll('[data-del-event]').forEach(b=>b.addEventListener('click',()=>deleteEvent(b.dataset.delEvent)));
 }
 
@@ -3853,12 +3887,18 @@ function showEventDetail(id){
     }
     return ev.objectives?`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="font-size:12px">${ev.objectives}</div>`:'';
   })();
-  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${_edetObjHTML}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
+  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${_edetObjHTML}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='gym'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-gym" style="width:100%">🏋️ Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
   // Show/hide "Eliminar série" button based on event type
-  document.getElementById('btn-del-series').style.display=ev.type==='training'?'':'none';
+  document.getElementById('btn-del-series').style.display=(ev.type==='training'||ev.type==='gym')?'':'none';
   document.getElementById('mo-edet').classList.add('open');
   if(ev.type==='training'){
     document.getElementById('btn-open-training').addEventListener('click',()=>{
+      document.getElementById('mo-edet').classList.remove('open');
+      nav('training',{id:ev.id});
+    });
+  }
+  if(ev.type==='gym'){
+    document.getElementById('btn-open-gym').addEventListener('click',()=>{
       document.getElementById('mo-edet').classList.remove('open');
       nav('training',{id:ev.id});
     });
@@ -3925,6 +3965,7 @@ document.getElementById('btn-confirm-del-series').addEventListener('click',funct
   toast(`✅ ${toDelete.length} treino${toDelete.length!==1?'s':''} eliminados.`);
   renderCal(); if(view==='dashboard')renderDash();
   if(view==='sq-trainings')renderSqTrainings();
+  if(view==='sq-gym')renderSqGym();
 });
 document.getElementById('cal-prev').addEventListener('click',()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--} renderCal() });
 document.getElementById('cal-next').addEventListener('click',()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++} renderCal() });
@@ -3987,11 +4028,13 @@ function updateCompetitionOptions(sq, currentVal=''){
 function toggleOpp(){
   const t=document.getElementById('e-type').value;
   const isGame=t==='game';
+  const isGym=t==='gym';
   document.getElementById('opp-grp').style.display=isGame?'block':'none';
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
-  document.getElementById('e-objectives-grp').style.display=isGame?'none':'block';
+  // Objetivos táticos apenas para treino de campo
+  document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
   if(isGame){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
   if(isGame) updateCompetitionOptions(document.getElementById('e-squad').value, document.getElementById('e-comp').value);
 }
@@ -4039,6 +4082,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   if(view==='training')renderTraining();
   if(view==='game')renderGame();
   if(view==='sq-trainings')renderSqTrainings();
+  if(view==='sq-gym')renderSqGym();
   if(view==='sq-games')renderSqGames();
 });
 
@@ -4256,18 +4300,22 @@ function renderTraining(){
             }
             return ev.objectives?row('Objetivos',ev.objectives):'';
           })();
-          return (utNum>0?row('UT',utNum.toString()):'')+
+          return ev.type==='gym'?'':(utNum>0?row('UT',utNum.toString()):'')+
                  (regime?row('Regime',regime):'')+
                  objRows;
         })()}
       </div>
+      ${ev.type==='gym'?`
+      <div class="card" style="margin-top:0">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c3aed;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">🏋️ Plano de Treino</h3>
+        <p style="font-size:12px;color:var(--muted);margin:0">O template de plano de ginásio está em desenvolvimento.<br>Em breve o preparador físico poderá registar o plano diretamente aqui.</p>
+      </div>`:`
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Ficha de Treino</h3>
         ${fichaZone}
         <input type="file" id="tr-ficha-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
         ${ev.fichaTreinoUrl?`<a href="${ev.fichaTreinoUrl}" target="_blank" class="btn btn-o btn-sm" style="margin-top:9px;width:100%;justify-content:center">Ver Ficha ↗</a>`:''}
         ${isAdmin()?`<button type="button" onclick="reporLinkFicha('${trainingEventId}')" style="margin-top:8px;width:100%;padding:5px 8px;border:1px dashed var(--border);border-radius:6px;background:none;color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit">🔗 Repor link da ficha (Storage)</button>`:''}
-
       </div>
       <div class="card" style="margin-top:14px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🥅 Treino de Guarda-Redes</h3>
@@ -4280,7 +4328,7 @@ function renderTraining(){
           <textarea id="gr-notes" rows="4" placeholder="${canEditGR?'Objetivos, exercícios, observações...':'Sem notas registadas.'}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)" ${canEditGR?'':'readonly'}>${grData.notes||''}</textarea>
           ${canEditGR?`<button class="btn btn-p btn-sm" id="btn-save-grnotes" style="margin-top:8px">Guardar Notas</button>`:''}
         </div>
-      </div>
+      </div>`}
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
@@ -4364,9 +4412,9 @@ function renderTraining(){
     renderTraining();
   }));
 
-  // Ficha upload
+  // Ficha upload (só existe para treinos de campo)
   const fichaInput=document.getElementById('tr-ficha-input');
-  fichaInput.addEventListener('change',async()=>{
+  if(fichaInput) fichaInput.addEventListener('change',async()=>{
     const f=fichaInput.files[0]; if(!f)return;
     const zone=document.getElementById('tr-ficha-zone');
     zone.innerHTML='<span class="dz-icon"><span class="spin" style="border-color:rgba(26,61,110,.3);border-top-color:var(--green)"></span></span><span>A carregar...</span>';
@@ -4413,7 +4461,10 @@ function renderTraining(){
   bindClinicalHandlers(trainingEventId, allPl, renderTraining);
 }
 
-document.getElementById('btn-back-training').addEventListener('click',()=>nav('sq-trainings',{squad}));
+document.getElementById('btn-back-training').addEventListener('click',()=>{
+  const ev=DB.getEvent(trainingEventId);
+  nav(ev?.type==='gym'?'sq-gym':'sq-trainings',{squad});
+});
 
 // ── MATCH DAY HUB ─────────────────────────────────────────────────────────────
 function renderMatchDay(){
@@ -5142,6 +5193,56 @@ function renderSqTrainings(){
 }
 document.getElementById('sqtr-prev').addEventListener('click',()=>{ sqtrMonth--; if(sqtrMonth<0){sqtrMonth=11;sqtrYear--;} renderSqTrainings(); });
 document.getElementById('sqtr-next').addEventListener('click',()=>{ sqtrMonth++; if(sqtrMonth>11){sqtrMonth=0;sqtrYear++;} renderSqTrainings(); });
+
+// ── SQUAD GYM CALENDAR ────────────────────────────────────────────────────────
+function renderSqGym(){
+  const nowDt=new Date();
+  const today=nowDt.toISOString().split('T')[0];
+  const nowMin=nowDt.getHours()*60+nowDt.getMinutes();
+  const allEvs=DB.events(squad).filter(e=>e.type==='gym');
+  document.getElementById('sqgym-title').textContent=`Ginásio ${SQUADS[squad]}`;
+  document.getElementById('sqgym-sub').textContent=`${allEvs.length} sessão${allEvs.length!==1?'ões':''}`;
+  document.getElementById('sqgym-label').textContent=`${MONTHS[sqgymMonth]} ${sqgymYear}`;
+
+  const first=new Date(sqgymYear,sqgymMonth,1);
+  let dow=first.getDay()-1; if(dow<0)dow=6;
+  const dim=new Date(sqgymYear,sqgymMonth+1,0).getDate();
+  const pmd=new Date(sqgymYear,sqgymMonth,0).getDate();
+  const total=Math.ceil((dow+dim)/7)*7;
+
+  const byDate={};
+  allEvs.forEach(ev=>{ if(!byDate[ev.date])byDate[ev.date]=[]; byDate[ev.date].push(ev); });
+
+  let cells='';
+  for(let i=0;i<total;i++){
+    let day,ds,other=false;
+    if(i<dow){ day=pmd-dow+i+1; const m2=sqgymMonth===0?11:sqgymMonth-1,y2=sqgymMonth===0?sqgymYear-1:sqgymYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
+    else if(i>=dow+dim){ day=i-dow-dim+1; const m2=sqgymMonth===11?0:sqgymMonth+1,y2=sqgymMonth===11?sqgymYear+1:sqgymYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
+    else{ day=i-dow+1; ds=`${sqgymYear}-${String(sqgymMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
+    const isT=ds===today;
+    const dayGyms=byDate[ds]||[];
+    const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
+    const dots=dayGyms.map(ev=>{
+      const isPast=ev.date<today||(ev.date===today&&ev.time&&(([h,m])=>h*60+m<=nowMin)(ev.time.split(':').map(Number)));
+      const att=ev.attendance||{};
+      const hasAtt=Object.keys(att).length>0;
+      const dot=hasAtt?'✅':'🏋️';
+      return `<div class="ce gym" data-gym-id="${ev.id}" style="${isPast?'opacity:.55':''}">
+        <div class="ce-title">${dot} ${ev.time||'Ginásio'}</div>
+        ${ev.location?`<div class="ce-meta">${ev.location}</div>`:''}
+      </div>`;
+    }).join('');
+    cells+=`<div class="cd${other?' om':''}${isT?' td':''}" data-date="${ds}">${numEl}${dots}</div>`;
+  }
+  const body=document.getElementById('sqgym-body');
+  body.innerHTML=cells;
+  body.querySelectorAll('[data-gym-id]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation(); nav('training',{id:el.dataset.gymId});
+  }));
+}
+document.getElementById('sqgym-prev').addEventListener('click',()=>{ sqgymMonth--; if(sqgymMonth<0){sqgymMonth=11;sqgymYear--;} renderSqGym(); });
+document.getElementById('sqgym-next').addEventListener('click',()=>{ sqgymMonth++; if(sqgymMonth>11){sqgymMonth=0;sqgymYear++;} renderSqGym(); });
+document.getElementById('btn-new-gym').addEventListener('click',()=>openEventModal(null,null,{type:'gym',squad}));
 
 // ── SQUAD GAMES LIST ──────────────────────────────────────────────────────────
 function renderSqGames(){
