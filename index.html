@@ -1691,29 +1691,17 @@ body.pm #v-pf{padding:30px}
         <div style="font-size:16px;font-weight:700;color:#7c3aed">🏋️ Registo de Cargas</div>
         <div id="gym-loads-meta" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
       </div>
+      <button class="btn btn-p btn-sm" id="mo-gym-loads-save">✅ Guardar e fechar</button>
       <button class="mc" id="mo-gym-loads-close">✕</button>
     </div>
-    <!-- Screen A: player selection -->
-    <div id="gym-loads-screen-select" style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
-      <div style="font-size:13px;color:var(--muted)">Seleciona os atletas presentes nesta sessão:</div>
-      <div id="gym-loads-player-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px"></div>
-      <div style="padding-top:8px">
-        <button class="btn btn-p" id="btn-gym-loads-start" style="width:100%;padding:14px;font-size:15px">Iniciar registo →</button>
+    <!-- Split: list left + form right -->
+    <div style="display:flex;flex:1;overflow:hidden">
+      <div id="gym-loads-player-list" style="width:150px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:8px 6px;display:flex;flex-direction:column;gap:4px"></div>
+      <div id="gym-loads-ex-area" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+        <div id="gym-loads-empty" style="color:var(--muted);font-size:13px;padding-top:20px">Seleciona um atleta na lista.</div>
+        <div id="gym-loads-ex-cards" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
     </div>
-    <!-- Screen B: per-player exercise log -->
-    <div id="gym-loads-screen-log" style="flex:1;overflow-y:auto;padding:16px 20px;display:none;flex-direction:column;gap:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <button class="btn btn-g btn-sm" id="btn-gym-loads-back-list">← Lista</button>
-        <div id="gym-loads-player-nav" style="font-size:13px;font-weight:700;color:#7c3aed;text-align:center"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-g btn-sm" id="btn-gym-loads-prev">‹</button>
-          <button class="btn btn-g btn-sm" id="btn-gym-loads-next-p">›</button>
-        </div>
-      </div>
-      <div id="gym-loads-ex-cards" style="display:flex;flex-direction:column;gap:10px"></div>
-    </div>
-    <div id="gym-loads-footer" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;background:var(--card)"></div>
   </div>
 </div>
 
@@ -4733,14 +4721,19 @@ function renderTraining(){
   const trialAtt=ev.trialAttendance||{};
   const totalPresCount=allPl.filter(p=>att[p.id]===true).length + trialPlayers.filter(tp=>trialAtt[tp.id]!==false).length;
 
+  const evUnavailMap={};
+  DB.getUnavailableOn(ev.date).forEach(r=>{ evUnavailMap[r.personId]=r.reason||true; });
+
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
     const present=att[p.id]===true;
+    const unavailReason=evUnavailMap[p.id];
+    const unavailBadge=unavailReason?`<span style="font-size:10px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;padding:1px 6px;border-radius:4px;white-space:nowrap">🚫 Indisponível${typeof unavailReason==='string'?' · '+unavailReason:''}</span>`:'';
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${dn(p)}</div>
-        <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}</div>
+        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}${unavailBadge}</div>
       </div>
       <button class="att-btn${present?' present':''}" data-att-pid="${p.id}">${present?'✓ Presente':'— Ausente'}</button>
     </div>`;
@@ -7805,10 +7798,10 @@ function gymExRowHTML(ex){
 }
 
 // ── GYM LOADS MODAL (tablet UX) ──────────────────────────────────────────────
-let _glEvId=null;         // event id being logged
-let _glData={};           // {pid:{pname,data:{exName:{peso,reps,notas}}}}
-let _glSelected=[];       // [{pid,pname}] selected+ordered players
-let _glIdx=0;             // current player index in screen B
+let _glEvId=null;
+let _glData={};          // {pid:{pname,data:{exName:{peso,reps,notas}}}}
+let _glCurrentPid=null;  // currently selected player
+let _glPlayers=[];       // [{id,label}] sorted alphabetically
 
 function openGymLoadsModal(){
   const ev=DB.getEvent(trainingEventId); if(!ev) return;
@@ -7816,156 +7809,107 @@ function openGymLoadsModal(){
   const plan=ev.gymPlan||{};
   const exs=(plan.exercises||[]).filter(e=>e.exercicio);
   if(!exs.length){ toast('Adiciona primeiro os exercícios ao plano.'); return; }
-
-  // Pre-load existing playerLogs into _glData
   _glData={};
-  (plan.playerLogs||[]).forEach(pl=>{
-    _glData[pl.playerId]={pname:pl.playerName, data:{...pl.data}};
-  });
-  _glSelected=(plan.playerLogs||[]).map(pl=>({pid:pl.playerId,pname:pl.playerName}));
-
+  (plan.playerLogs||[]).forEach(pl=>{ _glData[pl.playerId]={pname:pl.playerName, data:{...pl.data}}; });
   const evDate=ev.date?new Date(ev.date+'T00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
   document.getElementById('gym-loads-meta').textContent=evDate+` · ${exs.length} exercícios`;
-
-  // Build player grid
-  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad).filter(p=>p.name).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-  document.getElementById('gym-loads-player-grid').innerHTML=sqPlayers.map(p=>{
-    const sel=_glSelected.some(s=>s.pid===p.id);
-    return `<button type="button" class="gym-loads-pcard${sel?' selected':''}" data-pid="${esc(p.id)}" data-pname="${esc(p.name||'')}" onclick="gymLoadsTogglePlayer(this)">
-      <div style="font-size:15px;font-weight:700">${esc(p.name||'?')}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">${POS[p.position]||p.position||'—'}</div>
-    </button>`;
-  }).join('');
-
-  document.getElementById('gym-loads-screen-select').style.display='flex';
-  document.getElementById('gym-loads-screen-log').style.display='none';
-  document.getElementById('gym-loads-footer').innerHTML='';
+  const unavailIds=new Set(DB.getUnavailableOn(ev.date).map(r=>r.personId));
+  _glPlayers=DB.players(ev.squad==='both'?null:ev.squad)
+    .filter(p=>p.name&&!unavailIds.has(p.id))
+    .map(p=>({id:p.id, label:dn(p)||p.name}))
+    .sort((a,b)=>a.label.localeCompare(b.label,'pt'));
+  _glCurrentPid=null;
+  gymLoadsRenderList();
+  document.getElementById('gym-loads-empty').style.display='';
+  document.getElementById('gym-loads-ex-cards').innerHTML='';
+  document.getElementById('gym-loads-ex-area').scrollTop=0;
   document.getElementById('mo-gym-loads').classList.add('open');
 }
 
-function gymLoadsTogglePlayer(btn){
-  const pid=btn.dataset.pid, pname=btn.dataset.pname;
-  const idx=_glSelected.findIndex(s=>s.pid===pid);
-  if(idx>-1){
-    _glSelected.splice(idx,1);
-    btn.classList.remove('selected');
-  } else {
-    _glSelected.push({pid,pname});
-    btn.classList.add('selected');
-    if(!_glData[pid]) _glData[pid]={pname, data:{}};
-  }
-}
-
-function gymLoadsStart(){
-  if(!_glSelected.length){ toast('Seleciona pelo menos um atleta.'); return; }
-  _glIdx=0;
-  document.getElementById('gym-loads-screen-select').style.display='none';
-  document.getElementById('gym-loads-screen-log').style.display='flex';
-  gymLoadsRenderPlayer(_glIdx);
-}
-
-function gymLoadsRenderPlayer(idx){
-  const ev=DB.getEvent(_glEvId); if(!ev) return;
-  const exs=(ev.gymPlan?.exercises||[]).filter(e=>e.exercicio);
-  const {pid,pname}=_glSelected[idx];
-  const savedData=_glData[pid]?.data||{};
+function gymLoadsRenderList(){
   const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-
-  document.getElementById('gym-loads-player-nav').innerHTML=
-    `${esc(pname)} <span style="font-weight:400;color:var(--muted)">${idx+1}/${_glSelected.length}</span>`;
-
-  const cards=exs.map(ex=>{
-    const saved=savedData[ex.exercicio]||{};
-    const planInfo=[ex.series&&ex.reps?`${ex.series}×${ex.reps}`:'', ex.rm||'', ex.rpe?`RPE ${ex.rpe}`:''].filter(Boolean).join(' · ');
-    return `<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">
-      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
-        ${ex.bloco?`<span style="font-size:12px;font-weight:800;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:4px">${esc(ex.bloco)}</span>`:''}
-        <span style="font-size:14px;font-weight:700">${esc(ex.exercicio)}</span>
-      </div>
-      ${planInfo?`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Plano: ${planInfo}</div>`:''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
-        <div>
-          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:4px">Peso (kg)</label>
-          <input class="gym-inp gl-peso" data-ex="${esc(ex.exercicio)}" value="${esc(saved.peso)}" placeholder="0" style="width:100%;padding:10px 12px;font-size:18px;font-weight:700;text-align:center;border-radius:8px;border:2px solid var(--border)" type="number" inputmode="decimal">
-        </div>
-        <div>
-          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:4px">Reps reais</label>
-          <input class="gym-inp gl-reps" data-ex="${esc(ex.exercicio)}" value="${esc(saved.reps)}" placeholder="—" style="width:100%;padding:10px 12px;font-size:18px;font-weight:700;text-align:center;border-radius:8px;border:2px solid var(--border)">
-        </div>
-      </div>
-      <div>
-        <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:4px">Notas</label>
-        <input class="gym-inp gl-notas" data-ex="${esc(ex.exercicio)}" value="${esc(saved.notas)}" placeholder="Observações…" style="width:100%;padding:8px 10px;font-size:13px;border-radius:8px;border:1.5px solid var(--border)">
-      </div>
-    </div>`;
+  document.getElementById('gym-loads-player-list').innerHTML=_glPlayers.map(p=>{
+    const hasData=_glData[p.id]&&Object.values(_glData[p.id].data||{}).some(d=>d.peso||d.reps);
+    const isActive=_glCurrentPid===p.id;
+    return `<button type="button" onclick="gymLoadsSelectPlayer('${esc(p.id)}')"
+      style="width:100%;text-align:left;padding:9px 10px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${isActive?'700':'500'};
+             background:${isActive?'#7c3aed':'var(--bg)'};color:${isActive?'#fff':'var(--text)'};
+             transition:background .12s;display:flex;align-items:center;gap:6px">
+      <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${hasData?(isActive?'#fff':'#10b981'):'transparent'}"></span>
+      ${esc(p.label)}
+    </button>`;
   }).join('');
-  document.getElementById('gym-loads-ex-cards').innerHTML=cards;
-  // Scroll to top
-  document.getElementById('gym-loads-screen-log').scrollTop=0;
-
-  // Footer
-  const isLast=idx===_glSelected.length-1;
-  document.getElementById('gym-loads-footer').innerHTML=`
-    <button class="btn btn-g" onclick="gymLoadsSavePlayer(false)">Guardar</button>
-    ${isLast
-      ? `<button class="btn btn-p" onclick="gymLoadsSavePlayer(true)">✅ Guardar e fechar</button>`
-      : `<button class="btn btn-p" onclick="gymLoadsSavePlayer(false);gymLoadsNav(1)">Guardar e próximo →</button>`
-    }`;
 }
 
-function gymLoadsCollectCurrentPlayer(){
-  const {pid,pname}=_glSelected[_glIdx];
+function gymLoadsAutoSave(){
+  if(!_glCurrentPid) return;
+  const pname=_glPlayers.find(p=>p.id===_glCurrentPid)?.label||_glCurrentPid;
   const data={};
   document.querySelectorAll('#gym-loads-ex-cards [data-ex]').forEach(inp=>{
     const ex=inp.dataset.ex;
     if(!data[ex]) data[ex]={peso:'',reps:'',notas:''};
-    if(inp.classList.contains('gl-peso'))   data[ex].peso=inp.value.trim();
-    if(inp.classList.contains('gl-reps'))   data[ex].reps=inp.value.trim();
-    if(inp.classList.contains('gl-notas'))  data[ex].notas=inp.value.trim();
+    if(inp.classList.contains('gl-peso'))  data[ex].peso=inp.value.trim();
+    if(inp.classList.contains('gl-reps'))  data[ex].reps=inp.value.trim();
+    if(inp.classList.contains('gl-notas')) data[ex].notas=inp.value.trim();
   });
-  _glData[pid]={pname, data};
+  _glData[_glCurrentPid]={pname, data};
+  gymLoadsRenderList();
 }
 
-function gymLoadsSavePlayer(andClose){
-  gymLoadsCollectCurrentPlayer();
-  if(andClose) gymLoadsFinalSave();
-}
-
-function gymLoadsNav(dir){
-  const next=_glIdx+dir;
-  if(next<0||next>=_glSelected.length) return;
-  _glIdx=next;
-  gymLoadsRenderPlayer(_glIdx);
-  document.getElementById('gym-loads-screen-log').scrollTop=0;
+function gymLoadsSelectPlayer(pid){
+  gymLoadsAutoSave();
+  _glCurrentPid=pid;
+  gymLoadsRenderList();
+  const ev=DB.getEvent(_glEvId); if(!ev) return;
+  const exs=(ev.gymPlan?.exercises||[]).filter(e=>e.exercicio);
+  const savedData=_glData[pid]?.data||{};
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  document.getElementById('gym-loads-empty').style.display='none';
+  document.getElementById('gym-loads-ex-cards').innerHTML=exs.map(ex=>{
+    const saved=savedData[ex.exercicio]||{};
+    const planInfo=[ex.series&&ex.reps?`${ex.series}×${ex.reps}`:'',ex.rm&&ex.rm!=='—'?ex.rm:'',ex.rpe?`RPE ${ex.rpe}`:''].filter(Boolean).join(' · ');
+    return `<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+        ${ex.bloco?`<span style="font-size:11px;font-weight:800;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:4px">${esc(ex.bloco)}</span>`:''}
+        <span style="font-size:14px;font-weight:700">${esc(ex.exercicio)}</span>
+      </div>
+      ${planInfo?`<div style="font-size:11px;color:var(--muted);margin-bottom:12px">📋 ${planInfo}</div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:4px">Peso (kg)</label>
+          <input class="gym-inp gl-peso" data-ex="${esc(ex.exercicio)}" value="${esc(saved.peso)}" placeholder="0"
+            style="width:100%;padding:10px;font-size:20px;font-weight:700;text-align:center;border-radius:8px;border:2px solid var(--border);box-sizing:border-box" type="number" inputmode="decimal">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:4px">Reps reais</label>
+          <input class="gym-inp gl-reps" data-ex="${esc(ex.exercicio)}" value="${esc(saved.reps)}" placeholder="—"
+            style="width:100%;padding:10px;font-size:20px;font-weight:700;text-align:center;border-radius:8px;border:2px solid var(--border);box-sizing:border-box" inputmode="numeric">
+        </div>
+      </div>
+      <input class="gym-inp gl-notas" data-ex="${esc(ex.exercicio)}" value="${esc(saved.notas)}" placeholder="Notas…"
+        style="width:100%;padding:8px 10px;font-size:13px;border-radius:8px;border:1.5px solid var(--border);box-sizing:border-box">
+    </div>`;
+  }).join('');
+  document.getElementById('gym-loads-ex-area').scrollTop=0;
 }
 
 function gymLoadsFinalSave(){
-  // Write back to gymPlan.playerLogs
+  gymLoadsAutoSave();
   const ev=DB.getEvent(_glEvId); if(!ev) return;
   const plan=ev.gymPlan||{};
-  const playerLogs=_glSelected.map(({pid,pname})=>({
-    playerId:pid, playerName:pname,
-    data:_glData[pid]?.data||{}
-  }));
+  const playerLogs=Object.entries(_glData)
+    .filter(([,pl])=>Object.values(pl.data||{}).some(d=>d.peso||d.reps||d.notas))
+    .map(([pid,pl])=>({playerId:pid, playerName:pl.pname, data:pl.data}));
   DB.updateEvent(_glEvId,{gymPlan:{...plan, playerLogs, updatedAt:new Date().toISOString()}});
   document.getElementById('mo-gym-loads').classList.remove('open');
-  toast('✅ Cargas guardadas!');
+  toast('\u2705 Cargas guardadas!');
 }
 
+document.getElementById('mo-gym-loads-save').addEventListener('click', gymLoadsFinalSave);
 document.getElementById('mo-gym-loads-close').addEventListener('click',()=>{
-  gymLoadsCollectCurrentPlayer();
-  gymLoadsFinalSave();
+  gymLoadsAutoSave();
+  document.getElementById('mo-gym-loads').classList.remove('open');
 });
-document.getElementById('btn-gym-loads-start').addEventListener('click', gymLoadsStart);
-document.getElementById('btn-gym-loads-back-list').addEventListener('click',()=>{
-  gymLoadsCollectCurrentPlayer();
-  document.getElementById('gym-loads-screen-select').style.display='flex';
-  document.getElementById('gym-loads-screen-log').style.display='none';
-  document.getElementById('gym-loads-footer').innerHTML='';
-});
-document.getElementById('btn-gym-loads-prev').addEventListener('click',()=>gymLoadsNav(-1));
-document.getElementById('btn-gym-loads-next-p').addEventListener('click',()=>gymLoadsNav(1));
 
 function gymGetCurrentExercises(){
   // Read exercises either from live tbody (edit mode) or from current plan
