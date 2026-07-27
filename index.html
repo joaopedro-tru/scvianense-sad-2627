@@ -662,18 +662,7 @@ body.pm #v-pf{padding:30px}
     </div>
     <!-- ADMIN DASHBOARD -->
     <div id="d-admin-content">
-      <div class="sg" id="d-stats"></div>
-      <div class="g2col">
-        <div class="card">
-          <div style="font-size:14px;font-weight:700;margin-bottom:4px">🟡 Sub-19 <span style="font-size:11px;font-weight:400;color:var(--muted)">— últimos e próximos jogos</span></div>
-          <div id="d-games-19"></div>
-        </div>
-        <div class="card">
-          <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔵 Sub-23 <span style="font-size:11px;font-weight:400;color:var(--muted)">— últimos e próximos jogos</span></div>
-          <div id="d-games-23"></div>
-        </div>
-      </div>
-      <div id="d-admin-load"></div>
+      <div id="d-admin-cols"></div>
       <div class="card">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
         <div id="d-birthdays"></div>
@@ -1196,9 +1185,9 @@ body.pm #v-pf{padding:30px}
       <div class="fr" style="flex-wrap:wrap;gap:12px;margin-bottom:14px;align-items:flex-end">
         <div class="fg" style="min-width:130px"><label>Escalão</label>
           <select id="wp-squad" class="si">
-            <option value="eqa">Equipa A</option>
+            <option value="eqa" selected>Equipa A</option>
             <option value="sub23">Sub-23</option>
-            <option value="sub19" selected>Sub-19</option>
+            <option value="sub19">Sub-19</option>
           </select>
         </div>
         <div class="fg" style="min-width:160px"><label>Qualquer dia da semana</label>
@@ -1346,10 +1335,12 @@ body.pm #v-pf{padding:30px}
       <div class="fg"><label>Morada</label><input type="text" id="f-addr"></div>
       <div class="fst">Dados Desportivos</div>
       <div class="fr">
-        <div class="fg"><label>Escalão *</label>
-          <select id="f-squad" required>
-            <option value="eqa">Equipa A</option><option value="sub19">Sub-19</option><option value="sub23">Sub-23</option>
-          </select>
+        <div class="fg"><label>Escalão(ões) *</label>
+          <div id="f-squads-wrap" style="display:flex;gap:14px;padding:8px 0;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-eqa"> Equipa A</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-sub23"> Sub-23</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-sub19"> Sub-19</label>
+          </div>
         </div>
         <div class="fg"><label>Posição Principal</label>
           <select id="f-pos">
@@ -1962,6 +1953,12 @@ function compressImage(file, maxPx=600, quality=0.70) {
 }
 
 
+// ── PLAYER SQUAD HELPERS ──────────────────────────────────────────────────────
+// Suporte a atleta em múltiplos escalões simultaneamente.
+// squads[] tem prioridade; squad (string) é mantido para compatibilidade.
+function playerSquads(p){ return (Array.isArray(p.squads)&&p.squads.length)?p.squads:(p.squad?[p.squad]:[]) }
+function playerInSquad(p,sq){ return playerSquads(p).includes(sq) }
+
 // ── DATA LAYER (localStorage cache + Firestore cloud) ─────────────────────────
 // Leituras: localStorage (rápido/síncrono). Escritas: localStorage + Firestore em paralelo.
 const DB = {
@@ -1969,7 +1966,7 @@ const DB = {
   _s(d){ localStorage.setItem('scv_p',JSON.stringify(d.players)); localStorage.setItem('scv_e',JSON.stringify(d.events)) },
   _fsp(){ return firestoreDb?.collection('players') },
   _fse(){ return firestoreDb?.collection('events') },
-  players(squad){ const p=this._d().players; return squad?p.filter(x=>x.squad===squad):p },
+  players(squad){ const p=this._d().players; return squad?p.filter(x=>playerInSquad(x,squad)):p },
   events(squad){ const e=this._d().events; if(!squad||squad==='all')return e; return e.filter(x=>x.squad===squad||x.squad==='both') },
   addPlayer(p){
     const d=this._d(); p.ca=new Date().toISOString(); d.players.push(p); this._s(d);
@@ -2500,28 +2497,42 @@ function show(id){ document.getElementById(id).classList.add('active') }
 function setActive(sel){ const el=document.querySelector('.nl'+sel); if(el)el.classList.add('active') }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function bdayCards(ps,containerEl){
+function bdayCards(ps,containerEl,staffPs=[]){
   const now=new Date();
   const todayD=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const bdays=ps.filter(p=>p.dob).map(p=>{
-    const[y,m,d]=p.dob.split('-').map(Number);
+  // Build unified list of people with dob
+  const people=[
+    ...ps.filter(p=>p.dob).map(p=>({
+      name:dn(p),photoUrl:p.photoUrl,dob:p.dob,
+      subtitle:playerSquads(p).map(s=>SQUADS[s]).join(' / '),
+      isStaff:false
+    })),
+    ...(staffPs||[]).filter(sp=>sp.dob).map(sp=>({
+      name:sp.name||'—',photoUrl:sp.photoUrl,dob:sp.dob,
+      subtitle:(STAFF_ROLES_LABEL[sp.staffRole]||'Staff')+(sp.squad&&SQUADS[sp.squad]?' · '+(SQUADS[sp.squad]||sp.squad):''),
+      isStaff:true
+    }))
+  ];
+  const bdays=people.map(person=>{
+    const[y,m,d]=person.dob.split('-').map(Number);
     let bday=new Date(todayD.getFullYear(),m-1,d);
     if(bday<todayD) bday=new Date(todayD.getFullYear()+1,m-1,d);
     const days=Math.round((bday-todayD)/(86400000));
     const age=bday.getFullYear()-y;
-    return {p,bday,days,age};
-  }).sort((a,b)=>a.days-b.days).slice(0,8);
+    return {person,bday,days,age};
+  }).sort((a,b)=>a.days-b.days).slice(0,10);
   containerEl.style.display='grid';containerEl.style.gridTemplateColumns='repeat(auto-fill,minmax(220px,1fr))';containerEl.style.gap='10px';
-  containerEl.innerHTML=bdays.length===0?'<p style="color:var(--muted);font-size:13px">Sem atletas com data de nascimento.</p>':
-    bdays.map(({p,bday,days,age})=>{
+  containerEl.innerHTML=bdays.length===0?'<p style="color:var(--muted);font-size:13px">Sem registos com data de nascimento.</p>':
+    bdays.map(({person,bday,days,age})=>{
       const isToday=days===0;
       const label=isToday?'🎉 Hoje!':`em ${days} dia${days!==1?'s':''}`;
       const dateStr=`${String(bday.getDate()).padStart(2,'0')}/${String(bday.getMonth()+1).padStart(2,'0')}`;
+      const initials=person.name.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:${isToday?'#fff8e1':'var(--bg)'};border:1px solid ${isToday?'#ffd54f':'var(--border)'}">
-        <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+        <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0;${person.isStaff?'background:#e0e7ff;color:#4f46e5;':''}">${person.photoUrl?`<img src="${person.photoUrl}">`:initials}</div>
         <div style="min-width:0">
-          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dn(p)}</div>
-          <div style="font-size:11px;color:var(--muted)">${SQUADS[p.squad]} · ${dateStr} · ${age} anos · <span style="color:${isToday?'#e67e22':'var(--green)'};font-weight:600">${label}</span></div>
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${person.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${person.subtitle} · ${dateStr} · ${age} anos · <span style="color:${isToday?'#e67e22':'var(--green)'};font-weight:600">${label}</span></div>
         </div>
       </div>`;
     }).join('');
@@ -2669,7 +2680,7 @@ function renderDash(){
     const uEl=document.getElementById('d-coach-upcoming');
     uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
       upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
-    bdayCards(ps,document.getElementById('d-coach-birthdays'));
+    bdayCards(ps,document.getElementById('d-coach-birthdays'),DB.staffProfiles(cs));
     renderStaffLoadCharts(cs);
     return;
   }
@@ -2678,22 +2689,7 @@ function renderDash(){
   document.getElementById('d-admin-content').style.display='';
   document.getElementById('d-coach-content').style.display='none';
   const ps=DB.players(), es=DB.events();
-  const s19=ps.filter(p=>p.squad==='sub19').length, s23=ps.filter(p=>p.squad==='sub23').length;
   const today=now.toISOString().split('T')[0];
-
-  // Stats — focused on U19 + U23
-  const g19=es.filter(e=>e.type==='game'&&e.squad==='sub19');
-  const g23=es.filter(e=>e.type==='game'&&e.squad==='sub23');
-  const gResult=(games)=>{
-    const past=games.filter(g=>g.date<today);
-    const wins=past.filter(g=>{const mr=g.matchReport||{};const gf=(mr.events||[]).filter(e=>e.type==='goal').length,ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;return gf>ga;}).length;
-    return past.length>0?`${wins}V/${past.length-wins}D`:'—';
-  };
-  document.getElementById('d-stats').innerHTML=`
-    <div class="sc"><div class="sl">Sub-19</div><div class="sv" style="color:#b8860b">${s19}</div><div class="ss">atletas · ${gResult(g19)}</div></div>
-    <div class="sc"><div class="sl">Sub-23</div><div class="sv" style="color:var(--blue)">${s23}</div><div class="ss">atletas · ${gResult(g23)}</div></div>
-    <div class="sc"><div class="sl">Jogos U19</div><div class="sv">${g19.filter(g=>g.date>=today).length}</div><div class="ss">por disputar</div></div>
-    <div class="sc"><div class="sl">Jogos U23</div><div class="sv">${g23.filter(g=>g.date>=today).length}</div><div class="ss">por disputar</div></div>`;
 
   // Game card helper
   function dashGameCard(ev){
@@ -2707,39 +2703,54 @@ function renderDash(){
       const mr=ev.matchReport||{};
       const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
       const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
-      const isHome=ev.homeAway!=='away';
-      const scoreStr=isHome?`${gf}–${ga}`:`${ga}–${gf}`;
+      const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
       const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
-      badge=`<div style="padding:4px 10px;border-radius:6px;background:${res.c};color:#fff;font-size:12px;font-weight:700;flex-shrink:0">${res.l} ${scoreStr}</div>`;
+      badge=`<div style="padding:3px 8px;border-radius:6px;background:${res.c};color:#fff;font-size:11px;font-weight:700;flex-shrink:0">${res.l} ${scoreStr}</div>`;
     } else if(isToday){
-      badge=`<div style="padding:4px 10px;border-radius:6px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;flex-shrink:0">Hoje</div>`;
+      badge=`<div style="padding:3px 8px;border-radius:6px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;flex-shrink:0">Hoje</div>`;
     }
-    return `<div class="ui" style="cursor:pointer" onclick="nav('game',{id:'${ev.id}'})">
-      <div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div>
+    return `<div class="ui" style="cursor:pointer;padding:6px 2px" onclick="nav('game',{id:'${ev.id}'})">
+      <div class="ud" style="min-width:32px"><div class="day" style="font-size:14px">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ha} ${opponent}</div>
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ha} ${opponent}</div>
         <div style="font-size:11px;color:var(--muted)">${evLabel(ev)}${ev.time?' · '+ev.time:''}</div>
       </div>
       ${badge}
     </div>`;
   }
 
-  function renderSquadGames(games, elId){
-    const el=document.getElementById(elId);
-    const past=games.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).reverse();
-    const future=games.filter(g=>g.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
-    if(!past.length&&!future.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px 0">Sem jogos agendados.</p>'; return; }
-    let html='';
-    if(past.length) html+=past.map(dashGameCard).join('');
-    if(past.length&&future.length) html+=`<div style="border-top:2px dashed var(--border);margin:8px 0;position:relative"><span style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--card);padding:0 8px;font-size:10px;color:var(--muted);font-weight:600">HOJE</span></div>`;
-    if(future.length) html+=future.map(dashGameCard).join('');
-    el.innerHTML=html;
-  }
+  // 3-column grid: Equipa A → Sub-23 → Sub-19
+  const ADMIN_SQUADS=[
+    {cs:'eqa',  icon:'⚫',color:'#444'},
+    {cs:'sub23',icon:'🔵',color:'var(--blue)'},
+    {cs:'sub19',icon:'🟡',color:'#b8860b'},
+  ];
+  const colsEl=document.getElementById('d-admin-cols');
+  colsEl.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px';
+  colsEl.innerHTML=ADMIN_SQUADS.map(({cs,icon,color})=>{
+    const sqAthletes=DB.players(cs).length;
+    const sqGames=es.filter(e=>e.type==='game'&&e.squad===cs);
+    const past=sqGames.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2).reverse();
+    const future=sqGames.filter(g=>g.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,2);
+    let gamesHtml='';
+    if(past.length) gamesHtml+=past.map(dashGameCard).join('');
+    if(past.length&&future.length) gamesHtml+=`<div style="border-top:2px dashed var(--border);margin:6px 0"></div>`;
+    if(future.length) gamesHtml+=future.map(dashGameCard).join('');
+    if(!gamesHtml) gamesHtml='<p style="color:var(--muted);font-size:12px;padding:4px 0">Sem jogos agendados.</p>';
+    const loadHtml=_squadLoadCards(cs);
+    return `<div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div class="card" style="margin:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:${color}">${icon} ${SQUADS[cs]}</div>
+          <div style="font-size:11px;color:var(--muted)">${sqAthletes} atleta${sqAthletes!==1?'s':''}</div>
+        </div>
+        ${gamesHtml}
+      </div>
+      ${loadHtml}
+    </div>`;
+  }).join('');
 
-  renderSquadGames(g19,'d-games-19');
-  renderSquadGames(g23,'d-games-23');
-  renderAdminLoadCharts();
-  bdayCards(ps,document.getElementById('d-birthdays'));
+  bdayCards(ps,document.getElementById('d-birthdays'),DB.staffProfiles(null));
 }
 
 // ── SQUAD ─────────────────────────────────────────────────────────────────────
@@ -2943,35 +2954,41 @@ function renderPlayer(){
   const a=age(p.dob);
   const pid=p.id;
 
-  // ── Compute stats ──────────────────────────────────────────────
+  // ── Compute stats (por escalão) ────────────────────────────────
   const allEvs=DB.events();
-  let trainAttended=0, gamesConv=0, gamesPlayed=0;
-  let goals=0, assists=0, yellows=0, reds=0;
-  const ratings=[];
-
-  allEvs.forEach(ev=>{
-    if(ev.type==='training'){
-      if(ev.attendance&&ev.attendance[pid]===true) trainAttended++;
-    } else if(ev.type==='game'){
-      const conv=!!(ev.convocatoria?.players?.[pid]);
-      if(conv) gamesConv++;
-      const mr=ev.matchReport||{};
-      const evList=mr.events||[];
-      const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
-      const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
-      const subbedOut=evList.some(e=>e.type==='sub'&&e.playerOutId===pid);
-      if(hasRating||subbedIn) gamesPlayed++;
-      else if(conv&&!subbedOut) {/* stayed on bench — don't count */}
-      evList.forEach(e=>{
-        if(e.type==='goal'&&e.playerId===pid) goals++;
-        if(e.type==='goal'&&e.assistId===pid) assists++;
-        if((e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid) yellows++;
-        if((e.type==='red'||e.type==='yellow2')&&e.playerId===pid) reds++;
-      });
-      if(hasRating) ratings.push(parseFloat(mr.ratings[pid]));
-    }
-  });
-  const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
+  const pSquads=playerSquads(p);
+  function computeSquadStats(sq){
+    let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0;
+    const ratings=[];
+    allEvs.filter(ev=>!sq||ev.squad===sq||(!sq&&true)).forEach(ev=>{
+      if(ev.type==='training'){
+        if(sq&&ev.squad!==sq) return;
+        if(ev.attendance&&ev.attendance[pid]===true) trainAttended++;
+      } else if(ev.type==='game'){
+        if(sq&&ev.squad!==sq) return;
+        const conv=!!(ev.convocatoria?.players?.[pid]);
+        if(conv) gamesConv++;
+        const mr=ev.matchReport||{};
+        const evList=mr.events||[];
+        const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
+        const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
+        const subbedOut=evList.some(e=>e.type==='sub'&&e.playerOutId===pid);
+        if(hasRating||subbedIn) gamesPlayed++;
+        evList.forEach(e=>{
+          if(e.type==='goal'&&e.playerId===pid) goals++;
+          if(e.type==='goal'&&e.assistId===pid) assists++;
+          if((e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid) yellows++;
+          if((e.type==='red'||e.type==='yellow2')&&e.playerId===pid) reds++;
+        });
+        if(hasRating) ratings.push(parseFloat(mr.ratings[pid]));
+      }
+    });
+    const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
+    return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
+  }
+  // Use combined stats for GR and for single-squad players; per-squad when multi
+  const statsAll=computeSquadStats(null);
+  const {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating}=statsAll;
 
   // GR stats (only for GR position players)
   let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
@@ -3009,7 +3026,7 @@ function renderPlayer(){
         <h2>${dn(p)}</h2>
         ${p.alcunha?`<div style="font-size:12px;color:var(--muted);margin-top:1px;margin-bottom:2px">${p.name}</div>`:''}
         <div class="bgs">
-          <span class="bg bg-g">${SQUADS[p.squad]||'—'}</span>
+          ${pSquads.map(s=>`<span class="bg bg-g">${SQUADS[s]||s}</span>`).join('')||`<span class="bg bg-g">—</span>`}
           ${[p.position,p.position2,p.position3].filter(Boolean).map(x=>`<span class="bg bg-pos">${x}</span>`).join('')}
           ${p.number?`<span class="bg bg-n">#${p.number}</span>`:''}
           ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
@@ -3028,7 +3045,7 @@ function renderPlayer(){
       <div class="card"><h3>Dados Desportivos</h3>
         ${row('Posição',[p.position,p.position2,p.position3].filter(Boolean).map(x=>POS[x]||x).join(' · ')||null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
-        ${row('Escalão',SQUADS[p.squad])}
+        ${row('Escalão',pSquads.map(s=>SQUADS[s]||s).join(' / ')||null)}
         ${row('Clube Anterior',p.previousClub)}
         ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
         ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Equipamento</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Camisola',jnum!=null?`#${jnum}`:null)}`;})()}
@@ -3043,18 +3060,37 @@ function renderPlayer(){
       ${canViewClinicalSummary()?buildPlayerClinicalCard(pid):''}
       ${isAdmin()?buildPlayerUnavailCard(pid):''}
       <div class="card"><h3>Estatísticas</h3>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
-          ${statBox('Treinos',trainAttended,'presenças')}
-          ${statBox('Convocado',gamesConv,'jogos')}
-          ${statBox('Jogou',gamesPlayed,'jogos')}
-          ${statBox('Média',avgRating??'—','avaliação')}
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-          ${statBox('Golos',goals,'')}
-          ${statBox('Assist.',assists,'')}
-          ${statBox('Amarelos',yellows,'')}
-          ${statBox('Vermelhos',reds,'')}
-        </div>
+        ${pSquads.length>1
+          ? pSquads.map(sq=>{
+              const st=computeSquadStats(sq);
+              return `<div style="margin-bottom:14px">
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">${SQUADS[sq]}</div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:8px">
+                  ${statBox('Treinos',st.trainAttended,'presenças')}
+                  ${statBox('Convocado',st.gamesConv,'jogos')}
+                  ${statBox('Jogou',st.gamesPlayed,'jogos')}
+                  ${statBox('Média',st.avgRating??'—','avaliação')}
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+                  ${statBox('Golos',st.goals,'')}
+                  ${statBox('Assist.',st.assists,'')}
+                  ${statBox('Amarelos',st.yellows,'')}
+                  ${statBox('Vermelhos',st.reds,'')}
+                </div>
+              </div>`;
+            }).join('<div style="height:1px;background:var(--border);margin:8px 0"></div>')
+          : `<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
+              ${statBox('Treinos',trainAttended,'presenças')}
+              ${statBox('Convocado',gamesConv,'jogos')}
+              ${statBox('Jogou',gamesPlayed,'jogos')}
+              ${statBox('Média',avgRating??'—','avaliação')}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+              ${statBox('Golos',goals,'')}
+              ${statBox('Assist.',assists,'')}
+              ${statBox('Amarelos',yellows,'')}
+              ${statBox('Vermelhos',reds,'')}
+            </div>`}
       </div>
       ${p.position==='GR'&&grGames>0?`
       <div class="card" style="margin-top:16px">
@@ -3084,8 +3120,8 @@ function openPlayerModal(p=null){
   f('f-email').value=p?.email||'';
   f('f-addr').value=p?.address||'';
   const _sq = coachSquad();
-  f('f-squad').value=p?.squad||_sq||squad||'sub19';
-  document.getElementById('f-squad').disabled = !!_sq; // treinadores não mudam escalão
+  const _pSquads=p?playerSquads(p):(_sq?[_sq]:(squad?[squad]:['sub19']));
+  ['eqa','sub23','sub19'].forEach(s=>{const el=document.getElementById('f-sq-'+s);if(el){el.checked=_pSquads.includes(s);el.disabled=!!_sq;}});
   f('f-pos').value=p?.position||'';
   f('f-pos2').value=p?.position2||'';
   f('f-pos3').value=p?.position3||'';
@@ -3135,7 +3171,9 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       id:pid,
       name:f('f-name'),alcunha:f('f-alias').trim()||null,dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
-      squad:f('f-squad'),position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,dominantFoot:f('f-foot'),
+      squads:(()=>{const ss=['eqa','sub23','sub19'].filter(s=>document.getElementById('f-sq-'+s)?.checked);if(!ss.length){toast('⚠️ Seleciona pelo menos um escalão');throw new Error('no squad');}return ss;})(),
+      squad:(()=>{const ss=['eqa','sub23','sub19'].filter(s=>document.getElementById('f-sq-'+s)?.checked);return ss[0]||'sub19';})(),
+      position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
       injuries:f('f-inj'),shirtSize:f('f-shirt-size')||null,
       jerseyName:document.getElementById('f-jersey-name').value.toUpperCase()||null,
