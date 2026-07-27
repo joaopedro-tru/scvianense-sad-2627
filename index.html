@@ -3992,6 +3992,8 @@ function openEventModal(ev=null,date=null,defaults={}){
   // Tactical objectives reset
   _objPrimary=ev?.objectivePrimary?{...ev.objectivePrimary}:{moment:null,subPrinciples:[]};
   _objSecondary=ev?.objectiveSecondary?{...ev.objectiveSecondary}:{moment:null,subPrinciples:[]};
+  _fichaExercises=ev?.trainingExercises?[...ev.trainingExercises]:[];
+  _momentSummary=ev?.momentSummary?{...ev.momentSummary}:{};
   _fichaText='';
   document.getElementById('e-ficha-name').textContent='';
   document.getElementById('e-ai-status').style.display='none';
@@ -4061,7 +4063,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _p=_isTraining&&_objPrimary.moment?{..._objPrimary}:null;
   const _s=_isTraining&&_objSecondary.moment?{..._objSecondary}:null;
   const _objText=_p?[TACTICS_TAXONOMY[_p.moment].full,_p.subPrinciples.length?'('+_p.subPrinciples.join(', ')+')'  :''].filter(Boolean).join(' ') + (_s?(' · '+TACTICS_TAXONOMY[_s.moment].full+(_s.subPrinciples.length?' ('+_s.subPrinciples.join(', ')+')':'')):''): null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -4300,9 +4302,52 @@ function renderTraining(){
             }
             return ev.objectives?row('Objetivos',ev.objectives):'';
           })();
+          // Resumo de minutos por momento
+          const momentSummaryHTML=(()=>{
+            if(!ev.momentSummary||!Object.keys(ev.momentSummary).length) return '';
+            const entries=Object.entries(ev.momentSummary).filter(([,m])=>m>0).sort(([,a],[,b])=>b-a);
+            if(!entries.length) return '';
+            const totalMin=entries.reduce((s,[,m])=>s+m,0);
+            // Donut chart (SVG puro, sem dependências)
+            const CX=50,CY=50,R=38,IR=23;
+            let ang=-Math.PI/2;
+            const single=entries.length===1;
+            const svgPaths=entries.map(([mk,mins])=>{
+              const tc=TACTICS_TAXONOMY[mk]||{color:'#64748b'};
+              const sweep=mins/totalMin*2*Math.PI;
+              const a2=ang+sweep*(single?0.9999:1);
+              const la=sweep>Math.PI?1:0;
+              const x1=CX+R*Math.cos(ang),y1=CY+R*Math.sin(ang);
+              const x2=CX+R*Math.cos(a2),y2=CY+R*Math.sin(a2);
+              const ix1=CX+IR*Math.cos(a2),iy1=CY+IR*Math.sin(a2);
+              const ix2=CX+IR*Math.cos(ang),iy2=CY+IR*Math.sin(ang);
+              const d=`M${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R},0,${la},1,${x2.toFixed(2)},${y2.toFixed(2)} L${ix1.toFixed(2)},${iy1.toFixed(2)} A${IR},${IR},0,${la},0,${ix2.toFixed(2)},${iy2.toFixed(2)} Z`;
+              ang+=sweep;
+              return `<path d="${d}" fill="${tc.color}" stroke="var(--card)" stroke-width="2"/>`;
+            }).join('');
+            const legend=entries.map(([mk,mins])=>{
+              const tc=TACTICS_TAXONOMY[mk]||{label:mk,color:'#64748b'};
+              return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+                <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${tc.color}"></div>
+                <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${tc.label}</span>
+                <span style="font-size:11px;font-weight:700;white-space:nowrap">${mins}<span style="font-weight:400;color:var(--muted)">m</span></span>
+              </div>`;
+            }).join('');
+            return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">⏱ Minutos por Momento</div>
+              <div style="display:flex;align-items:center;gap:14px">
+                <svg viewBox="0 0 100 100" width="82" height="82" style="flex-shrink:0">
+                  ${svgPaths}
+                  <text x="50" y="47" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text)" font-family="-apple-system,sans-serif">${totalMin}</text>
+                  <text x="50" y="58" text-anchor="middle" font-size="8" fill="#999" font-family="-apple-system,sans-serif">min</text>
+                </svg>
+                <div style="flex:1;min-width:0">${legend}</div>
+              </div>
+            </div>`;
+          })();
           return ev.type==='gym'?'':(utNum>0?row('UT',utNum.toString()):'')+
                  (regime?row('Regime',regime):'')+
-                 objRows;
+                 objRows+momentSummaryHTML;
         })()}
       </div>
       ${ev.type==='gym'?`
@@ -4346,6 +4391,34 @@ function renderTraining(){
     </div>
   </div>
   ${fichaPreview}
+  ${(()=>{
+    const exs=ev.trainingExercises;
+    if(!exs||!exs.length) return '';
+    const exCards=exs.map(ex=>{
+      const tc=ex.moment?TACTICS_TAXONOMY[ex.moment]:null;
+      const mColor=tc?tc.color:'#64748b';
+      const badge=tc?`<span style="background:${mColor};color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;flex-shrink:0">${tc.label}</span>`
+        :(ex.isWarmup?`<span style="background:#f1f5f9;color:#64748b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;flex-shrink:0">Ativação</span>`:
+          `<span style="background:#f1f5f9;color:#64748b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;flex-shrink:0">Livre</span>`);
+      const dur=ex.duration?`<span style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;flex-shrink:0">⏱ ${ex.duration} min</span>`:'';
+      const meta=[ex.players?`👥 ${ex.players}`:null,ex.space?`📐 ${ex.space}`:null].filter(Boolean).join(' · ');
+      const specs=ex.specificObjectives?.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${ex.specificObjectives.map(o=>`<span style="background:${mColor}18;color:${mColor};border:1px solid ${mColor}35;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">${o}</span>`).join('')}</div>`:'';
+      const desc=ex.description?`<div style="font-size:12px;color:var(--muted);margin-top:7px;line-height:1.5;white-space:pre-line">${ex.description}</div>`:'';
+      return `<div style="border:1px solid var(--border);border-left:3px solid ${mColor};border-radius:0 8px 8px 0;padding:12px;margin-bottom:10px;${ex.isWarmup?'opacity:.7':''}">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:${meta||specs||desc?'6px':'0'}">
+          ${badge}
+          <span style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${ex.title||'Exercício'}</span>
+          ${dur}
+        </div>
+        ${meta?`<div style="font-size:11px;color:var(--muted);margin-bottom:2px">${meta}</div>`:''}
+        ${specs}${desc}
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-top:18px">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">📊 Exercícios do Plano</h3>
+      ${exCards}
+    </div>`;
+  })()}
   ${buildClinicalSection(trainingEventId, allPl)}`;
 
   // Mark ALL present
@@ -7106,11 +7179,13 @@ const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
 
 // ── PERIODIZAÇÃO TÁTICA — TAXONOMIA ───────────────────────────────────────────
 const TACTICS_TAXONOMY={
-  OO:{label:'Org. Ofensiva',  full:'Organização Ofensiva',  color:'#1a56db', subs:['Saída PB','MPB','Último Terço']},
-  OD:{label:'Org. Defensiva', full:'Organização Defensiva', color:'#c0392b', subs:['Bloco Alto','Bloco Médio','Bloco Baixo']},
-  TO:{label:'Trans. Ofensiva',full:'Transição Ofensiva',    color:'#1a8754', subs:['Ataque Rápido','Ataque Posicional']},
-  TD:{label:'Trans. Defensiva',full:'Transição Defensiva',  color:'#e65100', subs:['Reação à Perda','Ajuste de Posição']},
-  BP:{label:'Bola Parada',    full:'Bola Parada',           color:'#7c3aed', subs:['Ofensiva','Defensiva']},
+  OO:  {label:'Org. Ofensiva',   full:'Organização Ofensiva',          color:'#1a56db', subs:['Saída PB','MPB','VCJ','Último Terço','PBO']},
+  OD:  {label:'Org. Defensiva',  full:'Organização Defensiva',         color:'#c0392b', subs:['Bloco Alto','Bloco Médio','Bloco Baixo']},
+  TO:  {label:'Trans. Ofensiva', full:'Transição Ofensiva',            color:'#1a8754', subs:['Ataque Rápido','Ataque Posicional']},
+  TD:  {label:'Trans. Defensiva',full:'Transição Defensiva',           color:'#e65100', subs:['RAP','Ajuste de Posição']},
+  TOTD:{label:'Trans. Of./Def.', full:'Transição Ofensiva/Defensiva',  color:'#d97706', subs:['RAP','MPB','Ataque Rápido','Recuperação Def.']},
+  BP:  {label:'Bola Parada',     full:'Bola Parada',                   color:'#7c3aed', subs:['Ofensiva','Defensiva']},
+  SJ:  {label:'Sit. de Jogo',    full:'Situação de Jogo',              color:'#475569', subs:['Torneio','Jogo Formal','GR+GR']},
 };
 const REGIMES=[
   {key:'Recuperação', color:'#1a8754'},
@@ -7126,6 +7201,8 @@ const REGIME_DEFAULTS={
 let _regimes=[];
 let _objPrimary={moment:null,subPrinciples:[]};
 let _objSecondary={moment:null,subPrinciples:[]};
+let _fichaExercises=[];   // exercícios extraídos da IA
+let _momentSummary={};    // {OO:18, TOTD:16, SJ:19}
 let _fichaText='';
 
 function renderRegimePicker(){
@@ -7246,13 +7323,18 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
     const month=date?new Date(date+'T12:00:00').getMonth():new Date().getMonth();
     const period=(month>=5&&month<=7)?'preparatório':'competição';
     const fn=firebase.app().functions('europe-west1').httpsCallable('analyzeTraining');
-    const res=await fn({pdfText,currentObjectives,dayOfWeek:dow,squad:sq,period});
+    const res=await fn({pdfText,currentObjectives,dayOfWeek:dow,squad:sq,period,extractExercises:true});
     const d=res.data;
     const mEl=document.getElementById('e-ai-mismatch');
     if(d.mismatch&&d.mismatchReason){
       mEl.style.display='block';
       mEl.innerHTML=`⚠️ <b>Possível divergência:</b> ${d.mismatchReason}`;
     } else { mEl.style.display='none'; }
+    // Exercícios extraídos (novo)
+    if(d.exercises&&Array.isArray(d.exercises)){
+      _fichaExercises=d.exercises;
+      _momentSummary=d.momentSummary||{};
+    }
     if(!currentObjectives||d.mismatch){
       if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]){
         _objPrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
