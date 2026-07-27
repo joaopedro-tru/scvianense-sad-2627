@@ -2596,12 +2596,18 @@ function _squadLoadCards(cs){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
     const CX=sz/2,CY=sz/2,R=sz*0.42,IR=sz*0.265;
+    // Single entry (100%): arc path is degenerate — use a ring circle instead
+    if(entries.length===1){
+      const color=colorFn(entries[0][0]);
+      const mid=((R+IR)/2).toFixed(1);
+      const w=(R-IR).toFixed(1);
+      return `<svg viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" style="flex-shrink:0"><circle cx="${CX}" cy="${CY}" r="${mid}" fill="none" stroke="${color}" stroke-width="${w}"/></svg>`;
+    }
     let ang=-Math.PI/2;
-    const single=entries.length===1;
     const paths=entries.map(([key,val])=>{
       const color=colorFn(key);
       const sweep=val/total*2*Math.PI;
-      const a2=ang+sweep*(single?0.9999:1);
+      const a2=ang+sweep;
       const la=sweep>Math.PI?1:0;
       const x1=CX+R*Math.cos(ang),y1=CY+R*Math.sin(ang);
       const x2=CX+R*Math.cos(a2),y2=CY+R*Math.sin(a2);
@@ -2638,15 +2644,15 @@ function _squadLoadCards(cs){
   const gS=donutBlock(gdS,gColorFn,k=>k,'séries','Época');
   const t5=donutBlock(td5,tColorFn,tLabelFn,'min','Últimas 5 semanas');
   const tS=donutBlock(tdS,tColorFn,tLabelFn,'min','Época');
-  const gymCard=(g5||gS)?`<div class="card" style="flex:1;min-width:200px">
+  const gymCard=(g5||gS)?`<div class="card" style="margin:0">
     <div style="font-size:12px;font-weight:700;margin-bottom:12px">🏋️ Ginásio</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
   </div>`:'';
-  const trainCard=(t5||tS)?`<div class="card" style="flex:1;min-width:200px">
+  const trainCard=(t5||tS)?`<div class="card" style="margin:0">
     <div style="font-size:12px;font-weight:700;margin-bottom:12px">📋 Momentos de Jogo</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${t5}${divider(t5,tS)}${tS}</div>
   </div>`:'';
-  return (gymCard||trainCard)?`<div style="display:flex;gap:12px;flex-wrap:wrap">${gymCard}${trainCard}</div>`:'';
+  return (gymCard||trainCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${trainCard}</div>`:'';
 }
 function renderStaffLoadCharts(cs){
   const el=document.getElementById('d-staff-load');
@@ -2740,7 +2746,7 @@ function renderDash(){
           <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${ha} ${opponent}</div>
           ${badge}
         </div>
-        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${evLabel(ev)}${ev.time?' · '+ev.time:''}</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${[ev.competition,ev.time].filter(Boolean).join(' · ')}</div>
       </div>
     </div>`;
   }
