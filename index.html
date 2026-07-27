@@ -1833,6 +1833,7 @@ function isMedical(){ return currentUser()?.role==='medical'; }
 function staffRole(){ return currentUser()?.staffRole||null; }
 function staffRoleName(){ const r=staffRole(); return STAFF_ROLES_LABEL[r]||r||null; }
 function canSeeClinical(){ return isAdmin()||isMedical(); }
+function canViewClinicalSummary(){ return ['admin','coach','staff','medical'].includes(currentUser()?.role); }
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -2052,26 +2053,6 @@ const DB = {
     }catch(e){ console.warn('syncAthleteDocs:',e); }
   },
 
-  // ── ATHLETE PAYMENTS (U23) ───────────────────────────────
-  _fapay(){ return firestoreDb?.collection('athlete_payments') },
-  _apay(){ try{ return JSON.parse(localStorage.getItem('scv_pay')||'[]'); }catch{ return []; } },
-  _sapay(arr){ localStorage.setItem('scv_pay',JSON.stringify(arr)); },
-  getAthletePayment(playerId){ return this._apay().find(r=>r.playerId===playerId)||null; },
-  setAthletePayment(playerId, fields){
-    const arr=this._apay();
-    let rec=arr.find(r=>r.playerId===playerId);
-    if(rec){ Object.assign(rec,fields,{updatedAt:new Date().toISOString()}); }
-    else{ rec={id:uid(),playerId,...fields,updatedAt:new Date().toISOString()}; arr.push(rec); }
-    this._sapay(arr);
-    this._fapay()?.doc(rec.id).set(rec).catch(e=>console.error('FS setAthletePayment:',e));
-  },
-  async syncAthletePaymentsFromFirestore(){
-    if(!this._fapay()) return;
-    try{
-      const snap=await this._fapay().get();
-      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sapay(arr);
-    }catch(e){ console.warn('syncAthletePayments:',e); }
-  }
 };
 
 function uid(){ return crypto.randomUUID() }
@@ -2868,7 +2849,7 @@ function renderPlayer(){
         </div>
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
-      ${canSeeClinical()?buildPlayerClinicalCard(pid):''}
+      ${canViewClinicalSummary()?buildPlayerClinicalCard(pid):''}
       ${isAdmin()?buildPlayerUnavailCard(pid):''}
       <div class="card"><h3>Estatísticas</h3>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
@@ -7970,7 +7951,6 @@ function initCoordApp(){
         DB.syncClinicalFromFirestore(),
         DB.syncStaffProfilesFromFirestore(),
         DB.syncAthleteDocsFromFirestore(),
-        DB.syncAthletePaymentsFromFirestore(),
         DB.syncTrialFromFirestore(),
       ]);
       // 3. Operações admin
@@ -8009,12 +7989,17 @@ async function openAccountsModal(){
 
   const users=getAppUsers().slice().sort((a,b)=>a.user.localeCompare(b.user));
   const ROLE_LABELS={admin:'Admin',coach:'Treinador',staff:'Staff',medical:'Clínica',teammanager:'Team Manager'};
-  list.innerHTML=users.map(u=>`
+  list.innerHTML=`
+    <div id="mig-banner" style="font-size:11px;color:var(--muted);padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:10px;text-align:center">
+      A verificar estado de migração…
+    </div>`+
+    users.map(u=>`
     <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px">
           <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px">${u.user}</code>
           <span style="color:var(--muted);font-size:11px;margin-left:4px">${ROLE_LABELS[u.role]||u.role}${u.squad?' · '+u.squad:''}</span>
+          <span data-migbadge="${u.user}" title="A verificar…" style="font-size:11px;margin-left:4px;opacity:0.4">⏳</span>
         </div>
         <input type="email" value="${u.email||''}" data-user="${u.user}"
           style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box"
@@ -8025,6 +8010,36 @@ async function openAccountsModal(){
         Guardar
       </button>
     </div>`).join('');
+
+  // Async: fetch userProfiles to show migration status per user
+  if(firestoreDb){
+    try{
+      const profSnap=await firestoreDb.collection('userProfiles').get();
+      const migratedUsers=new Set();
+      profSnap.forEach(d=>{ const dd=d.data(); if(dd.user) migratedUsers.add(dd.user); });
+      const total=users.length;
+      const migrated=users.filter(u=>migratedUsers.has(u.user)).length;
+      const banner=document.getElementById('mig-banner');
+      if(banner){
+        if(migrated===total){
+          banner.innerHTML='✅ Todos os utilizadores migrados — os emails podem ser removidos do código.';
+          banner.style.color='#2e7d32';
+        } else {
+          banner.innerHTML=`⏳ ${migrated}/${total} utilizadores migrados. Os restantes migram automaticamente ao próximo login.`;
+          banner.style.color='#b45309';
+        }
+      }
+      users.forEach(u=>{
+        const badge=document.querySelector(`[data-migbadge="${u.user}"]`);
+        if(!badge) return;
+        if(migratedUsers.has(u.user)){
+          badge.textContent='✅'; badge.title='Perfil guardado no Firestore'; badge.style.opacity='1';
+        } else {
+          badge.textContent='⏳'; badge.title='Migração pendente — próximo login'; badge.style.opacity='0.7';
+        }
+      });
+    }catch(e){ console.warn('userProfiles migration check:',e); }
+  }
 }
 
 function closeAccountsModal(){
@@ -8087,18 +8102,43 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // ── Firebase Auth disponível ─────────────────────────────
   if(firebaseAuth){
+    // ── Lookup de perfil: Firestore (por UID) com fallback para USERS (por email) ──
+    // Fase de migração: na 1ª vez que cada utilizador faz login, o perfil é
+    // guardado no Firestore (coleção userProfiles/{uid}). Depois de todos terem
+    // migrado, os emails podem ser removidos do array USERS.
+    async function resolveProfile(fbUser){
+      // 1. Tentar Firestore por UID (fonte de verdade após migração)
+      if(firestoreDb){
+        try{
+          const doc=await firestoreDb.collection('userProfiles').doc(fbUser.uid).get();
+          if(doc.exists) return doc.data();
+        }catch(e){ console.warn('userProfiles lookup:',e); }
+      }
+      // 2. Fallback: USERS array por email (pré-migração)
+      const u=getAppUsers().find(x=>x.email===fbUser.email);
+      if(!u) return null;
+      const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
+      // Guardar no Firestore para que o próximo login já não precise do email
+      if(firestoreDb){
+        firestoreDb.collection('userProfiles').doc(fbUser.uid).set(profile)
+          .then(()=>console.log('✅ userProfile migrado:',u.user))
+          .catch(e=>console.warn('Save userProfile:',e));
+      }
+      return profile;
+    }
+
     // Observador de sessão — dispara automaticamente se sessão já existe
-    firebaseAuth.onAuthStateChanged(fbUser=>{
+    firebaseAuth.onAuthStateChanged(async fbUser=>{
       if(fbUser){
-        const u=getAppUsers().find(x=>x.email===fbUser.email);
-        if(u){
+        const profile=await resolveProfile(fbUser);
+        if(profile){
           sessionStorage.setItem(AUTH_KEY, JSON.stringify({
-            role:u.role, squad:u.squad||null, user:u.user,
-            staffRole:u.staffRole||null, email:fbUser.email, uid:fbUser.uid
+            role:profile.role, squad:profile.squad||null, user:profile.user,
+            staffRole:profile.staffRole||null, email:fbUser.email, uid:fbUser.uid
           }));
           initCoordApp();
         } else {
-          // Email não mapeado — sair
+          // Utilizador não mapeado — sair
           firebaseAuth.signOut();
           errEl.textContent='Conta não reconhecida neste sistema.';
         }
