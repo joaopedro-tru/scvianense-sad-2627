@@ -484,6 +484,27 @@ body.pm #v-pf{padding:30px}
   .pzone-lbl{font-size:8px}
   .mc-cols{gap:4px}
   .mc-col{gap:3px}
+
+  /* Admin dashboard — horizontal swipe cards */
+  #d-admin-cols{
+    display:flex!important;
+    flex-direction:row!important;
+    overflow-x:auto!important;
+    scroll-snap-type:x mandatory!important;
+    -webkit-overflow-scrolling:touch!important;
+    gap:12px!important;
+    padding-bottom:10px!important;
+    margin-left:-14px!important;
+    margin-right:-14px!important;
+    padding-left:14px!important;
+    padding-right:14px!important;
+  }
+  #d-admin-cols::-webkit-scrollbar{display:none}
+  #d-admin-cols>div{
+    scroll-snap-align:start!important;
+    flex:0 0 84%!important;
+    min-width:0!important;
+  }
 }
 
 /* ── CALENDAR PRINT ──────────────────────────────────────────────────────── */
@@ -2714,11 +2735,13 @@ function renderDash(){
     }
     return `<div class="ui" style="cursor:pointer;padding:6px 2px" onclick="nav('game',{id:'${ev.id}'})">
       <div class="ud" style="min-width:32px"><div class="day" style="font-size:14px">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ha} ${opponent}</div>
-        <div style="font-size:11px;color:var(--muted)">${evLabel(ev)}${ev.time?' · '+ev.time:''}</div>
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:5px;min-width:0">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${ha} ${opponent}</div>
+          ${badge}
+        </div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${evLabel(ev)}${ev.time?' · '+ev.time:''}</div>
       </div>
-      ${badge}
     </div>`;
   }
 
