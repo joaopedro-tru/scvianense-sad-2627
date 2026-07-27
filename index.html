@@ -3972,85 +3972,131 @@ function exportCalPDF(){
   };
 }
 
-function _renderCalPDF(selSquads){
-  // Build calendar grid for selected squads
+async function _renderCalPDF(selSquads){
+  toast('⏳ A gerar PDF...');
+  // Load jsPDF from CDN if not yet loaded
+  if(!window.jspdf){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
+      document.head.appendChild(s);
+    }).catch(()=>{ toast('❌ Erro ao carregar biblioteca PDF.'); throw 0; });
+  }
+  const {jsPDF}=window.jspdf;
   const squadLabel=selSquads.length===3?'Todos os escalões':selSquads.map(s=>({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[s])).join(' + ');
-  const allEvents=selSquads.length===3?DB.events():selSquads.flatMap(s=>DB.events(s)).filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i);
+  const allEvts=selSquads.length===3?DB.events():selSquads.flatMap(s=>DB.events(s)).filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i);
+  const multiSq=selSquads.length>1;
+
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const PW=297,PH=210,ML=7,MR=7,MT=7,MB=7;
+  const W=PW-ML-MR; // 283
+  const dayW=W/7;   // ~40.4
+
+  // ── Header bar ──
+  doc.setFillColor(14,36,68);
+  doc.rect(ML,MT,W,9,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255,255,255);
+  doc.text('SC Vianense SAD',ML+3,MT+6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  doc.text('Calendario '+MONTHS[calMonth]+' '+calYear+'  —  '+squadLabel,PW/2,MT+6,{align:'center'});
+  doc.setFontSize(7);
+  doc.text(new Date().toLocaleDateString('pt-PT'),PW-MR-3,MT+6,{align:'right'});
+
+  // ── Day-of-week header ──
+  const DNAMES=['SEG','TER','QUA','QUI','SEX','SAB','DOM'];
+  const HDR_H=6, HDR_Y=MT+10;
+  doc.setFillColor(30,58,110);
+  doc.rect(ML,HDR_Y,W,HDR_H,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
+  DNAMES.forEach((d,i)=>doc.text(d,ML+i*dayW+dayW/2,HDR_Y+HDR_H-1.8,{align:'center'}));
+
+  // ── Grid ──
+  const CAL_Y=HDR_Y+HDR_H, CAL_H=PH-MB-CAL_Y;
   const first=new Date(calYear,calMonth,1);
   let dow=first.getDay()-1; if(dow<0)dow=6;
   const dim=new Date(calYear,calMonth+1,0).getDate();
   const pmd=new Date(calYear,calMonth,0).getDate();
+  const numWeeks=Math.ceil((dow+dim)/7);
+  const cellH=CAL_H/numWeeks;
   const today=new Date().toISOString().split('T')[0];
-  const total=Math.ceil((dow+dim)/7)*7;
-  let cells='';
-  for(let i=0;i<total;i++){
-    let day,ds,other=false;
-    if(i<dow){ day=pmd-dow+i+1; const m2=calMonth===0?11:calMonth-1,y2=calMonth===0?calYear-1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
-    else if(i>=dow+dim){ day=i-dow-dim+1; const m2=calMonth===11?0:calMonth+1,y2=calMonth===11?calYear+1:calYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
-    else{ day=i-dow+1; ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
-    const dayEvs=allEvents.filter(e=>e.date===ds).sort((a,b)=>{if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});
-    const isT=ds===today;
-    const chips=dayEvs.map(ev=>{
-      let title,meta;
+  // event chip colour palette [bg R,G,B, text R,G,B]
+  const EV_COL={game:[204,229,255,0,64,133],gym:[237,233,254,76,29,149],training:[209,250,229,6,78,59]};
+
+  for(let i=0;i<numWeeks*7;i++){
+    const wk=Math.floor(i/7), wd=i%7;
+    const cx=ML+wd*dayW, cy=CAL_Y+wk*cellH;
+    let ds,dn,other=false;
+    const off=i-dow;
+    if(off<0){
+      dn=pmd+off+1;
+      const pm=calMonth===0?11:calMonth-1,py=calMonth===0?calYear-1:calYear;
+      ds=`${py}-${String(pm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`; other=true;
+    } else if(off>=dim){
+      dn=off-dim+1;
+      const nm=calMonth===11?0:calMonth+1,ny=calMonth===11?calYear+1:calYear;
+      ds=`${ny}-${String(nm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`; other=true;
+    } else {
+      dn=off+1;
+      ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`;
+    }
+    const isTd=ds===today;
+
+    // Cell bg
+    if(isTd){ doc.setFillColor(255,253,240); doc.rect(cx,cy,dayW,cellH,'F'); }
+    // Border
+    doc.setDrawColor(205,205,205); doc.setLineWidth(0.15); doc.rect(cx,cy,dayW,cellH);
+    // Day number
+    if(isTd){
+      doc.setFillColor(14,36,68); doc.circle(cx+3.5,cy+3.2,2.3,'F');
+      doc.setTextColor(255,255,255);
+    } else { const g=other?175:45; doc.setTextColor(g,g,g); }
+    doc.setFont('helvetica',other?'normal':'bold'); doc.setFontSize(6.5);
+    doc.text(String(dn),cx+3.5,cy+4,{align:'center'});
+
+    // Events
+    const dayEvs=allEvts.filter(e=>e.date===ds).sort((a,b)=>!a.time?1:!b.time?-1:a.time.localeCompare(b.time));
+    if(!dayEvs.length) continue;
+    let ey=cy+6.8;
+    const maxEy=cy+cellH-0.5;
+    const chipH=Math.min((maxEy-ey)/dayEvs.length,10);
+
+    dayEvs.forEach(ev=>{
+      if(ey+2>maxEy) return;
+      const thisH=Math.min(chipH,maxEy-ey);
+      const col=EV_COL[ev.type]||EV_COL.training;
+      doc.setFillColor(col[0],col[1],col[2]); doc.roundedRect(cx+0.4,ey,dayW-0.8,thisH,0.6,0.6,'F');
+      doc.setTextColor(col[3],col[4],col[5]);
+      // Title
+      doc.setFont('helvetica','bold'); doc.setFontSize(5.8);
+      let title='';
       if(ev.type==='game'){
-        const icon=ev.homeAway==='away'?'✈️':'🏠';
-        title=`${icon} ${ev.opponent||'Jogo'}`;
-        meta=[SQUADS[ev.squad],ev.time,abrevComp(ev.competition),ev.location].filter(Boolean).join(' · ');
+        title=(ev.homeAway==='away'?'V: ':'C: ')+(ev.opponent||'Jogo');
       } else if(ev.type==='gym'){
-        title=`🏋️ ${SQUADS[ev.squad]||'Ginásio'}`;
-        meta=[ev.time,ev.location].filter(Boolean).join(' · ');
+        title='GIN '+(multiSq?SQUADS[ev.squad]||'':'');
       } else {
-        title=`🏃 ${SQUADS[ev.squad]||'Treino'}`;
-        meta=[ev.time,ev.location].filter(Boolean).join(' · ');
+        title='TRE '+(multiSq?SQUADS[ev.squad]||'':'');
       }
-      const cls=ev.type==='game'?'gm':ev.type==='gym'?'gym':'tr';
-      return `<div class="ce ${cls}"><div class="ce-title">${title}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
-    }).join('');
-    cells+=`<div class="cd${other?' om':''}${isT?' td':''}"><div class="cdn${isT?' tdn':''}">${day}</div>${chips}</div>`;
+      const tLine=doc.splitTextToSize(title.trim(),dayW-1.6)[0]||'';
+      doc.text(tLine,cx+1,ey+3.2);
+      // Meta (time + location for games; time+location for all)
+      if(thisH>6.5){
+        const meta=[];
+        if(ev.time) meta.push(ev.time);
+        if(ev.type==='game'){ if(abrevComp(ev.competition)) meta.push(abrevComp(ev.competition)); if(ev.location) meta.push(ev.location); }
+        else if(ev.location){ meta.push(ev.location); }
+        if(meta.length){
+          doc.setFont('helvetica','normal'); doc.setFontSize(5);
+          const mLine=doc.splitTextToSize(meta.join(' · '),dayW-1.6)[0]||'';
+          doc.text(mLine,cx+1,ey+thisH-1.5);
+        }
+      }
+      ey+=chipH;
+    });
   }
-  const WD=['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
-  const gridHTML=`<div class="cg"><div class="chr">${WD.map(d=>`<div class="chc">${d}</div>`).join('')}</div><div class="cb">${cells}</div></div>`;
-  document.getElementById('kit-print-overlay')?.remove();
-  const overlay=document.createElement('div');
-  overlay.id='kit-print-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch';
-  overlay.innerHTML=`
-    <style>
-      @media print{
-        .kit-no-print{display:none!important}
-        body>*:not(#kit-print-overlay){display:none!important}
-        #kit-print-overlay{position:static!important;overflow:visible!important}
-        *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-      }
-      @page{size:A4 landscape;margin:8mm}
-      #cal-po .cg{box-shadow:none!important;margin:0!important;width:100%!important;border-radius:0!important}
-      #cal-po .chr{background:#0e2444!important;color:#fff!important;display:grid!important;grid-template-columns:repeat(7,1fr)!important}
-      #cal-po .chc{color:#fff!important;font-size:9px!important;padding:6px 3px!important;text-align:center!important}
-      #cal-po .cb{display:grid!important;grid-template-columns:repeat(7,1fr)!important}
-      #cal-po .cd{border:1px solid #ccc!important;min-height:20mm!important;padding:3px 4px!important}
-      #cal-po .cdn{font-size:8pt!important;font-weight:700!important;margin-bottom:2px!important}
-      #cal-po .tdn{background:#0e2444!important;color:#fff!important;width:18px!important;height:18px!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:7pt!important}
-      #cal-po .om{opacity:.3!important}
-      #cal-po .td{background:#fffbf0!important}
-      #cal-po .ce{font-size:7pt!important;padding:2px 4px!important;margin:1px 0!important;border-radius:3px!important;line-height:1.35!important}
-      #cal-po .ce.tr{background:#d4edda!important;color:#155724!important}
-      #cal-po .ce.gym{background:#f3e8ff!important;color:#5b21b6!important}
-      #cal-po .ce.gm{background:#cce5ff!important;color:#004085!important}
-      #cal-po .ce-title{font-size:7pt!important;font-weight:600!important}
-      #cal-po .ce-meta{display:block!important;font-size:6pt!important;opacity:.85!important;margin-top:1px!important}
-    </style>
-    <div class="kit-no-print" style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-bottom:1px solid #e0e0e0;position:sticky;top:0;background:#fff;z-index:1">
-      <button onclick="document.getElementById('kit-print-overlay').remove()" style="padding:9px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
-      <button onclick="window.print()" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
-    </div>
-    <div style="padding:14px 18px;max-width:100%">
-      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #0e2444">
-        <div style="font-size:17px;font-weight:800;font-family:Arial,sans-serif;color:#0e2444">SC Vianense SAD — Calendário</div>
-        <div style="font-size:12px;color:#666;font-family:Arial,sans-serif">${MONTHS[calMonth]} ${calYear} · ${squadLabel}</div>
-      </div>
-      <div id="cal-po">${gridHTML}</div>
-    </div>`;
-  document.body.appendChild(overlay);
+
+  doc.save(`calendario-scv-${calYear}-${String(calMonth+1).padStart(2,'0')}.pdf`);
+  toast('✅ PDF descarregado!');
 }
 
 // Show back button in standalone (PWA) mode
