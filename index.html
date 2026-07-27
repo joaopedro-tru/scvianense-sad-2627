@@ -158,12 +158,18 @@ select.si{cursor:pointer}
 .gym-field{width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit;background:var(--bg);color:var(--text);transition:border-color .15s}
 .gym-field:focus{border-color:var(--green-l)}
 .gym-table{width:100%;border-collapse:collapse;font-size:12px}
-.gym-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:5px 6px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;background:var(--bg)}
+.gym-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:5px 6px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;background:var(--bg);position:sticky;top:0;z-index:1}
 .gym-table td{padding:3px 4px;border-bottom:1px solid var(--border);vertical-align:middle}
 .gym-inp{width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;background:var(--card);color:var(--text);outline:none;transition:border-color .15s}
 .gym-inp:focus{border-color:var(--green-l)}
 .gym-table-ro td{padding:7px 8px;font-size:12px}
 .gym-table-ro th{padding:7px 8px}
+/* Full-screen modal */
+.mo-fs{padding:0}
+.mo-fs .md{max-width:100%;max-height:100%;height:100%;width:100%;border-radius:0;display:flex;flex-direction:column;padding:0}
+.gym-mh{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--card)}
+.gym-mb{flex:1;overflow-y:auto;padding:18px 24px;display:flex;flex-direction:column;gap:14px}
+.gym-mf{padding:12px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;background:var(--card)}
 
 /* EVENT LIST */
 .el{margin-top:26px}
@@ -1619,6 +1625,21 @@ body.pm #v-pf{padding:30px}
       <button class="btn btn-d" id="btn-confirm-del-series">🗑️ Eliminar série</button>
       <button class="btn btn-g" id="mo-del-series-cancel">Cancelar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: GYM PLAN BUILDER (full-screen) -->
+<div class="mo mo-fs" id="mo-gym-plan">
+  <div class="md">
+    <div class="gym-mh">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#7c3aed">🏋️ Plano de Ginásio</div>
+        <div id="gym-modal-meta" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <button class="mc" id="mo-gym-close">✕</button>
+    </div>
+    <div class="gym-mb" id="gym-modal-body"></div>
+    <div class="gym-mf" id="gym-modal-footer"></div>
   </div>
 </div>
 
@@ -3956,6 +3977,9 @@ document.getElementById('btn-edit-event').addEventListener('click',()=>{ documen
 document.getElementById('mo-edet-close').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 document.getElementById('mo-edet-cancel').addEventListener('click',()=>document.getElementById('mo-edet').classList.remove('open'));
 
+// ── GYM PLAN MODAL CLOSE ─────────────────────────────────────────────────────
+document.getElementById('mo-gym-close').addEventListener('click',()=>document.getElementById('mo-gym-plan').classList.remove('open'));
+
 // ── DELETE TRAINING SERIES ────────────────────────────────────────────────────
 document.getElementById('mo-del-series-close').addEventListener('click',()=>document.getElementById('mo-del-series').classList.remove('open'));
 document.getElementById('mo-del-series-cancel').addEventListener('click',()=>document.getElementById('mo-del-series').classList.remove('open'));
@@ -4365,58 +4389,17 @@ function renderTraining(){
         const plan=ev.gymPlan||{};
         const exs=plan.exercises||[];
         const canEdit=isAdmin()||isStaff();
-        const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-        const hdr=`<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c3aed;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🏋️ Plano de Ginásio</h3>`;
-        if(!canEdit){
-          if(!exs.length) return `<div class="card" style="margin-top:0">${hdr}<p style="font-size:12px;color:var(--muted)">Sem plano de ginásio registado para esta sessão.</p></div>`;
-          const tRows=exs.map(ex=>`<tr>
-            <td style="font-weight:700;color:#7c3aed;white-space:nowrap">${esc(ex.bloco)}</td>
-            <td style="font-weight:600">${esc(ex.exercicio)}</td>
-            <td style="text-align:center">${esc(ex.series)}</td>
-            <td style="white-space:nowrap">${esc(ex.reps)}</td>
-            <td style="white-space:nowrap">${esc(ex.rm)||'—'}</td>
-            <td style="white-space:nowrap">${esc(ex.rpe)}</td>
-            <td style="white-space:nowrap">${esc(ex.recuperacao)}</td>
-            <td style="color:var(--muted);font-size:11px">${esc(ex.notas)}</td>
-          </tr>`).join('');
-          return `<div class="card" style="margin-top:0">${hdr}
-            ${plan.descricao?`<div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(plan.descricao)}</div>`:''}
-            ${plan.objetivo?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">🎯 ${esc(plan.objetivo)}</div>`:''}
-            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
-              ${plan.duracao?`<span style="font-size:11px"><strong>Duração:</strong> ${esc(plan.duracao)}</span>`:''}
-              ${plan.contexto?`<span style="font-size:11px"><strong>Contexto:</strong> ${esc(plan.contexto)}</span>`:''}
-              ${plan.rpeGlobal?`<span style="font-size:11px"><strong>RPE:</strong> ${esc(plan.rpeGlobal)}</span>`:''}
-              ${plan.jogoSeguinte?`<span style="font-size:11px"><strong>Jogo seguinte:</strong> ${esc(plan.jogoSeguinte)}</span>`:''}
-            </div>
-            <div style="overflow-x:auto"><table class="gym-table gym-table-ro">
-              <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas</th></tr></thead>
-              <tbody>${tRows}</tbody>
-            </table></div>
-            ${plan.orientacoes?`<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-line">${esc(plan.orientacoes)}</div>`:''}
-          </div>`;
-        }
-        // Editable form
-        const rowsHTML=exs.length?exs.map(gymExRowHTML).join(''):gymExRowHTML();
-        return `<div class="card" style="margin-top:0">${hdr}
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-            <div><label class="gym-lbl">Descrição da sessão</label><input id="gym-descricao" class="gym-field" placeholder="Força geral pós-treino..." value="${esc(plan.descricao)}"></div>
-            <div><label class="gym-lbl">Objetivo</label><input id="gym-objetivo" class="gym-field" placeholder="Exposição à força com baixa fadiga" value="${esc(plan.objetivo)}"></div>
-            <div><label class="gym-lbl">Duração</label><input id="gym-duracao" class="gym-field" placeholder="30–35 min" value="${esc(plan.duracao)}"></div>
-            <div><label class="gym-lbl">Contexto</label><input id="gym-contexto" class="gym-field" placeholder="Após treino de tensão / Pré-jogo" value="${esc(plan.contexto)}"></div>
-            <div><label class="gym-lbl">RPE Global alvo</label><input id="gym-rpe-global" class="gym-field" placeholder="5–6/10" value="${esc(plan.rpeGlobal)}"></div>
-            <div><label class="gym-lbl">Jogo seguinte</label><input id="gym-jogo" class="gym-field" placeholder="Oponente — DD/MM/AAAA" value="${esc(plan.jogoSeguinte)}"></div>
+        const hasPlan=exs.length>0||plan.descricao;
+        const btnLabel=hasPlan?(canEdit?'Editar':'Ver Plano'):(canEdit?'+ Criar Plano':null);
+        return `<div class="card" style="margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${hasPlan?'10px':'0'};${hasPlan?'padding-bottom:8px;border-bottom:1px solid var(--border)':''}">
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#7c3aed">🏋️ Plano de Ginásio</h3>
+            ${btnLabel?`<button class="btn btn-o btn-sm" id="btn-open-gym-plan">${btnLabel}</button>`:''}
           </div>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Exercícios</div>
-          <div style="overflow-x:auto;margin-bottom:8px">
-            <table class="gym-table">
-              <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas de execução</th><th></th></tr></thead>
-              <tbody id="gym-ex-tbody">${rowsHTML}</tbody>
-            </table>
-          </div>
-          <button type="button" id="btn-add-gym-ex" class="btn btn-o btn-sm" style="margin-bottom:14px">+ Exercício</button>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Orientações da Sessão</div>
-          <textarea id="gym-orientacoes" rows="4" placeholder="Notas, restrições, ajustes para jogadores..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text)">${esc(plan.orientacoes)}</textarea>
-          <button type="button" class="btn btn-p btn-sm" id="btn-save-gymplan" style="margin-top:10px">Guardar Plano</button>
+          ${hasPlan?`
+            <div style="font-size:13px;font-weight:600;margin-bottom:3px">${plan.descricao||'Sem descrição'}</div>
+            <div style="font-size:12px;color:var(--muted)">${exs.length} exercício${exs.length!==1?'s':''}${plan.duracao?' · '+plan.duracao:''}${plan.rpeGlobal?' · RPE '+plan.rpeGlobal:''}</div>
+          `:(canEdit?'':'<p style="font-size:12px;color:var(--muted);margin-top:8px">Sem plano registado para esta sessão.</p>')}
         </div>`;
       })()+`\n      `:`
       <div class="card">
@@ -4583,13 +4566,8 @@ function renderTraining(){
     });
   }
 
-  // Gym plan — add exercise row
-  document.getElementById('btn-add-gym-ex')?.addEventListener('click',()=>{
-    document.getElementById('gym-ex-tbody').insertAdjacentHTML('beforeend',gymExRowHTML());
-  });
-
-  // Gym plan — save
-  document.getElementById('btn-save-gymplan')?.addEventListener('click', saveGymPlan);
+  // Gym plan — open modal
+  document.getElementById('btn-open-gym-plan')?.addEventListener('click', openGymPlanModal);
 
   // GR notes save
   const btnGrNotes=document.getElementById('btn-save-grnotes');
@@ -7295,6 +7273,78 @@ function gymExRowHTML(ex){
   </tr>`;
 }
 
+function openGymPlanModal(){
+  const ev=DB.getEvent(trainingEventId); if(!ev) return;
+  const plan=ev.gymPlan||{};
+  const exs=plan.exercises||[];
+  const canEdit=isAdmin()||isStaff();
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  // Meta subtitle
+  const evDate=ev.date?new Date(ev.date+'T00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
+  document.getElementById('gym-modal-meta').textContent=evDate+(ev.time?' · '+ev.time:'');
+  const body=document.getElementById('gym-modal-body');
+  const footer=document.getElementById('gym-modal-footer');
+  if(!canEdit){
+    // Read-only
+    const tRows=exs.length?exs.map(ex=>`<tr>
+      <td style="font-weight:700;color:#7c3aed;white-space:nowrap">${esc(ex.bloco)}</td>
+      <td style="font-weight:600">${esc(ex.exercicio)}</td>
+      <td style="text-align:center">${esc(ex.series)}</td>
+      <td style="white-space:nowrap">${esc(ex.reps)}</td>
+      <td style="white-space:nowrap">${ex.rm||'—'}</td>
+      <td style="white-space:nowrap">${esc(ex.rpe)}</td>
+      <td style="white-space:nowrap">${esc(ex.recuperacao)}</td>
+      <td style="color:var(--muted);font-size:11px">${esc(ex.notas)}</td>
+    </tr>`).join(''):'<tr><td colspan="8" style="padding:12px;color:var(--muted);text-align:center">Sem exercícios registados.</td></tr>';
+    body.innerHTML=`
+      ${plan.descricao?`<div style="font-size:15px;font-weight:700">${esc(plan.descricao)}</div>`:''}
+      ${plan.objetivo?`<div style="font-size:13px;color:var(--muted)">🎯 ${esc(plan.objetivo)}</div>`:''}
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        ${plan.duracao?`<span style="font-size:12px"><strong>Duração:</strong> ${esc(plan.duracao)}</span>`:''}
+        ${plan.contexto?`<span style="font-size:12px"><strong>Contexto:</strong> ${esc(plan.contexto)}</span>`:''}
+        ${plan.rpeGlobal?`<span style="font-size:12px"><strong>RPE:</strong> ${esc(plan.rpeGlobal)}</span>`:''}
+        ${plan.jogoSeguinte?`<span style="font-size:12px"><strong>Jogo seguinte:</strong> ${esc(plan.jogoSeguinte)}</span>`:''}
+      </div>
+      <div style="overflow-x:auto;flex:1"><table class="gym-table gym-table-ro">
+        <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas</th></tr></thead>
+        <tbody>${tRows}</tbody>
+      </table></div>
+      ${plan.orientacoes?`<div style="padding:12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-line">${esc(plan.orientacoes)}</div>`:''}`;
+    footer.innerHTML='';
+  } else {
+    // Editable
+    const rowsHTML=exs.length?exs.map(gymExRowHTML).join(''):gymExRowHTML();
+    body.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div><label class="gym-lbl">Descrição da sessão</label><input id="gym-descricao" class="gym-field" placeholder="Força geral pós-treino..." value="${esc(plan.descricao)}"></div>
+        <div><label class="gym-lbl">Objetivo</label><input id="gym-objetivo" class="gym-field" placeholder="Exposição à força com baixa fadiga" value="${esc(plan.objetivo)}"></div>
+        <div><label class="gym-lbl">Contexto</label><input id="gym-contexto" class="gym-field" placeholder="Após treino de tensão / Pré-jogo" value="${esc(plan.contexto)}"></div>
+        <div><label class="gym-lbl">Duração</label><input id="gym-duracao" class="gym-field" placeholder="30–35 min" value="${esc(plan.duracao)}"></div>
+        <div><label class="gym-lbl">RPE Global alvo</label><input id="gym-rpe-global" class="gym-field" placeholder="5–6/10" value="${esc(plan.rpeGlobal)}"></div>
+        <div><label class="gym-lbl">Jogo seguinte</label><input id="gym-jogo" class="gym-field" placeholder="Oponente — DD/MM/AAAA" value="${esc(plan.jogoSeguinte)}"></div>
+      </div>
+      <div style="overflow-x:auto;flex:1;display:flex;flex-direction:column">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Exercícios</div>
+        <div style="overflow:auto;flex:1"><table class="gym-table" style="min-width:700px">
+          <thead><tr><th>Bloco</th><th>Exercício</th><th>Séries</th><th>Reps</th><th>% 1RM</th><th>RPE</th><th>Rec.</th><th>Notas de execução</th><th></th></tr></thead>
+          <tbody id="gym-ex-tbody">${rowsHTML}</tbody>
+        </table></div>
+        <button type="button" id="btn-add-gym-ex" class="btn btn-o btn-sm" style="margin-top:8px;align-self:flex-start">+ Exercício</button>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Orientações da Sessão</div>
+        <textarea id="gym-orientacoes" rows="3" placeholder="Notas, restrições, ajustes para jogadores..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;font-family:inherit;resize:none;background:var(--bg);color:var(--text)">${esc(plan.orientacoes)}</textarea>
+      </div>`;
+    footer.innerHTML=`<button class="btn btn-g" id="mo-gym-cancel-btn">Cancelar</button><button class="btn btn-p" id="btn-save-gymplan">Guardar Plano</button>`;
+    document.getElementById('btn-add-gym-ex').addEventListener('click',()=>{
+      document.getElementById('gym-ex-tbody').insertAdjacentHTML('beforeend',gymExRowHTML());
+    });
+    document.getElementById('btn-save-gymplan').addEventListener('click', saveGymPlan);
+    document.getElementById('mo-gym-cancel-btn').addEventListener('click',()=>document.getElementById('mo-gym-plan').classList.remove('open'));
+  }
+  document.getElementById('mo-gym-plan').classList.add('open');
+}
+
 async function saveGymPlan(){
   const v=id=>document.getElementById(id)?.value?.trim()||'';
   const exercises=[...document.querySelectorAll('.gym-ex-row')].map(row=>({
@@ -7319,7 +7369,9 @@ async function saveGymPlan(){
     updatedAt: new Date().toISOString(),
   };
   DB.updateEvent(trainingEventId,{gymPlan:plan});
+  document.getElementById('mo-gym-plan').classList.remove('open');
   toast('✅ Plano de ginásio guardado!');
+  renderTraining();
 }
 
 function renderRegimePicker(){
