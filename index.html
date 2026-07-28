@@ -492,27 +492,19 @@ body.pm #v-pf{padding:30px}
   .mc-cols{gap:4px}
   .mc-col{gap:3px}
 
-  /* Admin dashboard — horizontal swipe cards */
-  #d-admin-cols{
-    display:flex!important;
-    flex-direction:row!important;
-    overflow-x:auto!important;
-    scroll-snap-type:x mandatory!important;
-    -webkit-overflow-scrolling:touch!important;
-    align-items:flex-start!important;
-    gap:12px!important;
-    padding-bottom:10px!important;
-    padding-left:14px!important;
-    padding-right:60px!important;
-    margin-left:-14px!important;
-    margin-right:-14px!important;
-  }
-  #d-admin-cols::-webkit-scrollbar{display:none}
-  #d-admin-cols>div{
-    scroll-snap-align:start!important;
-    flex:0 0 85vw!important;
-    min-width:0!important;
-  }
+  /* Admin dashboard — mobile: tabs */
+  #d-admin-tab-bar{display:flex}
+  #d-admin-cols{display:block!important;margin-bottom:14px!important}
+}
+
+/* Tablet: 2-column dashboard */
+@media(min-width:769px) and (max-width:1100px){
+  #d-admin-tab-bar{display:none}
+  .dash-tab-col{display:flex!important}
+}
+/* Desktop: hide tab bar */
+@media(min-width:769px){
+  #d-admin-tab-bar{display:none}
 }
 
 /* ── CALENDAR PRINT ──────────────────────────────────────────────────────── */
@@ -2781,15 +2773,14 @@ function renderDash(){
     </div>`;
   }
 
-  // 3-column grid: Equipa A → Sub-23 → Sub-19
   const ADMIN_SQUADS=[
     {cs:'eqa',  icon:'⚫',color:'#444'},
     {cs:'sub23',icon:'🔵',color:'var(--blue)'},
     {cs:'sub19',icon:'🟡',color:'#b8860b'},
   ];
   const colsEl=document.getElementById('d-admin-cols');
-  colsEl.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px';
-  colsEl.innerHTML=ADMIN_SQUADS.map(({cs,icon,color})=>{
+
+  function buildSquadCol(cs,icon,color){
     const sqAthletes=DB.players(cs).length;
     const sqGames=es.filter(e=>e.type==='game'&&e.squad===cs);
     const past=sqGames.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2).reverse();
@@ -2799,20 +2790,61 @@ function renderDash(){
     if(past.length&&future.length) gamesHtml+=`<div style="border-top:2px dashed var(--border);margin:6px 0"></div>`;
     if(future.length) gamesHtml+=future.map(dashGameCard).join('');
     if(!gamesHtml) gamesHtml='<p style="color:var(--muted);font-size:12px;padding:4px 0">Sem jogos agendados.</p>';
-    const loadHtml=_squadLoadCards(cs);
-    return `<div style="display:flex;flex-direction:column;gap:10px;min-width:0">
-      <div class="card" style="margin:0">
+    return `<div class="card" style="margin:0">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:${color}">${icon} ${SQUADS[cs]}</div>
           <div style="font-size:11px;color:var(--muted)">${sqAthletes} atleta${sqAthletes!==1?'s':''}</div>
         </div>
         ${gamesHtml}
       </div>
-      ${loadHtml}
+      ${_squadLoadCards(cs)}`;
+  }
+
+  const w=window.innerWidth;
+  if(w<=768){
+    // Mobile: tab-based, one squad at a time
+    colsEl.style.cssText='';
+    const tabBar=`<div id="d-admin-tab-bar" style="display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:14px">
+      ${ADMIN_SQUADS.map(({cs,icon},i)=>`<button type="button" id="dtab-${cs}" onclick="dashSetTab('${cs}')"
+        style="flex:1;padding:11px 6px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
+               background:${i===0?'var(--primary)':'var(--bg)'};color:${i===0?'#fff':'var(--muted)'};transition:all .15s">
+        ${icon} ${SQUADS[cs]}</button>`).join('')}
     </div>`;
-  }).join('');
+    const cols=ADMIN_SQUADS.map(({cs,icon,color},i)=>
+      `<div class="dash-tab-col" id="dcol-${cs}" style="display:${i===0?'flex':'none'};flex-direction:column;gap:10px;min-width:0">
+        ${buildSquadCol(cs,icon,color)}
+      </div>`).join('');
+    colsEl.innerHTML=tabBar+cols;
+  } else if(w<=1100){
+    // Tablet: 2-col — Equipa A left, Sub-23+Sub-19 stacked right
+    colsEl.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;align-items:start';
+    const eqaCol=`<div style="display:flex;flex-direction:column;gap:10px;min-width:0">${buildSquadCol('eqa','⚫','#444')}</div>`;
+    const rightCol=`<div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div style="display:flex;flex-direction:column;gap:10px">${buildSquadCol('sub23','🔵','var(--blue)')}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">${buildSquadCol('sub19','🟡','#b8860b')}</div>
+    </div>`;
+    colsEl.innerHTML=eqaCol+rightCol;
+  } else {
+    // Desktop: 3-col grid
+    colsEl.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;align-items:start';
+    colsEl.innerHTML=ADMIN_SQUADS.map(({cs,icon,color})=>
+      `<div style="display:flex;flex-direction:column;gap:10px;min-width:0">${buildSquadCol(cs,icon,color)}</div>`
+    ).join('');
+  }
 
   bdayCards(ps,document.getElementById('d-birthdays'),DB.staffProfiles(null));
+}
+
+function dashSetTab(active){
+  ['eqa','sub23','sub19'].forEach(cs=>{
+    const col=document.getElementById('dcol-'+cs);
+    const btn=document.getElementById('dtab-'+cs);
+    if(col) col.style.display=cs===active?'flex':'none';
+    if(btn){
+      btn.style.background=cs===active?'var(--primary)':'var(--bg)';
+      btn.style.color=cs===active?'#fff':'var(--muted)';
+    }
+  });
 }
 
 // ── SQUAD ─────────────────────────────────────────────────────────────────────
