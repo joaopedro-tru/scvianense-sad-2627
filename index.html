@@ -5076,11 +5076,19 @@ function renderTraining(){
       const url=await uploadFile(f,trainingEventId,'ficha');
       if(!url) throw new Error('URL vazia');
       DB.updateEvent(trainingEventId,{fichaTreinoUrl:url,fichaTreinoFileName:f.name});
-      toast('✅ Ficha carregada!'); renderTraining();
+      const _isPdf=(f.name||'').toLowerCase().endsWith('.pdf');
+      if(_isPdf){
+        toast('✅ Ficha carregada! A analisar...');
+        renderTraining();
+        await analyzeAndSaveFicha(url,f.name,trainingEventId);
+      } else {
+        toast('✅ Ficha carregada!');
+      }
+      renderTraining();
     } catch(err){
       console.error('Ficha upload failed:',err);
       toast('❌ Erro ao carregar ficha: '+err.message);
-      renderTraining(); // repõe a zona
+      renderTraining();
     }
   });
 
@@ -8463,6 +8471,45 @@ function reporLinkFicha(eventId){
   DB.updateEvent(eventId,{fichaTreinoUrl:url,fichaTreinoFileName:decodeURIComponent(name)});
   toast('✅ Link reposto! A recarregar...');
   setTimeout(()=>renderTraining(),400);
+}
+
+// Analyze a ficha PDF directly from a URL and save results to DB (used after training-view upload)
+async function analyzeAndSaveFicha(url, fileName, eventId){
+  const ev=DB.getEvent(eventId); if(!ev) return;
+  try{
+    if(typeof pdfjsLib==='undefined') throw new Error('pdf.js não carregado');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const pdf=await pdfjsLib.getDocument({data:await resp.arrayBuffer()}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(x=>x.str).join(' ')+'\n';
+    }
+    const date=ev.date||'';
+    const dow=date?['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][new Date(date+'T12:00:00').getDay()]:'';
+    const month=date?new Date(date+'T12:00:00').getMonth():new Date().getMonth();
+    const period=(month>=5&&month<=7)?'preparatório':'competição';
+    const fn=firebase.app().functions('europe-west1').httpsCallable('analyzeTraining');
+    const res=await fn({pdfText:text,currentObjectives:null,dayOfWeek:dow,squad:ev.squad,period,extractExercises:true});
+    const d=res.data;
+    const upd={};
+    if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
+    if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
+    if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]) upd.objectivePrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+    if(d.secondary&&TACTICS_TAXONOMY[d.secondary?.moment]) upd.objectiveSecondary={moment:d.secondary.moment,subPrinciples:d.secondary.subPrinciples||[]};
+    if(Object.keys(upd).length){
+      DB.updateEvent(eventId,upd);
+      toast('✅ Ficha analisada e guardada!');
+    } else {
+      toast('⚠️ Análise concluída — sem dados extraídos.');
+    }
+  }catch(e){
+    console.error('analyzeAndSaveFicha error:',e);
+    toast('⚠️ Ficha guardada mas análise falhou: '+e.message);
+  }
 }
 
 async function analyzeFichaFromUrl(url, name){
