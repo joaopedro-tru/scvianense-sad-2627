@@ -22,8 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -692,8 +691,11 @@ body.pm #v-pf{padding:30px}
       <div class="card" style="border:1.5px solid #ffc107;background:#fffdf0">
         <div style="font-size:13px;font-weight:700;margin-bottom:8px">🛠️ Ferramentas de Admin</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Operações de manutenção de dados — usar com cuidado.</div>
-        <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar todas as análises de treino</button>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">Remove objectivePrimary, objectiveSecondary, momentSummary e objectives de todos os treinos. Os exercícios e fichas ficam intactos.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn" onclick="document.getElementById('mo-gps-import').classList.add('open');document.getElementById('gps-preview').style.display='none';document.getElementById('btn-gps-confirm').style.display='none';document.getElementById('gps-file-name').textContent='';document.getElementById('gps-file-input').value=''" style="background:var(--blue);color:#fff;border:none;font-size:12px;padding:8px 16px">📡 Importar Presenças GPS</button>
+          <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">GPS: preenche presenças automaticamente a partir do Excel da Monitorização de Cargas (folha "Data"). · Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
       </div>
     </div>
     <!-- COACH DASHBOARD -->
@@ -2707,6 +2709,143 @@ function renderStaffLoadCharts(cs){
   const html=_squadLoadCards(cs);
   el.innerHTML=html?`<div style="margin-bottom:14px">${html}</div>`:'';
 }
+// ── GPS IMPORT ────────────────────────────────────────────────────────────────
+let _gpsImportData = null; // resultado do parse, aguarda confirmação
+
+function normalizeName(n){
+  return (n||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+}
+
+function previewGPSImport(input){
+  const file = input.files[0]; if(!file) return;
+  document.getElementById('gps-file-name').textContent = file.name;
+  if(typeof XLSX === 'undefined'){ toast('❌ SheetJS não carregado.'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      // Preferir folha "Data", fallback para a primeira
+      const sheetName = wb.SheetNames.includes('Data') ? 'Data' : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+      if(!rows.length){ toast('❌ Folha vazia.'); return; }
+      // Descobrir colunas Player Name + data (Period Name)
+      const header = rows[0].map(c=>(c||'').toString().toLowerCase().trim());
+      const colPlayer = header.findIndex(h=>h.includes('player') || h.includes('atleta') || h.includes('jogador'));
+      const colDate   = header.findIndex(h=>h.includes('period') || h.includes('data') || h.includes('date') || h.includes('sessão'));
+      if(colPlayer<0||colDate<0){ toast('❌ Não encontrei colunas de Atleta e Data na folha "'+sheetName+'".'); return; }
+      // Construir mapa date → Set(playerName)
+      const sessions = {};
+      for(let i=1;i<rows.length;i++){
+        const row=rows[i];
+        const rawPlayer=row[colPlayer]; const rawDate=row[colDate];
+        if(!rawPlayer||!rawDate) continue;
+        const playerName=rawPlayer.toString().trim();
+        // Normalizar data para YYYY-MM-DD
+        let dateStr;
+        if(rawDate instanceof Date){ dateStr=rawDate.toISOString().split('T')[0]; }
+        else {
+          const d=new Date(rawDate);
+          dateStr = isNaN(d)? rawDate.toString().split('T')[0].slice(0,10) : d.toISOString().split('T')[0];
+        }
+        if(!sessions[dateStr]) sessions[dateStr]=new Set();
+        sessions[dateStr].add(playerName);
+      }
+      // Obter plantel Equipa A + todos os jogadores (para matching)
+      const eqaPlayers = DB.players('eqa');
+      const allPlayers = DB.players(); // fallback: todos
+      const normToPlayer = {};
+      [...eqaPlayers, ...allPlayers].forEach(p=>{ normToPlayer[normalizeName(p.name)]=p; });
+      // Obter treinos Equipa A
+      const allEvs = DB.events('eqa');
+      const trainByDate = {};
+      allEvs.filter(e=>e.type==='training').forEach(e=>{
+        if(!trainByDate[e.date]) trainByDate[e.date]=[];
+        trainByDate[e.date].push(e);
+      });
+      // Construir resultado por sessão (ignorar 15 junho — dados não relevantes)
+      const SKIP_DATES = new Set(['2026-06-15']);
+      const result = [];
+      const unmatchedPlayers = new Set();
+      Object.entries(sessions).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,names])=>{
+        if(SKIP_DATES.has(date)) return; // ignorar
+        const evList = trainByDate[date]||[];
+        const presentIds = new Set();
+        const unmatched = [];
+        names.forEach(n=>{
+          const p = normToPlayer[normalizeName(n)];
+          if(p) presentIds.add(p.id);
+          else { unmatched.push(n); unmatchedPlayers.add(n); }
+        });
+        result.push({date, evList, presentIds, unmatched, names:[...names]});
+      });
+      _gpsImportData = {result, unmatchedPlayers:[...unmatchedPlayers]};
+      _renderGPSPreview();
+    }catch(err){
+      console.error('GPS parse error:',err);
+      toast('❌ Erro ao ler o ficheiro: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function _renderGPSPreview(){
+  const {result, unmatchedPlayers} = _gpsImportData;
+  const totalSessions = result.length;
+  const matchedSessions = result.filter(r=>r.evList.length>0).length;
+  const totalPresences = result.reduce((s,r)=>s+r.presentIds.size,0);
+  document.getElementById('gps-summary').innerHTML =
+    `<strong>${totalSessions}</strong> datas encontradas no GPS &nbsp;·&nbsp; ` +
+    `<strong style="color:${matchedSessions<totalSessions?'#e65100':'#27ae60'}">${matchedSessions}</strong> com treino na app &nbsp;·&nbsp; ` +
+    `<strong>${totalPresences}</strong> presentes · ausentes marcados automaticamente`;
+  const warnEl = document.getElementById('gps-warnings');
+  const warns = [];
+  if(unmatchedPlayers.length) warns.push('⚠️ Jogadores não encontrados na app: <strong>'+unmatchedPlayers.join(', ')+'</strong>');
+  const noEvent = result.filter(r=>r.evList.length===0);
+  if(noEvent.length) warns.push('⚠️ Datas sem treino registado na Equipa A: <strong>'+noEvent.map(r=>r.date).join(', ')+'</strong>');
+  if(warns.length){ warnEl.innerHTML=warns.join('<br>'); warnEl.style.display='block'; }
+  else { warnEl.style.display='none'; }
+  // Linhas de detalhe
+  const rowsHTML = result.map(r=>{
+    const evFound = r.evList.length>0;
+    const color = evFound?'var(--text)':'#aaa';
+    const evLabel = evFound ? r.evList.map(e=>'Treino '+fmtDate(e.date)).join(', ') : '— sem treino';
+    const squadPlCount = evFound ? DB.players(r.evList[0].squad==='both'?null:r.evList[0].squad).length : 0;
+    const absentCount = evFound ? Math.max(0, squadPlCount - r.presentIds.size) : 0;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="min-width:90px;font-weight:600;color:${color}">${r.date}</div>
+      <div style="min-width:180px;color:${evFound?'#27ae60':'#aaa'}">${evLabel}</div>
+      <div style="color:var(--muted)">${r.presentIds.size} ✓${absentCount>0?' · <span style="color:#c0392b">'+absentCount+' ausentes</span>':''}${r.unmatched.length?' · <span style="color:#f97316">'+r.unmatched.length+' sem match</span>':''}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('gps-rows').innerHTML = rowsHTML || '<div style="padding:12px;color:var(--muted);font-size:12px">Sem dados.</div>';
+  document.getElementById('gps-preview').style.display = '';
+  document.getElementById('btn-gps-confirm').style.display = matchedSessions>0 ? '' : 'none';
+}
+
+function confirmGPSImport(){
+  if(!_gpsImportData) return;
+  const {result} = _gpsImportData;
+  let updated = 0; let presencas = 0; let ausencias = 0;
+  result.forEach(({date, evList, presentIds})=>{
+    if(!evList.length) return;
+    // Se houver vários treinos no mesmo dia, aplica ao primeiro
+    const ev = evList[0];
+    const squadPl = DB.players(ev.squad==='both'?null:ev.squad);
+    const att = {}; // reset limpo — GPS é a fonte de verdade
+    squadPl.forEach(p=>{
+      if(presentIds.has(p.id)){ att[p.id]=true; presencas++; }
+      else { att[p.id]=false; ausencias++; } // ausente explícito
+    });
+    DB.updateEvent(ev.id, {attendance:att});
+    updated++;
+  });
+  document.getElementById('mo-gps-import').classList.remove('open');
+  _gpsImportData = null;
+  toast('✅ '+updated+' treino'+(updated!==1?'s':'')+' atualizados — '+presencas+' presentes, '+ausencias+' ausentes.');
+  if(view==='training') renderTraining();
+}
+
 function clearAllTrainingAnalyses(){
   if(!confirm('Tens a certeza? Isto vai apagar objectivePrimary, objectiveSecondary, momentSummary e objectives de TODOS os treinos de todos os escalões. Esta ação não pode ser desfeita.')) return;
   const allEvs=DB.events(); // todos os escalões
@@ -9840,5 +9979,36 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+
+<!-- ── MODAL: Importar Presenças GPS ─────────────────────────────────────── -->
+<div class="mo" id="mo-gps-import">
+  <div class="md" style="max-width:660px">
+    <div class="mh"><h2>📡 Importar Presenças GPS</h2><button class="mc" onclick="document.getElementById('mo-gps-import').classList.remove('open')">✕</button></div>
+    <div class="mb" style="padding:16px 20px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        Faz upload do ficheiro Excel da Monitorização de Cargas. A app vai ler a folha <strong>Data</strong> e preencher as presenças automaticamente para os treinos da Equipa A que correspondam às datas encontradas.
+      </p>
+      <div style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:2px dashed var(--border);border-radius:8px;cursor:pointer;background:var(--bg)">
+          <span style="font-size:20px">📂</span>
+          <span style="font-size:13px;color:var(--muted)">Clica para escolher o ficheiro .xlsx</span>
+          <input type="file" id="gps-file-input" accept=".xlsx,.xls" style="display:none" onchange="previewGPSImport(this)">
+        </label>
+        <div id="gps-file-name" style="font-size:12px;color:var(--muted);margin-top:5px;padding-left:4px"></div>
+      </div>
+      <div id="gps-preview" style="display:none">
+        <div id="gps-summary" style="background:#f0f9ff;border:1.5px solid #0ea5e9;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;line-height:1.6"></div>
+        <div id="gps-warnings" style="display:none;background:#fff8f0;border:1.5px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;line-height:1.6"></div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:6px">Detalhe por sessão</div>
+        <div id="gps-rows" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="document.getElementById('mo-gps-import').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-p" id="btn-gps-confirm" style="display:none" onclick="confirmGPSImport()">✅ Importar Presenças</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
