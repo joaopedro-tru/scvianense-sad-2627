@@ -1585,7 +1585,7 @@ body.pm #v-pf{padding:30px}
 
         <!-- Secondary objective -->
         <div>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivo Secundário <span style="text-transform:none;font-weight:400">(opcional)</span></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Tema / Foco Tático <span style="text-transform:none;font-weight:400">(opcional)</span></div>
           <div id="e-obj-secondary-moments" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px"></div>
           <div id="e-obj-secondary-subs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
         </div>
@@ -2592,8 +2592,8 @@ function _squadLoadCards(cs){
   const allEvs=DB.events(cs);
   const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
   const gym5w=gymEvs.filter(e=>e.date>=cutoff5w);
-  const DASH_MOM=['OO','OD','TO','TD','BPO','BPD'];
-  const trainEvs=allEvs.filter(e=>e.type==='training'&&e.momentSummary&&e.date<=today);
+  // Treinos: inclui eventos com objectivePrimary OU momentSummary (para não depender só da análise AI)
+  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary?.moment||e.momentSummary)&&e.date<=today);
   const train5w=trainEvs.filter(e=>e.date>=cutoff5w);
   function gymAgg(evs){
     const acc={};
@@ -2603,17 +2603,28 @@ function _squadLoadCards(cs){
     })});
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8);
   }
-  function trainAgg(evs){
+  // Contagem de sessões por momento principal
+  function trainAggPrimary(evs){
     const acc={};
-    evs.forEach(ev=>{DASH_MOM.forEach(m=>{
-      const v=(ev.momentSummary||{})[m]||0;
-      if(v>0) acc[m]=(acc[m]||0)+v;
-    })});
+    evs.forEach(ev=>{
+      const m=ev.objectivePrimary?.moment;
+      if(m&&PRIMARY_MOMENTS.includes(m)) acc[m]=(acc[m]||0)+1;
+    });
+    return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+  }
+  // Contagem de sessões por tema secundário
+  function trainAggSecondary(evs){
+    const acc={};
+    evs.forEach(ev=>{
+      const m=ev.objectiveSecondary?.moment;
+      if(m&&SECONDARY_THEMES[m]) acc[m]=(acc[m]||0)+1;
+    });
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
   const gd5=gymAgg(gym5w),gdS=gymAgg(gymEvs);
-  const td5=trainAgg(train5w),tdS=trainAgg(trainEvs);
-  if(!gd5.length&&!gdS.length&&!td5.length&&!tdS.length) return '';
+  const tp5=trainAggPrimary(train5w),tpS=trainAggPrimary(trainEvs);
+  const ts5=trainAggSecondary(train5w),tsS=trainAggSecondary(trainEvs);
+  if(!gd5.length&&!gdS.length&&!tp5.length&&!tpS.length&&!ts5.length&&!tsS.length) return '';
   function miniSVG(entries,colorFn,sz=72){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
@@ -2660,21 +2671,29 @@ function _squadLoadCards(cs){
   }
   function divider(a,b){return a&&b?'<div style="width:1px;background:var(--border);align-self:stretch"></div>':'';}
   const gColorFn=gymExColor;
-  const tColorFn=k=>TACTICS_TAXONOMY[k]?.color||'#64748b';
-  const tLabelFn=k=>TACTICS_TAXONOMY[k]?.label||k;
+  const tPrimaryColorFn=k=>TACTICS_TAXONOMY[k]?.color||'#64748b';
+  const tPrimaryLabelFn=k=>TACTICS_TAXONOMY[k]?.label||k;
+  const tSecColorFn=k=>SECONDARY_THEMES[k]?.color||'#64748b';
+  const tSecLabelFn=k=>SECONDARY_THEMES[k]?.label||k;
   const g5=donutBlock(gd5,gColorFn,k=>k,'séries','Últimas 5 semanas');
   const gS=donutBlock(gdS,gColorFn,k=>k,'séries','Época');
-  const t5=donutBlock(td5,tColorFn,tLabelFn,'min','Últimas 5 semanas');
-  const tS=donutBlock(tdS,tColorFn,tLabelFn,'min','Época');
+  const tp5b=donutBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'sessões','Últimas 5 semanas');
+  const tpSb=donutBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'sessões','Época');
+  const ts5b=donutBlock(ts5,tSecColorFn,tSecLabelFn,'sessões','Últimas 5 semanas');
+  const tsSb=donutBlock(tsS,tSecColorFn,tSecLabelFn,'sessões','Época');
   const gymCard=(g5||gS)?`<div class="card" style="margin:0">
     <div style="font-size:12px;font-weight:700;margin-bottom:12px">🏋️ Ginásio</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
   </div>`:'';
-  const trainCard=(t5||tS)?`<div class="card" style="margin:0">
-    <div style="font-size:12px;font-weight:700;margin-bottom:12px">📋 Momentos de Jogo</div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${t5}${divider(t5,tS)}${tS}</div>
+  const primaryCard=(tp5b||tpSb)?`<div class="card" style="margin:0">
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🎯 Momento de Jogo Principal</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${tp5b}${divider(tp5b,tpSb)}${tpSb}</div>
   </div>`:'';
-  return (gymCard||trainCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${trainCard}</div>`:'';
+  const secondaryCard=(ts5b||tsSb)?`<div class="card" style="margin:0">
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🔍 Tema Secundário</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${ts5b}${divider(ts5b,tsSb)}${tsSb}</div>
+  </div>`:'';
+  return (gymCard||primaryCard||secondaryCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${primaryCard}${secondaryCard}</div>`:'';
 }
 function renderStaffLoadCharts(cs){
   const el=document.getElementById('d-staff-load');
@@ -4284,7 +4303,8 @@ function showEventDetail(id){
       const tc=TACTICS_TAXONOMY;
       let h=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">`;
       h+=`<div><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[p.moment].label}</span>${p.subPrinciples?.length?`<div style="font-size:10px;color:${tc[p.moment].color};font-weight:600;margin-top:2px">${p.subPrinciples.join(' · ')}</div>`:''}</div>`;
-      if(s?.moment&&TACTICS_TAXONOMY[s.moment]) h+=`<div style="opacity:.75"><span style="display:inline-block;background:${tc[s.moment].color}25;color:${tc[s.moment].color};border:1px solid ${tc[s.moment].color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${tc[s.moment].label}</span>${s.subPrinciples?.length?`<div style="font-size:10px;color:${tc[s.moment].color};font-weight:600;margin-top:2px">${s.subPrinciples.join(' · ')}</div>`:''}</div>`;
+      const _stc=s?.moment?SECONDARY_THEMES[s.moment]:null;
+      if(_stc) h+=`<div style="opacity:.75"><span style="display:inline-block;background:${_stc.color}25;color:${_stc.color};border:1px solid ${_stc.color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${_stc.label}</span></div>`;
       return h+`</div>`;
     }
     return ev.objectives?`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="font-size:12px">${ev.objectives}</div>`:'';
@@ -4622,7 +4642,8 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _isTraining=f('e-type')==='training';
   const _p=_isTraining&&_objPrimary.moment?{..._objPrimary}:null;
   const _s=_isTraining&&_objSecondary.moment?{..._objSecondary}:null;
-  const _objText=_p?[TACTICS_TAXONOMY[_p.moment].full,_p.subPrinciples.length?'('+_p.subPrinciples.join(', ')+')'  :''].filter(Boolean).join(' ') + (_s?(' · '+TACTICS_TAXONOMY[_s.moment].full+(_s.subPrinciples.length?' ('+_s.subPrinciples.join(', ')+')':'')):''): null;
+  const _sLabel=_s?(SECONDARY_THEMES[_s.moment]?.full||TACTICS_TAXONOMY[_s.moment]?.full||_s.moment||null):null;
+  const _objText=_p?[TACTICS_TAXONOMY[_p.moment]?.full||_p.moment,(_p.subPrinciples||[]).length?'('+_p.subPrinciples.join(', ')+')':''].filter(Boolean).join(' ')+(_sLabel?' · '+_sLabel:''):null;
   const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
@@ -4861,9 +4882,13 @@ function renderTraining(){
             const tc=TACTICS_TAXONOMY;
             if(p?.moment&&tc[p.moment]){
               const pLabel=tc[p.moment].label+(p.subPrinciples?.length?' · '+p.subPrinciples.join(', '):'');
-              const sLabel=s?.moment&&tc[s.moment]?tc[s.moment].label+(s.subPrinciples?.length?' · '+s.subPrinciples.join(', '):''):'';
+              const _stc=s?.moment?SECONDARY_THEMES[s.moment]:null;
+              const sLabel=_stc?_stc.label:'';
+              const sColor=_stc?_stc.color:null;
               return `<div class="dr"><span class="dl">Obj. Principal</span><span class="dv" style="color:${tc[p.moment].color};font-weight:600">${pLabel}</span></div>`
-                    +(sLabel?`<div class="dr"><span class="dl">Obj. Secundário</span><span class="dv" style="color:${tc[s.moment].color}">${sLabel}</span></div>`:'');
+                    +(sLabel&&sColor?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv" style="color:${sColor}">${sLabel}</span></div>`:'')+
+                    (sLabel&&!sColor?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv">${sLabel}</span></div>`:'')+
+                    (!_stc&&s?.moment&&tc[s.moment]?`<div class="dr"><span class="dl">Obj. Secundário</span><span class="dv" style="color:${tc[s.moment].color}">${tc[s.moment].label}</span></div>`:'')
             }
             return ev.objectives?row('Objetivos',ev.objectives):'';
           })();
@@ -7721,8 +7746,11 @@ function generateWeeklyPlan(){
         const tc=TACTICS_TAXONOMY;
         let t=tc[p.moment].full;
         if(p.subPrinciples?.length) t+='\n'+p.subPrinciples.join(', ');
-        if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
-          t+='\n\n'+tc[s.moment].full;
+        const _stcObs=s?.moment?SECONDARY_THEMES[s.moment]:null;
+        if(_stcObs){
+          t+='\n\n'+_stcObs.full;
+        } else if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
+          t+='\n\n'+TACTICS_TAXONOMY[s.moment].full;
           if(s.subPrinciples?.length) t+='\n'+s.subPrinciples.join(', ');
         }
         return t;
@@ -8020,17 +8048,67 @@ const SHIRT_SIZES=['XS','S','M','L','XL','XXL','3XL'];
 
 // ── PERIODIZAÇÃO TÁTICA — TAXONOMIA ───────────────────────────────────────────
 const TACTICS_TAXONOMY={
-  OO:  {label:'Org. Ofensiva',   full:'Organização Ofensiva',          color:'#1a56db', subs:['Saída PB','MPB','VCJ','Último Terço','PBO']},
-  OD:  {label:'Org. Defensiva',  full:'Organização Defensiva',         color:'#c0392b', subs:['Bloco Alto','Bloco Médio','Bloco Baixo']},
-  TO:  {label:'Trans. Ofensiva', full:'Transição Ofensiva',            color:'#1a8754', subs:['Ataque Rápido','Ataque Posicional']},
-  TD:  {label:'Trans. Defensiva',full:'Transição Defensiva',           color:'#e65100', subs:['RAP','Ajuste de Posição']},
-  TOTD:{label:'Trans. Of./Def.', full:'Transição Ofensiva/Defensiva',  color:'#d97706', subs:['RAP','MPB','Ataque Rápido','Recuperação Def.']},
-  BP:  {label:'Bola Parada',     full:'Bola Parada',                   color:'#7c3aed', subs:['Ofensiva','Defensiva']},
-  BPO: {label:'BP Ofensiva',     full:'Bola Parada Ofensiva',          color:'#7c3aed', subs:['Canto Off.','Livre Direto','Livre Indireto']},
-  BPD: {label:'BP Defensiva',    full:'Bola Parada Defensiva',         color:'#5b21b6', subs:['Canto Def.','Livre Contra','Penálti Def.']},
-  SJ:  {label:'Sit. de Jogo',    full:'Situação de Jogo',              color:'#475569', subs:['Torneio','Jogo Formal','GR+GR']},
-  PF:  {label:'Prep. Física',    full:'Preparação Física',             color:'#f97316', subs:['Ativação','Força','Resistência','Velocidade','Flexibilidade']},
+  // ── Momentos principais (usados no picker) ──────────────────────────────────
+  OO:  {label:'Org. Ofensiva',   full:'Organização Ofensiva',         color:'#1a56db', subs:['Saída PB','MPB','Variação de Jogo','Último Terço','Combinações','Finalização']},
+  OD:  {label:'Org. Defensiva',  full:'Organização Defensiva',        color:'#c0392b', subs:['Pressão Alta','Bloco Médio','Bloco Baixo','Cobertura Defensiva','Linha Defensiva']},
+  TO:  {label:'Trans. Ofensiva', full:'Transição Ofensiva',           color:'#1a8754', subs:['Transição Rápida','3º Homem','Ataque Rápido','Ataque Posicional']},
+  TD:  {label:'Trans. Defensiva',full:'Transição Defensiva',          color:'#e65100', subs:['Reação à Perda','RAP','Recuperação Posicional']},
+  BPO: {label:'BP Ofensiva',     full:'Bola Parada Ofensiva',         color:'#7c3aed', subs:['Cantos Ofensivos','Livres Diretos','Livres Indiretos','Penálti']},
+  BPD: {label:'BP Defensiva',    full:'Bola Parada Defensiva',        color:'#5b21b6', subs:['Cantos Defensivos','Livres Contra','Penálti Defensivo']},
+  // ── Legado (para exibição de dados antigos, não aparecem no picker) ─────────
+  TOTD:{label:'Trans. Of./Def.', full:'Transição Ofensiva/Defensiva', color:'#d97706', subs:[]},
+  BP:  {label:'Bola Parada',     full:'Bola Parada',                  color:'#7c3aed', subs:[]},
+  SJ:  {label:'Sit. de Jogo',    full:'Situação de Jogo',             color:'#475569', subs:[]},
+  PF:  {label:'Prep. Física',    full:'Preparação Física',            color:'#f97316', subs:[]},
 };
+// Momentos primários válidos (para o picker e dashboard)
+const PRIMARY_MOMENTS=['OO','OD','TO','TD','BPO','BPD'];
+// Temas táticos secundários
+const SECONDARY_THEMES={
+  'ultimo-t':    {label:'Último Terço',       color:'#0284c7', full:'Último Terço'},
+  'saida-pb':    {label:'Saída a Jogar',      color:'#1a56db', full:'Saída a Jogar'},
+  'mpo':         {label:'Manutenção Posse',   color:'#2563eb', full:'Manutenção de Posse'},
+  '3o-homem':    {label:'3º Homem',           color:'#0891b2', full:'3º Homem'},
+  'combinacoes': {label:'Combinações',        color:'#06b6d4', full:'Combinações'},
+  'finalizacao': {label:'Finalização',        color:'#059669', full:'Finalização'},
+  'variacao':    {label:'Variação de Jogo',   color:'#0e7490', full:'Variação de Jogo'},
+  'pressao-a':   {label:'Pressão Alta',       color:'#dc2626', full:'Pressão Alta'},
+  'bloco-m':     {label:'Bloco Médio',        color:'#ef4444', full:'Bloco Médio'},
+  'bloco-b':     {label:'Bloco Baixo',        color:'#f87171', full:'Bloco Baixo'},
+  'cob-def':     {label:'Cobertura Def.',     color:'#b91c1c', full:'Cobertura Defensiva'},
+  'reacao-p':    {label:'Reação à Perda',     color:'#ea580c', full:'Reação à Perda'},
+  'trans-rap':   {label:'Transição Rápida',   color:'#f97316', full:'Transição Rápida'},
+  'rap':         {label:'RAP',                color:'#fb923c', full:'Recuperação Ativa de Posse'},
+  'bp-off':      {label:'BP Ofensiva',        color:'#7c3aed', full:'Bola Parada Ofensiva'},
+  'bp-def':      {label:'BP Defensiva',       color:'#6d28d9', full:'Bola Parada Defensiva'},
+  'jogo-pos':    {label:'Jogo Posicional',    color:'#475569', full:'Jogo Posicional'},
+};
+// Mapeamento de sub-princípios do primário → tema secundário (para sugestão da IA)
+const SUB_TO_SECONDARY={
+  'Último Terço':'ultimo-t','Saída PB':'saida-pb','MPB':'mpo',
+  'Variação de Jogo':'variacao','Combinações':'combinacoes','Finalização':'finalizacao',
+  'Transição Rápida':'trans-rap','3º Homem':'3o-homem','Ataque Rápido':'trans-rap',
+  'Ataque Posicional':'jogo-pos','Reação à Perda':'reacao-p','RAP':'rap',
+  'Recuperação Posicional':'reacao-p','Pressão Alta':'pressao-a',
+  'Bloco Médio':'bloco-m','Bloco Baixo':'bloco-b','Cobertura Defensiva':'cob-def',
+  'Cantos Ofensivos':'bp-off','Livres Diretos':'bp-off','Cantos Defensivos':'bp-def',
+};
+const AI_MOMENT_TO_SECONDARY={
+  'TD':'reacao-p','TO':'trans-rap','OD':'bloco-m','BPO':'bp-off','BPD':'bp-def',
+  'TOTD':'trans-rap','BP':'bp-off',
+};
+// Sugere o tema secundário a partir da resposta da IA
+function mapToSecondaryTheme(secondary, primary){
+  // 1ª prioridade: sub-princípios do momento primário
+  for(const sub of (primary?.subPrinciples||[])){
+    const k=SUB_TO_SECONDARY[sub];
+    if(k&&SECONDARY_THEMES[k]) return k;
+  }
+  // 2ª prioridade: momento secundário sugerido pela IA
+  const sm=secondary?.moment;
+  if(sm&&AI_MOMENT_TO_SECONDARY[sm]) return AI_MOMENT_TO_SECONDARY[sm];
+  return null;
+}
 const GYM_CATEGORIES={
   'Empurrar':  {color:'#3b82f6'},
   'Puxar':     {color:'#8b5cf6'},
@@ -8410,19 +8488,32 @@ function renderObjPicker(which){
   const mEl=document.getElementById(`e-obj-${which}-moments`);
   const sEl=document.getElementById(`e-obj-${which}-subs`);
   if(!mEl) return;
-  mEl.innerHTML=Object.entries(TACTICS_TAXONOMY).map(([k,v])=>{
-    const sel=obj.moment===k;
-    return `<button type="button" onclick="selectObjMoment('${which}','${k}')"
-      style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
-  }).join('');
-  if(obj.moment){
-    const v=TACTICS_TAXONOMY[obj.moment];
-    sEl.innerHTML=v.subs.map(sub=>{
-      const sel=obj.subPrinciples.includes(sub);
-      return `<button type="button" onclick="toggleObjSub('${which}','${sub}')"
-        style="padding:3px 9px;border-radius:5px;border:1.5px solid ${sel?v.color:'var(--border)'};background:${sel?v.color+'20':'transparent'};color:${sel?v.color:'var(--muted)'};font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;font-family:inherit">${sub}</button>`;
+  if(which==='primary'){
+    // Picker de momento de jogo — apenas os 6 momentos primários
+    mEl.innerHTML=PRIMARY_MOMENTS.map(k=>{
+      const v=TACTICS_TAXONOMY[k];
+      const sel=obj.moment===k;
+      return `<button type="button" onclick="selectObjMoment('primary','${k}')"
+        style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
     }).join('');
-  } else { sEl.innerHTML=''; }
+    // Sub-princípios do momento primário selecionado
+    if(obj.moment&&TACTICS_TAXONOMY[obj.moment]?.subs?.length){
+      const v=TACTICS_TAXONOMY[obj.moment];
+      sEl.innerHTML=v.subs.map(sub=>{
+        const sel=(obj.subPrinciples||[]).includes(sub);
+        return `<button type="button" onclick="toggleObjSub('primary','${sub}')"
+          style="padding:3px 9px;border-radius:5px;border:1.5px solid ${sel?v.color:'var(--border)'};background:${sel?v.color+'20':'transparent'};color:${sel?v.color:'var(--muted)'};font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;font-family:inherit">${sub}</button>`;
+      }).join('');
+    } else { if(sEl) sEl.innerHTML=''; }
+  } else {
+    // Picker de tema secundário — SECONDARY_THEMES
+    mEl.innerHTML=Object.entries(SECONDARY_THEMES).map(([k,v])=>{
+      const sel=obj.moment===k;
+      return `<button type="button" onclick="selectObjMoment('secondary','${k}')"
+        style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
+    }).join('');
+    if(sEl) sEl.innerHTML=''; // sem sub-princípios para secundário
+  }
 }
 function selectObjMoment(which,key){
   const obj=which==='primary'?_objPrimary:_objSecondary;
@@ -8498,8 +8589,15 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     const upd={};
     if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
     if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
-    if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]) upd.objectivePrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
-    if(d.secondary&&TACTICS_TAXONOMY[d.secondary?.moment]) upd.objectiveSecondary={moment:d.secondary.moment,subPrinciples:d.secondary.subPrinciples||[]};
+    if(d.primary&&PRIMARY_MOMENTS.includes(d.primary.moment)){
+      upd.objectivePrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+      // Mapear secundário para SECONDARY_THEMES — só define se evento ainda não tem secundário
+      const existing=ev.objectiveSecondary?.moment;
+      if(!existing||!SECONDARY_THEMES[existing]){
+        const secKey=mapToSecondaryTheme(d.secondary,d.primary);
+        if(secKey) upd.objectiveSecondary={moment:secKey,subPrinciples:[]};
+      }
+    }
     if(Object.keys(upd).length){
       DB.updateEvent(eventId,upd);
       toast('✅ Ficha analisada e guardada!');
@@ -8561,12 +8659,19 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
       _momentSummary=d.momentSummary||{};
     }
     if(!currentObjectives||d.mismatch){
-      if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]){
-        _objPrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+      // Fix race condition: só sobrescreve se o treinador ainda não selecionou nada
+      // (ou se há mismatch explícito — nesse caso a IA sabe melhor)
+      if(d.mismatch || !_objPrimary.moment){
+        if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]){
+          _objPrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+        }
+        // Mapear secundário para SECONDARY_THEMES
+        if(!_objSecondary.moment){
+          const secKey=mapToSecondaryTheme(d.secondary,d.primary);
+          _objSecondary=secKey?{moment:secKey,subPrinciples:[]}:{moment:null,subPrinciples:[]};
+        }
       }
-      if(d.secondary&&TACTICS_TAXONOMY[d.secondary?.moment]){
-        _objSecondary={moment:d.secondary.moment,subPrinciples:d.secondary.subPrinciples||[]};
-      } else { _objSecondary={moment:null,subPrinciples:[]}; }
+      // Sempre re-renderizar o picker para refletir estado atual
       renderObjPicker('primary'); renderObjPicker('secondary');
     }
   }catch(e){
