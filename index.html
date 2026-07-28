@@ -368,7 +368,7 @@ body.pm #v-pf{padding:30px}
 .lv-period-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
 .lv-period-chip:active{opacity:.75}
 
-.lv-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}.lv-btns.lv-btns-sm .lv-btn{padding:10px 8px;font-size:11px;min-height:56px}.lv-btns.lv-btns-sm .lv-icon{font-size:18px}
+.lv-btns{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}.lv-btns.lv-btns-sm .lv-btn{padding:10px 8px;font-size:11px;min-height:56px}.lv-btns.lv-btns-sm .lv-icon{font-size:18px}
 .lv-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;cursor:pointer;font-size:12px;font-weight:700;color:var(--text);transition:all .12s;-webkit-tap-highlight-color:transparent;user-select:none}
 .lv-btn:hover{background:#eef2f8;border-color:var(--green-l);transform:translateY(-1px)}
 .lv-btn:active{transform:scale(.96);background:#e0e8f4}
@@ -5464,49 +5464,44 @@ function renderLiveGeralTab(ev){
   const ctrs=mr.counters||{};
   const timeline=evs.length===0
     ?'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Sem eventos registados</div>'
-    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
+    :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':"'"}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
 
-  function ctrBtn(key,label,icon){
+  function ctr(key,label,icon){
     const v=ctrs[key]||0;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card)">
-      <span style="font-size:12px;font-weight:600">${icon} ${label}</span>
-      <div style="display:flex;align-items:center;gap:10px">
-        <button class="lv-cnt-dec" data-cnt-key="${key}" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--muted)">−</button>
-        <span style="font-size:18px;font-weight:700;min-width:24px;text-align:center">${v}</span>
-        <button class="lv-cnt-inc" data-cnt-key="${key}" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--primary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;color:#fff">+</button>
+    return `<div class="lv-btn" style="cursor:default;gap:4px;min-height:70px;justify-content:center">
+      <span class="lv-icon">${icon}</span>
+      <span style="font-size:11px;font-weight:700;text-align:center;line-height:1.25">${label}</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+        <button class="lv-cnt-dec" data-cnt-key="${key}" style="width:28px;height:28px;border-radius:50%;border:1.5px solid #ccc;background:#f5f5f5;font-size:17px;cursor:pointer;font-family:inherit;color:#555;line-height:1;display:flex;align-items:center;justify-content:center">&#8722;</button>
+        <span style="font-size:20px;font-weight:800;min-width:24px;text-align:center">${v}</span>
+        <button class="lv-cnt-inc" data-cnt-key="${key}" style="width:28px;height:28px;border-radius:50%;border:none;background:#27ae60;color:#fff;font-size:17px;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
       </div>
     </div>`;
   }
 
   document.getElementById('live-tab-content').innerHTML=`
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Eventos de Jogo</div>
-    <div class="lv-btns" style="margin-bottom:16px">
-      <div class="lv-btn" data-lv-type="goal"><span class="lv-icon">⚽</span>Golo</div>
-      <div class="lv-btn danger" data-lv-type="goal_conceded"><span class="lv-icon">🥅</span>Sofrido</div>
-      <div class="lv-btn" data-lv-type="yellow"><span class="lv-icon">🟡</span>Amarelo</div>
-      <div class="lv-btn" data-lv-type="red"><span class="lv-icon">🔴</span>Vermelho</div>
-      <div class="lv-btn" data-lv-type="sub"><span class="lv-icon">🔄</span>Sub</div>
-      <div class="lv-btn" data-lv-type="injury"><span class="lv-icon">🩺</span>Lesão</div>
-      <div class="lv-btn" data-lv-type="medical" style="grid-column:1/-1;flex-direction:row;gap:10px;justify-content:center;padding:12px 16px"><span class="lv-icon" style="font-size:20px">🏥</span>Assistência Médica</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">N&#243;s</div>
+    <div class="lv-btns">
+      <div class="lv-btn" data-lv-type="goal"><span class="lv-icon">&#9917;</span>Golo</div>
+      <div class="lv-btn" data-lv-type="yellow"><span class="lv-icon">&#128995;</span>Amarelo</div>
+      <div class="lv-btn" data-lv-type="red"><span class="lv-icon">&#128308;</span>Vermelho</div>
+      <div class="lv-btn" data-lv-type="sub"><span class="lv-icon">&#128260;</span>Substitui&#231;&#227;o</div>
+      <div class="lv-btn" data-lv-type="injury"><span class="lv-icon">&#129298;</span>Les&#227;o</div>
+      <div class="lv-btn" data-lv-type="medical" style="grid-column:1/-1;flex-direction:row;gap:10px;justify-content:center;padding:12px 16px"><span class="lv-icon" style="font-size:20px">&#127973;</span>Assist&#234;ncia M&#233;dica</div>
+      <div class="lv-btn" data-lv-type="shot_on"><span class="lv-icon">&#127919;</span>Remate &#224; Baliza</div>
+      <div class="lv-btn" data-lv-type="shot_off"><span class="lv-icon">&#128168;</span>Remate Fora</div>
+      <div class="lv-btn" data-lv-type="ball_won"><span class="lv-icon">&#9994;</span>Recupera&#231;&#227;o</div>
+      <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">&#10060;</span>Perda de Bola</div>
+      <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">&#9889;</span>Falta Cometida</div>
+      ${ctr('chance_for','Oport. Clara a Favor','&#10003;')}
     </div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Ações c/ Jogador</div>
-    <div class="lv-btns lv-btns-sm" style="margin-bottom:16px">
-      <div class="lv-btn" data-lv-type="shot_on"><span class="lv-icon">🎯</span>Remate à Baliza</div>
-      <div class="lv-btn" data-lv-type="shot_off"><span class="lv-icon">💨</span>Remate Fora</div>
-      <div class="lv-btn" data-lv-type="ball_won"><span class="lv-icon">✊</span>Recuperação</div>
-      <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">❌</span>Perda de Bola</div>
-      <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">⚡</span>Falta Cometida</div>
-    </div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Nós — Contadores</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
-      ${ctrBtn('chance_for','Oport. clara a favor','✅')}
-    </div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Adversário</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
-      ${ctrBtn('opp_shot_on','Remates à baliza','🎯')}
-      ${ctrBtn('opp_shot_off','Remates fora','💨')}
-      ${ctrBtn('foul_suffered','Faltas sofridas','⚡')}
-      ${ctrBtn('chance_against','Oport. clara contra','⚠️')}
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Advers&#225;rio</div>
+    <div class="lv-btns">
+      <div class="lv-btn danger" data-lv-type="goal_conceded"><span class="lv-icon">&#127941;</span>Golo Sofrido</div>
+      ${ctr('opp_shot_on','Remates &#224; Baliza','&#127919;')}
+      ${ctr('opp_shot_off','Remates Fora','&#128168;')}
+      ${ctr('foul_suffered','Faltas Sofridas','&#9889;')}
+      ${ctr('chance_against','Oport. Clara Contra','&#9888;&#65039;')}
     </div>
     <div class="lv-tl">
       <div class="lv-tl-head">
@@ -5515,6 +5510,7 @@ function renderLiveGeralTab(ev){
       </div>
       ${timeline}
     </div>`;
+
   document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>openLivePicker(btn.dataset.lvType)));
   document.querySelectorAll('[data-del-lv]').forEach(btn=>btn.addEventListener('click',()=>{
     if(!confirm('Remover este evento?')) return;
@@ -5536,6 +5532,7 @@ function renderLiveGeralTab(ev){
     });
   });
 }
+
 
 function renderLiveGRTab(ev){
   const tc=document.getElementById('live-tab-content');
