@@ -5497,12 +5497,15 @@ function renderLiveGeralTab(ev){
       <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">❌</span>Perda de Bola</div>
       <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">⚡</span>Falta Cometida</div>
     </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Nós — Contadores</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+      ${ctrBtn('chance_for','Oport. clara a favor','✅')}
+    </div>
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Adversário</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
       ${ctrBtn('opp_shot_on','Remates à baliza','🎯')}
       ${ctrBtn('opp_shot_off','Remates fora','💨')}
       ${ctrBtn('foul_suffered','Faltas sofridas','⚡')}
-      ${ctrBtn('chance_for','Oport. clara a favor','✅')}
       ${ctrBtn('chance_against','Oport. clara contra','⚠️')}
     </div>
     <div class="lv-tl">
