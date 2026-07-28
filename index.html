@@ -2443,7 +2443,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
 // Navigation back-tracking
 let _backView='dashboard', _backSquad='sub19';
 
@@ -5243,6 +5243,7 @@ function renderLiveSetup(ev){
     DB.updateEvent(liveGameId,{matchReport:cur});
     const _mr=DB.getEvent(liveGameId).matchReport||{};
     liveTempLineup=new Set(_mr.lineup||[]);
+    liveTempPositions=Object.assign({},_mr.lineupPositions||{});
     liveStep='lineup';
     renderLive();
   }));
@@ -5251,53 +5252,109 @@ function renderLiveSetup(ev){
 // ── LINEUP SELECTION ──────────────────────────────────────────────────────────
 function renderLiveLineup(ev){
   const convocados=sortByPos(getConvocados());
-  const count=liveTempLineup.size;
-  const isOk=count===11;
 
-  const rows=convocados.map(p=>{
-    const isTit=liveTempLineup.has(p.id);
-    return `<div class="pp-player${isTit?' pp-tit':''}" data-lu-pid="${p.id}" style="${isTit?'border-color:var(--ok);background:#f0faf4':''}">
-      <span class="pp-num" style="color:${isTit?'var(--ok)':'var(--muted)'}">${p.number||'—'}</span>
-      <div style="flex:1;min-width:0">
-        <div class="pp-name">${dn(p)}</div>
-        <div class="pp-pos">${POS[p.position]||'Sem posição'}</div>
+  const container=document.getElementById('v-live-content');
+  container.innerHTML=`
+    <div style="background:var(--green-d);color:#fff;padding:12px 16px;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:11px;opacity:.6">${SQUADS[ev.squad]||''}${ev.opponent?' · vs '+ev.opponent:''}</div>
+        <div style="font-size:16px;font-weight:700">11 Inicial</div>
       </div>
-      <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;${isTit?'background:var(--ok);color:#fff':'background:#eef0f3;color:var(--muted)'}">${isTit?'Titular':'Suplente'}</span>
+      <button id="btn-lu-confirm" class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:9px 18px;font-size:13px;font-weight:700">▶ Confirmar</button>
+    </div>
+    <div id="lu-badge" style="margin-bottom:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;background:var(--bg);border:1.5px solid var(--border)"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">
+      <!-- Left: convocados -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;text-align:center">Convocados</div>
+        <div id="lu-conv-list" style="display:flex;flex-direction:column;gap:3px">
+          ${convocados.map(p=>{
+            const isTit=liveTempLineup.has(p.id);
+            return `<button class="lu-chip${isTit?' lu-chip-on':''}" data-lu-pid="${p.id}" style="display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:8px;border:1.5px solid ${isTit?'var(--ok)':'var(--border)'};background:${isTit?'#f0faf4':'var(--bg)'};cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:all .1s">
+              <span style="font-size:11px;font-weight:700;color:var(--muted);min-width:18px">${p.number||'—'}</span>
+              <span style="font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${isTit?'var(--ok)':'var(--text)'}">${dn(p)}</span>
+              <span style="font-size:14px">${isTit?'✅':''}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <!-- Right: lineup being built -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;text-align:center">11 Inicial</div>
+        <div id="lu-lineup-list" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
     </div>`;
-  }).join('');
 
-  document.getElementById('v-live-content').innerHTML=`
-    <div style="background:var(--green-d);color:#fff;padding:16px 20px;border-radius:12px;margin-bottom:18px">
-      <div style="font-size:12px;opacity:.6;margin-bottom:3px">${SQUADS[ev.squad]||''}${ev.opponent?' · vs '+ev.opponent:''}</div>
-      <div style="font-size:17px;font-weight:700">11 Inicial</div>
-      <div style="font-size:12px;opacity:.7;margin-top:4px">Seleciona os titulares da convocatória</div>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;border-radius:8px;background:${isOk?'#f0faf4':'var(--bg)'};border:1.5px solid ${isOk?'var(--ok)':'var(--border)'}">
-      <span style="font-size:13px;font-weight:600;color:${isOk?'var(--ok)':'var(--text)'}">
-        ${isOk?'✅':'⚽'} ${count} titular${count!==1?'es':''}
-      </span>
-      <span style="font-size:12px;color:var(--muted)">${convocados.length} convocados</span>
-    </div>
-    <div class="pp-list" style="margin-bottom:16px">${rows||'<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Sem convocatória definida — define-a na vista do jogo primeiro.</p>'}</div>
-    <button id="btn-lu-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center">
-      ${count>0?`▶ Iniciar Jogo com ${count} titular${count!==1?'es':''}`:'▶ Iniciar sem 11 definido'}
-    </button>`;
+  function updateBadge(){
+    const n=liveTempLineup.size, ok=n===11;
+    document.getElementById('lu-badge').style.cssText=`margin-bottom:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;background:${ok?'#f0faf4':'var(--bg)'};border:1.5px solid ${ok?'var(--ok)':'var(--border)'};color:${ok?'var(--ok)':'var(--text)'}`;
+    document.getElementById('lu-badge').textContent=(ok?'✅ ':'⚽ ')+n+' titular'+(n!==1?'es':'')+' de '+convocados.length+' convocados';
+    const btn=document.getElementById('btn-lu-confirm');
+    if(btn) btn.textContent=(n>0?'▶ Confirmar '+n:'▶ Iniciar sem 11');
+  }
 
-  // Toggle titular
-  document.querySelectorAll('[data-lu-pid]').forEach(el=>el.addEventListener('click',()=>{
-    const pid=el.dataset.luPid;
-    if(liveTempLineup.has(pid)) liveTempLineup.delete(pid); else liveTempLineup.add(pid);
-    renderLiveLineup(ev);
-  }));
+  function updateLineupCol(){
+    const col=document.getElementById('lu-lineup-list');
+    if(!col) return;
+    const inLineup=convocados.filter(p=>liveTempLineup.has(p.id));
+    if(!inLineup.length){
+      col.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:14px 4px;border:1.5px dashed var(--border);border-radius:8px">← Seleciona jogadores</div>';
+      return;
+    }
+    col.innerHTML=inLineup.map(p=>{
+      const pos=liveTempPositions[p.id]||p.position||'';
+      return `<div style="background:var(--bg);border:1.5px solid var(--ok);border-radius:8px;padding:6px 8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dn(p)}</div>
+        <select data-lu-pos-pid="${p.id}" style="width:100%;font-size:11px;padding:2px 4px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit">
+          ${Object.entries(POS).map(([k,v])=>`<option value="${k}"${k===pos?' selected':''}>${k} — ${v}</option>`).join('')}
+          ${!pos?'<option value="" disabled selected>— posição —</option>':''}
+        </select>
+      </div>`;
+    }).join('');
+    col.querySelectorAll('[data-lu-pos-pid]').forEach(sel=>{
+      sel.addEventListener('change',()=>{ liveTempPositions[sel.dataset.luPosPid]=sel.value; });
+    });
+  }
+
+  // Toggle player — DOM only, no page re-render
+  container.querySelectorAll('[data-lu-pid]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid=btn.dataset.luPid;
+      if(liveTempLineup.has(pid)){
+        liveTempLineup.delete(pid);
+        btn.classList.remove('lu-chip-on');
+        btn.style.borderColor='var(--border)';
+        btn.style.background='var(--bg)';
+        btn.querySelector('span:nth-child(2)').style.color='var(--text)';
+        btn.querySelector('span:last-child').textContent='';
+        delete liveTempPositions[pid];
+      } else {
+        liveTempLineup.add(pid);
+        btn.classList.add('lu-chip-on');
+        btn.style.borderColor='var(--ok)';
+        btn.style.background='#f0faf4';
+        btn.querySelector('span:nth-child(2)').style.color='var(--ok)';
+        btn.querySelector('span:last-child').textContent='✅';
+        const p=convocados.find(x=>x.id===pid);
+        if(p&&p.position&&!liveTempPositions[pid]) liveTempPositions[pid]=p.position;
+      }
+      updateLineupCol();
+      updateBadge();
+    });
+  });
 
   // Confirm
   document.getElementById('btn-lu-confirm').addEventListener('click',()=>{
     const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
     cur.lineup=[...liveTempLineup];
+    cur.lineupPositions=Object.assign({},liveTempPositions);
     DB.updateEvent(liveGameId,{matchReport:cur});
     liveStep='recording';
     renderLive();
   });
+
+  updateLineupCol();
+  updateBadge();
 }
 
 // ── LIVE RECORDING ────────────────────────────────────────────────────────────
@@ -5376,6 +5433,7 @@ function renderLiveRecording(ev){
   // Edit lineup
   document.getElementById('btn-edit-lineup').addEventListener('click',()=>{
     liveTempLineup=new Set(lineup);
+    liveTempPositions=Object.assign({},mr.lineupPositions||{});
     liveStep='lineup';
     renderLive();
   });
