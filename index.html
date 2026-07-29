@@ -4986,18 +4986,21 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 function effectiveAtt(att, pid, date){
   const today=new Date().toISOString().slice(0,10);
   const explicit=att?.[pid];
-  if(explicit!==undefined) return explicit;  // valor explícito tem sempre prioridade
-  // Sem registo explícito — calcular por defeito
+  const player=DB.getPlayer(pid);
+  const isGR=player?.position==='GR';
+  // GR + treino passado + false explícito = artefacto do GPS antigo, ignorar
+  const ignoreExplicit = isGR && date<today && explicit===false;
+  if(explicit!==undefined && !ignoreExplicit) return explicit;
+  // Sem registo válido — calcular por defeito
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
-  if(date>=today) return true; // treinos futuros/hoje: presente por defeito
-  // Treinos passados: GR sem registo → presente desde a data de inscrição
-  const player=DB.getPlayer(pid);
-  if(player?.position==='GR'){
+  if(date>=today) return true; // presente por defeito a partir de hoje
+  // Treino passado: GR → presente desde a data de inscrição
+  if(isGR){
     const regDate=(player.ca||player.createdAt||'2000-01-01').slice(0,10);
     if(date>=regDate) return true;
   }
-  return false; // campo sem registo em treino passado = ausente
+  return false;
 }
 // Returns {cls, label} for rendering the att button.
 function attInfo(val){
