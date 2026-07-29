@@ -2790,8 +2790,29 @@ function previewGPSImport(input){
       // Obter plantel Equipa A + todos os jogadores (para matching)
       const eqaPlayers = DB.players('eqa');
       const allPlayers = DB.players(); // fallback: todos
-      const normToPlayer = {};
-      [...eqaPlayers, ...allPlayers].forEach(p=>{ normToPlayer[normalizeName(p.name)]=p; });
+      // O GPS usa: "Primeiro Último", "Alcunha Último", "Primeiro Alcunha" ou variações.
+      // Pré-calculamos todas as combinações por jogador (prioridade: nomes longos antes dos curtos).
+      const gpsIdx = {};
+      const addKey=(key,p)=>{ const k=normalizeName(key); if(k&&k.length>1&&!gpsIdx[k]) gpsIdx[k]=p; };
+      // Passagem 1: chaves longas / exatas (prioridade máxima — menos colisões)
+      [...eqaPlayers,...allPlayers].forEach(p=>{
+        const parts=(p.name||'').trim().split(/\s+/);
+        const first=parts[0]||''; const last=parts[parts.length-1]||'';
+        const alc=(p.alcunha||'').trim();
+        addKey(p.name,p);                                   // "João Pedro Silva"
+        if(alc) addKey(alc,p);                             // "Reko"
+        if(first&&last&&first!==last) addKey(`${first} ${last}`,p); // "João Silva"
+        if(alc&&last)  addKey(`${alc} ${last}`,p);        // "Reko Silva"
+        if(first&&alc) addKey(`${first} ${alc}`,p);       // "João Reko"
+        if(alc&&first) addKey(`${alc} ${first}`,p);       // "Reko João" (ordem inversa)
+      });
+      // Passagem 2: tokens simples (fallback — maior risco de colisão, por isso só se ainda não existe)
+      [...eqaPlayers,...allPlayers].forEach(p=>{
+        const parts=(p.name||'').trim().split(/\s+/);
+        addKey(parts[0]||'',p);                            // "João"
+        addKey(parts[parts.length-1]||'',p);              // "Silva"
+      });
+      const findPlayer=gpsName=>gpsIdx[normalizeName(gpsName)]||null;
       // Obter treinos Equipa A
       const allEvs = DB.events('eqa');
       const trainByDate = {};
@@ -2809,7 +2830,7 @@ function previewGPSImport(input){
         const presentIds = new Set();
         const unmatched = [];
         names.forEach(n=>{
-          const p = normToPlayer[normalizeName(n)];
+          const p = findPlayer(n);
           if(p) presentIds.add(p.id);
           else { unmatched.push(n); unmatchedPlayers.add(n); }
         });
