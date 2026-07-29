@@ -8304,16 +8304,30 @@ function addCustomSecondaryTheme(label){
 
 // Sugere o tema secundário a partir da resposta da IA
 function mapToSecondaryTheme(secondary, primary){
-  // 1ª prioridade: sub-princípios do momento primário
+  // 1ª prioridade: sub-princípios conhecidos (mapeados em SUB_TO_SECONDARY)
   for(const sub of (primary?.subPrinciples||[])){
     const k=SUB_TO_SECONDARY[sub];
     if(k&&SECONDARY_THEMES[k]) return k;
   }
-  // 2ª prioridade: momento secundário sugerido pela IA
+  // 2ª prioridade: sub-princípios DESCONHECIDOS → criar temas custom e selecionar o primeiro
+  // (ex: "PBD", "Pressão" gerados pela IA mas não na lista padrão)
+  const unknownSubs=(primary?.subPrinciples||[]).filter(s=>!SUB_TO_SECONDARY[s]&&s);
+  if(unknownSubs.length){
+    // Cria tema custom para cada sub desconhecido (aparecem todos no picker)
+    unknownSubs.forEach(s=>addCustomSecondaryTheme(s));
+    // Seleciona o primeiro
+    return addCustomSecondaryTheme(unknownSubs[0]);
+  }
+  // 3ª prioridade: fallback genérico pelo momento secundário da IA
   const sm=secondary?.moment;
   if(sm&&AI_MOMENT_TO_SECONDARY[sm]) return AI_MOMENT_TO_SECONDARY[sm];
-  // 3ª prioridade: criar tema dinâmico a partir do primeiro sub-princípio disponível
-  const firstSub=(primary?.subPrinciples||[])[0]||(secondary?.subPrinciples||[])[0];
+  // 4ª prioridade: sub-princípios do secundário da IA
+  const secUnknown=(secondary?.subPrinciples||[]).filter(s=>!SUB_TO_SECONDARY[s]&&s);
+  if(secUnknown.length){
+    secUnknown.forEach(s=>addCustomSecondaryTheme(s));
+    return addCustomSecondaryTheme(secUnknown[0]);
+  }
+  const firstSub=(secondary?.subPrinciples||[])[0];
   if(firstSub) return addCustomSecondaryTheme(firstSub);
   return null;
 }
@@ -8715,6 +8729,11 @@ function renderObjPicker(which){
     } else { if(sEl) sEl.innerHTML=''; }
   } else {
     // Picker de tema secundário — SECONDARY_THEMES
+    // Se o momento primário tem sub-princípios desconhecidos, adiciona-os como temas custom
+    // para aparecerem como opções mesmo sem re-analisar
+    (_objPrimary.subPrinciples||[])
+      .filter(s=>s&&!SUB_TO_SECONDARY[s])
+      .forEach(s=>addCustomSecondaryTheme(s));
     mEl.innerHTML=Object.entries(SECONDARY_THEMES).map(([k,v])=>{
       const sel=obj.moment===k;
       return `<button type="button" onclick="selectObjMoment('secondary','${k}')"
