@@ -5027,30 +5027,32 @@ function countPresent(att, players, date){
 // Usa localStorage para não repetir jogadores já processados.
 function backfillGRAttendance(){
   try{
-    // v4: p.ca opcional (fallback '2000-01-01' se campo ausente)
-    const KEY='scv_gr_backfill_v4';
+    // v5: apaga entradas false/null dos GRs em vez de as sobrescrever com true.
+    // effectiveAtt trata undefined em treino passado com isGR=true → presente.
+    // Apagar é mais seguro que escrever true (evita conflito com onSnapshot do Firestore).
+    const KEY='scv_gr_backfill_v5';
+    // Limpa chaves de versões anteriores para não bloquear este código
+    ['v1','v2','v3','v4'].forEach(v=>localStorage.removeItem('scv_gr_backfill_'+v));
     if(localStorage.getItem(KEY)) return;
     const today=new Date().toISOString().slice(0,10);
-    // Incluir todos os GRs mesmo sem p.ca
     const grPlayers=DB.players().filter(p=>p.position==='GR');
     if(!grPlayers.length){ localStorage.setItem(KEY,'1'); return; }
-    const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<=today);
-    console.log(`backfillGR: ${grPlayers.length} GR(s), ${allEvs.length} treino(s)`);
+    const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<today);
+    console.log(`backfillGR v5: ${grPlayers.length} GR(s), ${allEvs.length} treinos passados`);
     allEvs.forEach(ev=>{
       const att={...(ev.attendance||{})};
       let changed=false;
       grPlayers.forEach(p=>{
-        // p.ca pode ser undefined → tratar como início dos tempos
         const regDate=(p.ca||p.createdAt||'2000-01-01').slice(0,10);
-        if(ev.date<regDate) return; // treino anterior à inscrição
-        if(att[p.id]===true) return; // já presente, não tocar
-        att[p.id]=true; changed=true;
+        if(ev.date<regDate) return;
+        // Apagar false/null → effectiveAtt devolve true por default para GRs
+        if(att[p.id]===false||att[p.id]===null){ delete att[p.id]; changed=true; }
       });
       if(changed) DB.updateEvent(ev.id,{attendance:att});
     });
     localStorage.setItem(KEY,'1');
-    console.log('backfillGR: concluído');
-  }catch(e){ console.warn('backfillGR erro:',e); }
+    console.log('backfillGR v5: concluído');
+  }catch(e){ console.warn('backfillGR v5 erro:',e); }
 }
 
 function renderTraining(){
