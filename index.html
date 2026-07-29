@@ -3367,42 +3367,46 @@ function renderPlayer(){
     const isStarter=(mr.lineup||[]).includes(pid);
     const subInEv=evList.find(e=>e.type==='sub'&&e.playerInId===pid);
     const subOutEv=evList.find(e=>e.type==='sub'&&e.playerOutId===pid);
-    const subbedIn=!!subInEv; const subbedOut=!!subOutEv;
+    const subbedIn=!!subInEv;
     const played=isStarter||subbedIn;
     const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
     const rating=hasRating?parseFloat(mr.ratings[pid]):null;
-    // Eventos individuais com minuto
     const goalEvs=evList.filter(e=>e.type==='goal'&&e.playerId===pid);
     const assistEvs=evList.filter(e=>e.type==='goal'&&e.assistId===pid);
     const yellowEvs=evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid);
     const redEv=evList.find(e=>(e.type==='red'||e.type==='yellow2')&&e.playerId===pid);
-    const gls=goalEvs.length, ast=assistEvs.length, ylw=yellowEvs.length, red=redEv?1:0;
-    if(!conv&&!played&&!gls&&!ast&&!ylw&&!red&&!hasRating) return;
-    // Resultado
+    const shotOnEvs=evList.filter(e=>e.type==='shot_on'&&e.playerId===pid);
+    const shotOffEvs=evList.filter(e=>e.type==='shot_off'&&e.playerId===pid);
+    const foulEvs=evList.filter(e=>e.type==='foul_committed'&&e.playerId===pid);
+    const gls=goalEvs.length,ast=assistEvs.length,ylw=yellowEvs.length,red=redEv?1:0;
+    const sOn=shotOnEvs.length,sOff=shotOffEvs.length,fouls=foulEvs.length;
+    if(!conv&&!played&&!gls&&!ast&&!ylw&&!red&&!hasRating&&!sOn&&!sOff&&!fouls) return;
     const gf=evList.filter(e=>e.type==='goal').length;
     const ga=evList.filter(e=>e.type==='goal_conceded').length;
     const hasScore=evList.some(e=>e.type==='goal'||e.type==='goal_conceded');
-    const scoreStr=hasScore?`${gf}–${ga}`:'';
+    const scoreStr=hasScore?`${gf}–${ga}`:'—';
     const result=hasScore?(gf>ga?'V':gf<ga?'D':'E'):null;
     const resultColor=result==='V'?'#16a34a':result==='D'?'#dc2626':'#d97706';
-    // Minutos jogados
     const subInMin=subInEv?.minute; const subOutMin=subOutEv?.minute;
     let minsPlayed=null;
-    if(isStarter){ minsPlayed=subOutMin??90; }
-    else if(subbedIn){ minsPlayed=subOutMin?subOutMin-subInMin:90-(subInMin??0); }
-    // Timeline de eventos individuais ordenados por minuto
-    const timeline=[];
-    if(subbedIn && subInMin) timeline.push({min:subInMin, badge:`<span style="color:var(--ok);font-weight:700">↑${subInMin}'</span>`});
-    goalEvs.forEach(e=>{ if(e.minute) timeline.push({min:e.minute,badge:`<span style="color:var(--ok);font-weight:700">⚽${e.minute}'</span>`}); else timeline.push({min:999,badge:`<span style="color:var(--ok);font-weight:700">⚽</span>`}); });
-    assistEvs.forEach(e=>{ if(e.minute) timeline.push({min:e.minute,badge:`<span style="color:#2563eb;font-weight:700">🅰️${e.minute}'</span>`}); else timeline.push({min:999,badge:`<span style="color:#2563eb;font-weight:700">🅰️</span>`}); });
-    yellowEvs.forEach(e=>{ if(e.minute) timeline.push({min:e.minute,badge:`<span style="font-weight:700">🟡${e.minute}'</span>`}); else timeline.push({min:999,badge:`<span>🟡</span>`}); });
-    if(redEv){ if(redEv.minute) timeline.push({min:redEv.minute,badge:`<span style="font-weight:700">🔴${redEv.minute}'</span>`}); else timeline.push({min:999,badge:`<span>🔴</span>`}); }
-    if(subbedOut && subOutMin) timeline.push({min:subOutMin,badge:`<span style="color:var(--muted);font-weight:700">↓${subOutMin}'</span>`});
-    timeline.sort((a,b)=>a.min-b.min);
-    gameRecords.push({ev,gls,ast,ylw,red,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subbedOut,subInMin,subOutMin,minsPlayed,timeline});
+    if(isStarter) minsPlayed=subOutMin??90;
+    else if(subbedIn) minsPlayed=subOutMin?(subOutMin-subInMin):(90-(subInMin??0));
+    gameRecords.push({ev,gls,ast,ylw,red,sOn,sOff,fouls,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subInMin,subOutMin,minsPlayed,goalEvs,assistEvs,yellowEvs,redEv,shotOnEvs,shotOffEvs,foulEvs});
   });
 
+  // Helper: renders event cell with count + minutes below (compact)
+  function evCell(evArr, mainHTML, color){
+    if(!evArr.length) return '';
+    const mins=evArr.map(e=>e.minute).filter(Boolean);
+    return `<div style="font-size:12px;font-weight:700;${color?'color:'+color:''};text-align:center;line-height:1.2">${mainHTML}</div>${mins.length?`<div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.4">${mins.map(m=>m+"'").join('·')}</div>`:''}`;
+  }
+
   const statsTabHTML=(()=>{
+    // Totais para o resumo agregado — inclui remates e faltas
+    const totalShotOn=gameRecords.reduce((s,r)=>s+r.sOn,0);
+    const totalShotOff=gameRecords.reduce((s,r)=>s+r.sOff,0);
+    const totalFouls=gameRecords.reduce((s,r)=>s+r.fouls,0);
+
     const aggregateSummary=`
       <div class="card" style="margin-bottom:0">
         ${pSquads.length>1
@@ -3421,49 +3425,53 @@ function renderPlayer(){
           : `<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
               ${statBox('Treinos',trainAttended,'presenças')}${statBox('Convocado',gamesConv,'jogos')}${statBox('Jogou',gamesPlayed,'jogos')}${statBox('Média',avgRating??'—','nota')}
             </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
               ${statBox('Golos',goals,'')}${statBox('Assist.',assists,'')}${statBox('Amarelos',yellows,'')}${statBox('Vermelhos',reds,'')}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr)">
+              ${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}${statBox('Faltas',totalFouls,'')}
             </div>`}
       </div>`;
 
     if(!gameRecords.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados.</div>`;
 
-    const cards=gameRecords.map(({ev,gls,ast,ylw,red,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subInMin,subOutMin,minsPlayed,timeline})=>{
-      const roleLabel=played
+    const th=(t,align='center')=>`<th style="padding:6px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:${align};white-space:nowrap">${t}</th>`;
+    const td=(content,extra='')=>`<td style="padding:6px 5px;vertical-align:top;${extra}">${content}</td>`;
+
+    const rows=gameRecords.map(({ev,gls,ast,ylw,red,sOn,sOff,fouls,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subInMin,subOutMin,minsPlayed,goalEvs,assistEvs,yellowEvs,redEv,shotOnEvs,shotOffEvs,foulEvs})=>{
+      const roleStr=played
         ?(isStarter
-          ?`<span style="color:var(--ok);font-size:11px;font-weight:700">Titular${subOutMin?` ↓${subOutMin}'`:''}</span>`
-          :`<span style="color:#f97316;font-size:11px;font-weight:700">Suplente ↑${subInMin??'?'}'${subOutMin?` ↓${subOutMin}'`:''}</span>`)
-        :`<span style="color:var(--muted);font-size:11px">Convocado</span>`;
-      const minsLabel=minsPlayed!==null?`<span style="font-size:11px;color:var(--muted)">${minsPlayed}'</span>`:'';
-      const ratingBadge=rating!==null?`<span style="background:var(--green);color:#fff;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:700">${rating.toFixed(1)}</span>`:'';
-      const timelineBadges=timeline.length
-        ?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px">${timeline.map(t=>t.badge).join('')}</div>`
-        :'';
-      return `<div style="padding:11px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <span style="font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>
-              <span style="font-size:13px;font-weight:700;white-space:nowrap">${ev.homeAway==='away'?'✈️':'🏠'} ${ev.opponent||'—'}</span>
-              ${scoreStr?`<span style="font-size:13px;font-weight:800;color:${resultColor}">${result} ${scoreStr}</span>`:''}
-              ${ev.squad&&pSquads.length>1?`<span style="font-size:10px;background:var(--border);padding:1px 6px;border-radius:4px">${SQUADS[ev.squad]||ev.squad}</span>`:''}
-            </div>
-            <div style="margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              ${roleLabel} ${minsLabel}
-            </div>
-          </div>
-          ${ratingBadge}
-        </div>
-        ${timelineBadges}
-      </div>`;
+          ?`<span style="color:var(--ok);font-size:11px;font-weight:700">Tit.${subOutMin?`<br><span style="font-size:9px;color:var(--muted)">↓${subOutMin}'</span>`:''}</span>`
+          :`<span style="color:#f97316;font-size:11px;font-weight:700">Sub.<br><span style="font-size:9px;color:var(--muted)">↑${subInMin??'?'}'${subOutMin?` ↓${subOutMin}'`:''}</span></span>`)
+        :`<span style="color:var(--muted);font-size:10px">Conv.</span>`;
+      const minsStr=minsPlayed!==null?`<span style="font-size:11px;font-weight:600">${minsPlayed}'</span>`:'—';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        ${td(`<span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>`)}
+        ${td(`<span style="font-size:12px;font-weight:600">${ev.homeAway==='away'?'✈️':'🏠'} ${ev.opponent||'—'}</span>`,'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+        ${td(`<span style="font-size:12px;font-weight:700;color:${resultColor}">${result||''}${result?' ':''}</span><span style="font-size:12px;font-weight:600">${scoreStr}</span>`,'text-align:center')}
+        ${td(roleStr,'text-align:center')}
+        ${td(minsStr,'text-align:center')}
+        ${td(evCell(goalEvs,`⚽${gls}`,'var(--ok)'))}
+        ${td(evCell(assistEvs,`🅰️${ast}`,'#2563eb'))}
+        ${td(sOn?`<span style="font-size:12px;font-weight:700;color:#0891b2;text-align:center">🎯${sOn}</span><br>${shotOnEvs.filter(e=>e.minute).map(e=>`<span style="font-size:9px;color:var(--muted)">${e.minute}'</span>`).join('·')}`:'','text-align:center')}
+        ${td(sOff?`<span style="font-size:12px;font-weight:700;color:var(--muted);text-align:center">💨${sOff}</span><br>${shotOffEvs.filter(e=>e.minute).map(e=>`<span style="font-size:9px;color:var(--muted)">${e.minute}'</span>`).join('·')}`:'','text-align:center')}
+        ${td(fouls?`<span style="font-size:12px;font-weight:700;color:#7c3aed;text-align:center">⚡${fouls}</span><br>${foulEvs.filter(e=>e.minute).map(e=>`<span style="font-size:9px;color:var(--muted)">${e.minute}'</span>`).join('·')}`:'','text-align:center')}
+        ${td(evCell(yellowEvs,`🟡${ylw}`,''))}
+        ${td(redEv?evCell([redEv],'🔴',''):'')}
+        ${td(rating!==null?`<span style="background:var(--green);color:#fff;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">${rating.toFixed(1)}</span>`:'','text-align:center')}
+      </tr>`;
     }).join('');
 
     return aggregateSummary+`
       <div class="card" style="padding:0;overflow:hidden">
-        <div style="padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg)">
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Registos por Jogo</span>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:580px">
+            <thead><tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+              ${th('Data','left')}${th('Adversário','left')}${th('Res.')}${th('Papel')}${th('Min')}${th('⚽')}${th('🅰️')}${th('🎯')}${th('💨')}${th('⚡')}${th('🟡')}${th('🔴')}${th('Nota')}
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
         </div>
-        ${cards}
       </div>`;
   })();
 
