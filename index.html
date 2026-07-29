@@ -4983,14 +4983,14 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 // ── Attendance helpers ────────────────────────────────────────────────────────
 // Returns effective attendance value for a player on a given training date.
 // For dates >= today: unset players are present by default; unavailability auto-applied.
-function effectiveAtt(att, pid, date){
+function effectiveAtt(att, pid, date, playerHint){
   const today=new Date().toISOString().slice(0,10);
   const explicit=att?.[pid];
-  const player=DB.getPlayer(pid);
+  const player=playerHint||DB.getPlayer(pid);
   const isGR=player?.position==='GR';
-  // GR + treino passado + false explícito = artefacto do GPS antigo, ignorar
-  const ignoreExplicit = isGR && date<today && explicit===false;
-  if(explicit!==undefined && !ignoreExplicit) return explicit;
+  // GR + treino passado + false/null explícito = artefacto do GPS antigo, ignorar
+  const ignoreExplicit = isGR && date<today && (explicit===false||explicit===null);
+  if(explicit!=null && explicit!==undefined && !ignoreExplicit) return explicit;
   // Sem registo válido — calcular por defeito
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
@@ -5021,7 +5021,7 @@ function nextAttState(current){
 }
 // Count players who are effectively present or condicionado
 function countPresent(att, players, date){
-  return players.filter(p=>{ const s=effectiveAtt(att,p.id,date); return s===true||s==='condicionado'; }).length;
+  return players.filter(p=>{ const s=effectiveAtt(att,p.id,date,p); return s===true||s==='condicionado'; }).length;
 }
 // Backfill: marca GR como presentes em todos os treinos passados desde a data de inscrição.
 // Usa localStorage para não repetir jogadores já processados.
@@ -5097,7 +5097,7 @@ function renderTraining(){
 
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
-    const status=effectiveAtt(att,p.id,ev.date);
+    const status=effectiveAtt(att,p.id,ev.date,p);
     const info=attInfo(status);
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
@@ -5357,7 +5357,8 @@ function renderTraining(){
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.attPid;
     const a=DB.getEvent(trainingEventId).attendance||{};
-    a[pid]=nextAttState(effectiveAtt(a,pid,ev.date));
+    const playerHint=allPl.find(x=>x.id===pid);
+    a[pid]=nextAttState(effectiveAtt(a,pid,ev.date,playerHint));
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
   }));
