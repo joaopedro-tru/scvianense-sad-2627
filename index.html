@@ -5019,25 +5019,24 @@ function countPresent(att, players, date){
 // Usa localStorage para não repetir jogadores já processados.
 function backfillGRAttendance(){
   try{
-    // v2: sobrescreve false explícito (GPS antigo marcou GRs como ausentes antes do fix)
-    const KEY='scv_gr_backfill_v2';
-    const processed=new Set(JSON.parse(localStorage.getItem(KEY)||'[]'));
+    // v3: loop por evento (exterior) → GRs (interior) — evita sobrescrever updates anteriores
+    const KEY='scv_gr_backfill_v3';
+    if(localStorage.getItem(KEY)) return;
     const today=new Date().toISOString().slice(0,10);
-    const grPlayers=DB.players().filter(p=>p.position==='GR'&&p.ca&&!processed.has(p.id));
-    if(!grPlayers.length) return;
+    const grPlayers=DB.players().filter(p=>p.position==='GR'&&p.ca);
+    if(!grPlayers.length){ localStorage.setItem(KEY,'1'); return; }
     const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<=today);
-    grPlayers.forEach(p=>{
-      const regDate=p.ca.slice(0,10);
-      allEvs.forEach(ev=>{
-        if(ev.date<regDate) return;
-        const att={...(ev.attendance||{})};
-        if(att[p.id]===true) return; // já presente, não tocar
-        att[p.id]=true;
-        DB.updateEvent(ev.id,{attendance:att});
+    allEvs.forEach(ev=>{
+      const att={...(ev.attendance||{})};
+      let changed=false;
+      grPlayers.forEach(p=>{
+        if(ev.date<p.ca.slice(0,10)) return; // antes da inscrição
+        if(att[p.id]===true) return;          // já presente, não tocar
+        att[p.id]=true; changed=true;
       });
-      processed.add(p.id);
+      if(changed) DB.updateEvent(ev.id,{attendance:att});
     });
-    localStorage.setItem(KEY,JSON.stringify([...processed]));
+    localStorage.setItem(KEY,'1');
   }catch(e){ console.warn('backfillGR:',e); }
 }
 
