@@ -7107,6 +7107,34 @@ function renderGamePre(ev,sqPlayers,conv){
       <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
     </div>`;
   }).join('');
+  // Outros escalões
+  const sqPlayerIds=new Set(sqPlayers.map(p=>p.id));
+  const otherSqPlayers=ev.squad==='both'?[]:DB.players().filter(p=>!sqPlayerIds.has(p.id)&&p.personType!=='staff').sort((a,b)=>(a.squad||'').localeCompare(b.squad||'')||(a.name||'').localeCompare(b.name||''));
+  const otherSqGroups={};
+  otherSqPlayers.forEach(p=>{ const sq=p.squad||'?'; (otherSqGroups[sq]=otherSqGroups[sq]||[]).push(p); });
+  const otherConvCount=otherSqPlayers.filter(p=>!!conv.players[p.id]).length;
+  const otherSqHTML=Object.entries(otherSqGroups).map(([sq,players])=>`
+    <div style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">${SQUADS[sq]||sq}</div>
+      ${players.map(p=>{
+        const isConv=!!conv.players[p.id];
+        return `<div class="att-row">
+          <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${convName(p)}</div>
+            <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
+          </div>
+          <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  const otherSqSection=otherSqHTML?`
+    <details style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"${otherConvCount>0?' open':''}>
+      <summary style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;user-select:none;margin-bottom:4px">
+        Outros Escalões${otherConvCount>0?` · <span style="color:var(--ok)">${otherConvCount}</span>`:''}
+      </summary>
+      ${otherSqHTML}
+    </details>`:'';
   const haLabel=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
   // Staff section for game
   const gmSq=ev.squad==='both'?null:ev.squad;
@@ -7162,6 +7190,7 @@ function renderGamePre(ev,sqPlayers,conv){
       ${convUnavailAlert}
       ${isAway?`<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--muted)"><span>✈️ Desloca-se</span></div>`:''}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
+      ${otherSqSection}
     </div>
   </div>`;
   document.querySelectorAll('[data-gconv]').forEach(btn=>btn.addEventListener('click',()=>{
