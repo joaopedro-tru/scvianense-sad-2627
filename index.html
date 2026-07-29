@@ -7113,21 +7113,28 @@ function renderGamePre(ev,sqPlayers,conv){
   const otherSqGroups={};
   otherSqPlayers.forEach(p=>{ const sq=p.squad||'?'; (otherSqGroups[sq]=otherSqGroups[sq]||[]).push(p); });
   const otherConvCount=otherSqPlayers.filter(p=>!!conv.players[p.id]).length;
-  const otherSqHTML=Object.entries(otherSqGroups).map(([sq,players])=>`
-    <div style="margin-top:10px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">${SQUADS[sq]||sq}</div>
-      ${players.map(p=>{
-        const isConv=!!conv.players[p.id];
-        return `<div class="att-row">
-          <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600">${convName(p)}</div>
-            <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
-          </div>
-          <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
-        </div>`;
-      }).join('')}
-    </div>`).join('');
+  const SQ_ORDER=['eqa','sub23','sub19'];
+  const otherSqHTML=[...SQ_ORDER,...Object.keys(otherSqGroups).filter(k=>!SQ_ORDER.includes(k))].filter(sq=>otherSqGroups[sq]).map(sq=>{
+    const players=otherSqGroups[sq];
+    const sqConvCount=players.filter(p=>!!conv.players[p.id]).length;
+    const rows=players.map(p=>{
+      const isConv=!!conv.players[p.id];
+      return `<div class="att-row">
+        <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${convName(p)}</div>
+          <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
+        </div>
+        <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
+      </div>`;
+    }).join('');
+    return `<details style="margin-top:8px"${sqConvCount>0?' open':''}>
+      <summary style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;user-select:none;padding:4px 0">
+        ${SQUADS[sq]||sq}${sqConvCount>0?` · <span style="color:var(--ok)">${sqConvCount}</span>`:''}
+      </summary>
+      <div style="margin-top:4px">${rows}</div>
+    </details>`;
+  }).join('');
   const otherSqSection=otherSqHTML?`
     <details style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"${otherConvCount>0?' open':''}>
       <summary style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;user-select:none;margin-bottom:4px">
