@@ -7091,7 +7091,7 @@ function renderGamePre(ev,sqPlayers,conv){
   const traveling=conv.traveling||{};
   const convIds=sqPlayers.filter(p=>!!conv.players[p.id]).map(p=>p.id);
   const convUnavailAlert=buildUnavailabilityAlert(ev.date,convIds,ev.squad==='both'?null:ev.squad);
-  const pRows=sqPlayers.map(p=>{
+  const pRows=sortByPos(sqPlayers).map(p=>{
     const isConv=!!conv.players[p.id];
     const isTrav=!!traveling[p.id];
     const travBtn=isAway
@@ -7109,7 +7109,7 @@ function renderGamePre(ev,sqPlayers,conv){
   }).join('');
   // Outros escalões
   const sqPlayerIds=new Set(sqPlayers.map(p=>p.id));
-  const otherSqPlayers=ev.squad==='both'?[]:DB.players().filter(p=>!sqPlayerIds.has(p.id)&&p.personType!=='staff').sort((a,b)=>(a.squad||'').localeCompare(b.squad||'')||(a.name||'').localeCompare(b.name||''));
+  const otherSqPlayers=ev.squad==='both'?[]:sortByPos(DB.players().filter(p=>!sqPlayerIds.has(p.id)&&p.personType!=='staff'));
   const otherSqGroups={};
   otherSqPlayers.forEach(p=>{ const sq=p.squad||'?'; (otherSqGroups[sq]=otherSqGroups[sq]||[]).push(p); });
   const otherConvCount=otherSqPlayers.filter(p=>!!conv.players[p.id]).length;
