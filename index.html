@@ -2802,6 +2802,7 @@ function previewGPSImport(input){
         addKey(p.name,p);                                   // "João Pedro Silva"
         if(alc) addKey(alc,p);                             // "Reko"
         if(first&&last&&first!==last) addKey(`${first} ${last}`,p); // "João Silva"
+        if(parts.length>=3) addKey(`${first} ${parts[1]}`,p);     // "Lowen Nsonga" (1º+2º p/ nomes longos)
         if(alc&&last)  addKey(`${alc} ${last}`,p);        // "Reko Silva"
         if(first&&alc) addKey(`${first} ${alc}`,p);       // "João Reko"
         if(alc&&first) addKey(`${alc} ${first}`,p);       // "Reko João" (ordem inversa)
@@ -5013,6 +5014,30 @@ function nextAttState(current){
 // Count players who are effectively present or condicionado
 function countPresent(att, players, date){
   return players.filter(p=>{ const s=effectiveAtt(att,p.id,date); return s===true||s==='condicionado'; }).length;
+}
+// Backfill: marca GR como presentes em todos os treinos passados desde a data de inscrição.
+// Usa localStorage para não repetir jogadores já processados.
+function backfillGRAttendance(){
+  try{
+    const KEY='scv_gr_backfill_ids';
+    const processed=new Set(JSON.parse(localStorage.getItem(KEY)||'[]'));
+    const today=new Date().toISOString().slice(0,10);
+    const grPlayers=DB.players().filter(p=>p.position==='GR'&&p.ca&&!processed.has(p.id));
+    if(!grPlayers.length) return;
+    const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<=today);
+    grPlayers.forEach(p=>{
+      const regDate=p.ca.slice(0,10);
+      allEvs.forEach(ev=>{
+        if(ev.date<regDate) return;
+        const att={...(ev.attendance||{})};
+        if(att[p.id]!==undefined) return; // já tem registo explícito
+        att[p.id]=true;
+        DB.updateEvent(ev.id,{attendance:att});
+      });
+      processed.add(p.id);
+    });
+    localStorage.setItem(KEY,JSON.stringify([...processed]));
+  }catch(e){ console.warn('backfillGR:',e); }
 }
 
 function renderTraining(){
@@ -9930,6 +9955,7 @@ function initCoordApp(){
     }
     seedLiga3Games();
     seedGymPlan20260728();
+    backfillGRAttendance();
     document.getElementById('sync-overlay').style.display='none';
     nav('dashboard');
   })();
