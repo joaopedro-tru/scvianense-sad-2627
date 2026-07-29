@@ -317,7 +317,8 @@ body.pm #v-pf{padding:30px}
 .att-btn.lesao{background:#dc2626;color:#fff;border-color:#dc2626}
 .att-btn.just{background:#d97706;color:#fff;border-color:#d97706}
 .att-btn.injust{background:#7f1d1d;color:#fff;border-color:#7f1d1d}
-.att-btn:not(.present):not(.condicionado):not(.lesao):not(.just):not(.injust):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
+.att-btn.ni{background:#e5e7eb;color:#6b7280;border-color:#d1d5db;text-decoration:line-through}
+.att-btn:not(.present):not(.condicionado):not(.lesao):not(.just):not(.injust):not(.ni):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
 .trav-box{width:24px;height:24px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:var(--bg);font-size:15px;font-weight:800;color:transparent;transition:all .15s}
 .trav-box:hover{border-color:#aaa}
 .trav-box.checked{border-color:#e84444;background:#fff0f0;color:#e84444}
@@ -2787,15 +2788,14 @@ function previewGPSImport(input){
         if(!sessions[dateStr]) sessions[dateStr]=new Set();
         sessions[dateStr].add(playerName);
       }
-      // Obter plantel Equipa A + todos os jogadores (para matching)
+      // Obter apenas plantel Equipa A — o GPS é exclusivo desta equipa
       const eqaPlayers = DB.players('eqa');
-      const allPlayers = DB.players(); // fallback: todos
       // O GPS usa: "Primeiro Último", "Alcunha Último", "Primeiro Alcunha" ou variações.
       // Pré-calculamos todas as combinações por jogador (prioridade: nomes longos antes dos curtos).
       const gpsIdx = {};
       const addKey=(key,p)=>{ const k=normalizeName(key); if(k&&k.length>1&&!gpsIdx[k]) gpsIdx[k]=p; };
       // Passagem 1: chaves longas / exatas (prioridade máxima — menos colisões)
-      [...eqaPlayers,...allPlayers].forEach(p=>{
+      eqaPlayers.forEach(p=>{
         const parts=(p.name||'').trim().split(/\s+/);
         const first=parts[0]||''; const last=parts[parts.length-1]||'';
         const alc=(p.alcunha||'').trim();
@@ -2808,7 +2808,7 @@ function previewGPSImport(input){
         if(alc&&first) addKey(`${alc} ${first}`,p);       // "Reko João" (ordem inversa)
       });
       // Passagem 2: tokens simples (fallback — maior risco de colisão, por isso só se ainda não existe)
-      [...eqaPlayers,...allPlayers].forEach(p=>{
+      eqaPlayers.forEach(p=>{
         const parts=(p.name||'').trim().split(/\s+/);
         addKey(parts[0]||'',p);                            // "João"
         addKey(parts[parts.length-1]||'',p);              // "Silva"
@@ -2884,23 +2884,23 @@ function _renderGPSPreview(){
 function confirmGPSImport(){
   if(!_gpsImportData) return;
   const {result} = _gpsImportData;
-  let updated = 0; let presencas = 0; let ausencias = 0;
+  let updated = 0; let presencas = 0; let ninscrito = 0;
   result.forEach(({date, evList, presentIds})=>{
     if(!evList.length) return;
     // Se houver vários treinos no mesmo dia, aplica ao primeiro
     const ev = evList[0];
-    const squadPl = DB.players(ev.squad==='both'?null:ev.squad);
+    // GPS é exclusivo da Equipa A — usar sempre plantel eqa independentemente do ev.squad
+    const squadPl = DB.players('eqa');
     const att = {}; // reset limpo — GPS é a fonte de verdade
     squadPl.forEach(p=>{
       if(presentIds.has(p.id)){
         att[p.id]=true; presencas++;
       } else if(p.position==='GR'){
-        // GR não aparece no GPS — marcar como presente se já inscrito na plataforma
-        const regDate=(p.ca||'').slice(0,10);
-        if(!regDate||date>=regDate){ att[p.id]=true; presencas++; }
-        else { att[p.id]=false; ausencias++; }
+        // GR nunca aparece no GPS — sempre presente
+        att[p.id]=true; presencas++;
       } else {
-        att[p.id]=false; ausencias++;
+        // Não encontrado no GPS → não inscrito neste treino
+        att[p.id]='ni'; ninscrito++;
       }
     });
     DB.updateEvent(ev.id, {attendance:att});
@@ -2908,7 +2908,7 @@ function confirmGPSImport(){
   });
   document.getElementById('mo-gps-import').classList.remove('open');
   _gpsImportData = null;
-  toast('✅ '+updated+' treino'+(updated!==1?'s':'')+' atualizados — '+presencas+' presentes, '+ausencias+' ausentes.');
+  toast('✅ '+updated+' treino'+(updated!==1?'s':'')+' atualizados — '+presencas+' presentes, '+ninscrito+' não inscritos.');
   if(view==='training') renderTraining();
 }
 
@@ -4983,24 +4983,15 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 // ── Attendance helpers ────────────────────────────────────────────────────────
 // Returns effective attendance value for a player on a given training date.
 // For dates >= today: unset players are present by default; unavailability auto-applied.
-function effectiveAtt(att, pid, date, playerHint){
-  const today=new Date().toISOString().slice(0,10);
+function effectiveAtt(att, pid, date){
   const explicit=att?.[pid];
-  const player=playerHint||DB.getPlayer(pid);
-  const isGR=player?.position==='GR';
-  // GR + treino passado + false/null explícito = artefacto do GPS antigo, ignorar
-  const ignoreExplicit = isGR && date<today && (explicit===false||explicit===null);
-  if(explicit!=null && explicit!==undefined && !ignoreExplicit) return explicit;
-  // Sem registo válido — calcular por defeito
+  // Qualquer valor explícito tem prioridade (true, 'condicionado', 'just', 'injust', 'lesao', 'ni', false)
+  if(explicit!==undefined && explicit!==null) return explicit;
+  // Sem registo: verificar indisponibilidade manual
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
-  if(date>=today) return true; // presente por defeito a partir de hoje
-  // Treino passado: GR → presente desde a data de inscrição
-  if(isGR){
-    const regDate=(player.ca||player.createdAt||'2000-01-01').slice(0,10);
-    if(date>=regDate) return true;
-  }
-  return false;
+  // Default universal: todos presentes (passado e futuro)
+  return true;
 }
 // Returns {cls, label} for rendering the att button.
 function attInfo(val){
@@ -5009,50 +5000,45 @@ function attInfo(val){
   if(val==='just')           return {cls:'just',         label:'Aus. Justificada'};
   if(val==='injust')         return {cls:'injust',       label:'Aus. Injustificada'};
   if(val==='lesao')          return {cls:'lesao',        label:'🤕 Lesionado'};
+  if(val==='ni')             return {cls:'ni',           label:'Não Inscrito'};
   return                            {cls:'',             label:'— Ausente'};
 }
-// Cycles: Presente → Condicionado → Aus. c/ Justif. → Aus. s/ Justif. → Lesionado → Presente
+// Cycles: Presente → Condicionado → Aus. c/ Justif. → Aus. s/ Justif. → Lesionado → Não Inscrito → Presente
 function nextAttState(current){
   if(current===true)             return 'condicionado';
   if(current==='condicionado')   return 'just';
   if(current==='just')           return 'injust';
   if(current==='injust')         return 'lesao';
-  return true; // lesao / false / undefined → presente
+  if(current==='lesao')          return 'ni';
+  return true; // 'ni' / false / undefined → presente
 }
-// Count players who are effectively present or condicionado
+// Count players who are effectively present or condicionado (não inscritos não contam)
 function countPresent(att, players, date){
-  return players.filter(p=>{ const s=effectiveAtt(att,p.id,date,p); return s===true||s==='condicionado'; }).length;
+  return players.filter(p=>{ const s=effectiveAtt(att,p.id,date); return s===true||s==='condicionado'; }).length;
 }
 // Backfill: marca GR como presentes em todos os treinos passados desde a data de inscrição.
 // Usa localStorage para não repetir jogadores já processados.
 function backfillGRAttendance(){
   try{
-    // v5: apaga entradas false/null dos GRs em vez de as sobrescrever com true.
-    // effectiveAtt trata undefined em treino passado com isGR=true → presente.
-    // Apagar é mais seguro que escrever true (evita conflito com onSnapshot do Firestore).
-    const KEY='scv_gr_backfill_v5';
-    // Limpa chaves de versões anteriores para não bloquear este código
-    ['v1','v2','v3','v4'].forEach(v=>localStorage.removeItem('scv_gr_backfill_'+v));
+    // v6: apaga entradas false/null de TODOS os GRs em treinos passados.
+    // Com effectiveAtt a devolver true por defeito universal, basta apagar os false antigos.
+    const KEY='scv_gr_backfill_v6';
+    ['v1','v2','v3','v4','v5'].forEach(v=>localStorage.removeItem('scv_gr_backfill_'+v));
     if(localStorage.getItem(KEY)) return;
     const today=new Date().toISOString().slice(0,10);
     const grPlayers=DB.players().filter(p=>p.position==='GR');
     if(!grPlayers.length){ localStorage.setItem(KEY,'1'); return; }
     const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<today);
-    console.log(`backfillGR v5: ${grPlayers.length} GR(s), ${allEvs.length} treinos passados`);
     allEvs.forEach(ev=>{
       const att={...(ev.attendance||{})};
       let changed=false;
       grPlayers.forEach(p=>{
-        const regDate=(p.ca||p.createdAt||'2000-01-01').slice(0,10);
-        if(ev.date<regDate) return;
-        // Apagar false/null → effectiveAtt devolve true por default para GRs
         if(att[p.id]===false||att[p.id]===null){ delete att[p.id]; changed=true; }
       });
       if(changed) DB.updateEvent(ev.id,{attendance:att});
     });
     localStorage.setItem(KEY,'1');
-    console.log('backfillGR v5: concluído');
-  }catch(e){ console.warn('backfillGR v5 erro:',e); }
+  }catch(e){ console.warn('backfillGR v6 erro:',e); }
 }
 
 function renderTraining(){
@@ -5099,7 +5085,7 @@ function renderTraining(){
 
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
-    const status=effectiveAtt(att,p.id,ev.date,p);
+    const status=effectiveAtt(att,p.id,ev.date);
     const info=attInfo(status);
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
@@ -5359,8 +5345,7 @@ function renderTraining(){
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.attPid;
     const a=DB.getEvent(trainingEventId).attendance||{};
-    const playerHint=allPl.find(x=>x.id===pid);
-    a[pid]=nextAttState(effectiveAtt(a,pid,ev.date,playerHint));
+    a[pid]=nextAttState(effectiveAtt(a,pid,ev.date));
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
   }));
