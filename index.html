@@ -4128,6 +4128,23 @@ document.getElementById('nl-availlink').addEventListener('click',()=>{
 });
 
 // ── UNAVAILABILITY ────────────────────────────────────────────────────────────
+
+// Ao adicionar indisponibilidade, atualiza as presenças dos treinos no período.
+// lesao → 'lesao'; outro → 'just'. Sobrescreve qualquer estado anterior.
+function applyUnavailToTrainings(pid, from, until, type){
+  const p=DB.getPlayer(pid);
+  if(!p||p.personType==='staff') return; // só atletas
+  const attState=type==='lesao'?'lesao':'just';
+  const evs=DB.events(p.squad==='both'?null:p.squad)
+    .filter(e=>e.type==='training'&&e.date>=from&&e.date<=until);
+  evs.forEach(ev=>{
+    const att={...(ev.attendance||{})};
+    att[pid]=attState;
+    DB.updateEvent(ev.id,{attendance:att});
+  });
+  console.log(`applyUnavailToTrainings: ${evs.length} treino(s) atualizados para ${attState}`);
+}
+
 function buildUnavailabilityAlert(date, playerIds, squad){
   const all=DB.getUnavailableOn(date);
   const athleteHits=all.filter(r=>r.personType==='athlete'&&playerIds.includes(r.personId));
@@ -4193,6 +4210,7 @@ function bindUnavailHandlers(){
     if(!type){ toast('⚠️ Seleciona o motivo'); return; }
     const p=DB.getPlayer(pid);
     await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,type,reason});
+    applyUnavailToTrainings(pid,from,until,type);
     renderPlayer();
     toast('✅ Período adicionado');
   });
@@ -4279,6 +4297,7 @@ async function avSquadChange(){
         await firestoreDb.collection('unavailability').doc(rec.id).set(rec);
       } else {
         await DB.addUnavailability(rec);
+        if(rec.personType==='athlete') applyUnavailToTrainings(rec.personId,rec.startDate,rec.endDate,rec.type);
       }
       document.getElementById('av-success').style.display='';
       form.reset();
@@ -4984,14 +5003,16 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 // ── Attendance helpers ────────────────────────────────────────────────────────
 // Returns effective attendance value for a player on a given training date.
 // Default: 'pp' (por preencher) — trainer must activate toggle or fill individually.
+// Unavailability overrides 'true'/'pp'/'ni' but NOT manual states (condicionado, just, injust, lesao).
 function effectiveAtt(att, pid, date){
   const explicit=att?.[pid];
-  // Qualquer valor explícito tem prioridade (true, 'condicionado', 'just', 'injust', 'lesao', 'ni', 'pp', false)
-  if(explicit!==undefined && explicit!==null) return explicit;
-  // Sem registo: verificar indisponibilidade manual
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
-  if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
-  // Default: por preencher (requer ação do treinador)
+  // Indisponibilidade tem prioridade sobre: sem registo, 'pp', 'true', 'ni'
+  const overridable=explicit===undefined||explicit===null||explicit===true||explicit==='pp'||explicit==='ni';
+  if(unavail && overridable){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
+  // Qualquer outro valor explícito mantém-se (condicionado, just, injust, lesao — definidos manualmente)
+  if(explicit!==undefined && explicit!==null) return explicit;
+  // Default: por preencher
   return 'pp';
 }
 // Returns {cls, label} for rendering the att button.
@@ -5346,8 +5367,13 @@ function renderTraining(){
       // Desativar: apagar entradas → default 'pp'
       allPl.forEach(p=>{ delete a[p.id]; });
     } else {
-      // Ativar: marcar todos como presentes
-      allPl.forEach(p=>{ a[p.id]=true; });
+      // Ativar: marcar todos como presentes, exceto atletas com indisponibilidade activa
+      const unavailToday=DB.getUnavailableOn(ev.date);
+      allPl.forEach(p=>{
+        const hasUnavail=unavailToday.some(r=>r.personId===p.id);
+        if(!hasUnavail) a[p.id]=true;
+        // Se tem indisponibilidade, não escrever nada — effectiveAtt aplica o estado correcto
+      });
     }
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
