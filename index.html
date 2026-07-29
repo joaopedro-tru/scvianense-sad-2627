@@ -318,7 +318,8 @@ body.pm #v-pf{padding:30px}
 .att-btn.just{background:#d97706;color:#fff;border-color:#d97706}
 .att-btn.injust{background:#7f1d1d;color:#fff;border-color:#7f1d1d}
 .att-btn.ni{background:#e5e7eb;color:#6b7280;border-color:#d1d5db;text-decoration:line-through}
-.att-btn:not(.present):not(.condicionado):not(.lesao):not(.just):not(.injust):not(.ni):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
+.att-btn.pp{background:var(--bg);color:var(--muted);border-color:var(--border);border-style:dashed;font-style:italic}
+.att-btn:not(.present):not(.condicionado):not(.lesao):not(.just):not(.injust):not(.ni):not(.pp):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
 .trav-box{width:24px;height:24px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:var(--bg);font-size:15px;font-weight:800;color:transparent;transition:all .15s}
 .trav-box:hover{border-color:#aaa}
 .trav-box.checked{border-color:#e84444;background:#fff0f0;color:#e84444}
@@ -4982,16 +4983,16 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 
 // ── Attendance helpers ────────────────────────────────────────────────────────
 // Returns effective attendance value for a player on a given training date.
-// For dates >= today: unset players are present by default; unavailability auto-applied.
+// Default: 'pp' (por preencher) — trainer must activate toggle or fill individually.
 function effectiveAtt(att, pid, date){
   const explicit=att?.[pid];
-  // Qualquer valor explícito tem prioridade (true, 'condicionado', 'just', 'injust', 'lesao', 'ni', false)
+  // Qualquer valor explícito tem prioridade (true, 'condicionado', 'just', 'injust', 'lesao', 'ni', 'pp', false)
   if(explicit!==undefined && explicit!==null) return explicit;
   // Sem registo: verificar indisponibilidade manual
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
-  // Default universal: todos presentes (passado e futuro)
-  return true;
+  // Default: por preencher (requer ação do treinador)
+  return 'pp';
 }
 // Returns {cls, label} for rendering the att button.
 function attInfo(val){
@@ -5001,16 +5002,19 @@ function attInfo(val){
   if(val==='injust')         return {cls:'injust',       label:'Aus. Injustificada'};
   if(val==='lesao')          return {cls:'lesao',        label:'🤕 Lesionado'};
   if(val==='ni')             return {cls:'ni',           label:'Não Inscrito'};
+  if(val==='pp')             return {cls:'pp',           label:'Por Preencher'};
   return                            {cls:'',             label:'— Ausente'};
 }
-// Cycles: Presente → Condicionado → Aus. c/ Justif. → Aus. s/ Justif. → Lesionado → Não Inscrito → Presente
+// Cycles: Por Preencher → Presente → Condicionado → Aus. c/ Just. → Aus. s/ Just. → Lesionado → Por Preencher
+// 'ni' (GPS) → Presente ao clicar (override manual)
 function nextAttState(current){
-  if(current===true)             return 'condicionado';
-  if(current==='condicionado')   return 'just';
-  if(current==='just')           return 'injust';
-  if(current==='injust')         return 'lesao';
-  if(current==='lesao')          return 'ni';
-  return true; // 'ni' / false / undefined → presente
+  if(current==='ni')           return true;   // GPS não inscrito → trainer override: presente
+  if(current==='pp'||current===undefined||current===null||current===false) return true; // por preencher → presente
+  if(current===true)           return 'condicionado';
+  if(current==='condicionado') return 'just';
+  if(current==='just')         return 'injust';
+  if(current==='injust')       return 'lesao';
+  return 'pp'; // lesao → por preencher (reset)
 }
 // Count players who are effectively present or condicionado (não inscritos não contam)
 function countPresent(att, players, date){
@@ -5292,7 +5296,7 @@ function renderTraining(){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">👥 Presenças</h3>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="att-summary">${totalPresCount} / ${allPl.length + trialPlayers.length} presentes</span>
-          <button class="btn btn-o btn-sm" id="btn-all-present" title="Marcar todos como presentes">✓ Todos</button>
+          ${(()=>{const todosOn=allPl.length>0&&allPl.every(p=>effectiveAtt(att,p.id,ev.date)===true);return`<button class="btn ${todosOn?'btn-p':'btn-o'} btn-sm" id="btn-todos-toggle" title="${todosOn?'Desativar — marcar todos como Por Preencher':'Ativar — marcar todos como Presentes'}">${todosOn?'✓ Todos':'◯ Todos'}</button>`;})()}
         </div>
       </div>
       ${unavailAlert}
@@ -5333,10 +5337,18 @@ function renderTraining(){
   })()}
   ${buildClinicalSection(trainingEventId, allPl)}`;
 
-  // Mark ALL present (respects unavailabilities — sets absent/condicionado players to present, keeps others)
-  document.getElementById('btn-all-present')?.addEventListener('click',()=>{
-    const a=DB.getEvent(trainingEventId).attendance||{};
-    allPl.forEach(p=>{ a[p.id]=true; });
+  // Toggle "Todos": ON → todos presentes; OFF → todos por preencher (apaga entradas → default 'pp')
+  document.getElementById('btn-todos-toggle')?.addEventListener('click',()=>{
+    const currentAtt=DB.getEvent(trainingEventId).attendance||{};
+    const todosOn=allPl.length>0&&allPl.every(p=>effectiveAtt(currentAtt,p.id,ev.date)===true);
+    const a={...currentAtt};
+    if(todosOn){
+      // Desativar: apagar entradas → default 'pp'
+      allPl.forEach(p=>{ delete a[p.id]; });
+    } else {
+      // Ativar: marcar todos como presentes
+      allPl.forEach(p=>{ a[p.id]=true; });
+    }
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
   });
