@@ -2627,12 +2627,13 @@ function _squadLoadCards(cs){
     });
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
-  // Contagem de sessões por tema secundário
+  // Contagem de sessões por tema secundário (suporta array e formato antigo {moment:...})
   function trainAggSecondary(evs){
     const acc={};
     evs.forEach(ev=>{
-      const m=ev.objectiveSecondary?.moment;
-      if(m&&SECONDARY_THEMES[m]) acc[m]=(acc[m]||0)+1;
+      normalizeSecondaryArr(ev.objectiveSecondary).forEach(k=>{
+        if(SECONDARY_THEMES[k]) acc[k]=(acc[k]||0)+1;
+      });
     });
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
@@ -4468,9 +4469,12 @@ function showEventDetail(id){
     if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
       const tc=TACTICS_TAXONOMY;
       let h=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">`;
-      h+=`<div><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[p.moment].label}</span>${p.subPrinciples?.length?`<div style="font-size:10px;color:${tc[p.moment].color};font-weight:600;margin-top:2px">${p.subPrinciples.join(' · ')}</div>`:''}</div>`;
-      const _stc=s?.moment?SECONDARY_THEMES[s.moment]:null;
-      if(_stc) h+=`<div style="opacity:.75"><span style="display:inline-block;background:${_stc.color}25;color:${_stc.color};border:1px solid ${_stc.color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${_stc.label}</span></div>`;
+      h+=`<div><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[p.moment].label}</span></div>`;
+      const sArr=normalizeSecondaryArr(s);
+      sArr.forEach(k=>{
+        const stc=SECONDARY_THEMES[k]; if(!stc) return;
+        h+=`<div style="opacity:.85"><span style="display:inline-block;background:${stc.color}25;color:${stc.color};border:1px solid ${stc.color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${stc.label}</span></div>`;
+      });
       return h+`</div>`;
     }
     return ev.objectives?`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="font-size:12px">${ev.objectives}</div>`:'';
@@ -4737,7 +4741,12 @@ function openEventModal(ev=null,date=null,defaults={}){
   renderRegimePicker();
   // Tactical objectives reset
   _objPrimary=ev?.objectivePrimary?{...ev.objectivePrimary}:{moment:null,subPrinciples:[]};
-  _objSecondary=ev?.objectiveSecondary?{...ev.objectiveSecondary}:{moment:null,subPrinciples:[]};
+  // Normaliza secundário: suporta formato antigo {moment:...} e novo [] de chaves
+  _objSecondary=normalizeSecondaryArr(ev?.objectiveSecondary);
+  // Se secundário vazio mas primário tem sub-princípios, derivar temas do primário
+  if(!_objSecondary.length&&ev?.objectivePrimary?.subPrinciples?.length){
+    _objSecondary=mapToSecondaryThemes(null,ev.objectivePrimary);
+  }
   _fichaExercises=ev?.trainingExercises?[...ev.trainingExercises]:[];
   _momentSummary=ev?.momentSummary?{...ev.momentSummary}:{};
   _fichaText='';
@@ -4806,10 +4815,10 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
   const _isTraining=f('e-type')==='training';
-  const _p=_isTraining&&_objPrimary.moment?{..._objPrimary}:null;
-  const _s=_isTraining&&_objSecondary.moment?{..._objSecondary}:null;
-  const _sLabel=_s?(SECONDARY_THEMES[_s.moment]?.full||TACTICS_TAXONOMY[_s.moment]?.full||_s.moment||null):null;
-  const _objText=_p?[TACTICS_TAXONOMY[_p.moment]?.full||_p.moment,(_p.subPrinciples||[]).length?'('+_p.subPrinciples.join(', ')+')':''].filter(Boolean).join(' ')+(_sLabel?' · '+_sLabel:''):null;
+  const _p=_isTraining&&_objPrimary.moment?{moment:_objPrimary.moment}:null; // sem subPrinciples (vão para secundário)
+  const _s=_isTraining&&_objSecondary.length?[..._objSecondary]:null; // array de chaves
+  const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
+  const _objText=_p?((TACTICS_TAXONOMY[_p.moment]?.full||_p.moment)+(_sLabel?' · '+_sLabel:'')):null;
   const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
@@ -5047,14 +5056,12 @@ function renderTraining(){
             if(!p?.moment&&!ev.objectives) return '';
             const tc=TACTICS_TAXONOMY;
             if(p?.moment&&tc[p.moment]){
-              const pLabel=tc[p.moment].label+(p.subPrinciples?.length?' · '+p.subPrinciples.join(', '):'');
-              const _stc=s?.moment?SECONDARY_THEMES[s.moment]:null;
-              const sLabel=_stc?_stc.label:'';
-              const sColor=_stc?_stc.color:null;
-              return `<div class="dr"><span class="dl">Obj. Principal</span><span class="dv" style="color:${tc[p.moment].color};font-weight:600">${pLabel}</span></div>`
-                    +(sLabel&&sColor?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv" style="color:${sColor}">${sLabel}</span></div>`:'')+
-                    (sLabel&&!sColor?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv">${sLabel}</span></div>`:'')+
-                    (!_stc&&s?.moment&&tc[s.moment]?`<div class="dr"><span class="dl">Obj. Secundário</span><span class="dv" style="color:${tc[s.moment].color}">${tc[s.moment].label}</span></div>`:'')
+              const sArr=normalizeSecondaryArr(s);
+              const sLabels=sArr.map(k=>SECONDARY_THEMES[k]).filter(Boolean);
+              const sText=sLabels.map(v=>`<span style="color:${v.color};font-weight:600">${v.label}</span>`).join(' · ')||'';
+              return `<div class="dr"><span class="dl">Obj. Principal</span><span class="dv" style="color:${tc[p.moment].color};font-weight:600">${tc[p.moment].label}</span></div>`
+                    +(sText?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv">${sText}</span></div>`:'')+
+                    (sArr.length===0&&ev.objectives?`<div class="dr"><span class="dl">Objetivos</span><span class="dv">${ev.objectives}</span></div>`:'');
             }
             return ev.objectives?row('Objetivos',ev.objectives):'';
           })();
@@ -7909,16 +7916,10 @@ function generateWeeklyPlan(){
     if(ev.type==='training'){
       const p=ev.objectivePrimary, s=ev.objectiveSecondary;
       if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
-        const tc=TACTICS_TAXONOMY;
-        let t=tc[p.moment].full;
-        if(p.subPrinciples?.length) t+='\n'+p.subPrinciples.join(', ');
-        const _stcObs=s?.moment?SECONDARY_THEMES[s.moment]:null;
-        if(_stcObs){
-          t+='\n\n'+_stcObs.full;
-        } else if(s?.moment&&TACTICS_TAXONOMY[s.moment]){
-          t+='\n\n'+TACTICS_TAXONOMY[s.moment].full;
-          if(s.subPrinciples?.length) t+='\n'+s.subPrinciples.join(', ');
-        }
+        let t=TACTICS_TAXONOMY[p.moment].full;
+        const sArr=normalizeSecondaryArr(s);
+        const sFulls=sArr.map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean);
+        if(sFulls.length) t+='\n'+sFulls.join(', ');
         return t;
       }
       return ev.objectives||'';
@@ -8302,34 +8303,44 @@ function addCustomSecondaryTheme(label){
   return key;
 }
 
-// Sugere o tema secundário a partir da resposta da IA
-function mapToSecondaryTheme(secondary, primary){
+// Normaliza objectiveSecondary: aceita formato antigo {moment:...} e novo [] → sempre array de chaves
+function normalizeSecondaryArr(raw){
+  if(Array.isArray(raw)) return raw.filter(k=>k&&SECONDARY_THEMES[k]);
+  if(raw?.moment&&SECONDARY_THEMES[raw.moment]) return [raw.moment];
+  // Formato antigo com chave de TACTICS_TAXONOMY (ex: 'OD') — ignora
+  return [];
+}
+
+// Retorna array de chaves de SECONDARY_THEMES a partir da resposta da IA
+function mapToSecondaryThemes(secondary, primary){
+  const keys=[];
   // 1ª prioridade: sub-princípios conhecidos (mapeados em SUB_TO_SECONDARY)
   for(const sub of (primary?.subPrinciples||[])){
     const k=SUB_TO_SECONDARY[sub];
-    if(k&&SECONDARY_THEMES[k]) return k;
+    if(k&&SECONDARY_THEMES[k]&&!keys.includes(k)) keys.push(k);
   }
-  // 2ª prioridade: sub-princípios DESCONHECIDOS → criar temas custom e selecionar o primeiro
-  // (ex: "PBD", "Pressão" gerados pela IA mas não na lista padrão)
-  const unknownSubs=(primary?.subPrinciples||[]).filter(s=>!SUB_TO_SECONDARY[s]&&s);
-  if(unknownSubs.length){
-    // Cria tema custom para cada sub desconhecido (aparecem todos no picker)
-    unknownSubs.forEach(s=>addCustomSecondaryTheme(s));
-    // Seleciona o primeiro
-    return addCustomSecondaryTheme(unknownSubs[0]);
-  }
+  // 2ª prioridade: sub-princípios DESCONHECIDOS → criar temas custom
+  // (ex: "VCJ", "PBD" gerados pela IA mas não na lista padrão)
+  const unknownSubs=(primary?.subPrinciples||[]).filter(s=>s&&!SUB_TO_SECONDARY[s]);
+  unknownSubs.forEach(s=>{ const k=addCustomSecondaryTheme(s); if(k&&!keys.includes(k)) keys.push(k); });
   // 3ª prioridade: fallback genérico pelo momento secundário da IA
-  const sm=secondary?.moment;
-  if(sm&&AI_MOMENT_TO_SECONDARY[sm]) return AI_MOMENT_TO_SECONDARY[sm];
-  // 4ª prioridade: sub-princípios do secundário da IA
-  const secUnknown=(secondary?.subPrinciples||[]).filter(s=>!SUB_TO_SECONDARY[s]&&s);
-  if(secUnknown.length){
-    secUnknown.forEach(s=>addCustomSecondaryTheme(s));
-    return addCustomSecondaryTheme(secUnknown[0]);
+  if(!keys.length){
+    const sm=secondary?.moment;
+    if(sm&&AI_MOMENT_TO_SECONDARY[sm]) keys.push(AI_MOMENT_TO_SECONDARY[sm]);
   }
-  const firstSub=(secondary?.subPrinciples||[])[0];
-  if(firstSub) return addCustomSecondaryTheme(firstSub);
-  return null;
+  // 4ª prioridade: sub-princípios do secundário da IA
+  if(!keys.length){
+    (secondary?.subPrinciples||[]).forEach(s=>{
+      const k=s&&SUB_TO_SECONDARY[s]?SUB_TO_SECONDARY[s]:addCustomSecondaryTheme(s);
+      if(k&&!keys.includes(k)) keys.push(k);
+    });
+  }
+  return keys;
+}
+// Compat: versão singular que retorna a primeira chave (usada onde ainda necessário)
+function mapToSecondaryTheme(secondary, primary){
+  const arr=mapToSecondaryThemes(secondary,primary);
+  return arr[0]||null;
 }
 const GYM_CATEGORIES={
   'Empurrar':  {color:'#3b82f6'},
@@ -8354,7 +8365,7 @@ const REGIME_DEFAULTS={
 };
 let _regimes=[];
 let _objPrimary={moment:null,subPrinciples:[]};
-let _objSecondary={moment:null,subPrinciples:[]};
+let _objSecondary=[];   // array de chaves de SECONDARY_THEMES
 let _fichaExercises=[];   // exercícios extraídos da IA
 let _momentSummary={};    // {OO:18, TOTD:16, SJ:19}
 let _fichaText='';
@@ -8706,53 +8717,51 @@ function toggleRegime(key){
 }
 
 function renderObjPicker(which){
-  const obj=which==='primary'?_objPrimary:_objSecondary;
   const mEl=document.getElementById(`e-obj-${which}-moments`);
   const sEl=document.getElementById(`e-obj-${which}-subs`);
   if(!mEl) return;
   if(which==='primary'){
-    // Picker de momento de jogo — apenas os 6 momentos primários
+    // Picker de momento de jogo — apenas os 6 momentos primários, sem sub-princípios
     mEl.innerHTML=PRIMARY_MOMENTS.map(k=>{
       const v=TACTICS_TAXONOMY[k];
-      const sel=obj.moment===k;
+      const sel=_objPrimary.moment===k;
       return `<button type="button" onclick="selectObjMoment('primary','${k}')"
         style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
     }).join('');
-    // Sub-princípios do momento primário selecionado
-    if(obj.moment&&TACTICS_TAXONOMY[obj.moment]?.subs?.length){
-      const v=TACTICS_TAXONOMY[obj.moment];
-      sEl.innerHTML=v.subs.map(sub=>{
-        const sel=(obj.subPrinciples||[]).includes(sub);
-        return `<button type="button" onclick="toggleObjSub('primary','${sub}')"
-          style="padding:3px 9px;border-radius:5px;border:1.5px solid ${sel?v.color:'var(--border)'};background:${sel?v.color+'20':'transparent'};color:${sel?v.color:'var(--muted)'};font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;font-family:inherit">${sub}</button>`;
-      }).join('');
-    } else { if(sEl) sEl.innerHTML=''; }
+    if(sEl) sEl.innerHTML=''; // sub-princípios vão para o picker secundário
   } else {
-    // Picker de tema secundário — SECONDARY_THEMES
-    // Se o momento primário tem sub-princípios desconhecidos, adiciona-os como temas custom
-    // para aparecerem como opções mesmo sem re-analisar
+    // Picker de tema/foco tático — SECONDARY_THEMES, multi-select
+    // Sub-princípios guardados no primário → garantir que aparecem como opções custom
     (_objPrimary.subPrinciples||[])
       .filter(s=>s&&!SUB_TO_SECONDARY[s])
       .forEach(s=>addCustomSecondaryTheme(s));
     mEl.innerHTML=Object.entries(SECONDARY_THEMES).map(([k,v])=>{
-      const sel=obj.moment===k;
-      return `<button type="button" onclick="selectObjMoment('secondary','${k}')"
+      const sel=_objSecondary.includes(k);
+      return `<button type="button" onclick="toggleObjSecondary('${k}')"
         style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
     }).join('');
-    if(sEl) sEl.innerHTML=''; // sem sub-princípios para secundário
+    if(sEl) sEl.innerHTML='';
   }
 }
 function selectObjMoment(which,key){
-  const obj=which==='primary'?_objPrimary:_objSecondary;
-  if(obj.moment===key){obj.moment=null;obj.subPrinciples=[];}
-  else{obj.moment=key;obj.subPrinciples=[];}
-  renderObjPicker(which);
+  // Apenas para primário (toggle single-select)
+  if(_objPrimary.moment===key){_objPrimary.moment=null;_objPrimary.subPrinciples=[];}
+  else{_objPrimary.moment=key;_objPrimary.subPrinciples=[];}
+  renderObjPicker('primary');
+}
+function toggleObjSecondary(key){
+  // Multi-select para secundário
+  const i=_objSecondary.indexOf(key);
+  if(i>-1) _objSecondary.splice(i,1); else _objSecondary.push(key);
+  renderObjPicker('secondary');
 }
 function toggleObjSub(which,sub){
-  const obj=which==='primary'?_objPrimary:_objSecondary;
-  const i=obj.subPrinciples.indexOf(sub);
-  if(i>-1)obj.subPrinciples.splice(i,1); else obj.subPrinciples.push(sub);
-  renderObjPicker(which);
+  // Mantido por compat (não usado activamente)
+  if(which==='primary'){
+    const i=_objPrimary.subPrinciples.indexOf(sub);
+    if(i>-1)_objPrimary.subPrinciples.splice(i,1); else _objPrimary.subPrinciples.push(sub);
+    renderObjPicker('primary');
+  }
 }
 
 async function onFichaFileChange(input){
@@ -8818,12 +8827,12 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
     const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
     if(canonPrimary){
-      upd.objectivePrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]};
-      // Mapear secundário para SECONDARY_THEMES — só define se evento ainda não tem secundário válido
-      const existing=ev.objectiveSecondary?.moment;
-      if(!existing||!SECONDARY_THEMES[existing]){
-        const secKey=mapToSecondaryTheme(d.secondary,d.primary);
-        if(secKey) upd.objectiveSecondary={moment:secKey,subPrinciples:[]};
+      upd.objectivePrimary={moment:canonPrimary}; // sem subPrinciples (vão para secundário)
+      // Só actualiza secundário se ainda não existe secundário válido
+      const existingArr=normalizeSecondaryArr(ev.objectiveSecondary);
+      if(!existingArr.length){
+        const secKeys=mapToSecondaryThemes(d.secondary,d.primary);
+        if(secKeys.length) upd.objectiveSecondary=secKeys;
       }
     }
     if(Object.keys(upd).length){
@@ -8892,12 +8901,12 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
       if(d.mismatch || !_objPrimary.moment){
         const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
         if(canonPrimary){
-          _objPrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]};
+          _objPrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]}; // subPrinciples guardados para derivar secundário
         }
-        // Mapear secundário para SECONDARY_THEMES
-        if(!_objSecondary.moment){
-          const secKey=mapToSecondaryTheme(d.secondary,d.primary);
-          _objSecondary=secKey?{moment:secKey,subPrinciples:[]}:{moment:null,subPrinciples:[]};
+        // Mapear sub-princípios do primário para temas secundários (array)
+        if(!_objSecondary.length){
+          const secKeys=mapToSecondaryThemes(d.secondary,d.primary);
+          _objSecondary=[...secKeys];
         }
       }
       // Sempre re-renderizar o picker para refletir estado atual
