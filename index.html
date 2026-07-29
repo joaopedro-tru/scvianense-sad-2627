@@ -2464,7 +2464,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null;
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados';
 // Navigation back-tracking
 let _backView='dashboard', _backSquad='sub19';
 
@@ -3358,20 +3358,101 @@ function renderPlayer(){
     </div>`;
   }
 
-  document.getElementById('pd-content').innerHTML=`
-    <div class="pdh">
-      <div class="pda">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
-      <div>
-        <h2>${dn(p)}</h2>
-        ${p.alcunha?`<div style="font-size:12px;color:var(--muted);margin-top:1px;margin-bottom:2px">${p.name}</div>`:''}
-        <div class="bgs">
-          ${pSquads.map(s=>`<span class="bg bg-g">${SQUADS[s]||s}</span>`).join('')||`<span class="bg bg-g">—</span>`}
-          ${[p.position,p.position2,p.position3].filter(Boolean).map(x=>`<span class="bg bg-pos">${x}</span>`).join('')}
-          ${p.number?`<span class="bg bg-n">#${p.number}</span>`:''}
-          ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
+  // ── Build Stats tab content ───────────────────────────────────────────────
+  const gameRecords = [];
+  allEvs.filter(ev=>ev.type==='game').sort((a,b)=>b.date.localeCompare(a.date)).forEach(ev=>{
+    const conv=!!(ev.convocatoria?.players?.[pid]);
+    const mr=ev.matchReport||{};
+    const evList=mr.events||[];
+    const isStarter=(mr.lineup||[]).includes(pid);
+    const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
+    const subbedOut=evList.some(e=>e.type==='sub'&&e.playerOutId===pid);
+    const played=isStarter||subbedIn;
+    const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
+    const gls=evList.filter(e=>e.type==='goal'&&e.playerId===pid).length;
+    const ast=evList.filter(e=>e.type==='goal'&&e.assistId===pid).length;
+    const ylw=evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid).length;
+    const red=evList.filter(e=>(e.type==='red'||e.type==='yellow2')&&e.playerId===pid).length;
+    const rating=hasRating?parseFloat(mr.ratings[pid]):null;
+    if(!conv&&!played&&!gls&&!ast&&!ylw&&!red&&!hasRating) return;
+    const gf=evList.filter(e=>e.type==='goal').length;
+    const ga=evList.filter(e=>e.type==='goal_conceded').length;
+    const hasScore=evList.some(e=>e.type==='goal'||e.type==='goal_conceded');
+    const scoreStr=hasScore?`${gf} — ${ga}`:'— — —';
+    const result=hasScore?(gf>ga?'V':gf<ga?'D':'E'):null;
+    const resultColor=result==='V'?'#16a34a':result==='D'?'#dc2626':'#6b7280';
+    const roleIcon=played?(isStarter?'<span title="Titular" style="color:var(--ok);font-size:11px">⬤ Tit.</span>':'<span title="Suplente utilizado" style="color:#f97316;font-size:11px">⬤ Sub.</span>'):(conv?'<span title="Convocado não utilizado" style="color:var(--muted);font-size:11px">◯ Conv.</span>':'');
+    gameRecords.push({ev,gls,ast,ylw,red,rating,scoreStr,result,resultColor,roleIcon,played,conv});
+  });
+
+  const statsTabHTML=(()=>{
+    const aggregateSummary=`
+      <div class="card" style="margin-bottom:0">
+        ${pSquads.length>1
+          ? pSquads.map(sq=>{
+              const st=computeSquadStats(sq);
+              return `<div style="margin-bottom:10px">
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">${SQUADS[sq]}</div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:8px">
+                  ${statBox('Treinos',st.trainAttended,'presenças')}${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Média',st.avgRating??'—','nota')}
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+                  ${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}
+                </div>
+              </div>`;
+            }).join('<div style="height:1px;background:var(--border);margin:8px 0"></div>')
+          : `<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
+              ${statBox('Treinos',trainAttended,'presenças')}${statBox('Convocado',gamesConv,'jogos')}${statBox('Jogou',gamesPlayed,'jogos')}${statBox('Média',avgRating??'—','nota')}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+              ${statBox('Golos',goals,'')}${statBox('Assist.',assists,'')}${statBox('Amarelos',yellows,'')}${statBox('Vermelhos',reds,'')}
+            </div>`}
+      </div>`;
+
+    if(!gameRecords.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados.</div>`;
+
+    const rows=gameRecords.map(({ev,gls,ast,ylw,red,rating,scoreStr,result,resultColor,roleIcon})=>`
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 6px;font-size:12px;white-space:nowrap;color:var(--muted)">${fmtDate(ev.date)}</td>
+        <td style="padding:8px 6px;font-size:12px;font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ev.homeAway==='away'?'✈️ ':'🏠 '}${ev.opponent||'—'}</td>
+        <td style="padding:8px 6px;font-size:12px;font-weight:700;color:${resultColor};text-align:center">${result?`<span style="display:inline-block;min-width:20px;text-align:center">${result}</span> `:''}${scoreStr}</td>
+        <td style="padding:8px 6px;text-align:center;white-space:nowrap">${roleIcon}</td>
+        <td style="padding:8px 6px;text-align:center;font-size:12px;font-weight:700">${gls?`<span style="color:var(--ok)">⚽${gls}</span>`:''}</td>
+        <td style="padding:8px 6px;text-align:center;font-size:12px;font-weight:700">${ast?`<span style="color:#2563eb">🅰️${ast}</span>`:''}</td>
+        <td style="padding:8px 6px;text-align:center;font-size:12px">${ylw?`🟡${ylw>1?ylw:''}`:''}</td>
+        <td style="padding:8px 6px;text-align:center;font-size:12px">${red?'🔴':''}</td>
+        <td style="padding:8px 6px;text-align:center;font-size:12px;font-weight:700;color:var(--green)">${rating!==null?rating.toFixed(1):''}</td>
+      </tr>`).join('');
+
+    return aggregateSummary+`
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:480px">
+            <thead>
+              <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left">Data</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left">Adversário</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">Resultado</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">Papel</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">⚽</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">🅰️</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">🟡</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">🔴</th>
+                <th style="padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center">Nota</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
         </div>
-      </div>
-    </div>
+      </div>`;
+  })();
+
+  const tabBar=`<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;gap:0">
+    <button class="tab-btn${playerTab==='dados'?' tab-active':''}" data-ptab="dados" style="padding:10px 18px">Dados</button>
+    <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
+  </div>`;
+
+  const dadosHTML=`
     <div class="ds">
       <div class="card"><h3>Dados Pessoais</h3>
         ${row('Data de Nascimento',fmtDate(p.dob))}
@@ -3398,50 +3479,36 @@ function renderPlayer(){
       </div>
       ${canViewClinicalSummary()?buildPlayerClinicalCard(pid):''}
       ${isAdmin()?buildPlayerUnavailCard(pid):''}
-      <div class="card"><h3>Estatísticas</h3>
-        ${pSquads.length>1
-          ? pSquads.map(sq=>{
-              const st=computeSquadStats(sq);
-              return `<div style="margin-bottom:14px">
-                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">${SQUADS[sq]}</div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:8px">
-                  ${statBox('Treinos',st.trainAttended,'presenças')}
-                  ${statBox('Convocado',st.gamesConv,'jogos')}
-                  ${statBox('Jogou',st.gamesPlayed,'jogos')}
-                  ${statBox('Média',st.avgRating??'—','avaliação')}
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-                  ${statBox('Golos',st.goals,'')}
-                  ${statBox('Assist.',st.assists,'')}
-                  ${statBox('Amarelos',st.yellows,'')}
-                  ${statBox('Vermelhos',st.reds,'')}
-                </div>
-              </div>`;
-            }).join('<div style="height:1px;background:var(--border);margin:8px 0"></div>')
-          : `<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
-              ${statBox('Treinos',trainAttended,'presenças')}
-              ${statBox('Convocado',gamesConv,'jogos')}
-              ${statBox('Jogou',gamesPlayed,'jogos')}
-              ${statBox('Média',avgRating??'—','avaliação')}
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-              ${statBox('Golos',goals,'')}
-              ${statBox('Assist.',assists,'')}
-              ${statBox('Amarelos',yellows,'')}
-              ${statBox('Vermelhos',reds,'')}
-            </div>`}
-      </div>
       ${p.position==='GR'&&grGames>0?`
-      <div class="card" style="margin-top:16px">
+      <div class="card">
         <h3 style="margin-bottom:12px">🥅 GR — Resumo em Jogo</h3>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0">
-          ${statBox('Jogos',grGames,'com registo')}
-          ${statBox('Def.',grDefTotal,'ações')}
-          ${statBox('Of.',grOffTotal,'ações')}
-          ${statBox('Sofridos',grGoalsConceded,'golos')}
+          ${statBox('Jogos',grGames,'com registo')}${statBox('Def.',grDefTotal,'ações')}${statBox('Of.',grOffTotal,'ações')}${statBox('Sofridos',grGoalsConceded,'golos')}
         </div>
       </div>`:''}
     </div>`;
+
+  document.getElementById('pd-content').innerHTML=`
+    <div class="pdh">
+      <div class="pda">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+      <div>
+        <h2>${dn(p)}</h2>
+        ${p.alcunha?`<div style="font-size:12px;color:var(--muted);margin-top:1px;margin-bottom:2px">${p.name}</div>`:''}
+        <div class="bgs">
+          ${pSquads.map(s=>`<span class="bg bg-g">${SQUADS[s]||s}</span>`).join('')||`<span class="bg bg-g">—</span>`}
+          ${[p.position,p.position2,p.position3].filter(Boolean).map(x=>`<span class="bg bg-pos">${x}</span>`).join('')}
+          ${p.number?`<span class="bg bg-n">#${p.number}</span>`:''}
+          ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
+        </div>
+      </div>
+    </div>
+    ${tabBar}
+    ${playerTab==='stats'?`<div style="display:flex;flex-direction:column;gap:16px">${statsTabHTML}</div>`:dadosHTML}`;
+
+  // Tab click handlers
+  document.querySelectorAll('[data-ptab]').forEach(btn=>btn.addEventListener('click',()=>{
+    playerTab=btn.dataset.ptab; renderPlayer();
+  }));
   if(isAdmin()) bindUnavailHandlers();
 }
 
