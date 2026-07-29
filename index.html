@@ -8239,7 +8239,7 @@ const SECONDARY_THEMES={
   'vcj':         {label:'Var. Centro Jogo',    color:'#0e7490', full:'Variação do Centro de Jogo'},
   'combinacoes': {label:'Combinações',         color:'#06b6d4', full:'Combinações'},
   'finalizacao': {label:'Finalização',         color:'#059669', full:'Finalização'},
-  'variacao':    {label:'Variação de Jogo',    color:'#155e75', full:'Variação de Jogo'},
+  'variacao':    {label:'Variação de Jogo',    color:'#155e75', full:'Variação de Jogo',  _legacy:true}, // fusionado em vcj
   // ── Transição Ofensiva ───────────────────────────────────────────
   'ataque-rap':  {label:'Ataque Rápido',       color:'#f97316', full:'Ataque Rápido'},
   '3o-homem':    {label:'3º Homem',            color:'#0891b2', full:'3º Homem'},
@@ -8265,8 +8265,7 @@ const SUB_TO_SECONDARY={
   // OO
   'Último Terço':'ultimo-t',
   'MPB':'mpo','Manutenção Posse':'mpo','Manutenção de Posse':'mpo',
-  'VCJ':'vcj','Variação do Centro de Jogo':'vcj',
-  'Variação de Jogo':'variacao',
+  'VCJ':'vcj','Variação do Centro de Jogo':'vcj','Variação de Jogo':'vcj',
   'Combinações':'combinacoes','Finalização':'finalizacao',
   'Saída PB':'bp-off','Saída a Jogar':'bp-off',  // pontapé de baliza ofensivo = BPO
   'PBO':'bp-off',                                 // bola parada ofensiva explícita
@@ -8283,7 +8282,7 @@ const SUB_TO_SECONDARY={
   'Cantos Ofensivos':'bp-off','Livres Diretos':'bp-off',
   'Livres Indiretos':'bp-off','Penálti':'bp-off',
   // BPD
-  'Cantos Defensivos':'bp-def','Livres Contra':'bp-def','Penálti Defensivo':'bp-def',
+  'Cantos Defensivos':'bp-def','Livres Contra':'bp-def','Livres Defensivos':'bp-def','Penálti Defensivo':'bp-def',
   'BPD':'bp-def',
 };
 // Contexto de "PB" genérico: OD/BPD → bp-def, resto → bp-off
@@ -8325,13 +8324,36 @@ function normalizePrimaryArr(raw){
   return [];
 }
 
+// ── Migração de chaves antigas → chaves canónicas ────────────────────────────
+// Garante que eventos antigos com chaves deprecadas são exibidos correctamente
+const SECONDARY_MIGRATION={
+  'variacao':'vcj',    // Variação de Jogo → Variação do Centro de Jogo
+  'ct-vcj':'vcj',      // tema custom criado pela IA → agora tema próprio
+  'ct-pbo':'bp-off',   // PBO custom → BP Ofensiva
+  'ct-pb':'bp-off',    // PB custom → BP Ofensiva (por defeito)
+  'rap':'reacao-p',    // RAP → Reação à Perda
+  'trans-rap':'ataque-rap', // Transição Rápida → Ataque Rápido
+  'saida-pb':'bp-off', // Saída a Jogar → BP Ofensiva
+};
+// Chaves custom que foram absorvidas em temas canónicos e devem ser removidas do localStorage
+const DEPRECATED_CUSTOM_KEYS=['ct-vcj','ct-pbo','ct-pb'];
+
 // ── Temas secundários dinâmicos (gerados pela IA e guardados localmente) ────
 let _customSecondaryThemes={};
 (function loadCustomThemes(){
   try{
     const saved=JSON.parse(localStorage.getItem('scv_custom_themes')||'{}');
+    // Limpar chaves deprecated antes de fazer merge
+    DEPRECATED_CUSTOM_KEYS.forEach(k=>{ delete saved[k]; });
+    // Também remover qualquer custom cujo label já existe como tema canónico
+    const canonLabels=Object.values(SECONDARY_THEMES).map(v=>v.full?.toLowerCase()||v.label?.toLowerCase());
+    Object.keys(saved).forEach(k=>{
+      const lbl=(saved[k]?.label||'').toLowerCase();
+      if(canonLabels.includes(lbl)) delete saved[k];
+    });
     _customSecondaryThemes=saved;
-    Object.assign(SECONDARY_THEMES,saved); // merge na taxonomia em memória
+    Object.assign(SECONDARY_THEMES,saved);
+    try{ localStorage.setItem('scv_custom_themes',JSON.stringify(saved)); }catch(e){}
   }catch(e){}
 })();
 const _CUSTOM_COLORS=['#64748b','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ec4899','#0891b2','#84cc16'];
@@ -8350,10 +8372,11 @@ function addCustomSecondaryTheme(label){
 }
 
 // Normaliza objectiveSecondary: aceita formato antigo {moment:...} e novo [] → sempre array de chaves
+// Aplica SECONDARY_MIGRATION para converter chaves deprecadas em canónicas
 function normalizeSecondaryArr(raw){
-  if(Array.isArray(raw)) return raw.filter(k=>k&&SECONDARY_THEMES[k]);
-  if(raw?.moment&&SECONDARY_THEMES[raw.moment]) return [raw.moment];
-  // Formato antigo com chave de TACTICS_TAXONOMY (ex: 'OD') — ignora
+  const migrate=k=>SECONDARY_MIGRATION[k]||k;
+  if(Array.isArray(raw)) return [...new Set(raw.map(migrate))].filter(k=>k&&SECONDARY_THEMES[k]);
+  if(raw?.moment){ const k=migrate(raw.moment); if(SECONDARY_THEMES[k]) return [k]; }
   return [];
 }
 
