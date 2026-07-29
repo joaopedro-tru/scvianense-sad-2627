@@ -2612,11 +2612,18 @@ function _squadLoadCards(cs){
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8);
   }
   // Contagem de sessões por momento principal
+  // TOTD e BP dividem a carga igualmente pelos dois momentos (0.5 cada)
   function trainAggPrimary(evs){
     const acc={};
     evs.forEach(ev=>{
-      const m=ev.objectivePrimary?.moment;
-      if(m&&PRIMARY_MOMENTS.includes(m)) acc[m]=(acc[m]||0)+1;
+      const raw=ev.objectivePrimary?.moment;
+      if(!raw) return;
+      const split=LEGACY_SPLIT[raw];
+      if(split){
+        split.forEach(k=>{ acc[k]=(acc[k]||0)+1/split.length; });
+      } else if(PRIMARY_MOMENTS.includes(raw)){
+        acc[raw]=(acc[raw]||0)+1;
+      }
     });
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
@@ -2674,7 +2681,7 @@ function _squadLoadCards(cs){
     return `<div style="min-width:0">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px">${period}</div>
       <div style="display:flex;align-items:center;gap:10px">${miniSVG(entries,colorFn,sz)}<div style="flex:1;min-width:0">${legend}</div></div>
-      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${total} ${unit}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} ${unit}</div>
     </div>`;
   }
   function divider(a,b){return a&&b?'<div style="width:1px;background:var(--border);align-self:stretch"></div>':'';}
@@ -8256,6 +8263,45 @@ const AI_MOMENT_TO_SECONDARY={
   'TD':'reacao-p','TO':'trans-rap','OD':'bloco-m','BPO':'bp-off','BPD':'bp-def',
   'TOTD':'trans-rap','BP':'bp-off',
 };
+// Momentos legado que se dividem em dois primários com peso igual
+const LEGACY_SPLIT={
+  'TOTD':['TO','TD'],   // Transição Of./Def. → TO + TD (0.5 cada)
+  'BP':  ['BPO','BPD'], // Bola Parada genérica → BPO + BPD (0.5 cada)
+};
+// Devolve o momento canónico para guardar em DB:
+//   - PRIMARY_MOMENTS ou TOTD/BP → devolvem o próprio key (válidos)
+//   - SJ, PF e outros → null (descartados)
+function canonicalizePrimaryMoment(m){
+  if(!m) return null;
+  if(PRIMARY_MOMENTS.includes(m)) return m;
+  if(LEGACY_SPLIT[m]) return m; // manter para o gráfico dividir
+  return null; // SJ, PF → sem mapeamento
+}
+
+// ── Temas secundários dinâmicos (gerados pela IA e guardados localmente) ────
+let _customSecondaryThemes={};
+(function loadCustomThemes(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('scv_custom_themes')||'{}');
+    _customSecondaryThemes=saved;
+    Object.assign(SECONDARY_THEMES,saved); // merge na taxonomia em memória
+  }catch(e){}
+})();
+const _CUSTOM_COLORS=['#64748b','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ec4899','#0891b2','#84cc16'];
+function addCustomSecondaryTheme(label){
+  if(!label) return null;
+  // Chave normalizada
+  const key='ct-'+label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').slice(0,24);
+  if(SECONDARY_THEMES[key]) return key; // já existe
+  const color=_CUSTOM_COLORS[Object.keys(_customSecondaryThemes).length%_CUSTOM_COLORS.length];
+  const theme={label,color,full:label,custom:true};
+  SECONDARY_THEMES[key]=theme;
+  _customSecondaryThemes[key]=theme;
+  try{ localStorage.setItem('scv_custom_themes',JSON.stringify(_customSecondaryThemes)); }catch(e){}
+  console.log('[GPS] Novo tema secundário criado:',key,'→',label);
+  return key;
+}
+
 // Sugere o tema secundário a partir da resposta da IA
 function mapToSecondaryTheme(secondary, primary){
   // 1ª prioridade: sub-princípios do momento primário
@@ -8266,6 +8312,9 @@ function mapToSecondaryTheme(secondary, primary){
   // 2ª prioridade: momento secundário sugerido pela IA
   const sm=secondary?.moment;
   if(sm&&AI_MOMENT_TO_SECONDARY[sm]) return AI_MOMENT_TO_SECONDARY[sm];
+  // 3ª prioridade: criar tema dinâmico a partir do primeiro sub-princípio disponível
+  const firstSub=(primary?.subPrinciples||[])[0]||(secondary?.subPrinciples||[])[0];
+  if(firstSub) return addCustomSecondaryTheme(firstSub);
   return null;
 }
 const GYM_CATEGORIES={
@@ -8748,9 +8797,10 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     const upd={};
     if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
     if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
-    if(d.primary&&PRIMARY_MOMENTS.includes(d.primary.moment)){
-      upd.objectivePrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
-      // Mapear secundário para SECONDARY_THEMES — só define se evento ainda não tem secundário
+    const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
+    if(canonPrimary){
+      upd.objectivePrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]};
+      // Mapear secundário para SECONDARY_THEMES — só define se evento ainda não tem secundário válido
       const existing=ev.objectiveSecondary?.moment;
       if(!existing||!SECONDARY_THEMES[existing]){
         const secKey=mapToSecondaryTheme(d.secondary,d.primary);
@@ -8821,8 +8871,9 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
       // Fix race condition: só sobrescreve se o treinador ainda não selecionou nada
       // (ou se há mismatch explícito — nesse caso a IA sabe melhor)
       if(d.mismatch || !_objPrimary.moment){
-        if(d.primary&&TACTICS_TAXONOMY[d.primary.moment]){
-          _objPrimary={moment:d.primary.moment,subPrinciples:d.primary.subPrinciples||[]};
+        const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
+        if(canonPrimary){
+          _objPrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]};
         }
         // Mapear secundário para SECONDARY_THEMES
         if(!_objSecondary.moment){
