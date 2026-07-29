@@ -3301,7 +3301,7 @@ function renderPlayer(){
     allEvs.filter(ev=>!sq||ev.squad===sq||(!sq&&true)).forEach(ev=>{
       if(ev.type==='training'){
         if(sq&&ev.squad!==sq) return;
-        if(ev.attendance){ const s=ev.attendance[pid]; if(s===true||s==='condicionado') trainAttended++; }
+        { const s=effectiveAtt(ev.attendance||{},pid,ev.date); if(s===true||s==='condicionado') trainAttended++; }
       } else if(ev.type==='game'){
         if(sq&&ev.squad!==sq) return;
         const conv=!!(ev.convocatoria?.players?.[pid]);
@@ -4986,13 +4986,18 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 function effectiveAtt(att, pid, date){
   const today=new Date().toISOString().slice(0,10);
   const explicit=att?.[pid];
-  if(explicit!==undefined) return explicit;
-  if(date>=today){
-    const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
-    if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
-    return true; // presente por defeito
+  if(explicit!==undefined) return explicit;  // valor explícito tem sempre prioridade
+  // Sem registo explícito — calcular por defeito
+  const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
+  if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
+  if(date>=today) return true; // treinos futuros/hoje: presente por defeito
+  // Treinos passados: GR sem registo → presente desde a data de inscrição
+  const player=DB.getPlayer(pid);
+  if(player?.position==='GR'){
+    const regDate=(player.ca||player.createdAt||'2000-01-01').slice(0,10);
+    if(date>=regDate) return true;
   }
-  return false; // sessão passada sem registo = ausente
+  return false; // campo sem registo em treino passado = ausente
 }
 // Returns {cls, label} for rendering the att button.
 function attInfo(val){
