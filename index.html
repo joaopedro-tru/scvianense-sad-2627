@@ -1586,14 +1586,14 @@ body.pm #v-pf{padding:30px}
 
         <!-- Primary objective -->
         <div style="margin-bottom:12px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivo Principal</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivos Gerais</div>
           <div id="e-obj-primary-moments" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px"></div>
           <div id="e-obj-primary-subs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
         </div>
 
         <!-- Secondary objective -->
         <div>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Tema / Foco Tático <span style="text-transform:none;font-weight:400">(opcional)</span></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Objetivos Específicos <span style="text-transform:none;font-weight:400">(opcional)</span></div>
           <div id="e-obj-secondary-moments" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px"></div>
           <div id="e-obj-secondary-subs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
         </div>
@@ -2601,7 +2601,7 @@ function _squadLoadCards(cs){
   const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
   const gym5w=gymEvs.filter(e=>e.date>=cutoff5w);
   // Treinos: inclui eventos com objectivePrimary OU momentSummary (para não depender só da análise AI)
-  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary?.moment||e.momentSummary)&&e.date<=today);
+  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary||e.momentSummary)&&e.date<=today);
   const train5w=trainEvs.filter(e=>e.date>=cutoff5w);
   function gymAgg(evs){
     const acc={};
@@ -2611,19 +2611,15 @@ function _squadLoadCards(cs){
     })});
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8);
   }
-  // Contagem de sessões por momento principal
-  // TOTD e BP dividem a carga igualmente pelos dois momentos (0.5 cada)
+  // Contagem de sessões por momento principal (suporta array novo e objeto antigo)
+  // Quando há múltiplos momentos, divide igualmente (0.5 para TO+TD, etc.)
   function trainAggPrimary(evs){
     const acc={};
     evs.forEach(ev=>{
-      const raw=ev.objectivePrimary?.moment;
-      if(!raw) return;
-      const split=LEGACY_SPLIT[raw];
-      if(split){
-        split.forEach(k=>{ acc[k]=(acc[k]||0)+1/split.length; });
-      } else if(PRIMARY_MOMENTS.includes(raw)){
-        acc[raw]=(acc[raw]||0)+1;
-      }
+      const arr=normalizePrimaryArr(ev.objectivePrimary);
+      if(!arr.length) return;
+      const w=1/arr.length;
+      arr.forEach(k=>{ acc[k]=(acc[k]||0)+w; });
     });
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
   }
@@ -2702,11 +2698,11 @@ function _squadLoadCards(cs){
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
   </div>`:'';
   const primaryCard=(tp5b||tpSb)?`<div class="card" style="margin:0">
-    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🎯 Momento de Jogo Principal</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🎯 Objetivos Gerais</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${tp5b}${divider(tp5b,tpSb)}${tpSb}</div>
   </div>`:'';
   const secondaryCard=(ts5b||tsSb)?`<div class="card" style="margin:0">
-    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🔍 Tema Secundário</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🔍 Objetivos Específicos</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${ts5b}${divider(ts5b,tsSb)}${tsSb}</div>
   </div>`:'';
   return (gymCard||primaryCard||secondaryCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${primaryCard}${secondaryCard}</div>`:'';
@@ -4465,15 +4461,16 @@ function showEventDetail(id){
   const _edetObjHTML=(()=>{
     if(ev.type!=='training') return '';
     const p=ev.objectivePrimary, s=ev.objectiveSecondary;
-    if(!p?.moment&&!ev.objectives) return '';
-    if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
+    const pArr=normalizePrimaryArr(p);
+    if(!pArr.length&&!ev.objectives) return '';
+    if(pArr.length){
       const tc=TACTICS_TAXONOMY;
-      let h=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">`;
-      h+=`<div><span style="display:inline-block;background:${tc[p.moment].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[p.moment].label}</span></div>`;
+      let h=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">`;
+      pArr.forEach(k=>{ if(!tc[k]) return; h+=`<span style="display:inline-block;background:${tc[k].color};color:#fff;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700">${tc[k].label}</span>`; });
       const sArr=normalizeSecondaryArr(s);
       sArr.forEach(k=>{
         const stc=SECONDARY_THEMES[k]; if(!stc) return;
-        h+=`<div style="opacity:.85"><span style="display:inline-block;background:${stc.color}25;color:${stc.color};border:1px solid ${stc.color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${stc.label}</span></div>`;
+        h+=`<span style="display:inline-block;background:${stc.color}25;color:${stc.color};border:1px solid ${stc.color};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:600">${stc.label}</span>`;
       });
       return h+`</div>`;
     }
@@ -4739,11 +4736,10 @@ function openEventModal(ev=null,date=null,defaults={}){
   const _dow=new Date(_evDate+'T12:00:00').getDay();
   _regimes=ev?.regimes?.length?[...ev.regimes]:(REGIME_DEFAULTS[_evSq]?.[_dow]||[]);
   renderRegimePicker();
-  // Tactical objectives reset
-  _objPrimary=ev?.objectivePrimary?{...ev.objectivePrimary}:{moment:null,subPrinciples:[]};
-  // Normaliza secundário: suporta formato antigo {moment:...} e novo [] de chaves
+  // Tactical objectives reset — ambos como arrays
+  _objPrimary=normalizePrimaryArr(ev?.objectivePrimary);
   _objSecondary=normalizeSecondaryArr(ev?.objectiveSecondary);
-  // Se secundário vazio mas primário tem sub-princípios, derivar temas do primário
+  // Se secundário vazio mas primário antigo tem sub-princípios, derivar temas do primário
   if(!_objSecondary.length&&ev?.objectivePrimary?.subPrinciples?.length){
     _objSecondary=mapToSecondaryThemes(null,ev.objectivePrimary);
   }
@@ -4815,10 +4811,11 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const f=id=>document.getElementById(id).value;
   const id=f('e-id');
   const _isTraining=f('e-type')==='training';
-  const _p=_isTraining&&_objPrimary.moment?{moment:_objPrimary.moment}:null; // sem subPrinciples (vão para secundário)
-  const _s=_isTraining&&_objSecondary.length?[..._objSecondary]:null; // array de chaves
+  const _p=_isTraining&&_objPrimary.length?[..._objPrimary]:null; // array de chaves PRIMARY_MOMENTS
+  const _s=_isTraining&&_objSecondary.length?[..._objSecondary]:null; // array de chaves SECONDARY_THEMES
+  const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
-  const _objText=_p?((TACTICS_TAXONOMY[_p.moment]?.full||_p.moment)+(_sLabel?' · '+_sLabel:'')):null;
+  const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
   const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
@@ -5053,14 +5050,17 @@ function renderTraining(){
           // Objetivos táticos
           const p=ev.objectivePrimary, s=ev.objectiveSecondary;
           const objRows=(()=>{
-            if(!p?.moment&&!ev.objectives) return '';
+            const pArr=normalizePrimaryArr(p);
+            if(!pArr.length&&!ev.objectives) return '';
             const tc=TACTICS_TAXONOMY;
-            if(p?.moment&&tc[p.moment]){
+            if(pArr.length){
+              const pLabels=pArr.map(k=>tc[k]).filter(Boolean);
+              const pText=pLabels.map(v=>`<span style="color:${v.color};font-weight:600">${v.label}</span>`).join(' + ')||'';
               const sArr=normalizeSecondaryArr(s);
               const sLabels=sArr.map(k=>SECONDARY_THEMES[k]).filter(Boolean);
               const sText=sLabels.map(v=>`<span style="color:${v.color};font-weight:600">${v.label}</span>`).join(' · ')||'';
-              return `<div class="dr"><span class="dl">Obj. Principal</span><span class="dv" style="color:${tc[p.moment].color};font-weight:600">${tc[p.moment].label}</span></div>`
-                    +(sText?`<div class="dr"><span class="dl">Tema Secundário</span><span class="dv">${sText}</span></div>`:'')+
+              return `<div class="dr"><span class="dl">Objetivos Gerais</span><span class="dv">${pText}</span></div>`
+                    +(sText?`<div class="dr"><span class="dl">Objetivos Específicos</span><span class="dv">${sText}</span></div>`:'')+
                     (sArr.length===0&&ev.objectives?`<div class="dr"><span class="dl">Objetivos</span><span class="dv">${ev.objectives}</span></div>`:'');
             }
             return ev.objectives?row('Objetivos',ev.objectives):'';
@@ -7915,8 +7915,9 @@ function generateWeeklyPlan(){
     }
     if(ev.type==='training'){
       const p=ev.objectivePrimary, s=ev.objectiveSecondary;
-      if(p?.moment&&TACTICS_TAXONOMY[p.moment]){
-        let t=TACTICS_TAXONOMY[p.moment].full;
+      const pArr=normalizePrimaryArr(p);
+      if(pArr.length){
+        let t=pArr.map(k=>TACTICS_TAXONOMY[k]?.full||k).join(' + ');
         const sArr=normalizeSecondaryArr(s);
         const sFulls=sArr.map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean);
         if(sFulls.length) t+='\n'+sFulls.join(', ');
@@ -8232,37 +8233,66 @@ const TACTICS_TAXONOMY={
 const PRIMARY_MOMENTS=['OO','OD','TO','TD','BPO','BPD'];
 // Temas táticos secundários
 const SECONDARY_THEMES={
-  'ultimo-t':    {label:'Último Terço',       color:'#0284c7', full:'Último Terço'},
-  'saida-pb':    {label:'Saída a Jogar',      color:'#1a56db', full:'Saída a Jogar'},
-  'mpo':         {label:'Manutenção Posse',   color:'#2563eb', full:'Manutenção de Posse'},
-  '3o-homem':    {label:'3º Homem',           color:'#0891b2', full:'3º Homem'},
-  'combinacoes': {label:'Combinações',        color:'#06b6d4', full:'Combinações'},
-  'finalizacao': {label:'Finalização',        color:'#059669', full:'Finalização'},
-  'variacao':    {label:'Variação de Jogo',   color:'#0e7490', full:'Variação de Jogo'},
-  'pressao-a':   {label:'Pressão Alta',       color:'#dc2626', full:'Pressão Alta'},
-  'bloco-m':     {label:'Bloco Médio',        color:'#ef4444', full:'Bloco Médio'},
-  'bloco-b':     {label:'Bloco Baixo',        color:'#f87171', full:'Bloco Baixo'},
-  'cob-def':     {label:'Cobertura Def.',     color:'#b91c1c', full:'Cobertura Defensiva'},
-  'reacao-p':    {label:'Reação à Perda',     color:'#ea580c', full:'Reação à Perda'},
-  'trans-rap':   {label:'Transição Rápida',   color:'#f97316', full:'Transição Rápida'},
-  'rap':         {label:'RAP',                color:'#fb923c', full:'Recuperação Ativa de Posse'},
-  'bp-off':      {label:'BP Ofensiva',        color:'#7c3aed', full:'Bola Parada Ofensiva'},
-  'bp-def':      {label:'BP Defensiva',       color:'#6d28d9', full:'Bola Parada Defensiva'},
-  'jogo-pos':    {label:'Jogo Posicional',    color:'#475569', full:'Jogo Posicional'},
+  // ── Organização Ofensiva ─────────────────────────────────────────
+  'ultimo-t':    {label:'Último Terço',        color:'#0284c7', full:'Último Terço'},
+  'mpo':         {label:'Manutenção Posse',    color:'#2563eb', full:'Manutenção de Posse'},
+  'vcj':         {label:'Var. Centro Jogo',    color:'#0e7490', full:'Variação do Centro de Jogo'},
+  'combinacoes': {label:'Combinações',         color:'#06b6d4', full:'Combinações'},
+  'finalizacao': {label:'Finalização',         color:'#059669', full:'Finalização'},
+  'variacao':    {label:'Variação de Jogo',    color:'#155e75', full:'Variação de Jogo'},
+  // ── Transição Ofensiva ───────────────────────────────────────────
+  'ataque-rap':  {label:'Ataque Rápido',       color:'#f97316', full:'Ataque Rápido'},
+  '3o-homem':    {label:'3º Homem',            color:'#0891b2', full:'3º Homem'},
+  'jogo-pos':    {label:'Jogo Posicional',     color:'#475569', full:'Jogo Posicional'},
+  // ── Transição Defensiva ──────────────────────────────────────────
+  'reacao-p':    {label:'Reação à Perda',      color:'#ea580c', full:'Reação à Perda'},
+  // ── Organização Defensiva ────────────────────────────────────────
+  'pressao-a':   {label:'Pressão Alta',        color:'#dc2626', full:'Pressão Alta'},
+  'bloco-m':     {label:'Bloco Médio',         color:'#ef4444', full:'Bloco Médio'},
+  'bloco-b':     {label:'Bloco Baixo',         color:'#f87171', full:'Bloco Baixo'},
+  'cob-def':     {label:'Cobertura Def.',      color:'#b91c1c', full:'Cobertura Defensiva'},
+  // ── Bola Parada ──────────────────────────────────────────────────
+  'bp-off':      {label:'BP Ofensiva',         color:'#7c3aed', full:'Bola Parada Ofensiva'},
+  'bp-def':      {label:'BP Defensiva',        color:'#6d28d9', full:'Bola Parada Defensiva'},
+  // ── Legado (compat) — não usados para novos treinos ──────────────
+  'saida-pb':    {label:'Saída a Jogar',       color:'#1a56db', full:'Saída a Jogar',      _legacy:true},
+  'rap':         {label:'RAP',                 color:'#fb923c', full:'Recuperação Ativa',   _legacy:true},
+  'trans-rap':   {label:'Transição Rápida',    color:'#f97316', full:'Transição Rápida',    _legacy:true},
 };
-// Mapeamento de sub-princípios do primário → tema secundário (para sugestão da IA)
+// Mapeamento sub-princípio → chave SECONDARY_THEMES
+// "PB" é tratado por contexto em mapToSecondaryThemes (OO/TO→bp-off, OD/BPD→bp-def)
 const SUB_TO_SECONDARY={
-  'Último Terço':'ultimo-t','Saída PB':'saida-pb','MPB':'mpo',
-  'Variação de Jogo':'variacao','Combinações':'combinacoes','Finalização':'finalizacao',
-  'Transição Rápida':'trans-rap','3º Homem':'3o-homem','Ataque Rápido':'trans-rap',
-  'Ataque Posicional':'jogo-pos','Reação à Perda':'reacao-p','RAP':'rap',
-  'Recuperação Posicional':'reacao-p','Pressão Alta':'pressao-a',
-  'Bloco Médio':'bloco-m','Bloco Baixo':'bloco-b','Cobertura Defensiva':'cob-def',
-  'Cantos Ofensivos':'bp-off','Livres Diretos':'bp-off','Cantos Defensivos':'bp-def',
+  // OO
+  'Último Terço':'ultimo-t',
+  'MPB':'mpo','Manutenção Posse':'mpo','Manutenção de Posse':'mpo',
+  'VCJ':'vcj','Variação do Centro de Jogo':'vcj',
+  'Variação de Jogo':'variacao',
+  'Combinações':'combinacoes','Finalização':'finalizacao',
+  'Saída PB':'bp-off','Saída a Jogar':'bp-off',  // pontapé de baliza ofensivo = BPO
+  'PBO':'bp-off',                                 // bola parada ofensiva explícita
+  // TO
+  'Transição Rápida':'ataque-rap','Ataque Rápido':'ataque-rap',
+  '3º Homem':'3o-homem','Ataque Posicional':'jogo-pos',
+  // TD
+  'Reação à Perda':'reacao-p','RAP':'reacao-p',
+  'Recuperação Posicional':'reacao-p','Recuperação':'reacao-p',
+  // OD
+  'Pressão Alta':'pressao-a','Bloco Médio':'bloco-m',
+  'Bloco Baixo':'bloco-b','Cobertura Defensiva':'cob-def','Linha Defensiva':'cob-def',
+  // BPO
+  'Cantos Ofensivos':'bp-off','Livres Diretos':'bp-off',
+  'Livres Indiretos':'bp-off','Penálti':'bp-off',
+  // BPD
+  'Cantos Defensivos':'bp-def','Livres Contra':'bp-def','Penálti Defensivo':'bp-def',
+  'BPD':'bp-def',
 };
+// Contexto de "PB" genérico: OD/BPD → bp-def, resto → bp-off
+function pbContext(primaryMoment){
+  return ['OD','BPD'].includes(primaryMoment)?'bp-def':'bp-off';
+}
 const AI_MOMENT_TO_SECONDARY={
-  'TD':'reacao-p','TO':'trans-rap','OD':'bloco-m','BPO':'bp-off','BPD':'bp-def',
-  'TOTD':'trans-rap','BP':'bp-off',
+  'TD':'reacao-p','TO':'ataque-rap','OD':'bloco-m','BPO':'bp-off','BPD':'bp-def',
+  'TOTD':'ataque-rap','BP':'bp-off',
 };
 // Momentos legado que se dividem em dois primários com peso igual
 const LEGACY_SPLIT={
@@ -8275,8 +8305,24 @@ const LEGACY_SPLIT={
 function canonicalizePrimaryMoment(m){
   if(!m) return null;
   if(PRIMARY_MOMENTS.includes(m)) return m;
-  if(LEGACY_SPLIT[m]) return m; // manter para o gráfico dividir
+  if(LEGACY_SPLIT[m]) return m; // manter para compat
   return null; // SJ, PF → sem mapeamento
+}
+// Retorna array de chaves PRIMARY_MOMENTS a partir de um momento da IA
+function canonicalizePrimaryMoments(m){
+  if(!m) return [];
+  const split=LEGACY_SPLIT[m]; if(split) return [...split]; // TOTD→[TO,TD], BP→[BPO,BPD]
+  if(PRIMARY_MOMENTS.includes(m)) return [m];
+  return []; // SJ, PF → ignorados
+}
+// Normaliza objectivePrimary: aceita array novo [] e objeto antigo {moment:...}
+function normalizePrimaryArr(raw){
+  if(Array.isArray(raw)) return raw.filter(k=>PRIMARY_MOMENTS.includes(k));
+  if(raw?.moment){
+    const split=LEGACY_SPLIT[raw.moment]; if(split) return [...split];
+    if(PRIMARY_MOMENTS.includes(raw.moment)) return [raw.moment];
+  }
+  return [];
 }
 
 // ── Temas secundários dinâmicos (gerados pela IA e guardados localmente) ────
@@ -8314,26 +8360,31 @@ function normalizeSecondaryArr(raw){
 // Retorna array de chaves de SECONDARY_THEMES a partir da resposta da IA
 function mapToSecondaryThemes(secondary, primary){
   const keys=[];
-  // 1ª prioridade: sub-princípios conhecidos (mapeados em SUB_TO_SECONDARY)
+  const pm=primary?.moment||''; // momento primário da IA (para contexto de 'PB')
+  // 1ª prioridade: sub-princípios do primário
   for(const sub of (primary?.subPrinciples||[])){
+    if(sub==='PB'){ // PB genérico → contexto-dependente
+      const k=pbContext(pm); if(k&&!keys.includes(k)) keys.push(k); continue;
+    }
     const k=SUB_TO_SECONDARY[sub];
-    if(k&&SECONDARY_THEMES[k]&&!keys.includes(k)) keys.push(k);
+    if(k&&SECONDARY_THEMES[k]&&!SECONDARY_THEMES[k]._legacy&&!keys.includes(k)) keys.push(k);
   }
-  // 2ª prioridade: sub-princípios DESCONHECIDOS → criar temas custom
-  // (ex: "VCJ", "PBD" gerados pela IA mas não na lista padrão)
-  const unknownSubs=(primary?.subPrinciples||[]).filter(s=>s&&!SUB_TO_SECONDARY[s]);
+  // 2ª prioridade: sub-princípios desconhecidos → tema custom
+  const unknownSubs=(primary?.subPrinciples||[]).filter(s=>s&&s!=='PB'&&!SUB_TO_SECONDARY[s]);
   unknownSubs.forEach(s=>{ const k=addCustomSecondaryTheme(s); if(k&&!keys.includes(k)) keys.push(k); });
-  // 3ª prioridade: fallback genérico pelo momento secundário da IA
+  // 3ª prioridade: fallback pelo momento secundário da IA
   if(!keys.length){
     const sm=secondary?.moment;
-    if(sm&&AI_MOMENT_TO_SECONDARY[sm]) keys.push(AI_MOMENT_TO_SECONDARY[sm]);
+    if(sm==='BP') keys.push(pbContext(pm));
+    else if(sm&&AI_MOMENT_TO_SECONDARY[sm]) keys.push(AI_MOMENT_TO_SECONDARY[sm]);
   }
   // 4ª prioridade: sub-princípios do secundário da IA
   if(!keys.length){
-    (secondary?.subPrinciples||[]).forEach(s=>{
-      const k=s&&SUB_TO_SECONDARY[s]?SUB_TO_SECONDARY[s]:addCustomSecondaryTheme(s);
+    for(const s of (secondary?.subPrinciples||[])){
+      if(s==='PB'){ const k=pbContext(pm); if(k&&!keys.includes(k)) keys.push(k); continue; }
+      const k=SUB_TO_SECONDARY[s]||addCustomSecondaryTheme(s);
       if(k&&!keys.includes(k)) keys.push(k);
-    });
+    }
   }
   return keys;
 }
@@ -8364,7 +8415,7 @@ const REGIME_DEFAULTS={
   sub23:{2:['Recuperação'],3:['Tensão'],4:['Duração'],5:['Velocidade']},
 };
 let _regimes=[];
-let _objPrimary={moment:null,subPrinciples:[]};
+let _objPrimary=[];     // array de chaves de PRIMARY_MOMENTS
 let _objSecondary=[];   // array de chaves de SECONDARY_THEMES
 let _fichaExercises=[];   // exercícios extraídos da IA
 let _momentSummary={};    // {OO:18, TOTD:16, SJ:19}
@@ -8721,21 +8772,21 @@ function renderObjPicker(which){
   const sEl=document.getElementById(`e-obj-${which}-subs`);
   if(!mEl) return;
   if(which==='primary'){
-    // Picker de momento de jogo — apenas os 6 momentos primários, sem sub-princípios
+    // Picker de Objetivos Gerais — 6 momentos, multi-select
     mEl.innerHTML=PRIMARY_MOMENTS.map(k=>{
       const v=TACTICS_TAXONOMY[k];
-      const sel=_objPrimary.moment===k;
-      return `<button type="button" onclick="selectObjMoment('primary','${k}')"
+      const sel=_objPrimary.includes(k);
+      return `<button type="button" onclick="toggleObjPrimary('${k}')"
         style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
     }).join('');
-    if(sEl) sEl.innerHTML=''; // sub-princípios vão para o picker secundário
+    if(sEl) sEl.innerHTML=''; // sem sub-princípios — vão para objetivos específicos
   } else {
     // Picker de tema/foco tático — SECONDARY_THEMES, multi-select
-    // Sub-princípios guardados no primário → garantir que aparecem como opções custom
-    (_objPrimary.subPrinciples||[])
-      .filter(s=>s&&!SUB_TO_SECONDARY[s])
-      .forEach(s=>addCustomSecondaryTheme(s));
-    mEl.innerHTML=Object.entries(SECONDARY_THEMES).map(([k,v])=>{
+    // Sub-princípios do primário antigo (formato {subPrinciples:[]}) → criar temas custom se ainda não existirem
+    // (novo formato é array de chaves, sem subPrinciples — esta secção é só para compat com eventos antigos abertos no modal)
+    // Não é necessário fazer nada aqui pois _objPrimary é agora array de chaves
+    // Não mostrar temas legacy no picker (a menos que já estejam seleccionados)
+    mEl.innerHTML=Object.entries(SECONDARY_THEMES).filter(([k,v])=>!v._legacy||_objSecondary.includes(k)).map(([k,v])=>{
       const sel=_objSecondary.includes(k);
       return `<button type="button" onclick="toggleObjSecondary('${k}')"
         style="padding:5px 10px;border-radius:6px;border:2px solid ${sel?v.color:'var(--border)'};background:${sel?v.color:'var(--card)'};color:${sel?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s">${v.label}</button>`;
@@ -8743,11 +8794,16 @@ function renderObjPicker(which){
     if(sEl) sEl.innerHTML='';
   }
 }
-function selectObjMoment(which,key){
-  // Apenas para primário (toggle single-select)
-  if(_objPrimary.moment===key){_objPrimary.moment=null;_objPrimary.subPrinciples=[];}
-  else{_objPrimary.moment=key;_objPrimary.subPrinciples=[];}
+function toggleObjPrimary(key){
+  // Multi-select para primário
+  const i=_objPrimary.indexOf(key);
+  if(i>-1) _objPrimary.splice(i,1); else _objPrimary.push(key);
   renderObjPicker('primary');
+}
+function selectObjMoment(which,key){
+  // Compat (chamado por código antigo) — redireciona para toggle correto
+  if(which==='primary') toggleObjPrimary(key);
+  else toggleObjSecondary(key);
 }
 function toggleObjSecondary(key){
   // Multi-select para secundário
@@ -8755,14 +8811,7 @@ function toggleObjSecondary(key){
   if(i>-1) _objSecondary.splice(i,1); else _objSecondary.push(key);
   renderObjPicker('secondary');
 }
-function toggleObjSub(which,sub){
-  // Mantido por compat (não usado activamente)
-  if(which==='primary'){
-    const i=_objPrimary.subPrinciples.indexOf(sub);
-    if(i>-1)_objPrimary.subPrinciples.splice(i,1); else _objPrimary.subPrinciples.push(sub);
-    renderObjPicker('primary');
-  }
-}
+function toggleObjSub(){} // removido — mantido por compat vazio
 
 async function onFichaFileChange(input){
   const file=input.files[0]; if(!file) return;
@@ -8782,7 +8831,7 @@ async function onFichaFileChange(input){
     }
     _fichaText=text;
     statusEl.textContent='✨ A analisar com IA...';
-    const hasPrimary=!!_objPrimary.moment;
+    const hasPrimary=!!_objPrimary.length;
     await analyzeTrainingAI(text, hasPrimary?{primary:_objPrimary,secondary:_objSecondary}:null);
     statusEl.style.display='none';
   }catch(e){
@@ -8825,9 +8874,9 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     const upd={};
     if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
     if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
-    const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
-    if(canonPrimary){
-      upd.objectivePrimary={moment:canonPrimary}; // sem subPrinciples (vão para secundário)
+    const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
+    if(primaryArr.length){
+      upd.objectivePrimary=primaryArr; // array de chaves PRIMARY_MOMENTS
       // Só actualiza secundário se ainda não existe secundário válido
       const existingArr=normalizeSecondaryArr(ev.objectiveSecondary);
       if(!existingArr.length){
@@ -8866,7 +8915,7 @@ async function analyzeFichaFromUrl(url, name){
     }
     _fichaText=text;
     statusEl.textContent='✨ A analisar com IA...';
-    const hasPrimary=!!_objPrimary.moment;
+    const hasPrimary=!!_objPrimary.length;
     await analyzeTrainingAI(text, hasPrimary?{primary:_objPrimary,secondary:_objSecondary}:null);
     statusEl.style.display='none';
   }catch(e){
@@ -8898,10 +8947,10 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
     if(!currentObjectives||d.mismatch){
       // Fix race condition: só sobrescreve se o treinador ainda não selecionou nada
       // (ou se há mismatch explícito — nesse caso a IA sabe melhor)
-      if(d.mismatch || !_objPrimary.moment){
-        const canonPrimary=canonicalizePrimaryMoment(d.primary?.moment);
-        if(canonPrimary){
-          _objPrimary={moment:canonPrimary,subPrinciples:d.primary?.subPrinciples||[]}; // subPrinciples guardados para derivar secundário
+      if(d.mismatch || !_objPrimary.length){
+        const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
+        if(primaryArr.length){
+          _objPrimary=[...primaryArr];
         }
         // Mapear sub-princípios do primário para temas secundários (array)
         if(!_objSecondary.length){
