@@ -313,7 +313,11 @@ body.pm #v-pf{padding:30px}
 .att-row:last-child{border-bottom:none}
 .att-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:#eef0f3;color:var(--muted);transition:all .15s;font-family:inherit;white-space:nowrap}
 .att-btn.present{background:var(--ok);color:#fff;border-color:var(--ok)}
-.att-btn:not(.present):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
+.att-btn.condicionado{background:#f97316;color:#fff;border-color:#f97316}
+.att-btn.lesao{background:#dc2626;color:#fff;border-color:#dc2626}
+.att-btn.just{background:#d97706;color:#fff;border-color:#d97706}
+.att-btn.injust{background:#7f1d1d;color:#fff;border-color:#7f1d1d}
+.att-btn:not(.present):not(.condicionado):not(.lesao):not(.just):not(.injust):hover{border-color:var(--ok);color:var(--ok);background:#f0faf4}
 .trav-box{width:24px;height:24px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:var(--bg);font-size:15px;font-weight:800;color:transparent;transition:all .15s}
 .trav-box:hover{border-color:#aaa}
 .trav-box.checked{border-color:#e84444;background:#fff0f0;color:#e84444}
@@ -1187,8 +1191,15 @@ body.pm #v-pf{padding:30px}
           <div class="fg"><label>De (data início) *</label><input type="date" id="av-from" required></div>
           <div class="fg"><label>Até (data fim) *</label><input type="date" id="av-until" required></div>
         </div>
-        <div class="fg"><label>Motivo <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
-          <input type="text" id="av-reason" placeholder="Ex: Férias, compromisso pessoal, lesão...">
+        <div class="fg"><label>Motivo *</label>
+          <select id="av-type-unavail" required style="padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text);width:100%" onchange="document.getElementById('av-reason').placeholder=this.value==='outro'?'Ex: férias, doença, obrigação escolar...':'Ex: rotura, entorse, fratura...'">
+            <option value="">— Selecionar —</option>
+            <option value="lesao">🤕 Lesão</option>
+            <option value="outro">📋 Outro (férias, doença, escolar...)</option>
+          </select>
+        </div>
+        <div class="fg"><label>Observações <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <input type="text" id="av-reason" placeholder="Observações...">
         </div>
         <div class="fa">
           <button type="submit" class="btn btn-p" id="av-submit-btn">✓ Submeter</button>
@@ -2731,13 +2742,38 @@ function previewGPSImport(input){
       // Preferir folha "Data", fallback para a primeira
       const sheetName = wb.SheetNames.includes('Data') ? 'Data' : wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+      // raw:true preserva Date objects; raw:false pode converter para strings com fuso horário errado
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
       if(!rows.length){ toast('❌ Folha vazia.'); return; }
       // Descobrir colunas Player Name + data (Period Name)
       const header = rows[0].map(c=>(c||'').toString().toLowerCase().trim());
       const colPlayer = header.findIndex(h=>h.includes('player') || h.includes('atleta') || h.includes('jogador'));
       const colDate   = header.findIndex(h=>h.includes('period') || h.includes('data') || h.includes('date') || h.includes('sessão'));
       if(colPlayer<0||colDate<0){ toast('❌ Não encontrei colunas de Atleta e Data na folha "'+sheetName+'".'); return; }
+      // Helper: converte valor de célula → 'YYYY-MM-DD' usando hora local (evita desfasamento UTC)
+      function excelDateToStr(v){
+        if(v instanceof Date){
+          const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+          return `${y}-${m}-${d}`;
+        }
+        if(typeof v==='number'){
+          // Serial Excel: 1 = 1900-01-01; corrigir o bug do ano bissexto 1900
+          const epoch=new Date(Math.round((v-25569)*86400*1000));
+          const y=epoch.getUTCFullYear(), m=String(epoch.getUTCMonth()+1).padStart(2,'0'), d=String(epoch.getUTCDate()).padStart(2,'0');
+          return `${y}-${m}-${d}`;
+        }
+        if(typeof v==='string'){
+          const s=v.trim();
+          // Formato DD/MM/YYYY ou DD-MM-YYYY
+          const pt=/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(s);
+          if(pt) return `${pt[3]}-${pt[2].padStart(2,'0')}-${pt[1].padStart(2,'0')}`;
+          // ISO ou outro
+          const d=new Date(s);
+          if(!isNaN(d)){ const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${y}-${mo}-${dd}`; }
+          return s.slice(0,10);
+        }
+        return null;
+      }
       // Construir mapa date → Set(playerName)
       const sessions = {};
       for(let i=1;i<rows.length;i++){
@@ -2746,12 +2782,8 @@ function previewGPSImport(input){
         if(!rawPlayer||!rawDate) continue;
         const playerName=rawPlayer.toString().trim();
         // Normalizar data para YYYY-MM-DD
-        let dateStr;
-        if(rawDate instanceof Date){ dateStr=rawDate.toISOString().split('T')[0]; }
-        else {
-          const d=new Date(rawDate);
-          dateStr = isNaN(d)? rawDate.toString().split('T')[0].slice(0,10) : d.toISOString().split('T')[0];
-        }
+        const dateStr=excelDateToStr(rawDate);
+        if(!dateStr) continue;
         if(!sessions[dateStr]) sessions[dateStr]=new Set();
         sessions[dateStr].add(playerName);
       }
@@ -2838,8 +2870,16 @@ function confirmGPSImport(){
     const squadPl = DB.players(ev.squad==='both'?null:ev.squad);
     const att = {}; // reset limpo — GPS é a fonte de verdade
     squadPl.forEach(p=>{
-      if(presentIds.has(p.id)){ att[p.id]=true; presencas++; }
-      else { att[p.id]=false; ausencias++; } // ausente explícito
+      if(presentIds.has(p.id)){
+        att[p.id]=true; presencas++;
+      } else if(p.position==='GR'){
+        // GR não aparece no GPS — marcar como presente se já inscrito na plataforma
+        const regDate=(p.ca||'').slice(0,10);
+        if(!regDate||date>=regDate){ att[p.id]=true; presencas++; }
+        else { att[p.id]=false; ausencias++; }
+      } else {
+        att[p.id]=false; ausencias++;
+      }
     });
     DB.updateEvent(ev.id, {attendance:att});
     updated++;
@@ -3239,7 +3279,7 @@ function renderPlayer(){
     allEvs.filter(ev=>!sq||ev.squad===sq||(!sq&&true)).forEach(ev=>{
       if(ev.type==='training'){
         if(sq&&ev.squad!==sq) return;
-        if(ev.attendance&&ev.attendance[pid]===true) trainAttended++;
+        if(ev.attendance){ const s=ev.attendance[pid]; if(s===true||s==='condicionado') trainAttended++; }
       } else if(ev.type==='game'){
         if(sq&&ev.squad!==sq) return;
         const conv=!!(ev.convocatoria?.players?.[pid]);
@@ -4079,10 +4119,16 @@ function buildPlayerUnavailCard(pid){
   if(!isAdmin()) return '';
   const recs=DB.getUnavailability(pid).sort((a,b)=>a.startDate.localeCompare(b.startDate));
   const rows=recs.length
-    ?recs.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1;font-size:13px"><strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
-      <button class="btn btn-d btn-sm" data-del-unavail="${r.id}">🗑️</button>
-    </div>`).join('')
+    ?recs.map(r=>{
+      const isLesao=r.type!=='outro';
+      const badge=isLesao
+        ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#dc2626;padding:1px 7px;border-radius:4px;white-space:nowrap">🤕 Lesão</span>`
+        :`<span style="font-size:10px;font-weight:700;color:#fff;background:#d97706;padding:1px 7px;border-radius:4px;white-space:nowrap">📋 Outro</span>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;font-size:13px">${badge} <strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
+        <button class="btn btn-d btn-sm" data-del-unavail="${r.id}">🗑️</button>
+      </div>`;
+    }).join('')
     :'<p style="color:var(--muted);font-size:13px;font-style:italic">Nenhum período declarado.</p>';
   return `<div class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📆 Indisponibilidades</h3>
     ${rows}
@@ -4093,7 +4139,12 @@ function buildPlayerUnavailCard(pid){
           <div class="fg" style="margin:0"><input type="date" id="addunavail-from" placeholder="De"></div>
           <div class="fg" style="margin:0"><input type="date" id="addunavail-until" placeholder="Até"></div>
         </div>
-        <input type="text" id="addunavail-reason" placeholder="Motivo (opcional)" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none">
+        <select id="addunavail-type" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)" onchange="document.getElementById('addunavail-reason').placeholder=this.value==='outro'?'Ex: férias, doença, obrigação escolar...':'Ex: rotura, entorse, fratura...'">
+          <option value="">— Motivo —</option>
+          <option value="lesao">🤕 Lesão</option>
+          <option value="outro">📋 Outro (férias, doença, escolar...)</option>
+        </select>
+        <input type="text" id="addunavail-reason" placeholder="Observações (opcional)" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none">
         <button class="btn btn-p btn-sm" id="btn-add-unavail" data-pid="${pid}" style="margin-top:8px">+ Adicionar</button>
       </div>
     </div>
@@ -4112,11 +4163,13 @@ function bindUnavailHandlers(){
     const pid=addBtn.dataset.pid;
     const from=document.getElementById('addunavail-from').value;
     const until=document.getElementById('addunavail-until').value;
+    const type=document.getElementById('addunavail-type').value;
     const reason=document.getElementById('addunavail-reason').value.trim();
     if(!from||!until){ toast('⚠️ Preenche as datas'); return; }
     if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
+    if(!type){ toast('⚠️ Seleciona o motivo'); return; }
     const p=DB.getPlayer(pid);
-    await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,reason});
+    await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,type,reason});
     renderPlayer();
     toast('✅ Período adicionado');
   });
@@ -4180,8 +4233,9 @@ async function avSquadChange(){
     const squad=document.getElementById('av-squad').value;
     const from=document.getElementById('av-from').value;
     const until=document.getElementById('av-until').value;
+    const unavailType=document.getElementById('av-type-unavail').value;
     const reason=document.getElementById('av-reason').value.trim();
-    if(!type||!squad||!from||!until){ toast('⚠️ Preenche todos os campos obrigatórios'); return; }
+    if(!type||!squad||!from||!until||!unavailType){ toast('⚠️ Preenche todos os campos obrigatórios'); return; }
     if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
     const btn=document.getElementById('av-submit-btn');
     btn.disabled=true; btn.innerHTML='<span class="spin"></span> A enviar...';
@@ -4196,7 +4250,7 @@ async function avSquadChange(){
       if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
     }
     try{
-      const rec={personId,personName,personType:type,squad,startDate:from,endDate:until,reason};
+      const rec={personId,personName,personType:type,squad,startDate:from,endDate:until,type:unavailType,reason};
       if(firestoreDb){
         rec.id=crypto.randomUUID(); rec.createdAt=new Date().toISOString();
         await firestoreDb.collection('unavailability').doc(rec.id).set(rec);
@@ -4904,6 +4958,42 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
   });
 }
 
+// ── Attendance helpers ────────────────────────────────────────────────────────
+// Returns effective attendance value for a player on a given training date.
+// For dates >= today: unset players are present by default; unavailability auto-applied.
+function effectiveAtt(att, pid, date){
+  const today=new Date().toISOString().slice(0,10);
+  const explicit=att?.[pid];
+  if(explicit!==undefined) return explicit;
+  if(date>=today){
+    const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
+    if(unavail){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
+    return true; // presente por defeito
+  }
+  return false; // sessão passada sem registo = ausente
+}
+// Returns {cls, label} for rendering the att button.
+function attInfo(val){
+  if(val===true)             return {cls:'present',     label:'✓ Presente'};
+  if(val==='condicionado')   return {cls:'condicionado', label:'⚡ Condicionado'};
+  if(val==='just')           return {cls:'just',         label:'Aus. Justificada'};
+  if(val==='injust')         return {cls:'injust',       label:'Aus. Injustificada'};
+  if(val==='lesao')          return {cls:'lesao',        label:'🤕 Lesionado'};
+  return                            {cls:'',             label:'— Ausente'};
+}
+// Cycles: Presente → Condicionado → Aus. c/ Justif. → Aus. s/ Justif. → Lesionado → Presente
+function nextAttState(current){
+  if(current===true)             return 'condicionado';
+  if(current==='condicionado')   return 'just';
+  if(current==='just')           return 'injust';
+  if(current==='injust')         return 'lesao';
+  return true; // lesao / false / undefined → presente
+}
+// Count players who are effectively present or condicionado
+function countPresent(att, players, date){
+  return players.filter(p=>{ const s=effectiveAtt(att,p.id,date); return s===true||s==='condicionado'; }).length;
+}
+
 function renderTraining(){
   const ev=DB.getEvent(trainingEventId); if(!ev){ nav('calendar'); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
@@ -4913,7 +5003,7 @@ function renderTraining(){
   const extraObjs=extras.map(id=>DB.getPlayer(id)).filter(Boolean);
   const allPl=[...sqPlayers,...extraObjs];
   const att=ev.attendance||{};
-  const presCount=allPl.filter(p=>att[p.id]===true).length;
+  const presCount=countPresent(att,allPl,ev.date);
   const unavailAlert=buildUnavailabilityAlert(ev.date,allPl.map(p=>p.id),ev.squad==='both'?null:ev.squad);
 
   // Staff attendance
@@ -4944,23 +5034,19 @@ function renderTraining(){
 
   const trialPlayers=DB.getTrialPlayers(ev.squad==='both'?null:ev.squad);
   const trialAtt=ev.trialAttendance||{};
-  const totalPresCount=allPl.filter(p=>att[p.id]===true).length + trialPlayers.filter(tp=>trialAtt[tp.id]!==false).length;
-
-  const evUnavailMap={};
-  DB.getUnavailableOn(ev.date).forEach(r=>{ evUnavailMap[r.personId]=r.reason||true; });
+  const totalPresCount=countPresent(att,allPl,ev.date) + trialPlayers.filter(tp=>trialAtt[tp.id]!==false).length;
 
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
-    const present=att[p.id]===true;
-    const unavailReason=evUnavailMap[p.id];
-    const unavailBadge=unavailReason?`<span style="font-size:10px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;padding:1px 6px;border-radius:4px;white-space:nowrap">🚫 Indisponível${typeof unavailReason==='string'?' · '+unavailReason:''}</span>`:'';
+    const status=effectiveAtt(att,p.id,ev.date);
+    const info=attInfo(status);
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${dn(p)}</div>
-        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}${unavailBadge}</div>
+        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}</div>
       </div>
-      <button class="att-btn${present?' present':''}" data-att-pid="${p.id}">${present?'✓ Presente':'— Ausente'}</button>
+      <button class="att-btn${info.cls?' '+info.cls:''}" data-att-pid="${p.id}">${info.label}</button>
     </div>`;
   }).join('');
 
@@ -5200,7 +5286,7 @@ function renderTraining(){
   })()}
   ${buildClinicalSection(trainingEventId, allPl)}`;
 
-  // Mark ALL present
+  // Mark ALL present (respects unavailabilities — sets absent/condicionado players to present, keeps others)
   document.getElementById('btn-all-present')?.addEventListener('click',()=>{
     const a=DB.getEvent(trainingEventId).attendance||{};
     allPl.forEach(p=>{ a[p.id]=true; });
@@ -5208,11 +5294,11 @@ function renderTraining(){
     renderTraining();
   });
 
-  // Toggle attendance
+  // Toggle attendance (cycles: present → condicionado → absent → present)
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.attPid;
     const a=DB.getEvent(trainingEventId).attendance||{};
-    a[pid]=a[pid]!==true;
+    a[pid]=nextAttState(effectiveAtt(a,pid,ev.date));
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
   }));
