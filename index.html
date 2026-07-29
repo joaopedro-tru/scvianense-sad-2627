@@ -5019,25 +5019,30 @@ function countPresent(att, players, date){
 // Usa localStorage para não repetir jogadores já processados.
 function backfillGRAttendance(){
   try{
-    // v3: loop por evento (exterior) → GRs (interior) — evita sobrescrever updates anteriores
-    const KEY='scv_gr_backfill_v3';
+    // v4: p.ca opcional (fallback '2000-01-01' se campo ausente)
+    const KEY='scv_gr_backfill_v4';
     if(localStorage.getItem(KEY)) return;
     const today=new Date().toISOString().slice(0,10);
-    const grPlayers=DB.players().filter(p=>p.position==='GR'&&p.ca);
+    // Incluir todos os GRs mesmo sem p.ca
+    const grPlayers=DB.players().filter(p=>p.position==='GR');
     if(!grPlayers.length){ localStorage.setItem(KEY,'1'); return; }
     const allEvs=DB.events().filter(e=>e.type==='training'&&e.date<=today);
+    console.log(`backfillGR: ${grPlayers.length} GR(s), ${allEvs.length} treino(s)`);
     allEvs.forEach(ev=>{
       const att={...(ev.attendance||{})};
       let changed=false;
       grPlayers.forEach(p=>{
-        if(ev.date<p.ca.slice(0,10)) return; // antes da inscrição
-        if(att[p.id]===true) return;          // já presente, não tocar
+        // p.ca pode ser undefined → tratar como início dos tempos
+        const regDate=(p.ca||p.createdAt||'2000-01-01').slice(0,10);
+        if(ev.date<regDate) return; // treino anterior à inscrição
+        if(att[p.id]===true) return; // já presente, não tocar
         att[p.id]=true; changed=true;
       });
       if(changed) DB.updateEvent(ev.id,{attendance:att});
     });
     localStorage.setItem(KEY,'1');
-  }catch(e){ console.warn('backfillGR:',e); }
+    console.log('backfillGR: concluído');
+  }catch(e){ console.warn('backfillGR erro:',e); }
 }
 
 function renderTraining(){
