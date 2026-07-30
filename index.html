@@ -6843,21 +6843,25 @@ function renderGameGR(ev, sqPlayers, conv, mr){
   const liveMin=getMatchMinute(clock);
   const liveHalf=getMatchHalf(clock);
   const clockActive=(clock.phase==='1h'||clock.phase==='2h');
+  const gameFinishedGR=(clock.phase==='finished');
+  const canAddGR=clockActive||gameFinishedGR;
   const clockInfo=clockActive
     ? `<span style="color:#2e7d32;font-weight:700">⏱ ${liveMin}'</span> <span style="font-size:11px;color:var(--muted)">${liveHalf===1?'1ª Parte':'2ª Parte'}</span>`
+    : gameFinishedGR
+    ? `<span style="font-weight:600;color:var(--muted)">🏁 Terminado</span> <span style="font-size:12px;color:var(--muted);margin-left:8px">Minuto:</span> <input type="number" id="gr-manual-min" min="0" max="200" value="90" style="width:58px;padding:3px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;display:inline-block;vertical-align:middle;font-family:inherit;background:var(--bg);color:var(--text)">`
     : `<span style="color:var(--muted);font-size:12px">${clockPhaseLabel(clock)} — inicia o jogo no relógio acima</span>`;
 
   const catActions=GR_ACTIONS[activeCat]||[];
   const actionBtns=catActions.map(a=>{
     const n=counts[a.key]||0;
     const isWarn=a.warn;
-    return `<button data-gr-act="${a.key}" data-gr-label="${a.label}" ${!clockActive?'disabled':''} style="
+    return `<button data-gr-act="${a.key}" data-gr-label="${a.label}" ${!canAddGR?'disabled':''} style="
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
       padding:14px 8px;border:1.5px solid ${n>0?(isWarn?'#e74c3c':'var(--primary)'):'var(--border)'};
-      border-radius:10px;background:${!clockActive?'var(--bg)':n>0?(isWarn?'#fdecea':'#e8f0fe'):'var(--card)'};
-      cursor:${clockActive?'pointer':'not-allowed'};font-size:12px;font-weight:600;
-      color:${!clockActive?'var(--muted)':isWarn&&n>0?'#c0392b':n>0?'var(--primary)':'var(--text)'};
-      text-align:center;min-height:70px;opacity:${clockActive?1:.5};transition:.15s">
+      border-radius:10px;background:${!canAddGR?'var(--bg)':n>0?(isWarn?'#fdecea':'#e8f0fe'):'var(--card)'};
+      cursor:${canAddGR?'pointer':'not-allowed'};font-size:12px;font-weight:600;
+      color:${!canAddGR?'var(--muted)':isWarn&&n>0?'#c0392b':n>0?'var(--primary)':'var(--text)'};
+      text-align:center;min-height:70px;opacity:${canAddGR?1:.5};transition:.15s">
       <span style="font-size:22px;font-weight:700;line-height:1">${n||'·'}</span>
       <span style="font-size:11px;line-height:1.3">${a.label}</span>
     </button>`;
@@ -6925,12 +6929,12 @@ function renderGameGR(ev, sqPlayers, conv, mr){
   }));
 
   el.querySelectorAll('[data-gr-act]').forEach(btn=>btn.addEventListener('click',()=>{
-    if(!clockActive) return;
+    if(!canAddGR) return;
     const key=btn.dataset.grAct;
     const label=btn.dataset.grLabel;
     const curClock=DB.getEvent(gameEventId).matchReport?.matchClock||{};
-    const minute=getMatchMinute(curClock)||0;
-    const half=getMatchHalf(curClock);
+    const minute=clockActive?(getMatchMinute(curClock)||0):(parseInt(document.getElementById('gr-manual-min')?.value||'90')||90);
+    const half=clockActive?getMatchHalf(curClock):2;
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
     curMr.grStats=curMr.grStats||{};
     curMr.grStats.events=curMr.grStats.events||[];
@@ -6971,6 +6975,8 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
   const clock=mr.matchClock||{phase:'pre'};
   const adjEvents=(mr.adjEvents||[]).slice().sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
   const clockActive=(clock.phase==='1h'||clock.phase==='2h');
+  const gameFinishedAdj=(clock.phase==='finished');
+  const canAddAdj=clockActive||gameFinishedAdj;
   const liveMin=getMatchMinute(clock);
   const liveHalf=getMatchHalf(clock);
 
@@ -6984,12 +6990,14 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
 
   const clockInfo=clockActive
     ? `<span style="color:#2e7d32;font-weight:700">⏱ ${liveMin}'</span> <span style="font-size:11px;color:var(--muted)">${liveHalf===1?'1ª Parte':'2ª Parte'}</span>`
+    : gameFinishedAdj
+    ? `<span style="font-weight:600;color:var(--muted)">🏁 Terminado</span> <span style="font-size:12px;color:var(--muted);margin-left:8px">Minuto:</span> <input type="number" id="adj-manual-min" min="0" max="200" value="90" style="width:58px;padding:3px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;display:inline-block;vertical-align:middle;font-family:inherit;background:var(--bg);color:var(--text)">`
     : `<span style="color:var(--muted);font-size:12px">${clockPhaseLabel(clock)} — inicia o jogo no relógio acima</span>`;
 
   const typeBtns=ADJ_EVENT_TYPES.map(t=>`
-    <button data-adj-type="${t.key}" ${!clockActive?'disabled':''} style="display:flex;align-items:center;gap:6px;padding:10px 14px;
+    <button data-adj-type="${t.key}" ${!canAddAdj?'disabled':''} style="display:flex;align-items:center;gap:6px;padding:10px 14px;
       border:1.5px solid var(--border);border-radius:9px;background:var(--card);
-      cursor:${clockActive?'pointer':'not-allowed'};opacity:${clockActive?1:.5};
+      cursor:${canAddAdj?'pointer':'not-allowed'};opacity:${canAddAdj?1:.5};
       font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:calc(50% - 4px);justify-content:center;transition:.15s">
       <span style="font-size:18px">${t.icon}</span> ${t.label}
     </button>`).join('');
@@ -7047,7 +7055,7 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
   // Show 2nd player row for sub/golo/assist
   const p2Row=document.getElementById('adj-p2-row');
   el.querySelectorAll('[data-adj-type]').forEach(btn=>btn.addEventListener('click',()=>{
-    if(!clockActive) return;
+    if(!canAddAdj) return;
     const type=btn.dataset.adjType;
     // Show/hide p2 row based on type
     p2Row.style.display=(type==='sub'||type==='golo'||type==='assist')?'block':'none';
@@ -7055,8 +7063,8 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
     const player2Id=document.getElementById('adj-player2')?.value||'';
     const notes=document.getElementById('adj-notes').value.trim();
     const curClock=DB.getEvent(gameEventId).matchReport?.matchClock||{};
-    const minute=getMatchMinute(curClock)||0;
-    const half=getMatchHalf(curClock);
+    const minute=clockActive?(getMatchMinute(curClock)||0):(parseInt(document.getElementById('adj-manual-min')?.value||'90')||90);
+    const half=clockActive?getMatchHalf(curClock):2;
     const pObj=sqPlayers.find(p=>p.id===playerId);
     const p2Obj=sqPlayers.find(p=>p.id===player2Id);
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
@@ -7234,7 +7242,8 @@ function renderGamePre(ev,sqPlayers,conv){
 
 // ── SUMÁRIO ───────────────────────────────────────────────────────────────────
 function renderGameSumario(ev,sqPlayers,conv,mr){
-  const evs=(mr.events||[]).sort((a,b)=>sortMin(a)-sortMin(b));
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub']);
+  const evs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>sortMin(a)-sortMin(b));
   const isHome=ev.homeAway!=='away';
   function pn(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
 
@@ -7403,6 +7412,43 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       <div style="font-size:15px;font-weight:700">${motmPlayer.name}</div>
     </div>${rBadge(motmPlayer.id)}</div>`:'';
 
+  // Stats totals
+  const nGoals=evs.filter(e=>e.type==='goal').length;
+  const nGC=evs.filter(e=>e.type==='goal_conceded').length;
+  const nYel=evs.filter(e=>e.type==='yellow').length;
+  const nYel2=evs.filter(e=>e.type==='yellow2').length;
+  const nRed=evs.filter(e=>e.type==='red').length;
+  const nSub=evs.filter(e=>e.type==='sub').length;
+  const nShotOn=evs.filter(e=>e.type==='shot_on').length;
+  const nShotOff=evs.filter(e=>e.type==='shot_off').length;
+  const nFoulC=evs.filter(e=>e.type==='foul_committed').length;
+  const nFoulS=evs.filter(e=>e.type==='foul_suffered').length;
+  function relStatCell(icon,label,val){
+    return `<div style="text-align:center;padding:10px 6px;background:var(--bg);border-radius:8px;min-width:75px;flex:1">
+      <div style="font-size:18px;line-height:1.4">${icon}</div>
+      <div style="font-size:22px;font-weight:800;line-height:1.2">${val}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">${label}</div>
+    </div>`;
+  }
+  const statsHtml=`<div class="card" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">📊 Totais do Jogo</h3>
+      <button id="btn-rel-pdf" class="btn btn-sm" style="font-size:11px;padding:5px 12px">📄 PDF</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${relStatCell('⚽','Golos',nGoals)}
+      ${relStatCell('🥅','Sofridos',nGC)}
+      ${relStatCell('🟡','Amarelos',nYel)}
+      ${nYel2?relStatCell('🟡🔴','Duplo Am.',nYel2):''}
+      ${relStatCell('🔴','Vermelhos',nRed)}
+      ${relStatCell('🔄','Subs',nSub)}
+      ${(nShotOn||nShotOff)?relStatCell('🎯','Rem. Golo',nShotOn):''}
+      ${(nShotOn||nShotOff)?relStatCell('💨','Rem. Fora',nShotOff):''}
+      ${(nFoulC||nFoulS)?relStatCell('⚡','F. Com.',nFoulC):''}
+      ${(nFoulC||nFoulS)?relStatCell('🤕','F. Sof.',nFoulS):''}
+    </div>
+  </div>`;
+
   document.getElementById('gm-tab-content').innerHTML=`
     <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">
       ${formation?`<strong style="color:var(--text)">${formation}</strong> · `:''}Arrasta os jogadores para ajustar posições
@@ -7429,7 +7475,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
         :tokensHtml}
     </div>
     ${benchHtml}
-    ${motmHtml}`;
+    ${motmHtml}
+    ${statsHtml}`;
 
   // ── DRAG & DROP ──────────────────────────────────────────────────────────────
   if(tits.length>0){
@@ -7466,6 +7513,56 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       });
     });
   }
+
+  // ── PDF EXPORT ───────────────────────────────────────────────────────────────
+  document.getElementById('btn-rel-pdf')?.addEventListener('click', async()=>{
+    if(!window.jspdf) await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
+    });
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=doc.internal.pageSize.getWidth();
+    let y=22;
+    const isHome=ev.homeAway!=='away';
+    const opp=ev.opponent||'Adversario';
+    // Header
+    doc.setFontSize(18); doc.setFont('helvetica','bold');
+    doc.text('SC Vianense SAD', W/2, y, {align:'center'}); y+=9;
+    doc.setFontSize(13); doc.setFont('helvetica','normal');
+    doc.text(isHome?`vs ${opp}`:`em ${opp}`, W/2, y, {align:'center'}); y+=7;
+    if(ev.competition){ doc.setFontSize(10); doc.text(ev.competition, W/2, y, {align:'center'}); y+=6; }
+    if(ev.date){ doc.setFontSize(10); doc.text(fmtDate(ev.date)+(ev.time?' | '+ev.time:''), W/2, y, {align:'center'}); y+=6; }
+    // Score
+    const sc=isHome?`${nGoals} - ${nGC}`:`${nGC} - ${nGoals}`;
+    doc.setFontSize(36); doc.setFont('helvetica','bold');
+    doc.text(sc, W/2, y+13, {align:'center'}); y+=24;
+    // Separator
+    doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
+    // Stats
+    doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('Estatisticas', 15, y); y+=9;
+    doc.setFontSize(11);
+    const statRows=[
+      ['Golos marcados', nGoals],
+      ['Golos sofridos', nGC],
+      ['Cartoes amarelos', nYel],
+      ...(nYel2?[['Duplos amarelos (2x amarelo)', nYel2]]:[]),
+      ['Cartoes vermelhos', nRed],
+      ['Substituicoes', nSub],
+      ...(nShotOn||nShotOff?[['Remates enquadrados', nShotOn],['Remates fora', nShotOff]]:[]),
+      ...(nFoulC||nFoulS?[['Faltas cometidas', nFoulC],['Faltas sofridas', nFoulS]]:[]),
+    ];
+    statRows.forEach(([label,val])=>{
+      doc.setFont('helvetica','normal'); doc.text(label, 20, y);
+      doc.setFont('helvetica','bold'); doc.text(String(val), W-20, y, {align:'right'});
+      doc.setDrawColor(220,220,220); doc.line(20, y+2.5, W-20, y+2.5);
+      doc.setFont('helvetica','normal');
+      y+=9;
+    });
+    doc.save(`Relatorio_${opp.replace(/\s+/g,'_')}_${ev.date||'jogo'}.pdf`);
+  });
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
@@ -7503,6 +7600,14 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(e.type==='sub'){ icon='🔄'; desc=`Substituição — ${pName(e.playerOutId)} ↔ ${pName(e.playerInId)}` }
     else if(e.type==='medical'){ icon='🏥'; desc=`Assist. Médica — ${pName(e.playerId)}${e.playerInId?` <span style="color:var(--muted);font-size:11px">→ ${pName(e.playerInId)}</span>`:''}` }
     else if(e.type==='injury'){ icon='🩺'; desc=`Lesão — ${pName(e.playerId)}` }
+    else if(e.type==='yellow2'){ icon='🟡🔴'; desc=`Duplo Amarelo — ${pName(e.playerId)}` }
+    else if(e.type==='shot_on'){ icon='🎯'; desc=`Remate enquadrado — ${pName(e.playerId)}` }
+    else if(e.type==='shot_off'){ icon='💨'; desc=`Remate fora — ${pName(e.playerId)}` }
+    else if(e.type==='foul_committed'){ icon='⚡'; desc=`Falta cometida — ${pName(e.playerId)}` }
+    else if(e.type==='foul_suffered'){ icon='🤕'; desc=`Falta sofrida — ${pName(e.playerId)}` }
+    else if(e.type==='ball_won'){ icon='💪'; desc=`Bola recuperada — ${pName(e.playerId)}` }
+    else if(e.type==='ball_lost'){ icon='❌'; desc=`Bola perdida — ${pName(e.playerId)}` }
+    if(!icon) return '';
     return `<div class="mev"><span class="mev-min">${fmtEvMin(e.minute)}</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
   }).join('');
   // Ratings: players who were on the field (lineup + subs in); fallback to all convocados
