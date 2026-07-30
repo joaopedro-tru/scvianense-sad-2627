@@ -3143,12 +3143,13 @@ function getSqFormation(sq){
 }
 
 // Normaliza a posição do jogador para o campo:
-// PL → AV | Extremo+AV(pos2) → AV | Extremo+Ala(pos2) → ALD/ALE
+// PL → AV | Extremo+AV(pos2) → AV | Extremo+Ala(pos2) → ALD/ALE | Lateral+Ala(pos2) → ALD/ALE
 function getDisplayPos(p){
   const pos=p.position, pos2=p.position2;
   if(pos==='PL') return 'AV';
   if((pos==='ED'||pos==='EE') && pos2==='AV') return 'AV';
   if((pos==='ED'||pos==='EE') && (pos2==='ALD'||pos2==='ALE')) return pos2;
+  if((pos==='LD'||pos==='LE') && (pos2==='ALD'||pos2==='ALE')) return pos2;
   return pos;
 }
 // Normaliza roles do FORMATIONS para o pitch view (PL e AV tratados como AV)
