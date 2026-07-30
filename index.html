@@ -7277,6 +7277,7 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
       else if(e.type==='sub') desc=`🔄 <span style="color:var(--muted)">${pn(e.playerOutId)}</span> → <strong>${pn(e.playerInId)}</strong>`;
       else if(e.type==='injury') desc=`🩺 ${pn(e.playerId)||'—'}`;
       else if(e.type==='medical'){ desc=`🏥 ${e.playerId?pn(e.playerId):'—'}${e.playerInId?` → <strong>${pn(e.playerInId)}</strong>`:''}`; }
+      if(!desc && !scoreBadge) return '';
       return `<div class="sum-ev"><span class="sum-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="sum-desc">${desc}</span>${scoreBadge}</div>`;
     }).join('');
     const pOur=ourG-start[0], pTheir=theirG-start[1];
@@ -7450,7 +7451,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   </div>`;
 
   document.getElementById('gm-tab-content').innerHTML=`
-    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px">
+    ${statsHtml}
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin:12px 0 6px">
       ${formation?`<strong style="color:var(--text)">${formation}</strong> · `:''}Arrasta os jogadores para ajustar posições
     </div>
     <div id="rel-pitch" style="position:relative;width:100%;padding-top:62%;
@@ -7475,8 +7477,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
         :tokensHtml}
     </div>
     ${benchHtml}
-    ${motmHtml}
-    ${statsHtml}`;
+    ${motmHtml}`;
 
   // ── DRAG & DROP ──────────────────────────────────────────────────────────────
   if(tits.length>0){
