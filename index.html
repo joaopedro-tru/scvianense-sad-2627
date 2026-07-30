@@ -3138,132 +3138,122 @@ function renderSquad(){
 }
 
 // ── PITCH VIEW ────────────────────────────────────────────────────────────────
-function renderPitch(allPs){
-  const byPos={};
-  allPs.forEach(p=>{ const pos=p.position; if(!pos)return; if(!byPos[pos])byPos[pos]=[]; byPos[pos].push(p) });
+function getSqFormation(sq){
+  return localStorage.getItem('scv_sq_form_'+(sq||'eqa'))||DEFAULT_FORMATION[sq||'eqa']||'4-3-3';
+}
 
+// Normaliza a posição do jogador para o campo:
+// PL → AV | Extremo+AV(pos2) → AV | Extremo+Ala(pos2) → ALD/ALE
+function getDisplayPos(p){
+  const pos=p.position, pos2=p.position2;
+  if(pos==='PL') return 'AV';
+  if((pos==='ED'||pos==='EE') && pos2==='AV') return 'AV';
+  if((pos==='ED'||pos==='EE') && (pos2==='ALD'||pos2==='ALE')) return pos2;
+  return pos;
+}
+// Normaliza roles do FORMATIONS para o pitch view (PL e AV tratados como AV)
+const PITCH_ROLE_NORM={PL:'AV'};
+
+function renderPitch(allPs){
+  const form=getSqFormation(squad);
+  const slots=FORMATIONS[form]||[];
   const isMob=window.innerWidth<=768;
 
-  // Short name: "Firstname L." on mobile, "Firstname Lastname" on desktop
+  // Compute avg x/y per unique role in this formation (PL normalizado para AV)
+  const roleAcc={};
+  slots.forEach(s=>{
+    const role=PITCH_ROLE_NORM[s.role]||s.role;
+    if(!roleAcc[role])roleAcc[role]={sx:0,sy:0,n:0};
+    roleAcc[role].sx+=s.x; roleAcc[role].sy+=s.y; roleAcc[role].n++;
+  });
+  // roleZones[role] = {left, top} as css percentages for horizontal or vertical pitch
+  const roleZones={};
+  Object.entries(roleAcc).forEach(([role,d])=>{
+    const ax=d.sx/d.n, ay=d.sy/d.n;
+    // Horizontal pitch: x=left(GR→attack), y=top(0=top,100=bottom)
+    // Vertical mobile pitch: attack at top → left=y, top=(100-x)
+    roleZones[role]=isMob?{left:ay,top:100-ax}:{left:ax,top:ay};
+  });
+
+  // Group players by normalized display position
+  const byPos={};
+  allPs.forEach(p=>{
+    const dp=getDisplayPos(p);
+    if(!dp)return;
+    (byPos[dp]=byPos[dp]||[]).push(p);
+  });
+
+  // Players whose position has no slot in the current formation
+  const formRoles=new Set(Object.keys(roleZones));
+  const outsiders=allPs.filter(p=>!p.position||!formRoles.has(p.position));
+
   function sn(name){
     if(!name)return '—';
     const p=name.trim().split(/\s+/);
-    if(p.length===1) return p[0];
-    return isMob ? `${p[0]} ${p[p.length-1][0]}.` : `${p[0]} ${p[p.length-1]}`;
+    if(p.length===1)return p[0];
+    return isMob?`${p[0]} ${p[p.length-1][0]}.`:`${p[0]} ${p[p.length-1]}`;
   }
 
-  function pills(pos,cls=''){
-    const pls=byPos[pos]||[];
-    if(pls.length===0) return `<div class="ppill empty">${POS[pos]||pos}</div>`;
-    return pls.map(p=>`<div class="ppill ${cls}" title="${p.name}" onclick="nav('player',{id:'${p.id}'})">${sn(dn(p))}</div>`).join('');
-  }
+  // Zones HTML — sorted by formation slot order (first occurrence of each normalized role)
+  const seenRoles=[];
+  slots.forEach(s=>{const r=PITCH_ROLE_NORM[s.role]||s.role;if(!seenRoles.includes(r))seenRoles.push(r);});
+  const zonesHTML=seenRoles.map(role=>{
+    const pos=roleZones[role];
+    const pls=byPos[role]||[];
+    const isGR=role==='GR';
+    const pillsHTML=pls.length
+      ?pls.map(p=>`<div class="ppill${isGR?' gk':''}" title="${p.name}" onclick="nav('player',{id:'${p.id}'})">${sn(dn(p))}</div>`).join('')
+      :`<div class="ppill empty">${POS[role]||role}</div>`;
+    return `<div class="pzone" style="left:${pos.left.toFixed(1)}%;top:${pos.top.toFixed(1)}%"><div class="pzone-lbl">${POS[role]||role}</div>${pillsHTML}</div>`;
+  }).join('');
 
-  // MC zone: MC + MO — split evenly into 2 columns
-  const mcAll=[...(byPos['MC']||[]),...(byPos['MO']||[])];
-  const mcSplit=Math.ceil(mcAll.length/2);
-  const mcL=mcAll.slice(0,mcSplit);
-  const mcR=mcAll.slice(mcSplit);
-  function mcColPills(arr){ if(arr.length===0) return `<div class="ppill empty">MC</div>`; return arr.map(p=>`<div class="ppill" title="${p.name}" onclick="nav('player',{id:'${p.id}'})">${sn(dn(p))}</div>`).join(''); }
+  const outsiderNote=outsiders.length
+    ?`<div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:rgba(255,255,255,.38)">Fora do esquema: ${outsiders.map(p=>sn(dn(p))).join(' · ')}</div>`
+    :'';
 
-  const formPos=['GR','LE','DC','LD','MD','MC','MO','EE','PL','ED'];
-  const outsiders=allPs.filter(p=>!p.position||!formPos.includes(p.position));
+  const chips=Object.keys(FORMATIONS).map(f=>
+    `<button class="form-chip${f===form?' active':''}" onclick="localStorage.setItem('scv_sq_form_${squad}','${f}');renderSquad()">${f}</button>`
+  ).join('');
 
-  if(isMob){
-    // ── VERTICAL PITCH (mobile) ─────────────────────────────────
-    // viewBox 43×100, attack at top, GR at bottom
-    const outsiderNote=outsiders.length?`<div style="position:absolute;top:5px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:8px;color:rgba(255,255,255,.32)">Sem posição: ${outsiders.map(p=>sn(dn(p))).join(' · ')}</div>`:'';
-    document.getElementById('p-pitch').innerHTML=`
-<div class="pitch-wrap">
-  <div class="pitch-field" style="padding-bottom:210%;min-height:0">
-    <svg class="pitch-svg" viewBox="0 0 43 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      ${Array.from({length:6},(_,i)=>`<rect x="0" y="${(i*16.67).toFixed(1)}" width="43" height="8.33" fill="${i%2?'rgba(0,0,0,.04)':'none'}"/>`).join('')}
-      <rect x="1" y="1" width="41" height="98" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".4"/>
-      <line x1="1" y1="50" x2="42" y2="50" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
-      <circle cx="21.5" cy="50" r="8.5" fill="none" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
-      <circle cx="21.5" cy="50" r=".55" fill="rgba(255,255,255,.7)"/>
-      <!-- GR penalty area (bottom) -->
-      <rect x="7" y="86" width="29" height="13" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
-      <rect x="14" y="93.5" width="15" height="5.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
-      <circle cx="21.5" cy="89" r=".4" fill="rgba(255,255,255,.55)"/>
-      <!-- AT penalty area (top) -->
-      <rect x="7" y="1" width="29" height="13" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
-      <rect x="14" y="1" width="15" height="5.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
-      <circle cx="21.5" cy="11" r=".4" fill="rgba(255,255,255,.55)"/>
-      <text x="21.5" y="4.5" text-anchor="middle" font-family="sans-serif" font-size="2.5" fill="rgba(255,255,255,.2)">&#9660; ATAQUE</text>
-    </svg>
-    <!-- Attack → top, GR → bottom -->
-    <div class="pzone" style="left:50%;top:93%"><div class="pzone-lbl">GR</div>${pills('GR','gk')}</div>
+  const svgH=`<svg class="pitch-svg" viewBox="0 0 100 43" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    ${Array.from({length:7},(_,i)=>`<rect x="${(i*14.3).toFixed(1)}" y="0" width="7.15" height="43" fill="${i%2?'rgba(0,0,0,.04)':'none'}"/>`).join('')}
+    <rect x="1" y="1" width="98" height="41" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".4"/>
+    <line x1="50" y1="1" x2="50" y2="42" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
+    <circle cx="50" cy="21.5" r="8.5" fill="none" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
+    <circle cx="50" cy="21.5" r=".55" fill="rgba(255,255,255,.7)"/>
+    <rect x="1" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
+    <rect x="1" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
+    <circle cx="11" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/>
+    <rect x="85" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
+    <rect x="93.5" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
+    <circle cx="89" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/>
+    <text x="97" y="22.3" text-anchor="end" font-family="sans-serif" font-size="1.7" fill="rgba(255,255,255,.2)">&#9654; ATAQUE</text>
+  </svg>`;
 
-    <div class="pzone" style="left:12%;top:78%"><div class="pzone-lbl">LE</div>${pills('LE')}</div>
-    <div class="pzone" style="left:50%;top:78%"><div class="pzone-lbl">DC</div>${pills('DC')}</div>
-    <div class="pzone" style="left:88%;top:78%"><div class="pzone-lbl">LD</div>${pills('LD')}</div>
+  const svgV=`<svg class="pitch-svg" viewBox="0 0 43 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    ${Array.from({length:6},(_,i)=>`<rect x="0" y="${(i*16.67).toFixed(1)}" width="43" height="8.33" fill="${i%2?'rgba(0,0,0,.04)':'none'}"/>`).join('')}
+    <rect x="1" y="1" width="41" height="98" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".4"/>
+    <line x1="1" y1="50" x2="42" y2="50" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
+    <circle cx="21.5" cy="50" r="8.5" fill="none" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
+    <circle cx="21.5" cy="50" r=".55" fill="rgba(255,255,255,.7)"/>
+    <rect x="7" y="86" width="29" height="13" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
+    <rect x="14" y="93.5" width="15" height="5.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
+    <circle cx="21.5" cy="89" r=".4" fill="rgba(255,255,255,.55)"/>
+    <rect x="7" y="1" width="29" height="13" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
+    <rect x="14" y="1" width="15" height="5.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
+    <circle cx="21.5" cy="11" r=".4" fill="rgba(255,255,255,.55)"/>
+    <text x="21.5" y="4.5" text-anchor="middle" font-family="sans-serif" font-size="2.5" fill="rgba(255,255,255,.2)">&#9660; ATAQUE</text>
+  </svg>`;
 
-    <div class="pzone" style="left:50%;top:63%"><div class="pzone-lbl">MD</div>${pills('MD','trinco')}</div>
-
-    <div class="pzone" style="left:50%;top:46%">
-      <div class="pzone-lbl">MC</div>
-      <div class="mc-cols">
-        <div class="mc-col">${mcColPills(mcL)}</div>
-        <div class="mc-col">${mcColPills(mcR)}</div>
+  document.getElementById('p-pitch').innerHTML=`
+    <div style="overflow-x:auto;padding:4px 0 10px;white-space:nowrap">${chips}</div>
+    <div class="pitch-wrap">
+      <div class="pitch-field"${isMob?' style="padding-bottom:210%;min-height:0"':''}>
+        ${isMob?svgV:svgH}
+        ${zonesHTML}
+        ${outsiderNote}
       </div>
-    </div>
-
-    <div class="pzone" style="left:12%;top:22%"><div class="pzone-lbl">EE</div>${pills('EE')}</div>
-    <div class="pzone" style="left:50%;top:18%"><div class="pzone-lbl">PL</div>${pills('PL')}</div>
-    <div class="pzone" style="left:88%;top:22%"><div class="pzone-lbl">ED</div>${pills('ED')}</div>
-
-    ${outsiderNote}
-  </div>
-</div>`;
-  } else {
-    // ── HORIZONTAL PITCH (desktop) ──────────────────────────────
-    const outsiderNote=outsiders.length?`<div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:rgba(255,255,255,.32)">Sem posição: ${outsiders.map(p=>sn(dn(p))).join(' · ')}</div>`:'';
-    document.getElementById('p-pitch').innerHTML=`
-<div class="pitch-wrap">
-  <div class="pitch-field">
-    <svg class="pitch-svg" viewBox="0 0 100 43" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      ${Array.from({length:7},(_,i)=>`<rect x="${(i*14.3).toFixed(1)}" y="0" width="7.15" height="43" fill="${i%2?'rgba(0,0,0,.04)':'none'}"/>`).join('')}
-      <rect x="1" y="1" width="98" height="41" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".4"/>
-      <line x1="50" y1="1" x2="50" y2="42" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
-      <circle cx="50" cy="21.5" r="8.5" fill="none" stroke="rgba(255,255,255,.6)" stroke-width=".3"/>
-      <circle cx="50" cy="21.5" r=".55" fill="rgba(255,255,255,.7)"/>
-      <rect x="1" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
-      <rect x="1" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
-      <circle cx="11" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/>
-      <rect x="85" y="9" width="14" height="25" fill="none" stroke="rgba(255,255,255,.5)" stroke-width=".3"/>
-      <rect x="93.5" y="14.5" width="5.5" height="14" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".25"/>
-      <circle cx="89" cy="21.5" r=".4" fill="rgba(255,255,255,.55)"/>
-      <path d="M1,2 Q2.5,1 2.5,2.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/>
-      <path d="M99,2 Q97.5,1 97.5,2.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/>
-      <path d="M1,41 Q2.5,42 2.5,40.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/>
-      <path d="M99,41 Q97.5,42 97.5,40.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".3"/>
-      <text x="97" y="22.3" text-anchor="end" font-family="sans-serif" font-size="1.7" fill="rgba(255,255,255,.2)">&#9654; ATAQUE</text>
-    </svg>
-
-    <div class="pzone" style="left:5%;top:50%"><div class="pzone-lbl">GR</div>${pills('GR','gk')}</div>
-
-    <div class="pzone" style="left:20%;top:13%"><div class="pzone-lbl">LE</div>${pills('LE')}</div>
-    <div class="pzone" style="left:20%;top:50%"><div class="pzone-lbl">DC</div>${pills('DC')}</div>
-    <div class="pzone" style="left:20%;top:87%"><div class="pzone-lbl">LD</div>${pills('LD')}</div>
-
-    <div class="pzone" style="left:37%;top:50%"><div class="pzone-lbl">MD &middot; Trinco</div>${pills('MD','trinco')}</div>
-
-    <div class="pzone" style="left:55%;top:50%">
-      <div class="pzone-lbl">MC</div>
-      <div class="mc-cols">
-        <div class="mc-col">${mcColPills(mcL)}</div>
-        <div class="mc-col">${mcColPills(mcR)}</div>
-      </div>
-    </div>
-
-    <div class="pzone" style="left:78%;top:13%"><div class="pzone-lbl">EE</div>${pills('EE')}</div>
-    <div class="pzone" style="left:78%;top:50%"><div class="pzone-lbl">PL</div>${pills('PL')}</div>
-    <div class="pzone" style="left:78%;top:87%"><div class="pzone-lbl">ED</div>${pills('ED')}</div>
-
-    ${outsiderNote}
-  </div>
-</div>`;
-  }
+    </div>`;
 }
 
 // ── PLAYER DETAIL ─────────────────────────────────────────────────────────────
