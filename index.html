@@ -4527,7 +4527,9 @@ async function _renderCalPDF(selSquads){
       doc.setFont('helvetica','bold'); doc.setFontSize(5.8);
       let title='';
       if(ev.type==='game'){
-        title=(ev.homeAway==='away'?'V: ':'C: ')+(ev.opponent||'Jogo');
+        const _sqShort={eqa:'EqA',sub23:'U23',sub19:'U19',both:'All'};
+        const _sq=_sqShort[ev.squad]||ev.squad||'';
+        title=(ev.homeAway==='away'?'F':'C')+(_sq?' ['+_sq+']':'')+' '+(ev.opponent||'Jogo');
       } else if(ev.type==='gym'){
         title='GIN '+(multiSq?SQUADS[ev.squad]||'':'');
       } else {
