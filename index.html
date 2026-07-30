@@ -10040,6 +10040,93 @@ function seedLiga3Games(){
   if(added>0) console.log(`Liga 3: ${added} jogo(s) adicionado(s).`);
 }
 
+function seedMesocicloAgosto2026(){
+  const KEY='scv_seed_meso_ago26_v1';
+  if(localStorage.getItem(KEY)) return;
+  const EMMM='Estádio Municipal Manuela Machado';
+  const EDJM='Estádio Dr. José de Matos';
+  const COMP='Liga 3 Placard Série A 26/27';
+
+  // ── 1. Corrigir / actualizar jogos Liga 3 de Agosto ──────────────────────────
+  // J2 mudou de 16/08 para 15/08 (Sábado). Os outros ganham hora, local e nome correcto.
+  const ligaFixes=[
+    {searchDate:'2026-08-09', date:'2026-08-09', opponent:'AD Fafe SAD',         homeAway:'away', time:'17:00', location:'Estádio Municipal de Fafe'},
+    {searchDate:'2026-08-16', date:'2026-08-15', opponent:'CD Trofense',         homeAway:'home', time:'17:00', location:EDJM},
+    {searchDate:'2026-08-23', date:'2026-08-23', opponent:'AD Marco 09',         homeAway:'away', time:'17:00', location:'Estádio Municipal Marco de Canavezes'},
+    {searchDate:'2026-09-06', date:'2026-09-06', opponent:'FC Paços de Ferreira',homeAway:'home', time:'15:00', location:EDJM},
+  ];
+  ligaFixes.forEach(f=>{
+    const ev=DB.events().find(e=>e.type==='game'&&e.squad==='eqa'&&e.date===f.searchDate);
+    if(ev){
+      DB.updateEvent(ev.id,{date:f.date,opponent:f.opponent,homeAway:f.homeAway,time:f.time,location:f.location,competition:COMP});
+    } else {
+      const dup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date===f.date);
+      if(!dup) DB.addEvent({type:'game',squad:'eqa',competition:COMP,...f,searchDate:undefined});
+    }
+  });
+
+  // ── 2. Jogos Particulares ────────────────────────────────────────────────────
+  [
+    {date:'2026-08-01', homeAway:'away', opponent:'AD Os Limianos', time:'10:30', location:'Estádio de Vila Chã, Esposende', competition:'Particular', notes:'JP-6'},
+    {date:'2026-08-02', homeAway:'home', opponent:'Gil Vicente U23', time:'17:00', location:EMMM,                           competition:'Particular', notes:'JP-7'},
+  ].forEach(g=>{
+    const dup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date===g.date&&e.opponent===g.opponent);
+    if(!dup) DB.addEvent({type:'game',squad:'eqa',...g});
+  });
+
+  // ── 3. Taça de Portugal ──────────────────────────────────────────────────────
+  const tacaDup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date==='2026-08-30');
+  if(!tacaDup) DB.addEvent({type:'game',squad:'eqa',date:'2026-08-30',homeAway:'home',opponent:'A definir (sorteio)',time:'',location:'',competition:'Taça de Portugal Tranquilidade',notes:'1ª Eliminatória — data/hora sujeita a sorteio'});
+
+  // ── 4. Treinos ───────────────────────────────────────────────────────────────
+  [
+    // Semana 5 (cont.)
+    {date:'2026-07-30', time:'10:00', location:EMMM},
+    {date:'2026-07-31', time:'10:00', location:EMMM},
+    // Semana 7
+    {date:'2026-08-04', time:'10:00', location:EMMM},
+    {date:'2026-08-05', time:'10:00', location:EMMM},  // bi-diário manhã
+    {date:'2026-08-06', time:'10:00', location:EMMM},
+    {date:'2026-08-07', time:'10:00', location:EMMM},
+    {date:'2026-08-08', time:'10:00', location:EMMM},
+    // Semana 8
+    {date:'2026-08-11', time:'10:00', location:EMMM},  // bi-diário manhã
+    {date:'2026-08-12', time:'10:00', location:EMMM},
+    {date:'2026-08-13', time:'10:00', location:EMMM},
+    {date:'2026-08-14', time:'10:00', location:EMMM},
+    // Semana 9
+    {date:'2026-08-18', time:'10:00', location:EDJM},
+    {date:'2026-08-19', time:'10:00', location:EMMM},  // bi-diário manhã
+    {date:'2026-08-20', time:'10:00', location:EDJM},
+    {date:'2026-08-21', time:'10:00', location:EMMM},
+    {date:'2026-08-22', time:'10:00', location:EDJM},
+    // Semana 10
+    {date:'2026-08-24', time:'10:00', location:EDJM},
+    {date:'2026-08-26', time:'10:00', location:EMMM},
+    {date:'2026-08-27', time:'10:00', location:EDJM},
+    {date:'2026-08-28', time:'10:00', location:EMMM},
+    {date:'2026-08-29', time:'10:00', location:EDJM},
+    // Semana 11
+    {date:'2026-08-31', time:'10:00', location:EDJM},
+    {date:'2026-09-02', time:'10:00', location:EMMM},
+    {date:'2026-09-03', time:'10:00', location:EDJM},
+    {date:'2026-09-04', time:'10:00', location:EMMM},
+    {date:'2026-09-05', time:'10:00', location:EDJM},
+  ].forEach(t=>{
+    const dup=DB.events().some(e=>e.type==='training'&&e.squad==='eqa'&&e.date===t.date);
+    if(!dup) DB.addEvent({type:'training',squad:'eqa',...t});
+  });
+
+  // ── 5. Ginásio tarde (treinos bi-diários) ────────────────────────────────────
+  ['2026-08-05','2026-08-11','2026-08-19'].forEach(date=>{
+    const dup=DB.events().some(e=>e.type==='gym'&&e.squad==='eqa'&&e.date===date);
+    if(!dup) DB.addEvent({type:'gym',squad:'eqa',date,time:'14:30',location:EMMM,title:'Ginásio — Bi-diário tarde',notes:'Sessão da tarde do treino bi-diário (ginásio)'});
+  });
+
+  localStorage.setItem(KEY,'1');
+  console.log('Seed: Mesociclo Agosto 2026 importado com sucesso.');
+}
+
 function seedGymPlan20260728(){
   // Limpa chaves antigas (corridas falhadas anteriores)
   localStorage.removeItem('scv_seed_gym_20260728');
@@ -10125,6 +10212,7 @@ function initCoordApp(){
     }
     seedLiga3Games();
     seedGymPlan20260728();
+    seedMesocicloAgosto2026();
     backfillGRAttendance();
     document.getElementById('sync-overlay').style.display='none';
     nav('dashboard');
