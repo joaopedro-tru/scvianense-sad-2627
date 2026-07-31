@@ -7952,11 +7952,11 @@ function generateConvocatoriaPDF(evId){
   const totalMm=fixedMm+convocados.length*rowMm;
   const zoom=Math.min(1,parseFloat((275/totalMm).toFixed(4)));
 
-  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Convocatória — SC Vianense SAD</title><style>
+  const dateSlash=ev.date?(ev.date.split('-').reverse().join('/')):'';
+  const pdfTitle=`Convocatória - ${leftTeam} vs ${rightTeam}${dateSlash?' - '+dateSlash:''}`;
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>${pdfTitle}</title><style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:20px 18px;color:#111;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.no-print{text-align:right;margin-bottom:12px}
-.no-print button{background:#1a3d6e;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:700}
 .header{display:flex;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
 .header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
 .header-text .club{font-size:16px;font-weight:800;color:#1a3d6e}
@@ -7993,11 +7993,9 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
 .footer{text-align:center;font-size:9px;color:#bbb;margin-top:8px;padding-top:6px;border-top:1px solid #eee}
 @media print{
   @page{size:A4 portrait;margin:10mm}
-  .no-print{display:none!important}
   body{padding:0;margin:0;max-width:100%;zoom:${zoom};overflow:hidden}
 }
-</style></head><body>
-<div class="no-print"><button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
+</style></head><body onload="window.print()">
 <div class="header">
   <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
   <div class="header-text">
@@ -8061,15 +8059,14 @@ ${convocados.map(p=>{
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
 <div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
 </body></html>`;
-  // Abre o PDF dentro da app (PWA-safe — evita window.open que fecha o histórico)
+  // Carrega o HTML num iframe oculto; o script auto-print dentro da página abre o diálogo de PDF
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const frame=document.getElementById('pdf-preview-frame');
-  // Revoga URL anterior se existir
   if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl);}
   frame._blobUrl=url;
+  frame.onload=function(){ setTimeout(()=>{ URL.revokeObjectURL(url); frame._blobUrl=null; },3000); };
   frame.src=url;
-  document.getElementById('mo-pdf-preview').style.display='flex';
 }
 function closePdfPreview(){
   document.getElementById('mo-pdf-preview').style.display='none';
