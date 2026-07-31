@@ -7161,30 +7161,102 @@ function renderGamePre(ev,sqPlayers,conv){
     <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🧑‍💼 Equipa Técnica</h3>
     ${gmStaffRows}
   </div>`:'';
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const isEqa = ev.squad==='eqa';
+  // Build sorted schedule timeline items
+  function schedItems(){
+    const gameTime=ev.time||'';
+    const items=[];
+    if(isEqa && conv.scheduleBreakfast) items.push({time:conv.scheduleBreakfast,label:'☕ Pequeno-almoço'});
+    if(conv.concentrationTime)  items.push({time:conv.concentrationTime, label:'🏠 Concentração'});
+    if(conv.scheduleLunch)      items.push({time:conv.scheduleLunch,      label:'🍽️ Almoço'});
+    if(conv.scheduleArrival)    items.push({time:conv.scheduleArrival,    label:'📍 Chegada ao local'});
+    if(conv.schedulePalestra)   items.push({time:conv.schedulePalestra,   label:'📋 Palestra'});
+    if(conv.scheduleGkWarmup)   items.push({time:conv.scheduleGkWarmup,   label:'🧤 Aquecimento GR'});
+    if(conv.scheduleWarmup)     items.push({time:conv.scheduleWarmup,     label:'🏃 Aquecimento'});
+    if(conv.scheduleDressing)   items.push({time:conv.scheduleDressing,   label:'👕 Recolha ao balneário'});
+    if(gameTime) items.push({time:gameTime,label:'⚽ Jogo',isGame:true});
+    return items.sort((a,b)=>a.time.localeCompare(b.time));
+  }
+  const si=schedItems();
+  const schedTimelineHtml=si.length
+    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 20px">${
+        si.map(it=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)${it.isGame?';background:var(--green-bg,rgba(0,150,70,.07));border-radius:6px;padding:5px 8px;margin:2px 0':''}">
+          <span style="font-size:13px;font-weight:700;min-width:40px;color:${it.isGame?'var(--ok)':'var(--text)'}">${it.time}</span>
+          <span style="font-size:13px${it.isGame?';font-weight:600':''}">${it.label}</span>
+        </div>`).join('')
+      }</div>`
+    : `<p style="color:var(--muted);font-size:13px;margin:0">Sem horários definidos. Preenche o programa abaixo.</p>`;
+
+  // Default schedule template helpers
+  const TPL_KEY=`scv_sched_tpl_${ev.squad||'eqa'}`;
+  const tpl=JSON.parse(localStorage.getItem(TPL_KEY)||'{}');
+  function tplVal(k){ return tpl[k]!==undefined&&tpl[k]!==''?tpl[k]:''; }
+  function offLabel(v){ if(v===''||v===null||v===undefined)return '—'; const n=parseInt(v); if(isNaN(n))return '—'; return n<0?`${Math.abs(n)} min antes`:`${n} min depois`; }
+
+  // TM / admin: default schedule config panel
+  const isTMorAdmin=isTeamManager()||isAdmin();
+  const tplFields=[
+    ...(isEqa?[{key:'breakfastOffset',label:'Pequeno-almoço'}]:[]),
+    {key:'concentrationOffset',label:'Concentração'},
+    {key:'lunchOffset',label:'Almoço (tarde)'},
+    {key:'lunchOffsetMorning',label:'Almoço (manhã, após jogo)'},
+    {key:'arrivalOffset',label:'Chegada ao local'},
+    {key:'palestraOffset',label:'Palestra'},
+    {key:'gkWarmupOffset',label:'Aquecimento GR'},
+    {key:'warmupOffset',label:'Aquecimento'},
+    {key:'dressingOffset',label:'Recolha ao balneário'},
+  ];
+  const tplConfigHtml=isTMorAdmin?`
+    <details style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <summary style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;user-select:none">⚙️ Configurar horários padrão</summary>
+      <p style="font-size:11px;color:var(--muted);margin:8px 0 10px">Minutos em relação ao início do jogo (negativo = antes, positivo = depois).</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
+        ${tplFields.map(f=>`<div class="fg" style="margin-bottom:0">
+          <label style="font-size:11px">${f.label}</label>
+          <input type="number" data-tpl-key="${f.key}" value="${tplVal(f.key)}" placeholder="ex: -60" style="padding:5px 8px;font-size:12px">
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-o btn-sm" id="btn-save-tpl" style="margin-top:10px;width:100%">💾 Guardar padrões</button>
+    </details>`:'';
+
   document.getElementById('gm-tab-content').innerHTML=`
+  <!-- ⏱️ Programa do Dia – sorted timeline -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">⏱️ Programa do Dia</h3>
+      <button class="btn btn-o btn-sm" id="btn-apply-tpl" style="font-size:11px;padding:3px 9px">🔄 Aplicar padrão</button>
+    </div>
+    ${schedTimelineHtml}
+    ${conv.notes?`<p style="font-size:12px;color:var(--muted);margin:10px 0 0;font-style:italic">📝 ${conv.notes}</p>`:''}
+  </div>
+
   <div class="gm-detail-grid" style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
     <div>
-      <div class="card" style="margin-bottom:18px">
+      <div class="card" style="margin-bottom:14px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
         ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
       </div>
       ${gmStaffCard}
       <div class="card" style="margin-top:${gmStaffCard?'14':'0'}px">
-        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🎯 Concentração</h3>
-        <div class="fg"><label>Hora de Concentração</label><input type="time" id="gm-conc-time" value="${conv.concentrationTime||''}"></div>
-        <div class="fg"><label>Local de Concentração</label><input type="text" id="gm-conc-place" value="${conv.concentrationPlace||''}" placeholder="Ex: Balneários principais"></div>
-        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 11px;padding-top:12px;border-top:1px solid var(--border)">⏱️ Programa do Dia</h3>
-        <div class="fg"><label>Hora de Almoço</label><input type="time" id="gm-sch-lunch" value="${conv.scheduleLunch||''}"></div>
-        <div class="fg"><label>Chegada ao local de jogo</label><input type="time" id="gm-sch-arrival" value="${conv.scheduleArrival||''}"></div>
-        <div class="fg"><label>Palestra pré-jogo</label><input type="time" id="gm-sch-palestra" value="${conv.schedulePalestra||''}"></div>
-        <div class="fg"><label>Aquecimento GR</label><input type="time" id="gm-sch-gk" value="${conv.scheduleGkWarmup||''}"></div>
-        <div class="fg"><label>Aquecimento dos restantes</label><input type="time" id="gm-sch-warmup" value="${conv.scheduleWarmup||''}"></div>
-        <div class="fg"><label>Recolha ao balneário</label><input type="time" id="gm-sch-dressing" value="${conv.scheduleDressing||''}"></div>
-        <div class="fg"><label>Observações</label><textarea id="gm-notes" style="min-height:50px">${conv.notes||''}</textarea></div>
-        <div style="display:flex;gap:8px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">✏️ Editar Programa</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px">
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Hora de Concentração</label><input type="time" id="gm-conc-time" value="${conv.concentrationTime||''}"></div>
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Local</label><input type="text" id="gm-conc-place" value="${conv.concentrationPlace||''}" placeholder="Ex: Balneários"></div>
+          ${isEqa?`<div class="fg" style="margin-bottom:0"><label style="font-size:11px">Pequeno-almoço</label><input type="time" id="gm-sch-breakfast" value="${conv.scheduleBreakfast||''}"></div>`:'<div></div>'}
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Almoço</label><input type="time" id="gm-sch-lunch" value="${conv.scheduleLunch||''}"></div>
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Chegada ao local</label><input type="time" id="gm-sch-arrival" value="${conv.scheduleArrival||''}"></div>
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Palestra pré-jogo</label><input type="time" id="gm-sch-palestra" value="${conv.schedulePalestra||''}"></div>
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Aquecimento GR</label><input type="time" id="gm-sch-gk" value="${conv.scheduleGkWarmup||''}"></div>
+          <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Aquecimento</label><input type="time" id="gm-sch-warmup" value="${conv.scheduleWarmup||''}"></div>
+          <div class="fg" style="margin-bottom:0;grid-column:1/-1"><label style="font-size:11px">Recolha ao balneário</label><input type="time" id="gm-sch-dressing" value="${conv.scheduleDressing||''}"></div>
+        </div>
+        <div class="fg" style="margin-top:8px"><label style="font-size:11px">Observações</label><textarea id="gm-notes" style="min-height:44px">${conv.notes||''}</textarea></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
           <button class="btn btn-p" id="btn-save-conv" style="flex:1">💾 Guardar</button>
           <button class="btn btn-o" id="btn-gen-pdf">📄 PDF</button>
         </div>
+        ${tplConfigHtml}
       </div>
     </div>
     <div class="card">
@@ -7201,6 +7273,8 @@ function renderGamePre(ev,sqPlayers,conv){
       ${otherSqSection}
     </div>
   </div>`;
+
+  // ── event listeners ──────────────────────────────────────────────────────
   document.querySelectorAll('[data-gconv]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.gconv;
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
@@ -7212,7 +7286,7 @@ function renderGamePre(ev,sqPlayers,conv){
     if(btn.disabled) return;
     const pid=btn.dataset.gtrav;
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
-    if(!c.players[pid]) return; // só convocados podem marcar deslocação
+    if(!c.players[pid]) return;
     c.traveling=c.traveling||{};
     if(c.traveling[pid]) delete c.traveling[pid]; else c.traveling[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
@@ -7228,6 +7302,7 @@ function renderGamePre(ev,sqPlayers,conv){
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
     c.concentrationTime=document.getElementById('gm-conc-time').value;
     c.concentrationPlace=document.getElementById('gm-conc-place').value;
+    if(isEqa) c.scheduleBreakfast=document.getElementById('gm-sch-breakfast')?.value||'';
     c.scheduleLunch=document.getElementById('gm-sch-lunch').value;
     c.scheduleArrival=document.getElementById('gm-sch-arrival').value;
     c.schedulePalestra=document.getElementById('gm-sch-palestra').value;
@@ -7235,9 +7310,48 @@ function renderGamePre(ev,sqPlayers,conv){
     c.scheduleWarmup=document.getElementById('gm-sch-warmup').value;
     c.scheduleDressing=document.getElementById('gm-sch-dressing').value;
     c.notes=document.getElementById('gm-notes').value;
-    DB.updateEvent(gameEventId,{convocatoria:c}); toast('✅ Guardado!');
+    DB.updateEvent(gameEventId,{convocatoria:c}); toast('✅ Guardado!'); renderGame();
   });
   document.getElementById('btn-gen-pdf').addEventListener('click',()=>generateConvocatoriaPDF(gameEventId));
+
+  // Apply default schedule template
+  document.getElementById('btn-apply-tpl')?.addEventListener('click',()=>{
+    const curTpl=JSON.parse(localStorage.getItem(TPL_KEY)||'{}');
+    if(!Object.keys(curTpl).length){ toast('⚠️ Sem padrão configurado. Define os offsets abaixo.'); return; }
+    const gameTime=ev.time||'15:00';
+    const [gh,gm]=gameTime.split(':').map(Number);
+    const gameMins=gh*60+gm;
+    const isMorning=gameMins<780; // before 13:00
+    function calc(offset){
+      if(offset===''||offset===null||offset===undefined) return '';
+      const n=parseInt(offset); if(isNaN(n)) return '';
+      const total=gameMins+n;
+      if(total<0||total>=1440) return '';
+      return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+    }
+    const setV=(id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+    if(isEqa) setV('gm-sch-breakfast', calc(curTpl.breakfastOffset));
+    setV('gm-conc-time', calc(curTpl.concentrationOffset));
+    // morning game: lunch after game using lunchOffsetMorning; afternoon: before game
+    setV('gm-sch-lunch', isMorning ? calc(curTpl.lunchOffsetMorning??60) : calc(curTpl.lunchOffset));
+    setV('gm-sch-arrival', calc(curTpl.arrivalOffset));
+    setV('gm-sch-palestra', calc(curTpl.palestraOffset));
+    setV('gm-sch-gk', calc(curTpl.gkWarmupOffset));
+    setV('gm-sch-warmup', calc(curTpl.warmupOffset));
+    setV('gm-sch-dressing', calc(curTpl.dressingOffset));
+    toast('✅ Horários preenchidos. Guarda para confirmar.');
+  });
+
+  // Save TM template
+  document.getElementById('btn-save-tpl')?.addEventListener('click',()=>{
+    const newTpl={};
+    document.querySelectorAll('[data-tpl-key]').forEach(inp=>{
+      const v=inp.value.trim();
+      newTpl[inp.dataset.tplKey]=v===''?'':parseInt(v);
+    });
+    localStorage.setItem(TPL_KEY,JSON.stringify(newTpl));
+    toast('✅ Padrão guardado!');
+  });
 }
 
 // ── SUMÁRIO ───────────────────────────────────────────────────────────────────
@@ -7864,8 +7978,10 @@ function generateConvocatoriaPDF(evId){
   // Estimativa de altura por secção (em mm, layout compacto):
   const hasConc=!!(conv.concentrationTime||conv.concentrationPlace);
   const hasNotes=!!conv.notes;
-  const fixedMm=16/*header*/+18/*game*/+28/*schedule*/+8/*footer*/+18/*gaps*/
-    +(hasConc?12:0)+(hasNotes?14:0);
+  const isEqaForZoom=ev.squad==='eqa';
+  const schedRowCount=[conv.scheduleBreakfast&&isEqaForZoom,conv.concentrationTime,conv.scheduleLunch,conv.scheduleArrival,conv.schedulePalestra,conv.scheduleGkWarmup,conv.scheduleWarmup,conv.scheduleDressing,ev.time].filter(Boolean).length;
+  const fixedMm=16/*header*/+18/*game*/+14/*schedule-header*/+(schedRowCount*5.5)+8/*footer*/+18/*gaps*/
+    +(hasNotes?14:0);
   const rowMm=6.2; // altura de cada linha de atleta
   const totalMm=fixedMm+convocados.length*rowMm;
   const zoom=Math.min(1,parseFloat((275/totalMm).toFixed(4)));
@@ -7956,14 +8072,26 @@ ${convocados.map(p=>{
   return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
 }).join('')}
 </tbody></table>
-<div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
-${conv.scheduleLunch?`<div class="sch-row"><span>🍽️ Hora de almoço</span><span class="sch-time">${conv.scheduleLunch}</span></div>`:''}
-<div class="sch-row"><span>🚗 Chegada ao local de jogo</span><span class="sch-time">${conv.scheduleArrival||'—'}</span></div>
-<div class="sch-row"><span>🗣️ Palestra pré-jogo</span><span class="sch-time">${conv.schedulePalestra||'—'}</span></div>
-<div class="sch-row"><span>🥅 Aquecimento GR</span><span class="sch-time">${conv.scheduleGkWarmup||'—'}</span></div>
-<div class="sch-row"><span>🏃 Aquecimento dos restantes</span><span class="sch-time">${conv.scheduleWarmup||'—'}</span></div>
-<div class="sch-row"><span>🔒 Recolha ao balneário</span><span class="sch-time">${conv.scheduleDressing||'—'}</span></div>
-</div>
+${(()=>{
+  const isEqaPdf=ev.squad==='eqa';
+  const pdfSchedItems=[];
+  if(isEqaPdf&&conv.scheduleBreakfast) pdfSchedItems.push({time:conv.scheduleBreakfast,label:'☕ Pequeno-almoço'});
+  if(conv.concentrationTime) pdfSchedItems.push({time:conv.concentrationTime,label:'🏠 Concentração'});
+  if(conv.scheduleLunch)     pdfSchedItems.push({time:conv.scheduleLunch,    label:'🍽️ Almoço'});
+  if(conv.scheduleArrival)   pdfSchedItems.push({time:conv.scheduleArrival,  label:'🚗 Chegada ao local de jogo'});
+  if(conv.schedulePalestra)  pdfSchedItems.push({time:conv.schedulePalestra, label:'🗣️ Palestra pré-jogo'});
+  if(conv.scheduleGkWarmup)  pdfSchedItems.push({time:conv.scheduleGkWarmup, label:'🥅 Aquecimento GR'});
+  if(conv.scheduleWarmup)    pdfSchedItems.push({time:conv.scheduleWarmup,   label:'🏃 Aquecimento dos restantes'});
+  if(conv.scheduleDressing)  pdfSchedItems.push({time:conv.scheduleDressing, label:'🔒 Recolha ao balneário'});
+  if(ev.time)                pdfSchedItems.push({time:ev.time,               label:'⚽ Jogo',isGame:true});
+  pdfSchedItems.sort((a,b)=>a.time.localeCompare(b.time));
+  if(!pdfSchedItems.length) return '';
+  return `<div class="sch-box"><div class="sch-title">📋 Programa do Dia</div>
+${pdfSchedItems.map(it=>`<div class="sch-row"${it.isGame?` style="font-weight:800;border-top:1.5px solid #2a6030;margin-top:2px;padding-top:6px"`:''}>
+  <span>${it.label}</span><span class="sch-time">${it.time}</span>
+</div>`).join('')}
+</div>`;
+})()}
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
 <div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
 </body></html>`;
