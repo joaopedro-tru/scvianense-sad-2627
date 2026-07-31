@@ -7163,30 +7163,6 @@ function renderGamePre(ev,sqPlayers,conv){
   </div>`:'';
   // ── helpers ──────────────────────────────────────────────────────────────
   const isEqa = ev.squad==='eqa';
-  // Build sorted schedule timeline items
-  function schedItems(){
-    const gameTime=ev.time||'';
-    const items=[];
-    if(isEqa && conv.scheduleBreakfast) items.push({time:conv.scheduleBreakfast,label:'☕ Pequeno-almoço'});
-    if(conv.concentrationTime)  items.push({time:conv.concentrationTime, label:'🏠 Concentração'});
-    if(conv.scheduleLunch)      items.push({time:conv.scheduleLunch,      label:'🍽️ Almoço'});
-    if(conv.scheduleArrival)    items.push({time:conv.scheduleArrival,    label:'📍 Chegada ao local'});
-    if(conv.schedulePalestra)   items.push({time:conv.schedulePalestra,   label:'📋 Palestra'});
-    if(conv.scheduleGkWarmup)   items.push({time:conv.scheduleGkWarmup,   label:'🧤 Aquecimento GR'});
-    if(conv.scheduleWarmup)     items.push({time:conv.scheduleWarmup,     label:'🏃 Aquecimento'});
-    if(conv.scheduleDressing)   items.push({time:conv.scheduleDressing,   label:'👕 Recolha ao balneário'});
-    if(gameTime) items.push({time:gameTime,label:'⚽ Jogo',isGame:true});
-    return items.sort((a,b)=>a.time.localeCompare(b.time));
-  }
-  const si=schedItems();
-  const schedTimelineHtml=si.length
-    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 20px">${
-        si.map(it=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)${it.isGame?';background:var(--green-bg,rgba(0,150,70,.07));border-radius:6px;padding:5px 8px;margin:2px 0':''}">
-          <span style="font-size:13px;font-weight:700;min-width:40px;color:${it.isGame?'var(--ok)':'var(--text)'}">${it.time}</span>
-          <span style="font-size:13px${it.isGame?';font-weight:600':''}">${it.label}</span>
-        </div>`).join('')
-      }</div>`
-    : `<p style="color:var(--muted);font-size:13px;margin:0">Sem horários definidos. Preenche o programa abaixo.</p>`;
 
   // Default schedule template helpers
   const TPL_KEY=`scv_sched_tpl_${ev.squad||'eqa'}`;
@@ -7221,16 +7197,6 @@ function renderGamePre(ev,sqPlayers,conv){
     </details>`:'';
 
   document.getElementById('gm-tab-content').innerHTML=`
-  <!-- ⏱️ Programa do Dia – sorted timeline -->
-  <div class="card" style="margin-bottom:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
-      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">⏱️ Programa do Dia</h3>
-      <button class="btn btn-o btn-sm" id="btn-apply-tpl" style="font-size:11px;padding:3px 9px">🔄 Aplicar padrão</button>
-    </div>
-    ${schedTimelineHtml}
-    ${conv.notes?`<p style="font-size:12px;color:var(--muted);margin:10px 0 0;font-style:italic">📝 ${conv.notes}</p>`:''}
-  </div>
-
   <div class="gm-detail-grid" style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
     <div>
       <div class="card" style="margin-bottom:14px">
@@ -8053,25 +8019,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
     <span>${isHome?'🏠 Em Casa':'✈️ Fora'}</span>
   </div>
 </div>
-${hasConc?`<div class="conc-box">${conv.concentrationTime?`<div class="conc-item"><div class="cl">⏰ Concentração</div><div class="cv">${conv.concentrationTime}</div></div>`:''}${conv.concentrationPlace?`<div class="conc-item"><div class="cl">📍 Local</div><div class="cv">${conv.concentrationPlace}</div></div>`:''}</div>`:''}
-<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:24px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
-${convocados.map(p=>{
-  const parts=(p.name||'').trim().split(/\s+/).filter(Boolean);
-  const first=parts[0]||''; const last=parts.length>1?parts[parts.length-1]:first;
-  const alias=(p.alcunha||'').trim();
-  const base=parts.length>1?`${first} ${last}`:first;
-  let nameHtml;
-  if(!alias){ nameHtml=base; }
-  else{
-    const al=alias.toLowerCase();
-    if(al===first.toLowerCase()) nameHtml=`<strong>${first}</strong>${parts.length>1?' '+last:''}`;
-    else if(al===last.toLowerCase()&&parts.length>1) nameHtml=`${first} <strong>${last}</strong>`;
-    else nameHtml=`${base} (<strong>${alias}</strong>)`;
-  }
-  const travCell=!isHome?`<td style="text-align:center"><span class="trav-check">${traveling[p.id]?'✕':''}</span></td>`:'';
-  return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
-}).join('')}
-</tbody></table>
+${conv.concentrationPlace?`<div class="conc-box"><div class="conc-item"><div class="cl">📍 Local de Concentração</div><div class="cv">${conv.concentrationPlace}</div></div></div>`:''}
 ${(()=>{
   const isEqaPdf=ev.squad==='eqa';
   const pdfSchedItems=[];
@@ -8092,6 +8040,24 @@ ${pdfSchedItems.map(it=>`<div class="sch-row"${it.isGame?` style="font-weight:80
 </div>`).join('')}
 </div>`;
 })()}
+<table class="pt"><thead><tr><th style="width:36px">#</th><th>Nome</th>${!isHome?`<th style="width:24px;text-align:center">✈️</th>`:''}<th style="width:110px">Assinatura</th></tr></thead><tbody>
+${convocados.map(p=>{
+  const parts=(p.name||'').trim().split(/\s+/).filter(Boolean);
+  const first=parts[0]||''; const last=parts.length>1?parts[parts.length-1]:first;
+  const alias=(p.alcunha||'').trim();
+  const base=parts.length>1?`${first} ${last}`:first;
+  let nameHtml;
+  if(!alias){ nameHtml=base; }
+  else{
+    const al=alias.toLowerCase();
+    if(al===first.toLowerCase()) nameHtml=`<strong>${first}</strong>${parts.length>1?' '+last:''}`;
+    else if(al===last.toLowerCase()&&parts.length>1) nameHtml=`${first} <strong>${last}</strong>`;
+    else nameHtml=`${base} (<strong>${alias}</strong>)`;
+  }
+  const travCell=!isHome?`<td style="text-align:center"><span class="trav-check">${traveling[p.id]?'✕':''}</span></td>`:'';
+  return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
+}).join('')}
+</tbody></table>
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
 <div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
 </body></html>`;
