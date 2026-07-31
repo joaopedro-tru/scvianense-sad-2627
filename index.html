@@ -3129,7 +3129,7 @@ function renderSquad(){
   grid.style.display=''; pitchEl.style.display='none'; sf.style.display='';
 
   if(ps.length===0){ grid.innerHTML=`<div class="es" style="grid-column:1/-1"><div class="ei2">👥</div><h3>Nenhum atleta</h3><p>Clica em "+ Adicionar Atleta" para começar.</p></div>`; return }
-  grid.innerHTML=ps.map(p=>{
+  grid.innerHTML=sortByPos(ps).map(p=>{
     const allPos=[p.position,p.position2,p.position3].filter(Boolean);
     const posLabel=allPos.length?allPos.map(x=>POS[x]||x).join(' · '):'—';
     return `<div class="pc" data-pid="${p.id}">${p.number?`<span class="pnb">#${p.number}</span>`:''}<div class="av">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div><div class="pn">${dn(p)}</div><div class="pp">${posLabel}</div>${age(p.dob)!==null?`<div class="pa">${age(p.dob)} anos</div>`:''}</div>`;
