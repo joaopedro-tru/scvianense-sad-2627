@@ -10098,6 +10098,41 @@ function applyRoleUI(){
 }
 
 // ── LIGA 3 SEED ───────────────────────────────────────────────────────────────
+function deduplicateCalendarEvents(){
+  // Runs once to remove duplicate events created by seed functions running multiple times.
+  // Key insight: seedLiga3Games() ran every open and couldn't detect games
+  // renamed by seedMesocicloAgosto2026() (e.g. 'Fafe' → 'AD Fafe SAD').
+  const KEY='scv_dedup_calendar_v2';
+  if(localStorage.getItem(KEY)) return;
+  const all=DB.events();
+  const seen={};
+  const toDelete=[];
+  // Sort richer events first so we keep the one with the most data
+  const byRichness=[...all].sort((a,b)=>{
+    const ra=Object.values(a).filter(v=>v!=null&&v!=='').length;
+    const rb=Object.values(b).filter(v=>v!=null&&v!=='').length;
+    return rb-ra;
+  });
+  byRichness.forEach(e=>{
+    let key;
+    if(e.type==='game'){
+      // Same squad + date + competition → duplicate
+      key=`game|${e.squad||''}|${e.date||''}|${(e.competition||'').trim()}`;
+    } else {
+      // Same type + squad + date → duplicate
+      key=`${e.type}|${e.squad||''}|${e.date||''}`;
+    }
+    if(seen[key]){
+      toDelete.push(e.id);
+    } else {
+      seen[key]=true;
+    }
+  });
+  toDelete.forEach(id=>DB.deleteEvent(id));
+  if(toDelete.length) console.log(`Dedup: ${toDelete.length} evento(s) duplicado(s) eliminado(s).`);
+  localStorage.setItem(KEY,'1');
+}
+
 function seedLiga3Games(){
   const COMP = 'Liga 3 Placard Série A 26/27';
   const games = [
@@ -10127,10 +10162,11 @@ function seedLiga3Games(){
     targetDates.has(e.date) && !(e.opponent||'').trim()
   ).map(e=>e.id);
   toDelete.forEach(id=>DB.deleteEvent(id));
-  // Add each game if not already present with this opponent
+  // Add each game if not already present for this date+squad+competition
+  // (ignores opponent name changes done by seedMesocicloAgosto2026)
   let added = 0;
   games.forEach(g=>{
-    const dup = DB.events().some(e=>e.type==='game'&&e.date===g.date&&e.opponent===g.opponent&&e.squad==='eqa');
+    const dup = DB.events().some(e=>e.type==='game'&&e.date===g.date&&e.squad==='eqa'&&e.competition===COMP);
     if(!dup){
       DB.addEvent({type:'game', squad:'eqa', time:'15:00', competition:COMP, ...g});
       added++;
@@ -10309,6 +10345,7 @@ function initCoordApp(){
     } else {
       seedIfEmpty();
     }
+    deduplicateCalendarEvents();
     seedLiga3Games();
     seedGymPlan20260728();
     seedMesocicloAgosto2026();
