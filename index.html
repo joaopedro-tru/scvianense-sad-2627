@@ -1817,7 +1817,7 @@ body.pm #v-pf{padding:30px}
   <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0d1a;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1)">
     <button onclick="closePdfPreview()" style="background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">← Voltar</button>
     <span style="flex:1;color:#aaa;font-size:13px;text-align:center">Pré-visualização</span>
-    <button onclick="printPdfPreview()" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button>
+    <button id="btn-download-conv-pdf" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">⬇️ Guardar PDF</button>
   </div>
   <iframe id="pdf-preview-frame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
 </div>
@@ -7995,7 +7995,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
   @page{size:A4 portrait;margin:10mm}
   body{padding:0;margin:0;max-width:100%;zoom:${zoom};overflow:hidden}
 }
-</style></head><body onload="window.print()">
+</style></head><body>
 <div class="header">
   <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
   <div class="header-text">
@@ -8059,14 +8059,13 @@ ${convocados.map(p=>{
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
 <div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
 </body></html>`;
-  // Carrega o HTML num iframe oculto; o script auto-print dentro da página abre o diálogo de PDF
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const frame=document.getElementById('pdf-preview-frame');
   if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl);}
   frame._blobUrl=url;
-  frame.onload=function(){ setTimeout(()=>{ URL.revokeObjectURL(url); frame._blobUrl=null; },3000); };
   frame.src=url;
+  document.getElementById('mo-pdf-preview').style.display='flex';
 }
 function closePdfPreview(){
   document.getElementById('mo-pdf-preview').style.display='none';
@@ -8074,11 +8073,35 @@ function closePdfPreview(){
   if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl); frame._blobUrl=null;}
   frame.src='';
 }
-function printPdfPreview(){
+document.getElementById('btn-download-conv-pdf').addEventListener('click',async function(){
+  const btn=this;
   const frame=document.getElementById('pdf-preview-frame');
-  try{ frame.contentWindow.print(); }
-  catch(e){ toast('⚠️ Usa o botão "Imprimir" dentro do documento.'); }
-}
+  const frameDoc=frame.contentDocument||frame.contentWindow?.document;
+  if(!frameDoc){ toast('⚠️ Sem conteúdo para guardar.'); return; }
+  btn.disabled=true; btn.textContent='⏳ A gerar…';
+  try{
+    if(!window.html2pdf){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        s.onload=res; s.onerror=()=>rej(new Error('html2pdf load failed'));
+        document.head.appendChild(s);
+      });
+    }
+    const filename=(frameDoc.title||'Convocatória')+'.pdf';
+    // clone body, strip .no-print elements
+    const clone=frameDoc.body.cloneNode(true);
+    clone.querySelectorAll('.no-print').forEach(el=>el.remove());
+    await html2pdf().set({
+      margin:[10,10,10,10],
+      filename,
+      image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:2,useCORS:true,logging:false},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(clone).save();
+  }catch(e){ toast('⚠️ Erro ao gerar PDF: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='⬇️ Guardar PDF'; }
+});
 
 document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
 document.getElementById('btn-del-game').addEventListener('click',()=>{
