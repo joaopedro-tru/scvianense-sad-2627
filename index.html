@@ -10774,10 +10774,11 @@ function deduplicateCalendarEvents(){
 // v3: suporte a 34 eventos (17 equipas → 2 BYEs do SCV nas j16 e j33).
 //     Os eventos BYE são eliminados; os 32 reais ficam com dados corretos.
 async function seedSub23MKACalendar(){
-  const KEY='scv_mka_sub23_v3';
+  const KEY='scv_mka_sub23_v4';
   // Limpar seeds anteriores para evitar conflitos
   localStorage.removeItem('scv_mka_sub23_v1');
   localStorage.removeItem('scv_mka_sub23_v2');
+  localStorage.removeItem('scv_mka_sub23_v3');
   if(localStorage.getItem(KEY)) return;
 
   // Calendário completo — 32 jogos (jornadas 16 e 33 são DESCANSO)
@@ -10862,8 +10863,61 @@ async function seedSub23MKACalendar(){
       updated++;
     });
 
+    // Corrigir datas das semanas de pausa (BYE J16 e J33)
+    // Após atribuir adversários, verificar se as datas dos jogos seguintes
+    // a cada BYE têm pelo menos 14 dias de diferença (2 Domingos).
+    // Se diferença ≤ 10 dias, avançar +7 dias.
+    let dateFixed=0;
+    // J16 BYE: entre realGames[14] (J15) e realGames[15] (J17)
+    if(realGames.length>=16){
+      const j15=realGames[14]; const j17=realGames[15];
+      if(j15&&j17){
+        const d15=new Date(j15.date+'T12:00:00');
+        const d17=new Date(j17.date+'T12:00:00');
+        const diff=Math.round((d17-d15)/86400000);
+        if(diff<=10){
+          const nd=new Date(d17); nd.setDate(nd.getDate()+7);
+          // Shiftar todos os jogos a partir de J17 em +7 dias
+          for(let k=15;k<realGames.length;k++){
+            const ev=realGames[k];
+            const evd=new Date(ev.date+'T12:00:00');
+            evd.setDate(evd.getDate()+7);
+            const fixedDate=evd.toISOString().split('T')[0];
+            DB.updateEvent(ev.id,{date:fixedDate});
+            // Actualizar o objecto em memória para o check J33 a seguir
+            ev.date=fixedDate;
+            dateFixed++;
+          }
+          console.log(`✅ J16 BYE: todos os jogos a partir de J17 avançados +7 dias.`);
+        }
+      }
+    }
+    // J33 BYE: entre realGames[30] (J32) e realGames[31] (J34)
+    // MKA[30]=round32, MKA[31]=round34 → índices 30 e 31 em realGames
+    if(realGames.length>=32){
+      const j32=realGames[30]; const j34=realGames[31];
+      if(j32&&j34){
+        const d32=new Date(j32.date+'T12:00:00');
+        const d34=new Date(j34.date+'T12:00:00');
+        const diff=Math.round((d34-d32)/86400000);
+        if(diff<=10){
+          // Shiftar todos os jogos a partir de J34 em +7 dias
+          for(let k=31;k<realGames.length;k++){
+            const ev=realGames[k];
+            const evd=new Date(ev.date+'T12:00:00');
+            evd.setDate(evd.getDate()+7);
+            const fixedDate=evd.toISOString().split('T')[0];
+            DB.updateEvent(ev.id,{date:fixedDate});
+            ev.date=fixedDate;
+            dateFixed++;
+          }
+          console.log(`✅ J33 BYE: todos os jogos a partir de J34 avançados +7 dias.`);
+        }
+      }
+    }
+
     localStorage.setItem(KEY,'1');
-    console.log(`✅ MKA Sub-23 v3: ${byeCount} BYE(s) eliminado(s), ${updated} jogo(s) atualizado(s).`);
+    console.log(`✅ MKA Sub-23 v4: ${byeCount} BYE(s) eliminado(s), ${updated} jogo(s) atualizado(s), ${dateFixed} data(s) corrigida(s).`);
   } catch(e){ console.warn('seedSub23MKACalendar:',e); }
 }
 
