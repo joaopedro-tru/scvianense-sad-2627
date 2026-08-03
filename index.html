@@ -8834,17 +8834,17 @@ async function wpExecPrint(){
       const maxH=Math.max(...bars.map(b=>b.getBoundingClientRect().height));
       bars.forEach(b=>b.style.minHeight=Math.ceil(maxH)+'px');
     }
-    // Lazy-load html2canvas
+    // Lazy-load html2canvas (part of html2pdf bundle — reuse if already loaded)
     if(!window.html2canvas) await new Promise((res,rej)=>{
       const s=document.createElement('script');
       s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+      s.onload=res; s.onerror=()=>rej(new Error('html2canvas load failed')); document.head.appendChild(s);
     });
     // Lazy-load jsPDF
     if(!window.jspdf) await new Promise((res,rej)=>{
       const s=document.createElement('script');
       s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+      s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed')); document.head.appendChild(s);
     });
     const canvas=await html2canvas(wpp,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
     // Restore original styles
@@ -8858,10 +8858,9 @@ async function wpExecPrint(){
     let iw=pw, ih=pw/aspect;
     if(ih>ph){ih=ph; iw=ph*aspect;}
     pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',6,6,iw,ih);
-    // Open as blob URL — works for save/share on all devices
     const fname=`Plano_${_wpDateRange.replace(/\//g,'-')}.pdf`;
     const blob=pdf.output('blob');
-    // Web Share API — iOS PWA, Android (shows native share sheet)
+    // Web Share API — iOS PWA / Android
     if(navigator.share && navigator.canShare){
       const file=new File([blob],fname,{type:'application/pdf'});
       if(navigator.canShare({files:[file]})){
@@ -8869,18 +8868,14 @@ async function wpExecPrint(){
         return;
       }
     }
-    // Desktop fallback: open in new tab
+    // Desktop: force download via <a> (avoids popup-blocker on async functions)
     const url=URL.createObjectURL(blob);
-    const opened=window.open(url,'_blank');
-    if(!opened){
-      // Last resort if popup blocked: <a download>
-      const a=document.createElement('a');
-      a.href=url; a.download=fname;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
+    const a=document.createElement('a');
+    a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),5000);
   }catch(e){
-    if(e.name!=='AbortError'){console.error('PDF error:',e); toast('❌ Erro ao gerar PDF');}
+    if(e.name!=='AbortError'){console.error('PDF error:',e); toast('❌ Erro ao gerar PDF: '+e.message);}
   }finally{
     if(btn){btn.disabled=false;btn.textContent='📄 Guardar PDF';}
   }
