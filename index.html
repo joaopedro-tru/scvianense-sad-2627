@@ -8860,15 +8860,7 @@ async function wpExecPrint(){
     pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',6,6,iw,ih);
     const fname=`Plano_${_wpDateRange.replace(/\//g,'-')}.pdf`;
     const blob=pdf.output('blob');
-    // Web Share API — iOS PWA / Android
-    if(navigator.share && navigator.canShare){
-      const file=new File([blob],fname,{type:'application/pdf'});
-      if(navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title:'Plano Semanal SC Vianense SAD'});
-        return;
-      }
-    }
-    // Desktop: force download via <a> (avoids popup-blocker on async functions)
+    // Direct download (works on all platforms without share sheet)
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url; a.download=fname;
