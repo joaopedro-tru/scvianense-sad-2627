@@ -1324,7 +1324,27 @@ body.pm #v-pf{padding:30px}
   <div class="view" id="v-sq-games">
     <div class="tb">
       <div><h1 id="sqgm-title">Jogos</h1><div class="sub" id="sqgm-sub"></div></div>
-      <button class="btn btn-p btn-sm" id="btn-new-game">+ Novo Jogo</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="position:relative">
+          <button class="btn btn-o btn-sm" id="btn-gcal-pdf" title="Exportar calendário de jogos em PDF">📄 PDF</button>
+          <!-- Date range popover -->
+          <div id="gcal-pdf-popover" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200">
+            <div style="font-size:12px;font-weight:700;margin-bottom:12px">📄 Exportar Calendário</div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="gcal-all-dates" checked style="width:15px;height:15px;accent-color:var(--primary)">
+              Calendário completo
+            </label>
+            <div id="gcal-range-grp" style="display:none;margin-bottom:12px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="fg" style="margin-bottom:0"><label style="font-size:11px">De</label><input type="date" id="gcal-from" style="padding:6px 8px;font-size:12px"></div>
+                <div class="fg" style="margin-bottom:0"><label style="font-size:11px">Até</label><input type="date" id="gcal-to" style="padding:6px 8px;font-size:12px"></div>
+              </div>
+            </div>
+            <button class="btn btn-p" id="btn-gcal-gen" style="width:100%;font-size:13px">Gerar PDF</button>
+          </div>
+        </div>
+        <button class="btn btn-p btn-sm" id="btn-new-game">+ Novo Jogo</button>
+      </div>
     </div>
     <div id="sqgm-list"></div>
   </div>
@@ -7020,6 +7040,117 @@ function renderSqGames(){
     </div>`;
   }).join('');
   lEl.querySelectorAll('[data-gm-id]').forEach(el=>el.addEventListener('click',()=>nav('game',{id:el.dataset.gmId})));
+
+  // ── PDF calendar popover wiring ────────────────────────────────────────────
+  const pdfBtn=document.getElementById('btn-gcal-pdf');
+  const popover=document.getElementById('gcal-pdf-popover');
+  const allChk=document.getElementById('gcal-all-dates');
+  const rangeGrp=document.getElementById('gcal-range-grp');
+  if(pdfBtn&&popover){
+    pdfBtn.onclick=(e)=>{ e.stopPropagation(); popover.style.display=popover.style.display==='none'?'block':'none'; };
+    document.addEventListener('click',(e)=>{ if(!popover.contains(e.target)&&e.target!==pdfBtn) popover.style.display='none'; },{capture:false,once:false});
+    allChk.onchange=()=>{ rangeGrp.style.display=allChk.checked?'none':'block'; };
+    document.getElementById('btn-gcal-gen').onclick=()=>{
+      const from=allChk.checked?null:document.getElementById('gcal-from').value||null;
+      const to=allChk.checked?null:document.getElementById('gcal-to').value||null;
+      popover.style.display='none';
+      generateGameCalendarPDF(squad,from,to);
+    };
+  }
+}
+
+// ── GAME CALENDAR PDF ─────────────────────────────────────────────────────────
+function generateGameCalendarPDF(sq, from, to){
+  let evs=DB.events(sq).filter(e=>e.type==='game'&&e.squad===sq).sort((a,b)=>a.date.localeCompare(b.date));
+  if(from) evs=evs.filter(e=>e.date>=from);
+  if(to)   evs=evs.filter(e=>e.date<=to);
+  if(!evs.length){ toast('⚠️ Sem jogos no período selecionado.'); return; }
+
+  const squadName=SQUADS[sq]||sq;
+  const today=new Date().toISOString().split('T')[0];
+  const rangeLabel=from||to
+    ?`${from?fmtDate(from):'início'} — ${to?fmtDate(to):'fim'}`
+    :'Calendário Completo';
+
+  const rows=evs.map((ev,i)=>{
+    const isPast=ev.date<today;
+    const ha=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
+    const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
+    const mr=ev.matchReport||{};
+    const evList=mr.events||[];
+    const goals=evList.filter(e=>e.type==='goal').length;
+    const conc=evList.filter(e=>e.type==='goal_conceded').length;
+    const hasResult=isPast&&evList.length>0;
+    const isHome=ev.homeAway!=='away';
+    const gf=isHome?goals:conc, ga=isHome?conc:goals;
+    const resultBadge=hasResult
+      ?`<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;color:#fff;background:${gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100'}">${gf}–${ga}</span>`
+      :'';
+    const bg=i%2===0?'#fff':'#f7f9fc';
+    return `<tr style="background:${bg}${isPast?';opacity:.7':''}">
+      <td style="padding:7px 10px;font-weight:700;white-space:nowrap">${fmtDate(ev.date)}${ev.time?`<br><span style="font-size:10px;font-weight:400;color:#888">${ev.time}</span>`:''}</td>
+      <td style="padding:7px 10px;white-space:nowrap">${ha}</td>
+      <td style="padding:7px 10px;font-weight:600">${ev.opponent||'—'} ${resultBadge}</td>
+      <td style="padding:7px 10px;font-size:11px;color:#555">${loc}</td>
+      <td style="padding:7px 10px;font-size:11px">${ev.competition||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+<title>Calendário Jogos — SC Vianense SAD ${squadName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:20px 18px;color:#111;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header{display:flex;align-items:center;gap:14px;padding-bottom:12px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
+.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
+.club{font-size:17px;font-weight:800;color:#1a3d6e}
+.squad-badge{font-size:10px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:2px 9px;border-radius:10px;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.doc-label{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:3px}
+.range-badge{font-size:11px;color:#555;margin:8px 0 14px;font-style:italic}
+table{width:100%;border-collapse:collapse;margin-bottom:14px}
+thead th{background:#1a3d6e;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+tbody td{border-bottom:1px solid #e8e8e8;vertical-align:middle}
+.footer{text-align:center;font-size:9px;color:#bbb;margin-top:10px;padding-top:6px;border-top:1px solid #eee}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{padding:0;max-width:100%}
+}
+</style></head><body>
+<div class="header">
+  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
+  <div>
+    <div class="club">SC Vianense SAD</div>
+    <div><span class="squad-badge">${squadName}</span></div>
+    <div class="doc-label">Calendário de Jogos</div>
+  </div>
+</div>
+<div class="range-badge">${rangeLabel} · ${evs.length} jogo${evs.length!==1?'s':''}</div>
+<table>
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Casa / Fora</th>
+      <th>Adversário</th>
+      <th>Local</th>
+      <th>Competição</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')}</div>
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const frame=document.getElementById('pdf-preview-frame');
+  const overlay=document.getElementById('pdf-preview-overlay');
+  const dlBtn=document.getElementById('btn-download-conv-pdf');
+  if(frame&&overlay){
+    frame.src=url;
+    overlay.style.display='flex';
+    const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.html`;
+    dlBtn.onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=fname; a.click(); };
+  }
 }
 
 // ── GAME DETAIL (TABS: PRÉ-JOGO / PÓS-JOGO) ──────────────────────────────────
