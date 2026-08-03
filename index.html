@@ -1587,6 +1587,10 @@ body.pm #v-pf{padding:30px}
       <div class="fg" id="city-grp" style="display:none">
         <label>Localidade</label><input type="text" id="e-city" placeholder="Ex: Viana do Castelo">
       </div>
+      <div class="fg" id="address-grp" style="display:none">
+        <label>Morada completa <span style="font-size:10px;font-weight:400;color:var(--muted)">(para link Maps)</span></label>
+        <input type="text" id="e-address" placeholder="Ex: Rua do Campo, 4935-000 Viana do Castelo">
+      </div>
       <div class="fr">
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
@@ -5313,6 +5317,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-notes').value=ev?.notes||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
   document.getElementById('e-city').value=ev?.city||'';
+  document.getElementById('e-address').value=ev?.address||'';
   // Regime de contração — usa guardado, ou defaults por escalão/dia
   const _evSq=ev?.squad||defaults.squad||squad||'sub19';
   const _evDate=ev?.date||date||new Date().toISOString().split('T')[0];
@@ -5361,14 +5366,17 @@ function updateCompetitionOptions(sq, currentVal=''){
   const sel = document.getElementById('e-comp');
   sel.innerHTML = comps.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
 }
+function _isAway(){ return document.querySelector('input[name="e-ha"]:checked')?.value==='away'; }
 function toggleOpp(){
   const t=document.getElementById('e-type').value;
   const isGame=t==='game';
   const isGym=t==='gym';
+  const away=isGame&&_isAway();
   document.getElementById('opp-grp').style.display=isGame?'block':'none';
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
   document.getElementById('city-grp').style.display=isGame?'block':'none';
+  document.getElementById('address-grp').style.display=away?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
   // Objetivos táticos apenas para treino de campo
   document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
@@ -5385,6 +5393,9 @@ document.querySelectorAll('input[name="e-ha"]').forEach(r=>r.addEventListener('c
   const HOME_STAD='Estádio Dr José de Matos';
   if(this.value==='home'&&!locEl.value) locEl.value=HOME_STAD;
   else if(this.value==='away'&&locEl.value===HOME_STAD) locEl.value='';
+  // Mostrar/esconder morada consoante casa/fora
+  const addrGrp=document.getElementById('address-grp');
+  if(addrGrp) addrGrp.style.display=this.value==='away'?'block':'none';
 }));
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
 document.getElementById('btn-cal-pdf').addEventListener('click',exportCalPDF);
@@ -5400,7 +5411,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -7705,7 +7716,7 @@ function renderGamePre(ev,sqPlayers,conv){
     <div>
       <div class="card" style="margin-bottom:14px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
-        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Localidade',ev.city)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
+        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Localidade',ev.city)}${ev.address?(()=>{const mu='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(ev.address);return row('Morada',`<a href="${mu}" target="_blank" rel="noopener" style="color:var(--primary)">📍 ${ev.address}</a>`);})():''}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
       </div>
       ${gmStaffCard}
       <div class="card" style="margin-top:${gmStaffCard?'14':'0'}px">
@@ -8518,7 +8529,15 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
     <span>${fmtDate(ev.date)}</span>
     ${ev.time?`<span>${ev.time}</span>`:''}
     ${ev.location?`<span>${ev.location}</span>`:''}
-    ${ev.city?`<span>📍 ${ev.city}</span>`:''}
+    ${(()=>{
+      if(!ev.city&&!ev.address) return '';
+      const label=ev.city||'';
+      if(ev.address){
+        const mapsUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(ev.address);
+        return `<span>📍 <a href="${mapsUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${label||ev.address}</a></span>`;
+      }
+      return `<span>📍 ${label}</span>`;
+    })()}
     <span>${isHome?'🏠 Em Casa':'✈️ Fora'}</span>
   </div>
 </div>
@@ -10770,50 +10789,51 @@ function deduplicateCalendarEvents(){
 // v3: suporte a 34 eventos (17 equipas → 2 BYEs do SCV nas j16 e j33).
 //     Os eventos BYE são eliminados; os 32 reais ficam com dados corretos.
 async function seedSub23MKACalendar(){
-  const KEY='scv_mka_sub23_v4';
+  const KEY='scv_mka_sub23_v5';
   // Limpar seeds anteriores para evitar conflitos
   localStorage.removeItem('scv_mka_sub23_v1');
   localStorage.removeItem('scv_mka_sub23_v2');
   localStorage.removeItem('scv_mka_sub23_v3');
+  localStorage.removeItem('scv_mka_sub23_v4');
   if(localStorage.getItem(KEY)) return;
 
   // Calendário completo — 32 jogos (jornadas 16 e 33 são DESCANSO)
   // location = nome do estádio/campo; city = município (aparece na convocatória)
   const MKA=[
-    {round:1,  opponent:'Vila Fria 1980',          homeAway:'away', location:'Campo do Vila Fria 1980',              city:'Viana do Castelo'},
+    {round:1,  opponent:'Vila Fria 1980',          homeAway:'away', location:'Campo do Vila Fria 1980',               city:'Viana do Castelo',    address:'Rua da Senrela, 4935-884 Vila Fria, Viana do Castelo'},
     {round:2,  opponent:'ADC Anha',                homeAway:'home'},
-    {round:3,  opponent:'Ilustre Caminha',         homeAway:'away', location:'Estádio Municipal Morber',             city:'Caminha'},
+    {round:3,  opponent:'Ilustre Caminha',         homeAway:'away', location:'Estádio Municipal Morber',              city:'Caminha',             address:'Mata Nacional do Camarido, 4910-180 Caminha'},
     {round:4,  opponent:'Neves FC',                homeAway:'home'},
-    {round:5,  opponent:'FC Cabaços',              homeAway:'away', location:'Campo da Cumieira',                    city:'Ponte de Lima'},
+    {round:5,  opponent:'FC Cabaços',              homeAway:'away', location:'Campo da Cumieira',                     city:'Ponte de Lima',       address:'Rua da Cumieira 235, 4990-565 Cabaços, Ponte de Lima'},
     {round:6,  opponent:'UD "Os Raianos"',         homeAway:'home'},
-    {round:7,  opponent:'AD Campos',               homeAway:'away', location:'Campo 1º Janeiro',                    city:'Vila Nova de Cerveira'},
+    {round:7,  opponent:'AD Campos',               homeAway:'away', location:'Campo 1º Janeiro',                     city:'Vila Nova de Cerveira',address:'Av. 1º de Janeiro, 4920-014 Campos, Vila Nova de Cerveira'},
     {round:8,  opponent:'UD Moreira',              homeAway:'home'},
-    {round:9,  opponent:'Deucriste SC',            homeAway:'away', location:'Campo Barão São Fernando',            city:'Viana do Castelo'},
+    {round:9,  opponent:'Deucriste SC',            homeAway:'away', location:'Campo Barão São Fernando',             city:'Viana do Castelo',    address:'Estrada 23 de Fevereiro, Deocriste, Viana do Castelo'},
     {round:10, opponent:'ADC Perre',               homeAway:'home'},
-    {round:11, opponent:'ADC Aboim Sabadim',       homeAway:'away', location:'Campo Costa do Monte',                city:'Arcos de Valdevez'},
+    {round:11, opponent:'ADC Aboim Sabadim',       homeAway:'away', location:'Campo Costa do Monte',                 city:'Arcos de Valdevez',   address:'Costa do Monte, 4970-014 Aboim das Choças, Arcos de Valdevez'},
     {round:12, opponent:'Anais FC',                homeAway:'home'},
-    {round:13, opponent:'ARC Paçô',                homeAway:'away', location:'Estádio de Paçô',                     city:'Arcos de Valdevez'},
+    {round:13, opponent:'ARC Paçô',                homeAway:'away', location:'Estádio de Paçô',                      city:'Arcos de Valdevez',   address:'Paçô Velho, Paçô, Arcos de Valdevez'},
     {round:14, opponent:'CRC Távora',              homeAway:'home'},
-    {round:15, opponent:'CC "Os Torreenses"',      homeAway:'away', location:'Campo da Cruz',                       city:'Valença'},
+    {round:15, opponent:'CC "Os Torreenses"',      homeAway:'away', location:'Campo da Cruz',                        city:'Valença',             address:'EN13, 4930-509 São Pedro da Torre, Valença'},
     // J16: DESCANSO
     {round:17, opponent:'AD Darquense',            homeAway:'home'},
     {round:18, opponent:'Vila Fria 1980',          homeAway:'home'},
-    {round:19, opponent:'ADC Anha',                homeAway:'away', location:'Campo de Jogos Dr. José de Alpuim',   city:'Viana do Castelo'},
+    {round:19, opponent:'ADC Anha',                homeAway:'away', location:'Campo de Jogos Dr. José de Alpuim',    city:'Viana do Castelo',    address:'Av. do Cruzeiro 244, 4935-331 Vila Nova de Anha'},
     {round:20, opponent:'Ilustre Caminha',         homeAway:'home'},
-    {round:21, opponent:'Neves FC',                homeAway:'away', location:'Estádio Alferes Pinto Ribeiro',       city:'Viana do Castelo'},
+    {round:21, opponent:'Neves FC',                homeAway:'away', location:'Estádio Alferes Pinto Ribeiro',        city:'Viana do Castelo',    address:'R. Alferes Pinto Ribeiro, 4905-641 Vila de Punhe, Viana do Castelo'},
     {round:22, opponent:'FC Cabaços',              homeAway:'home'},
-    {round:23, opponent:'UD "Os Raianos"',         homeAway:'away', location:'Campo do Areal',                      city:'Monção'},
+    {round:23, opponent:'UD "Os Raianos"',         homeAway:'away', location:'Campo do Areal',                       city:'Monção',              address:'Messegães, 4950-280 Monção'},
     {round:24, opponent:'AD Campos',               homeAway:'home'},
-    {round:25, opponent:'UD Moreira',              homeAway:'away', location:'Campo Tomada',                        city:'Monção'},
+    {round:25, opponent:'UD Moreira',              homeAway:'away', location:'Campo Tomada',                         city:'Monção',              address:'Beco da Tomada, 4950-615 Moreira, Monção'},
     {round:26, opponent:'Deucriste SC',            homeAway:'home'},
-    {round:27, opponent:'ADC Perre',               homeAway:'away', location:'Campo Srª do Olival',                 city:'Viana do Castelo'},
+    {round:27, opponent:'ADC Perre',               homeAway:'away', location:'Campo Srª do Olival',                  city:'Viana do Castelo',    address:'Caminho da Srª do Olival, 4925-573 Perre, Viana do Castelo'},
     {round:28, opponent:'ADC Aboim Sabadim',       homeAway:'home'},
-    {round:29, opponent:'Anais FC',                homeAway:'away', location:'Campo da Cegonha',                    city:'Ponte de Lima'},
+    {round:29, opponent:'Anais FC',                homeAway:'away', location:'Campo da Cegonha',                     city:'Ponte de Lima',       address:'Anais, 4990-501 Ponte de Lima'},
     {round:30, opponent:'ARC Paçô',                homeAway:'home'},
-    {round:31, opponent:'CRC Távora',              homeAway:'away', location:'Campo Monte Aval',                    city:'Arcos de Valdevez'},
+    {round:31, opponent:'CRC Távora',              homeAway:'away', location:'Campo Monte Aval',                     city:'Arcos de Valdevez',   address:'Monte Aval, 4970-529 Távora, Arcos de Valdevez'},
     {round:32, opponent:'CC "Os Torreenses"',      homeAway:'home'},
     // J33: DESCANSO
-    {round:34, opponent:'AD Darquense',            homeAway:'away', location:'Campo de Jogos Senhora das Oliveiras', city:'Viana do Castelo'},
+    {round:34, opponent:'AD Darquense',            homeAway:'away', location:'Campo de Jogos Senhora das Oliveiras',  city:'Viana do Castelo',   address:'Av. Rocha Páris 152, 4935-078 Darque, Viana do Castelo'},
   ];
   const HOME_LOC='Estádio Dr. José de Matos nº2';
   const HOME_CITY='Viana do Castelo';
@@ -10854,6 +10874,7 @@ async function seedSub23MKACalendar(){
         round:       m.round,
         location:    isHome ? HOME_LOC : (m.location||ev.location||''),
         city:        isHome ? HOME_CITY : (m.city||ev.city||''),
+        address:     isHome ? '' : (m.address||ev.address||''),
       };
       DB.updateEvent(ev.id,patch);
       updated++;
@@ -10913,7 +10934,7 @@ async function seedSub23MKACalendar(){
     }
 
     localStorage.setItem(KEY,'1');
-    console.log(`✅ MKA Sub-23 v4: ${byeCount} BYE(s) eliminado(s), ${updated} jogo(s) atualizado(s), ${dateFixed} data(s) corrigida(s).`);
+    console.log(`✅ MKA Sub-23 v5: ${byeCount} BYE(s) eliminado(s), ${updated} jogo(s) atualizado(s), ${dateFixed} data(s) corrigida(s).`);
   } catch(e){ console.warn('seedSub23MKACalendar:',e); }
 }
 
