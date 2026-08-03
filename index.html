@@ -2871,8 +2871,8 @@ function attachObjChartListeners(cs, sfx=''){
       _selectedKey=key; _selectedTag=tag;
       allSlices.forEach(p=>p.style.opacity=(p.dataset.key===key?'1':'0.3'));
 
-      // gather matching sessions based on tag (5w or ep — show all for the primary key)
-      const matchingSessions=(cs||[]).filter(ev=>{
+      // gather matching sessions for this squad + primary key
+      const matchingSessions=DB.events(cs).filter(ev=>{
         if(ev.type!=='training') return false;
         const arr=typeof normalizePrimaryArr==='function'?normalizePrimaryArr(ev.objectivePrimary):(ev.objectivePrimary||[]);
         return arr.includes(key);
