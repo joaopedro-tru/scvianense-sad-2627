@@ -8153,6 +8153,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ['Substituicoes', nSub],
       ...(nShotOn||nShotOff?[['Remates enquadrados', nShotOn],['Remates fora', nShotOff]]:[]),
       ...(nFoulC||nFoulS?[['Faltas cometidas', nFoulC],['Faltas sofridas', nFoulS]]:[]),
+      ...(nBallWon||nBallLost?[['Recuperacoes de bola', nBallWon],['Perdas de bola', nBallLost]]:[]),
     ];
     statRows.forEach(([label,val])=>{
       doc.setFont('helvetica','normal'); doc.text(label, 20, y);
