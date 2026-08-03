@@ -690,6 +690,9 @@ body.pm #v-pf{padding:30px}
     <!-- ADMIN DASHBOARD -->
     <div id="d-admin-content">
       <div id="d-admin-cols"></div>
+      <!-- Staff dashboard viewer -->
+      <div id="d-admin-staff-picker" style="margin-bottom:16px"></div>
+      <div id="d-admin-staff-view" style="display:none;margin-bottom:16px"></div>
       <div class="card">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
         <div id="d-birthdays"></div>
@@ -3256,6 +3259,143 @@ function renderDash(){
   }
 
   bdayCards(ps,document.getElementById('d-birthdays'),DB.staffProfiles(null));
+
+  // ── Staff dashboard picker ────────────────────────────────────────────────
+  const pickerEl=document.getElementById('d-admin-staff-picker');
+  if(pickerEl){
+    const staffUsers=USERS.filter(u=>u.role!=='admin'&&u.squad);
+    const bySquad={};
+    staffUsers.forEach(u=>{
+      if(!bySquad[u.squad]) bySquad[u.squad]=[];
+      bySquad[u.squad].push(u);
+    });
+    const squadMeta={eqa:{icon:'⚫',color:'#444',label:SQUADS.eqa},sub23:{icon:'🔵',color:'var(--blue)',label:SQUADS.sub23},sub19:{icon:'🟡',color:'#b8860b',label:SQUADS.sub19}};
+    const roleIcon={coach:'🎯',staff:'👤',medical:'🩺',teammanager:'📋'};
+    const roleName={coach:'Treinador',medical:'Clínica',teammanager:'Team Manager'};
+    const sections=Object.entries(bySquad).map(([sq,users])=>{
+      const m=squadMeta[sq]||{icon:'⚪',color:'#888',label:sq};
+      const chips=users.map(u=>{
+        const sp=DB.staffProfiles(sq).find(p=>p.username===u.user)||{};
+        const name=sp.name||u.user;
+        const initials=name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+        const roleLabel=u.role==='staff'?(STAFF_ROLES_LABEL[u.staffRole]||'Staff'):roleName[u.role]||u.role;
+        const ic=roleIcon[u.role]||'👤';
+        return `<button onclick="renderAdminStaffView('${u.user}')" id="staff-chip-${u.user}"
+          style="display:flex;align-items:center;gap:8px;padding:7px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;font-family:inherit;transition:all .15s;text-align:left"
+          onmouseover="this.style.borderColor='${m.color}'" onmouseout="if(!this.classList.contains('active'))this.style.borderColor='var(--border)'">
+          <div style="width:30px;height:30px;border-radius:50%;background:${m.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div>
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${name.split(' ')[0]}</div>
+            <div style="font-size:10px;color:var(--muted)">${ic} ${roleLabel}</div>
+          </div>
+        </button>`;
+      }).join('');
+      return `<div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${m.color};margin-bottom:8px">${m.icon} ${m.label}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
+      </div>`;
+    }).join('<div style="height:1px;background:var(--border);margin:4px 0"></div>');
+    pickerEl.innerHTML=`<div class="card" style="margin:0">
+      <div style="font-size:14px;font-weight:700;margin-bottom:14px">👁️ Ver Dashboard Como…</div>
+      <div style="display:flex;flex-direction:column;gap:14px">${sections}</div>
+    </div>`;
+  }
+}
+
+function renderAdminStaffView(userKey){
+  const viewEl=document.getElementById('d-admin-staff-view');
+  if(!viewEl) return;
+
+  // Toggle: click again to close
+  if(viewEl.dataset.activeUser===userKey&&viewEl.style.display!=='none'){
+    viewEl.style.display='none';
+    viewEl.dataset.activeUser='';
+    document.querySelectorAll('[id^="staff-chip-"]').forEach(b=>{b.classList.remove('active');b.style.borderColor='var(--border)';b.style.background='var(--card)';});
+    return;
+  }
+
+  const u=USERS.find(x=>x.user===userKey);
+  if(!u) return;
+  const cs=u.squad;
+  const sp=DB.staffProfiles(cs).find(p=>p.username===userKey)||{};
+  const name=sp.name||u.user;
+  const roleIcon={coach:'🎯',staff:'👤',medical:'🩺',teammanager:'📋'};
+  const roleName={coach:'Treinador',medical:'Clínica',teammanager:'Team Manager'};
+  const roleLabel=u.role==='staff'?(STAFF_ROLES_LABEL[u.staffRole]||'Staff'):roleName[u.role]||u.role;
+  const squadMeta={eqa:{icon:'⚫',color:'#444'},sub23:{icon:'🔵',color:'var(--blue)'},sub19:{icon:'🟡',color:'#b8860b'}};
+  const m=squadMeta[cs]||{icon:'⚪',color:'#888'};
+
+  // Update chip styles
+  document.querySelectorAll('[id^="staff-chip-"]').forEach(b=>{
+    const isActive=b.id==='staff-chip-'+userKey;
+    b.classList.toggle('active',isActive);
+    b.style.borderColor=isActive?m.color:'var(--border)';
+    b.style.background=isActive?'#f0f7ff':'var(--card)';
+  });
+
+  const now=new Date();
+  const today=now.toISOString().split('T')[0];
+  const cutoff=new Date(now-35*24*3600*1000).toISOString().split('T')[0];
+  const ps=DB.players(cs);
+  const es=DB.events(cs);
+  const pastGames=es.filter(e=>e.type==='game'&&e.date<today);
+  const pastTrains=es.filter(e=>e.type==='training'&&e.date<today);
+  const wins=pastGames.filter(g=>{
+    const mr=g.matchReport||{events:[]};
+    const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
+    const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
+    return gf>ga;
+  }).length;
+  const winPct=pastGames.length?Math.round(wins/pastGames.length*100):null;
+  const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,6);
+
+  const statsHtml=`<div class="sg" style="margin-bottom:16px">
+    <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${m.color}">${ps.length}</div><div class="ss">${SQUADS[cs]||cs}</div></div>
+    <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrains.length}</div><div class="ss">esta época</div></div>
+    <div class="sc"><div class="sl">Jogos Realizados</div><div class="sv">${pastGames.length}</div><div class="ss">esta época</div></div>
+    <div class="sc"><div class="sl">% Vitórias</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">${wins} vitória${wins!==1?'s':''} em ${pastGames.length} jogo${pastGames.length!==1?'s':''}</div></div>
+  </div>`;
+
+  const upcomingHtml=upcoming.length===0
+    ?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>'
+    :upcoming.map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`;}).join('');
+
+  viewEl.innerHTML=`<div class="card" style="margin:0;border-left:3px solid ${m.color}">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div style="width:36px;height:36px;border-radius:50%;background:${m.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'}</div>
+      <div>
+        <div style="font-size:15px;font-weight:700">${name}</div>
+        <div style="font-size:12px;color:var(--muted)">${roleIcon[u.role]||'👤'} ${roleLabel} · ${m.icon} ${SQUADS[cs]||cs}</div>
+      </div>
+      <button onclick="renderAdminStaffView('${userKey}')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--muted)">✕ Fechar</button>
+    </div>
+    ${statsHtml}
+    <div id="d-admin-sv-load" style="margin-bottom:16px"></div>
+    <div class="g2col">
+      <div class="card" style="margin:0">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">📅 Próximos Eventos</div>
+        ${upcomingHtml}
+      </div>
+      <div class="card" style="margin:0">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
+        <div id="d-admin-sv-bday"></div>
+      </div>
+    </div>
+  </div>`;
+
+  viewEl.style.display='block';
+  viewEl.dataset.activeUser=userKey;
+
+  // Render sub-components
+  const loadEl=document.getElementById('d-admin-sv-load');
+  if(loadEl){
+    const sfx='-sv-'+cs;
+    const html=_squadLoadCards(cs,sfx);
+    loadEl.innerHTML=html?`<div style="margin-bottom:0">${html}</div>`:'';
+    attachObjChartListeners(cs,sfx);
+  }
+  bdayCards(ps,document.getElementById('d-admin-sv-bday'),DB.staffProfiles(cs));
+  viewEl.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function dashSetTab(active){
