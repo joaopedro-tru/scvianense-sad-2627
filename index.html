@@ -1564,6 +1564,9 @@ body.pm #v-pf{padding:30px}
         <label>Competição</label>
         <select id="e-comp"></select>
       </div>
+      <div class="fg" id="city-grp" style="display:none">
+        <label>Localidade</label><input type="text" id="e-city" placeholder="Ex: Viana do Castelo">
+      </div>
       <div class="fr">
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
@@ -2718,14 +2721,9 @@ function _squadLoadCards(cs, sfx=''){
       <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} ${unit}</div>
     </div>`;
   }
-  function divider(a,b){return a&&b?'<div style="width:1px;background:var(--border);align-self:stretch"></div>':'';}
   const gColorFn=gymExColor;
   const g5=donutBlock(gd5,gColorFn,k=>k,'séries','Últimas 5 semanas');
   const gS=donutBlock(gdS,gColorFn,k=>k,'séries','Época');
-  const gymCard=(g5||gS)?`<div class="card" style="margin:0">
-    <div style="font-size:12px;font-weight:700;margin-bottom:12px">🏋️ Ginásio</div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${g5}${divider(g5,gS)}${gS}</div>
-  </div>`:'';
 
   // ── Pie chart helpers ─────────────────────────────────────────────────────
   const tPrimaryColorFn=k=>TACTICS_TAXONOMY[k]?.color||'#64748b';
@@ -2762,30 +2760,71 @@ function _squadLoadCards(cs, sfx=''){
       </div>`;
     }).join('');
   }
-  function pieBlock(entries,colorFn,labelFn,period,tag,sz=130){
+  function pieBlock(entries,colorFn,labelFn,tag,sz=130){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
-    return `<div style="min-width:0">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px">${period}</div>
-      <div style="display:flex;align-items:center;gap:12px">
+    return `<div style="display:flex;align-items:center;gap:12px">
         ${pieSVG(entries,colorFn,sz,tag)}
         <div style="flex:1;min-width:0">${pieLegend(entries,colorFn,labelFn,total)}</div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} sessões</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} sessões</div>`;
+  }
+
+  // ── Toggle buttons ────────────────────────────────────────────────────────
+  const tbS=`padding:3px 9px;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s`;
+  function tglBtns(type){
+    return `<div style="display:flex;gap:3px;background:var(--bg);border-radius:8px;padding:2px">
+      <button id="lc-${type}b-5w${sfx}" onclick="_lcToggle('${type}','${sfx}','5w')" style="${tbS};background:var(--primary);color:#fff">5 sem.</button>
+      <button id="lc-${type}b-ep${sfx}" onclick="_lcToggle('${type}','${sfx}','ep')" style="${tbS};background:transparent;color:var(--muted)">Época</button>
     </div>`;
   }
 
-  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'Últimas 5 semanas','5w');
-  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'Época','ep');
+  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w');
+  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep');
+  const noObjData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
   const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
-    <div style="font-size:12px;font-weight:700;margin-bottom:4px">🎯 Objetivos Gerais</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:12px;font-weight:700">🎯 Objetivos Gerais</div>
+      ${tglBtns('o')}
+    </div>
     <div style="font-size:10px;color:var(--muted);margin-bottom:12px">Clica numa fatia para ver os objetivos específicos</div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${pb5}${divider(pb5,pbEp)}${pbEp}</div>
+    <div id="lc-o-5w${sfx}">${pb5||noObjData}</div>
+    <div id="lc-o-ep${sfx}" style="display:none">${pbEp||noObjData}</div>
   </div>`:'';
   const secondaryPlaceholder=`<div id="obj-secondary-card${sfx}" style="display:none"></div>`;
 
-  return (gymCard||primaryCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${primaryCard}${secondaryPlaceholder}</div>`:'';
+  const noGymData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
+  const gymCard=(g5||gS)?`<div class="card" style="margin:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700">🏋️ Ginásio</div>
+      ${tglBtns('g')}
+    </div>
+    <div id="lc-g-5w${sfx}">${g5||noGymData}</div>
+    <div id="lc-g-ep${sfx}" style="display:none">${gS||noGymData}</div>
+  </div>`:'';
+
+  return (primaryCard||gymCard)?`<div style="display:flex;flex-direction:column;gap:10px">${primaryCard}${secondaryPlaceholder}${gymCard}</div>`:'';
 }
+
+// Global toggle handler for period buttons in load cards
+window._lcToggle=function(type,sfx,period){
+  ['5w','ep'].forEach(p=>{
+    const panel=document.getElementById('lc-'+type+'-'+p+sfx);
+    const btn=document.getElementById('lc-'+type+'b-'+p+sfx);
+    if(panel) panel.style.display=p===period?'':'none';
+    if(btn){
+      btn.style.background=p===period?'var(--primary)':'transparent';
+      btn.style.color=p===period?'#fff':'var(--muted)';
+    }
+  });
+  // When toggling objectives, reset secondary drill-down
+  if(type==='o'){
+    const sc=document.getElementById('obj-secondary-card'+sfx);
+    if(sc){sc.style.display='none';sc.innerHTML='';}
+    const pc=document.getElementById('obj-primary-card'+sfx);
+    if(pc) pc.querySelectorAll('.obj-ps').forEach(el=>el.style.opacity='1');
+  }
+};
 function renderStaffLoadCharts(cs){
   const el=document.getElementById('d-staff-load');
   if(!el) return;
@@ -5253,6 +5292,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-notes').value=ev?.notes||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
+  document.getElementById('e-city').value=ev?.city||'';
   // Regime de contração — usa guardado, ou defaults por escalão/dia
   const _evSq=ev?.squad||defaults.squad||squad||'sub19';
   const _evDate=ev?.date||date||new Date().toISOString().split('T')[0];
@@ -5308,6 +5348,7 @@ function toggleOpp(){
   document.getElementById('opp-grp').style.display=isGame?'block':'none';
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
+  document.getElementById('city-grp').style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
   // Objetivos táticos apenas para treino de campo
   document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
@@ -5339,7 +5380,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -7537,7 +7578,7 @@ function renderGamePre(ev,sqPlayers,conv){
     <div>
       <div class="card" style="margin-bottom:14px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">Info do Jogo</h3>
-        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
+        ${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Local',ev.location)}${row('Localidade',ev.city)}${row('Adversário',ev.opponent)}${row('Jogo',haLabel)}
       </div>
       ${gmStaffCard}
       <div class="card" style="margin-top:${gmStaffCard?'14':'0'}px">
@@ -8350,6 +8391,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:10px}
     <span>${fmtDate(ev.date)}</span>
     ${ev.time?`<span>${ev.time}</span>`:''}
     ${ev.location?`<span>${ev.location}</span>`:''}
+    ${ev.city?`<span>📍 ${ev.city}</span>`:''}
     <span>${isHome?'🏠 Em Casa':'✈️ Fora'}</span>
   </div>
 </div>
@@ -10595,126 +10637,85 @@ function deduplicateCalendarEvents(){
 }
 
 
-function seedMesocicloAgosto2026(){
-  const KEY='scv_seed_meso_ago26_v1';
+
+// ── SUB-23 MKA CALENDAR SEED ──────────────────────────────────────────────────
+// Preenche adversário, local e casa/fora nos jogos sub-23 já criados com datas
+// mas sem adversário, por ordem de data ascendente.
+// Corre apenas uma vez (guard: localStorage 'scv_mka_sub23_v1').
+async function seedSub23MKACalendar(){
+  const KEY='scv_mka_sub23_v2';
   if(localStorage.getItem(KEY)) return;
-  const EMMM='Estádio Municipal Manuela Machado';
-  const EDJM='Estádio Dr. José de Matos';
-  const COMP='Liga 3 Placard Série A 26/27';
 
-  // ── 1. Corrigir / actualizar jogos Liga 3 de Agosto ──────────────────────────
-  // J2 mudou de 16/08 para 15/08 (Sábado). Os outros ganham hora, local e nome correcto.
-  const ligaFixes=[
-    {searchDate:'2026-08-09', date:'2026-08-09', opponent:'AD Fafe SAD',         homeAway:'away', time:'17:00', location:'Estádio Municipal de Fafe'},
-    {searchDate:'2026-08-16', date:'2026-08-15', opponent:'CD Trofense',         homeAway:'home', time:'17:00', location:EDJM},
-    {searchDate:'2026-08-23', date:'2026-08-23', opponent:'AD Marco 09',         homeAway:'away', time:'17:00', location:'Estádio Municipal Marco de Canavezes'},
-    {searchDate:'2026-09-06', date:'2026-09-06', opponent:'FC Paços de Ferreira',homeAway:'home', time:'15:00', location:EDJM},
+  // Calendário completo — 32 jogos (jornadas 16 e 33 são DESCANSO)
+  // location = nome do estádio/campo; city = município (aparece na convocatória)
+  const MKA=[
+    {round:1,  opponent:'Vila Fria 1980',          homeAway:'away', location:'Campo do Vila Fria 1980',              city:'Viana do Castelo'},
+    {round:2,  opponent:'ADC Anha',                homeAway:'home'},
+    {round:3,  opponent:'Ilustre Caminha',         homeAway:'away', location:'Estádio Municipal Morber',             city:'Caminha'},
+    {round:4,  opponent:'Neves FC',                homeAway:'home'},
+    {round:5,  opponent:'FC Cabaços',              homeAway:'away', location:'Campo da Cumieira',                    city:'Ponte de Lima'},
+    {round:6,  opponent:'UD "Os Raianos"',         homeAway:'home'},
+    {round:7,  opponent:'AD Campos',               homeAway:'away', location:'Campo 1º Janeiro',                    city:'Vila Nova de Cerveira'},
+    {round:8,  opponent:'UD Moreira',              homeAway:'home'},
+    {round:9,  opponent:'Deucriste SC',            homeAway:'away', location:'Campo Barão São Fernando',            city:'Viana do Castelo'},
+    {round:10, opponent:'ADC Perre',               homeAway:'home'},
+    {round:11, opponent:'ADC Aboim Sabadim',       homeAway:'away', location:'Campo Costa do Monte',                city:'Arcos de Valdevez'},
+    {round:12, opponent:'Anais FC',                homeAway:'home'},
+    {round:13, opponent:'ARC Paçô',                homeAway:'away', location:'Estádio de Paçô',                     city:'Arcos de Valdevez'},
+    {round:14, opponent:'CRC Távora',              homeAway:'home'},
+    {round:15, opponent:'CC "Os Torreenses"',      homeAway:'away', location:'Campo da Cruz',                       city:'Valença'},
+    // J16: DESCANSO
+    {round:17, opponent:'AD Darquense',            homeAway:'home'},
+    {round:18, opponent:'Vila Fria 1980',          homeAway:'home'},
+    {round:19, opponent:'ADC Anha',                homeAway:'away', location:'Campo de Jogos Dr. José de Alpuim',   city:'Viana do Castelo'},
+    {round:20, opponent:'Ilustre Caminha',         homeAway:'home'},
+    {round:21, opponent:'Neves FC',                homeAway:'away', location:'Estádio Alferes Pinto Ribeiro',       city:'Viana do Castelo'},
+    {round:22, opponent:'FC Cabaços',              homeAway:'home'},
+    {round:23, opponent:'UD "Os Raianos"',         homeAway:'away', location:'Campo do Areal',                      city:'Monção'},
+    {round:24, opponent:'AD Campos',               homeAway:'home'},
+    {round:25, opponent:'UD Moreira',              homeAway:'away', location:'Campo Tomada',                        city:'Monção'},
+    {round:26, opponent:'Deucriste SC',            homeAway:'home'},
+    {round:27, opponent:'ADC Perre',               homeAway:'away', location:'Campo Srª do Olival',                 city:'Viana do Castelo'},
+    {round:28, opponent:'ADC Aboim Sabadim',       homeAway:'home'},
+    {round:29, opponent:'Anais FC',                homeAway:'away', location:'Campo da Cegonha',                    city:'Ponte de Lima'},
+    {round:30, opponent:'ARC Paçô',                homeAway:'home'},
+    {round:31, opponent:'CRC Távora',              homeAway:'away', location:'Campo Monte Aval',                    city:'Arcos de Valdevez'},
+    {round:32, opponent:'CC "Os Torreenses"',      homeAway:'home'},
+    // J33: DESCANSO
+    {round:34, opponent:'AD Darquense',            homeAway:'away', location:'Campo de Jogos Senhora das Oliveiras', city:'Viana do Castelo'},
   ];
-  ligaFixes.forEach(f=>{
-    const ev=DB.events().find(e=>e.type==='game'&&e.squad==='eqa'&&e.date===f.searchDate);
-    if(ev){
-      DB.updateEvent(ev.id,{date:f.date,opponent:f.opponent,homeAway:f.homeAway,time:f.time,location:f.location,competition:COMP});
-    } else {
-      const dup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date===f.date);
-      if(!dup) DB.addEvent({type:'game',squad:'eqa',competition:COMP,...f,searchDate:undefined});
-    }
-  });
+  const HOME_LOC='Estádio Dr. José de Matos nº2';
+  const HOME_CITY='Viana do Castelo';
+  const COMP='Campeonato MKA · AFVC 2026';
 
-  // ── 2. Jogos Particulares ────────────────────────────────────────────────────
-  [
-    {date:'2026-08-01', homeAway:'away', opponent:'AD Os Limianos', time:'10:30', location:'Estádio de Vila Chã, Esposende', competition:'Particular', notes:'JP-6'},
-    {date:'2026-08-02', homeAway:'home', opponent:'Gil Vicente U23', time:'17:00', location:EMMM,                           competition:'Particular', notes:'JP-7'},
-  ].forEach(g=>{
-    const dup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date===g.date&&e.opponent===g.opponent);
-    if(!dup) DB.addEvent({type:'game',squad:'eqa',...g});
-  });
+  try{
+    // Jogos sub-23 sem adversário, ordenados por data
+    const games=DB.events('sub23')
+      .filter(e=>e.type==='game'&&!e.opponent)
+      .sort((a,b)=>a.date.localeCompare(b.date));
 
-  // ── 3. Taça de Portugal ──────────────────────────────────────────────────────
-  const tacaDup=DB.events().some(e=>e.type==='game'&&e.squad==='eqa'&&e.date==='2026-08-30');
-  if(!tacaDup) DB.addEvent({type:'game',squad:'eqa',date:'2026-08-30',homeAway:'home',opponent:'A definir (sorteio)',time:'',location:'',competition:'Taça de Portugal Tranquilidade',notes:'1ª Eliminatória — data/hora sujeita a sorteio'});
+    if(!games.length){ localStorage.setItem(KEY,'1'); return; }
 
-  // ── 4. Treinos ───────────────────────────────────────────────────────────────
-  [
-    // Semana 5 (cont.)
-    {date:'2026-07-30', time:'10:00', location:EMMM},
-    {date:'2026-07-31', time:'10:00', location:EMMM},
-    // Semana 7
-    {date:'2026-08-04', time:'10:00', location:EMMM},
-    {date:'2026-08-05', time:'10:00', location:EMMM},  // bi-diário manhã
-    {date:'2026-08-06', time:'10:00', location:EMMM},
-    {date:'2026-08-07', time:'10:00', location:EMMM},
-    {date:'2026-08-08', time:'10:00', location:EMMM},
-    // Semana 8
-    {date:'2026-08-11', time:'10:00', location:EMMM},  // bi-diário manhã
-    {date:'2026-08-12', time:'10:00', location:EMMM},
-    {date:'2026-08-13', time:'10:00', location:EMMM},
-    {date:'2026-08-14', time:'10:00', location:EMMM},
-    // Semana 9
-    {date:'2026-08-18', time:'10:00', location:EDJM},
-    {date:'2026-08-19', time:'10:00', location:EMMM},  // bi-diário manhã
-    {date:'2026-08-20', time:'10:00', location:EDJM},
-    {date:'2026-08-21', time:'10:00', location:EMMM},
-    {date:'2026-08-22', time:'10:00', location:EDJM},
-    // Semana 10
-    {date:'2026-08-24', time:'10:00', location:EDJM},
-    {date:'2026-08-26', time:'10:00', location:EMMM},
-    {date:'2026-08-27', time:'10:00', location:EDJM},
-    {date:'2026-08-28', time:'10:00', location:EMMM},
-    {date:'2026-08-29', time:'10:00', location:EDJM},
-    // Semana 11
-    {date:'2026-08-31', time:'10:00', location:EDJM},
-    {date:'2026-09-02', time:'10:00', location:EMMM},
-    {date:'2026-09-03', time:'10:00', location:EDJM},
-    {date:'2026-09-04', time:'10:00', location:EMMM},
-    {date:'2026-09-05', time:'10:00', location:EDJM},
-  ].forEach(t=>{
-    const dup=DB.events().some(e=>e.type==='training'&&e.squad==='eqa'&&e.date===t.date);
-    if(!dup) DB.addEvent({type:'training',squad:'eqa',...t});
-  });
+    let updated=0;
+    games.forEach((ev,i)=>{
+      if(i>=MKA.length) return;
+      const m=MKA[i];
+      const isHome=m.homeAway==='home';
+      const patch={
+        opponent:  m.opponent,
+        homeAway:  m.homeAway,
+        competition: COMP,
+        round:     m.round,
+        location:  ev.location||(isHome?HOME_LOC:(m.location||'')),
+        city:      ev.city||(isHome?HOME_CITY:(m.city||'')),
+      };
+      DB.updateEvent(ev.id, patch);
+      updated++;
+    });
 
-  // ── 5. Ginásio tarde (treinos bi-diários) ────────────────────────────────────
-  ['2026-08-05','2026-08-11','2026-08-19'].forEach(date=>{
-    const dup=DB.events().some(e=>e.type==='gym'&&e.squad==='eqa'&&e.date===date);
-    if(!dup) DB.addEvent({type:'gym',squad:'eqa',date,time:'14:30',location:EMMM,title:'Ginásio — Bi-diário tarde',notes:'Sessão da tarde do treino bi-diário (ginásio)'});
-  });
-
-  localStorage.setItem(KEY,'1');
-  console.log('Seed: Mesociclo Agosto 2026 importado com sucesso.');
-}
-
-function seedGymPlan20260728(){
-  // Limpa chaves antigas (corridas falhadas anteriores)
-  localStorage.removeItem('scv_seed_gym_20260728');
-  localStorage.removeItem('scv_seed_gym_20260728_v2');
-  // Verifica se já existe evento de ginásio em 28/07 para eqa
-  const existing=DB.events('eqa').find(e=>e.type==='gym'&&e.date==='2026-07-28');
-  // Se existe E já tem plano com exercícios, não faz nada
-  if(existing?.gymPlan?.exercises?.length) return;
-  const gymPlan={
-    descricao:'Força geral pós-treino de tensão | Véspera do jogo vs. AFS',
-    objetivo:'Exposição à força com baixa fadiga',
-    duracao:'30–35 min',
-    contexto:'Após treino de tensão',
-    rpeGlobal:'5–6/10',
-    jogoSeguinte:'AFS — 29/07/2026',
-    orientacoes:'• Nenhuma série próxima da falha. Interromper se a velocidade de execução cair claramente.\n• Se o treino de tensão for muito exigente, retirar 1 série do Bulgarian Split Squat aos jogadores mais utilizados.\n• Evitar Nordic Hamstring, RDL pesado, agachamento com volume elevado e pliometria adicional nesta sessão.',
-    exercises:[
-      {bloco:'A1',exercicio:'Barbell Hip Thrust',series:'2',reps:'4–5',rm:'60–65%',rpe:'5–6',recuperacao:'2 min',notas:'Subida rápida; descida controlada; sem falha'},
-      {bloco:'A2',exercicio:'Bench Press',series:'3',reps:'4–5',rm:'70–75%',rpe:'6–7',recuperacao:'90–120 s',notas:'Manter 3–4 repetições em reserva'},
-      {bloco:'B1',exercicio:'Bulgarian Split Squat',series:'2',reps:'4/perna',rm:'55–65%',rpe:'5–6',recuperacao:'90–120 s',notas:'Amplitude confortável; controlo postural'},
-      {bloco:'B2',exercicio:'Remada',series:'3',reps:'5–6',rm:'65–70%',rpe:'6–7',recuperacao:'90 s',notas:'Tronco estável; sem compensações'},
-      {bloco:'C1',exercicio:'Sóleo sentado',series:'2',reps:'6–8',rm:'60–70%',rpe:'6',recuperacao:'60–90 s',notas:'Pausa curta no topo; movimento controlado'},
-      {bloco:'C2',exercicio:'Copenhagen isométrico',series:'2',reps:'15–20 s/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Versão curta; alinhamento da bacia'},
-      {bloco:'D', exercicio:'Pallof Press',series:'2',reps:'6/lado',rm:'—',rpe:'5–6',recuperacao:'45–60 s',notas:'Evitar rotação; expirar na extensão'},
-    ],
-    updatedAt:new Date().toISOString(),
-  };
-  if(existing){
-    DB.updateEvent(existing.id,{gymPlan});
-  } else {
-    DB.addEvent({type:'gym',squad:'eqa',date:'2026-07-28',time:'',title:'Ginásio — Força pós-treino de tensão',gymPlan});
-  }
-  console.log('Seed: plano de ginásio 28/07/2026 adicionado.');
+    localStorage.setItem(KEY,'1');
+    if(updated) console.log(`✅ MKA Sub-23: ${updated} jogo(s) atualizado(s).`);
+  } catch(e){ console.warn('seedSub23MKACalendar:',e); }
 }
 
 function initCoordApp(){
@@ -10758,6 +10759,7 @@ function initCoordApp(){
       // 3. Operações admin
       if(isAdmin()){
         await seedAppUsersIfNeeded();
+        await seedSub23MKACalendar();
         await loadAppUsers();
         await syncPendingAthletes(true);
         checkPendingBadge();
@@ -10766,8 +10768,6 @@ function initCoordApp(){
       seedIfEmpty();
     }
     deduplicateCalendarEvents();
-    seedGymPlan20260728();
-    seedMesocicloAgosto2026();
     backfillGRAttendance();
     document.getElementById('sync-overlay').style.display='none';
     nav('dashboard');
