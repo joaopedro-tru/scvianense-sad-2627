@@ -7142,15 +7142,11 @@ tbody td{border-bottom:1px solid #e8e8e8;vertical-align:middle}
 
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
-  const frame=document.getElementById('pdf-preview-frame');
-  const overlay=document.getElementById('pdf-preview-overlay');
-  const dlBtn=document.getElementById('btn-download-conv-pdf');
-  if(frame&&overlay){
-    frame.src=url;
-    overlay.style.display='flex';
-    const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.html`;
-    dlBtn.onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=fname; a.click(); };
-  }
+  const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.html`;
+  const a=document.createElement('a');
+  a.href=url; a.download=fname; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  toast('📄 Calendário exportado!');
 }
 
 // ── GAME DETAIL (TABS: PRÉ-JOGO / PÓS-JOGO) ──────────────────────────────────
