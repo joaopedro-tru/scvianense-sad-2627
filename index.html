@@ -2469,8 +2469,17 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
 let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados';
-// Navigation back-tracking
-let _backView='dashboard', _backSquad='sub19';
+// Navigation stack — replaces flat _backView/_backSquad
+const _navStack=[];
+let _navBack=false; // prevents stack push during back navigation
+
+function navBack(){
+  if(!_navStack.length){ nav('dashboard'); return; }
+  _navBack=true;
+  const prev=_navStack.pop();
+  nav(prev.v, prev.opts||{});
+  _navBack=false;
+}
 
 const COMP_ABBR=[
   [/Liga 3 Placard[^,]*/i,       'Liga 3'],
@@ -2516,6 +2525,18 @@ function nav(v,opts={}){
   // Treinadores só acedem ao seu escalão
   const cs=coachSquad();
   if(cs && opts.squad && opts.squad!==cs && opts.squad!=='both'){ return; }
+  // Push current state to nav stack (unless we're going back or staying on same view)
+  if(!_navBack && v!==view){
+    const curOpts={};
+    if(squad) curOpts.squad=squad;
+    if(view==='player'&&player) curOpts.id=player.id;
+    else if(view==='training'&&trainingEventId) curOpts.id=trainingEventId;
+    else if(view==='game'&&gameEventId) curOpts.id=gameEventId;
+    _navStack.push({v:view,opts:curOpts});
+    if(_navStack.length>30) _navStack.shift(); // safety cap
+  }
+  // Dashboard is root — clear stack
+  if(v==='dashboard'&&!_navBack) _navStack.length=0;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nl').forEach(x=>x.classList.remove('active'));
   view=v;
@@ -2523,11 +2544,11 @@ function nav(v,opts={}){
   else if(v==='squad'){ squad=opts.squad||squad; show('v-squad'); setActive(`[data-view="squad"][data-squad="${squad}"]`); renderSquad() }
   else if(v==='player'){ if(opts.id)player=DB.getPlayer(opts.id)||player; show('v-player'); renderPlayer() }
   else if(v==='calendar'){ show('v-cal'); setActive('[data-view="calendar"]'); renderCal() }
-  else if(v==='training'){ _backView=view; _backSquad=squad; if(opts.id)trainingEventId=opts.id; show('v-training'); renderTraining() }
+  else if(v==='training'){ if(opts.id)trainingEventId=opts.id; show('v-training'); renderTraining() }
   else if(v==='sq-trainings'){ squad=opts.squad||squad; show('v-sq-trainings'); setActive(`[data-view="sq-trainings"][data-squad="${squad}"]`); renderSqTrainings() }
   else if(v==='sq-gym'){ squad=opts.squad||squad; show('v-sq-gym'); setActive(`[data-view="sq-gym"][data-squad="${squad}"]`); renderSqGym() }
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
-  else if(v==='game'){ _backView=view; _backSquad=squad; if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
+  else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='weekly-plan'){
     show('v-weekly-plan'); setActive('[data-view="weekly-plan"]');
@@ -3965,7 +3986,7 @@ document.getElementById('btn-del-player').addEventListener('click',()=>{
   DB.deletePlayer(player.id); toast('Atleta eliminado.'); nav('squad',{squad:player.squad});
 });
 document.getElementById('btn-edit-player').addEventListener('click',()=>openPlayerModal(player));
-document.getElementById('btn-back').addEventListener('click',()=>nav('squad',{squad:player?.squad}));
+document.getElementById('btn-back').addEventListener('click',()=>navBack());
 document.getElementById('btn-add-player').addEventListener('click',()=>openPlayerModal());
 document.getElementById('mo-p-close').addEventListener('click',closePlayerModal);
 document.getElementById('mo-p-cancel').addEventListener('click',closePlayerModal);
@@ -5902,10 +5923,7 @@ function renderTraining(){
   bindClinicalHandlers(trainingEventId, allPl, renderTraining);
 }
 
-document.getElementById('btn-back-training').addEventListener('click',()=>{
-  if(_backView==='dashboard') nav('dashboard');
-  else { const ev=DB.getEvent(trainingEventId); nav(ev?.type==='gym'?'sq-gym':'sq-trainings',{squad:_backSquad||squad}); }
-});
+document.getElementById('btn-back-training').addEventListener('click',()=>navBack());
 
 // ── MATCH DAY HUB ─────────────────────────────────────────────────────────────
 function renderMatchDay(){
@@ -8428,10 +8446,7 @@ document.getElementById('btn-del-game').addEventListener('click',()=>{
   DB.deleteEvent(gameEventId); toast('Jogo eliminado.'); nav('sq-games',{squad});
 });
 document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
-document.getElementById('btn-back-game').addEventListener('click',()=>{
-  if(_backView==='dashboard') nav('dashboard');
-  else nav('sq-games',{squad:_backSquad||squad});
-});
+document.getElementById('btn-back-game').addEventListener('click',()=>navBack());
 document.getElementById('btn-new-training').addEventListener('click',()=>openEventModal(null,null,{type:'training',squad}));
 document.getElementById('btn-new-game').addEventListener('click',()=>openEventModal(null,null,{type:'game',squad}));
 
