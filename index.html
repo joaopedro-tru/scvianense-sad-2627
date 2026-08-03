@@ -1108,7 +1108,8 @@ body.pm #v-pf{padding:30px}
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:44px">#</th>
               <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:80px">Posição</th>
-              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:100px">Tamanho</th>
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">🎽 Camisola</th>
+              <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">🩳 Calções</th>
               <th style="text-align:left;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:130px">Nome Camisola</th>
               <th style="text-align:center;padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);width:90px">Nº Camisola</th>
               <th id="tm-kit-clear-th" style="display:none;width:36px;border-bottom:1px solid var(--border)"></th>
@@ -9717,20 +9718,22 @@ function printKit(){
     const d=DB.getAthleteDoc(p.id)||{};
     const jname=p.jerseyName||d.jerseyName||'';
     const jsize=p.jerseySize||d.jerseySize||'';
+    const ssize=p.shortsSize||d.shortsSize||jsize;
     const jnum=p.jerseyNumber??d.jerseyNumber??'';
     const isGR=p.position==='GR';
     let groupRow='';
     if(isGR&&i===0){
-      groupRow=`<tr><td colspan="6" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Guarda-Redes</td></tr>`;
+      groupRow=`<tr><td colspan="7" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Guarda-Redes</td></tr>`;
     } else if(!isGR&&!_sepShown){
       _sepShown=true;
-      groupRow=`<tr><td colspan="6" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Campo</td></tr>`;
+      groupRow=`<tr><td colspan="7" style="background:#e8f0fe;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border:1px solid #ddd">Campo</td></tr>`;
     }
     return `${groupRow}<tr style="background:${i%2===0?'#fff':'#fafafa'}">
       <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?jnum:'—'}</td>
       <td style="padding:8px 10px;border:1px solid #ddd">${dn(p)}</td>
       <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
       <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jsize||'—'}</td>
+      <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${ssize||'—'}</td>
       <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700;letter-spacing:.5px">${jname||'—'}</td>
       <td style="text-align:center;padding:8px 10px;border:1px solid #ddd;font-weight:700">${jnum!==''?`#${jnum}`:'—'}</td>
     </tr>`;
@@ -9739,7 +9742,8 @@ function printKit(){
     <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:40px">#</th>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd">Atleta</th>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:80px">Pos.</th>
-    <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:80px">Tamanho</th>
+    <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:80px">🎽 Camisola</th>
+    <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:80px">🩳 Calções</th>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:130px">Nome Camisola</th>
     <th style="background:#f0f0f0;padding:8px 10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.4px;border:1px solid #ddd;width:80px">Nº Camisola</th>
   </tr>`;
@@ -9764,39 +9768,43 @@ function exportRouparia(){
     const nb=b.jerseyNumber??db.jerseyNumber??999;
     return na-nb;
   });
-  const sizeCountsGR={},sizeCountsField={};
+  const sizeCountsGR={},sizeCountsField={},shortsCountsGR={},shortsCountsField={};
   let _sepShown=false;
   const rows=players.map((p,i)=>{
     const d=DB.getAthleteDoc(p.id)||{};
     const jname=(p.jerseyName||d.jerseyName||'').toUpperCase();
     const jsize=p.jerseySize||d.jerseySize||'';
+    const ssize=p.shortsSize||d.shortsSize||jsize;
     const jnum=p.jerseyNumber??d.jerseyNumber??'';
     if(jsize){ if(p.position==='GR') sizeCountsGR[jsize]=(sizeCountsGR[jsize]||0)+1; else sizeCountsField[jsize]=(sizeCountsField[jsize]||0)+1; }
+    if(ssize){ if(p.position==='GR') shortsCountsGR[ssize]=(shortsCountsGR[ssize]||0)+1; else shortsCountsField[ssize]=(shortsCountsField[ssize]||0)+1; }
     const isGR=p.position==='GR';
     let groupRow='';
     if(isGR&&i===0){
-      groupRow=`<tr><td colspan="6" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Guarda-Redes</td></tr>`;
+      groupRow=`<tr><td colspan="7" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Guarda-Redes</td></tr>`;
     } else if(!isGR&&!_sepShown){
       _sepShown=true;
-      groupRow=`<tr><td colspan="6" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Campo</td></tr>`;
+      groupRow=`<tr><td colspan="7" style="background:#0e2444;color:#e8b84b;padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid #0e2444">Campo</td></tr>`;
     }
     return `${groupRow}<tr style="background:${i%2===0?'#fff':'#f8faff'}">
       <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;color:#666">${jnum!==''?jnum:'—'}</td>
       <td style="padding:9px 12px;border:1px solid #dde3f0;font-weight:600">${dn(p)}<span style="font-size:11px;color:#999;margin-left:6px">${sq?'':`(${SQUADS[p.squad]||p.squad})`}</span></td>
       <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-size:12px;color:#666">${POS[p.position]||'—'}</td>
-      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:15px;color:#1a56db">${jsize}</td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:15px;color:#1a56db">${jsize||'—'}</td>
+      <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:15px;color:#1a56db">${ssize||'—'}</td>
       <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:700;letter-spacing:1.5px;font-size:13px">${jname}</td>
       <td style="text-align:center;padding:9px 10px;border:1px solid #dde3f0;font-weight:800;font-size:16px;color:#0e2444">${jnum!==''?`#${jnum}`:'—'}</td>
     </tr>`;
   }).join('');
   const fmtSizes=(counts)=>Object.entries(counts).sort(([a],[b])=>SHIRT_SIZES.indexOf(a)-SHIRT_SIZES.indexOf(b)).map(([s,c])=>`<span style="display:inline-block;background:#e8f0fe;border:1px solid #c5d3f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;margin:2px"><b>${s}</b> × ${c}</span>`).join('');
-  const summaryGR=fmtSizes(sizeCountsGR);
-  const summaryField=fmtSizes(sizeCountsField);
+  const summaryGR=`<div style="margin-bottom:4px"><b>GR Camisola:</b> ${fmtSizes(sizeCountsGR)||'—'}</div><div><b>GR Calções:</b> ${fmtSizes(shortsCountsGR)||'—'}</div>`;
+  const summaryField=`<div style="margin-bottom:4px"><b>Campo Camisola:</b> ${fmtSizes(sizeCountsField)||'—'}</div><div><b>Campo Calções:</b> ${fmtSizes(shortsCountsField)||'—'}</div>`;
   const head=`<tr>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:40px">#</th>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444">Atleta</th>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:80px">Pos.</th>
-    <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:80px">Tamanho</th>
+    <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:80px">🎽 Camisola</th>
+    <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:80px">🩳 Calções</th>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:140px">Nome na Camisola</th>
     <th style="background:#0e2444;color:#e8b84b;padding:10px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid #0e2444;width:80px">Nº Camisola</th>
   </tr>`;
@@ -9828,8 +9836,8 @@ function exportRouparia(){
       </table>
       <div style="background:#f5f8ff;border:1px solid #dde3f0;border-radius:8px;padding:14px 16px;font-family:Arial,sans-serif">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:10px">Resumo de Tamanhos</div>
-        ${summaryGR?`<div style="margin-bottom:8px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;margin-right:6px">GR</span>${summaryGR}</div>`:''}
-        ${summaryField?`<div><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;margin-right:6px">Campo</span>${summaryField}</div>`:''}
+        ${summaryGR?`<div style="margin-bottom:10px">${summaryGR}</div>`:''}
+        ${summaryField?`<div>${summaryField}</div>`:''}
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -9984,7 +9992,7 @@ function renderKitTab(){
 
   const body=document.getElementById('tm-kit-body');
   if(!players.length){
-    body.innerHTML=`<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`;
+    body.innerHTML=`<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`;
     return;
   }
 
@@ -10000,14 +10008,19 @@ function renderKitTab(){
     let groupRow='';
     if(!isGR&&!_kitSepShown){
       _kitSepShown=true;
-      groupRow=`<tr class="pos-group"><td colspan="6" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Campo</td></tr>`;
+      groupRow=`<tr class="pos-group"><td colspan="7" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Campo</td></tr>`;
     } else if(isGR&&!_kitSepShown){
-      groupRow=`<tr class="pos-group"><td colspan="6" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Guarda-Redes</td></tr>`;
+      groupRow=`<tr class="pos-group"><td colspan="7" style="padding:6px 14px;background:#f0f4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a56db;border-bottom:1px solid var(--border)">Guarda-Redes</td></tr>`;
     }
-    const sizeOpts=SHIRT_SIZES.map(s=>`<option value="${s}"${(p.jerseySize||d.jerseySize)===s?' selected':''}>${s}</option>`).join('');
+    // Camisola size (jersey)
+    const curJerseySize=p.jerseySize||d.jerseySize||'';
+    const jerseyOpts=SHIRT_SIZES.map(s=>`<option value="${s}"${curJerseySize===s?' selected':''}>${s}</option>`).join('');
+    // Calções size — default to jerseySize if not explicitly set
+    const curShortsSize=p.shortsSize||d.shortsSize||curJerseySize;
+    const shortsOpts=SHIRT_SIZES.map(s=>`<option value="${s}"${curShortsSize===s?' selected':''}>${s}</option>`).join('');
     const jname=p.jerseyName||d.jerseyName||'';
     const jnum=p.jerseyNumber??d.jerseyNumber??'';
-    const complete=!!(jname&&(p.jerseySize||d.jerseySize)&&jnum!=='');
+    const complete=!!(jname&&curJerseySize&&jnum!=='');
     const isDup=jnum!==''&&_dupNums.has(Number(jnum));
     const rowBg=isDup?'#fff3e0':(complete?'#f0fff4':'inherit');
     return `${groupRow}<tr style="border-bottom:1px solid var(--border);background:${rowBg}" ${isDup?'title="Número duplicado — discutir com atleta"':''}>
@@ -10023,8 +10036,13 @@ function renderKitTab(){
       </td>
       <td style="text-align:center;padding:10px;font-size:12px;color:var(--muted)">${POS[p.position]||'—'}</td>
       <td style="text-align:center;padding:8px 6px">
-        <select data-kit-size="${p.id}" style="padding:4px 6px;border:1.5px solid ${(p.jerseySize||d.jerseySize)?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;background:${(p.jerseySize||d.jerseySize)?'#e8f5e9':'var(--card)'};color:var(--text);outline:none;cursor:pointer;width:100%">
-          <option value="">—</option>${sizeOpts}
+        <select data-kit-size="${p.id}" style="padding:4px 6px;border:1.5px solid ${curJerseySize?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;background:${curJerseySize?'#e8f5e9':'var(--card)'};color:var(--text);outline:none;cursor:pointer;width:100%">
+          <option value="">—</option>${jerseyOpts}
+        </select>
+      </td>
+      <td style="text-align:center;padding:8px 6px">
+        <select data-kit-shorts="${p.id}" style="padding:4px 6px;border:1.5px solid ${(p.shortsSize||d.shortsSize)?'var(--green)':'var(--border)'};border-radius:6px;font-size:12px;font-weight:600;background:${(p.shortsSize||d.shortsSize)?'#e8f5e9':'var(--card)'};color:var(--text);outline:none;cursor:pointer;width:100%">
+          <option value="">—</option>${shortsOpts}
         </select>
       </td>
       <td style="padding:8px 6px">
@@ -10049,6 +10067,16 @@ function renderKitTab(){
       sel.style.borderColor=val?'var(--green)':'var(--border)';
       sel.style.background=val?'#e8f5e9':'var(--card)';
       refreshStats();
+    };
+  });
+  body.querySelectorAll('[data-kit-shorts]').forEach(sel=>{
+    sel.onchange=()=>{
+      const pid=sel.dataset.kitShorts;
+      const val=sel.value||null;
+      DB.setAthleteDoc(pid,{shortsSize:val});
+      DB.updatePlayer(pid,{shortsSize:val});
+      sel.style.borderColor=val?'var(--green)':'var(--border)';
+      sel.style.background=val?'#e8f5e9':'var(--card)';
     };
   });
   body.querySelectorAll('[data-kit-jname]').forEach(inp=>{
@@ -10082,8 +10110,8 @@ function renderKitTab(){
       const pid=btn.dataset.kitClear;
       const p=DB.players().find(x=>x.id===pid);
       if(!confirm(`Limpar ficha de camisola de ${p?dn(p):'este atleta'}?`)) return;
-      DB.setAthleteDoc(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null});
-      DB.updatePlayer(pid,{jerseyName:null,jerseySize:null,jerseyNumber:null,number:null});
+      DB.setAthleteDoc(pid,{jerseyName:null,jerseySize:null,shortsSize:null,jerseyNumber:null});
+      DB.updatePlayer(pid,{jerseyName:null,jerseySize:null,shortsSize:null,jerseyNumber:null,number:null});
       renderKitTab();
     };
   });
