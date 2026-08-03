@@ -2606,7 +2606,8 @@ function bdayCards(ps,containerEl,staffPs=[]){
 }
 
 // Shared helper — returns gym + treino cards HTML for a squad ('' if no data)
-function _squadLoadCards(cs){
+// sfx = optional ID suffix to avoid collisions when multiple squads are on the same page
+function _squadLoadCards(cs, sfx=''){
   const now=new Date();
   const today=now.toISOString().split('T')[0];
   const cutoff5w=new Date(now-35*24*3600*1000).toISOString().split('T')[0];
@@ -2751,26 +2752,27 @@ function _squadLoadCards(cs){
 
   const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'Últimas 5 semanas','5w');
   const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'Época','ep');
-  const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card" style="margin:0">
+  const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
     <div style="font-size:12px;font-weight:700;margin-bottom:4px">🎯 Objetivos Gerais</div>
     <div style="font-size:10px;color:var(--muted);margin-bottom:12px">Clica numa fatia para ver os objetivos específicos</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">${pb5}${divider(pb5,pbEp)}${pbEp}</div>
   </div>`:'';
-  const secondaryPlaceholder=`<div id="obj-secondary-card" style="display:none"></div>`;
+  const secondaryPlaceholder=`<div id="obj-secondary-card${sfx}" style="display:none"></div>`;
 
   return (gymCard||primaryCard)?`<div style="display:flex;flex-direction:column;gap:10px">${gymCard}${primaryCard}${secondaryPlaceholder}</div>`:'';
 }
 function renderStaffLoadCharts(cs){
   const el=document.getElementById('d-staff-load');
   if(!el) return;
-  const html=_squadLoadCards(cs);
+  const sfx='-'+cs;
+  const html=_squadLoadCards(cs,sfx);
   el.innerHTML=html?`<div style="margin-bottom:14px">${html}</div>`:'';
-  attachObjChartListeners(cs);
+  attachObjChartListeners(cs,sfx);
 }
 
-function attachObjChartListeners(cs){
-  const primaryCard=document.getElementById('obj-primary-card');
-  const secondaryCard=document.getElementById('obj-secondary-card');
+function attachObjChartListeners(cs, sfx=''){
+  const primaryCard=document.getElementById('obj-primary-card'+sfx);
+  const secondaryCard=document.getElementById('obj-secondary-card'+sfx);
   if(!primaryCard||!secondaryCard) return;
 
   const OBJ_PIE_PALETTE=['#1a56db','#c0392b','#1a8754','#e65100','#7c3aed','#0891b2','#d97706','#059669','#dc2626','#f97316','#0e7490','#6d28d9'];
@@ -3095,8 +3097,10 @@ function renderAdminLoadCharts(){
   const el=document.getElementById('d-admin-load');
   if(!el) return;
   const META={sub19:{icon:'🟡',color:'#b8860b'},sub23:{icon:'🔵',color:'var(--blue)'},eqa:{icon:'⚫',color:'#444'}};
-  const sections=['sub19','sub23','eqa'].map(cs=>{
-    const html=_squadLoadCards(cs);
+  const squads=['sub19','sub23','eqa'];
+  const sections=squads.map(cs=>{
+    const sfx='-adm-'+cs;
+    const html=_squadLoadCards(cs,sfx);
     if(!html) return '';
     const m=META[cs];
     return `<div><div style="font-size:12px;font-weight:700;color:${m.color};margin-bottom:10px">${m.icon} ${SQUADS[cs]}</div>${html}</div>`;
@@ -3106,6 +3110,8 @@ function renderAdminLoadCharts(){
     <div style="font-size:14px;font-weight:700;margin-bottom:16px">📊 Carga de Trabalho</div>
     <div style="display:flex;flex-direction:column;gap:18px">${sections.join('<div style="height:1px;background:var(--border)"></div>')}</div>
   </div>`;
+  // Wire pie chart click listeners for each squad
+  squads.forEach(cs=>attachObjChartListeners(cs,'-adm-'+cs));
 }
 
 function renderDash(){
@@ -3190,6 +3196,7 @@ function renderDash(){
   const colsEl=document.getElementById('d-admin-cols');
 
   function buildSquadCol(cs,icon,color){
+    const sfx='-dc-'+cs;
     const sqAthletes=DB.players(cs).length;
     const sqGames=es.filter(e=>e.type==='game'&&e.squad===cs);
     const past=sqGames.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2).reverse();
@@ -3206,7 +3213,10 @@ function renderDash(){
         </div>
         ${gamesHtml}
       </div>
-      ${_squadLoadCards(cs)}`;
+      ${_squadLoadCards(cs,sfx)}`;
+  }
+  function wireColListeners(){
+    ADMIN_SQUADS.forEach(({cs})=>attachObjChartListeners(cs,'-dc-'+cs));
   }
 
   const w=window.innerWidth;
@@ -3224,6 +3234,7 @@ function renderDash(){
         ${buildSquadCol(cs,icon,color)}
       </div>`).join('');
     colsEl.innerHTML=tabBar+cols;
+    wireColListeners();
   } else if(w<=1100){
     // Tablet: 2-col — Equipa A left, Sub-23+Sub-19 stacked right
     colsEl.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;align-items:start';
@@ -3233,12 +3244,14 @@ function renderDash(){
       <div style="display:flex;flex-direction:column;gap:10px">${buildSquadCol('sub19','🟡','#b8860b')}</div>
     </div>`;
     colsEl.innerHTML=eqaCol+rightCol;
+    wireColListeners();
   } else {
     // Desktop: 3-col grid
     colsEl.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;align-items:start';
     colsEl.innerHTML=ADMIN_SQUADS.map(({cs,icon,color})=>
       `<div style="display:flex;flex-direction:column;gap:10px;min-width:0">${buildSquadCol(cs,icon,color)}</div>`
     ).join('');
+    wireColListeners();
   }
 
   bdayCards(ps,document.getElementById('d-birthdays'),DB.staffProfiles(null));
