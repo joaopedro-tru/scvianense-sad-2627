@@ -8019,6 +8019,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const nShotOff=evs.filter(e=>e.type==='shot_off').length;
   const nFoulC=evs.filter(e=>e.type==='foul_committed').length;
   const nFoulS=evs.filter(e=>e.type==='foul_suffered').length;
+  const nBallWon=evs.filter(e=>e.type==='ball_won').length;
+  const nBallLost=evs.filter(e=>e.type==='ball_lost').length;
   function relStatCell(icon,label,val){
     return `<div style="text-align:center;padding:10px 6px;background:var(--bg);border-radius:8px;min-width:75px;flex:1">
       <div style="font-size:18px;line-height:1.4">${icon}</div>
@@ -8042,6 +8044,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ${(nShotOn||nShotOff)?relStatCell('💨','Rem. Fora',nShotOff):''}
       ${(nFoulC||nFoulS)?relStatCell('⚡','F. Com.',nFoulC):''}
       ${(nFoulC||nFoulS)?relStatCell('🤕','F. Sof.',nFoulS):''}
+      ${(nBallWon||nBallLost)?relStatCell('✊','Recuper.',nBallWon):''}
+      ${(nBallWon||nBallLost)?relStatCell('❌','Perdas',nBallLost):''}
     </div>
   </div>`;
 
