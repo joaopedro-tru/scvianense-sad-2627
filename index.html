@@ -1060,6 +1060,7 @@ body.pm #v-pf{padding:30px}
     <div style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card);margin-bottom:0">
       <button class="tm-tab active" data-tab="docs" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-1px">📋 Documentos</button>
       <button class="tm-tab" data-tab="kit" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">👕 Equipamento</button>
+      <button class="tm-tab" data-tab="fines" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⏱ Atrasos / Multas</button>
     </div>
     <!-- docs panel -->
     <div id="tm-panel-docs">
@@ -1121,6 +1122,10 @@ body.pm #v-pf{padding:30px}
           <tbody id="tm-kit-body"></tbody>
         </table>
       </div>
+    </div>
+    <!-- fines panel -->
+    <div id="tm-panel-fines" style="display:none">
+      <div id="tm-fines-content"></div>
     </div>
   </div>
 
@@ -5607,16 +5612,21 @@ function renderTraining(){
   const trialAtt=ev.trialAttendance||{};
   const totalPresCount=countPresent(att,allPl,ev.date) + trialPlayers.filter(tp=>trialAtt[tp.id]!==false).length;
 
+  const lateMinutes=ev.lateMinutes||{};
   const pRows=allPl.map(p=>{
     const isExtra=extras.includes(p.id);
     const status=effectiveAtt(att,p.id,ev.date);
     const info=attInfo(status);
+    const isPresent=status===true||status==='condicionado';
+    const lateMin=lateMinutes[p.id]||0;
+    const lateBadge=isPresent?`<button class="btn btn-sm" data-late-pid="${p.id}" title="Minutos de atraso" style="font-size:11px;padding:3px 8px;min-width:38px;${lateMin?'background:#fff3e0;color:#e65100;border-color:#e65100;font-weight:700':'background:var(--bg);color:var(--muted);border-color:var(--border)'}">${lateMin?'⏱ '+lateMin+'m':'⏱'}</button>`:'<span style="min-width:38px;display:inline-block"></span>';
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${dn(p)}</div>
         <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}</div>
       </div>
+      ${lateBadge}
       <button class="att-btn${info.cls?' '+info.cls:''}" data-att-pid="${p.id}">${info.label}</button>
     </div>`;
   }).join('');
@@ -5811,19 +5821,29 @@ function renderTraining(){
         </div>
       </div>`}
     </div>
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">👥 Presenças</h3>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="att-summary">${totalPresCount} / ${allPl.length + trialPlayers.length} presentes</span>
-          ${(()=>{const todosOn=allPl.length>0&&allPl.every(p=>effectiveAtt(att,p.id,ev.date)===true);return`<button class="btn ${todosOn?'btn-p':'btn-o'} btn-sm" id="btn-todos-toggle" title="${todosOn?'Desativar — marcar todos como Por Preencher':'Ativar — marcar todos como Presentes'}">${todosOn?'✓ Todos':'◯ Todos'}</button>`;})()}
+    <div class="card" id="att-card">
+      ${(()=>{
+        const attCollapsed=localStorage.getItem('scv_att_collapsed')==='true';
+        const todosOn=allPl.length>0&&allPl.every(p=>effectiveAtt(att,p.id,ev.date)===true);
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${attCollapsed?'0':'14px'};padding-bottom:${attCollapsed?'0':'10px'};${attCollapsed?'':'border-bottom:1px solid var(--border)'}">
+          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px" id="att-heading">
+            <span id="att-chevron" style="font-size:10px;transition:transform .2s">${attCollapsed?'▶':'▼'}</span>
+            👥 Presenças
+          </h3>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="att-summary">${totalPresCount} / ${allPl.length + trialPlayers.length} presentes</span>
+            <button class="btn ${todosOn?'btn-p':'btn-o'} btn-sm" id="btn-todos-toggle" title="${todosOn?'Desativar':'Ativar — marcar todos como Presentes'}">${todosOn?'✓ Todos':'◯ Todos'}</button>
+          </div>
         </div>
-      </div>
-      ${unavailAlert}
-      ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
-      ${extraSection}
-      ${trialSection}
-      ${staffSection}
+        <div id="att-content" style="display:${attCollapsed?'none':'block'}">
+          ${unavailAlert}
+          ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
+          ${extraSection}
+          ${trialSection}
+          ${staffSection}
+        </div>`;
+      })()}
     </div>
   </div>
   ${fichaPreview}
@@ -5877,6 +5897,36 @@ function renderTraining(){
     DB.updateEvent(trainingEventId,{attendance:a});
     renderTraining();
   });
+
+  // Toggle colapsar presenças
+  document.getElementById('att-heading')?.addEventListener('click',()=>{
+    const content=document.getElementById('att-content');
+    const chevron=document.getElementById('att-chevron');
+    const isNowCollapsed=content.style.display!=='none';
+    content.style.display=isNowCollapsed?'none':'block';
+    if(chevron) chevron.textContent=isNowCollapsed?'▶':'▼';
+    const hdr=content.previousElementSibling;
+    if(hdr){
+      hdr.style.marginBottom=isNowCollapsed?'0':'14px';
+      hdr.style.paddingBottom=isNowCollapsed?'0':'10px';
+      hdr.style.borderBottom=isNowCollapsed?'none':'1px solid var(--border)';
+    }
+    localStorage.setItem('scv_att_collapsed', isNowCollapsed?'true':'false');
+  });
+
+  // Registar minutos de atraso
+  document.querySelectorAll('[data-late-pid]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.latePid;
+    const pName=allPl.find(p=>p.id===pid);
+    const cur=(DB.getEvent(trainingEventId).lateMinutes||{})[pid]||0;
+    const val=prompt(`Minutos de atraso — ${pName?dn(pName):'atleta'}:`, cur||'');
+    if(val===null) return;
+    const mins=parseInt(val)||0;
+    const lm={...(DB.getEvent(trainingEventId).lateMinutes||{})};
+    if(mins>0) lm[pid]=mins; else delete lm[pid];
+    DB.updateEvent(trainingEventId,{lateMinutes:lm});
+    renderTraining();
+  }));
 
   // Toggle attendance (cycles: present → condicionado → absent → present)
   document.querySelectorAll('[data-att-pid]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -10208,11 +10258,13 @@ function renderTM(){
       const tab=btn.dataset.tab;
       document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
       document.getElementById('tm-panel-kit').style.display=tab==='kit'?'':'none';
+      document.getElementById('tm-panel-fines').style.display=tab==='fines'?'':'none';
       if(tab==='kit'){
         // Always re-sync athlete_docs before rendering kit tab
         // (athletes may have filled the public form after the last login sync)
         DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
       }
+      if(tab==='fines') renderTMFines();
     };
   });
 
@@ -10310,6 +10362,162 @@ function renderTM(){
     kitSquadSel.style.display='';
   }
   kitSquadSel.onchange=renderKitTab;
+}
+
+function renderTMFines(){
+  const container=document.getElementById('tm-fines-content');
+  if(!container) return;
+
+  // ── Config (per squad) ──────────────────────────────────────────────────────
+  const cfgKey='scv_fines_config';
+  let cfg=JSON.parse(localStorage.getItem(cfgKey)||'{}');
+  // defaults: 0.50€/min treino, 1.00€/min jogo
+  const getRate=(sq,type)=>{
+    if(!cfg[sq]) cfg[sq]={};
+    if(cfg[sq][type]==null) cfg[sq][type]=(type==='train'?0.5:1.0);
+    return cfg[sq][type];
+  };
+
+  const u=currentUser();
+  const squads=u?.role==='admin'?Object.keys(SQUADS):[u?.squad].filter(Boolean);
+
+  let html=`<div style="padding:16px 0">`;
+
+  squads.forEach(sq=>{
+    const sqLabel=SQUADS[sq]||sq;
+    const rTrain=getRate(sq,'train');
+    const rGame=getRate(sq,'game');
+
+    // Collect all events for this squad
+    const evs=DB.events().filter(e=>e.squad===sq);
+    const trainEvs=evs.filter(e=>e.type==='training'||e.type==='gym');
+    const gameEvs=evs.filter(e=>e.type==='game');
+
+    // Per-player totals
+    const players=DB.players().filter(p=>p.squad===sq);
+    // sort: GK first, then by number
+    players.sort((a,b)=>{
+      const ag=a.position==='GR', bg=b.position==='GR';
+      if(ag!==bg) return ag?-1:1;
+      return (parseInt(a.number)||99)-(parseInt(b.number)||99);
+    });
+
+    const totals={}; // {pid:{train:0, game:0}}
+    trainEvs.forEach(e=>{
+      const lm=e.lateMinutes||{};
+      Object.entries(lm).forEach(([pid,mins])=>{
+        if(!totals[pid]) totals[pid]={train:0,game:0};
+        totals[pid].train+=(parseInt(mins)||0);
+      });
+    });
+    gameEvs.forEach(e=>{
+      const lm=e.lateMinutes||{};
+      Object.entries(lm).forEach(([pid,mins])=>{
+        if(!totals[pid]) totals[pid]={train:0,game:0};
+        totals[pid].game+=(parseInt(mins)||0);
+      });
+    });
+
+    // Collective totals
+    let colTrain=0, colGame=0;
+    players.forEach(p=>{ colTrain+=(totals[p.id]?.train||0); colGame+=(totals[p.id]?.game||0); });
+    const colFine=(colTrain*rTrain+colGame*rGame);
+
+    html+=`
+    <div class="card" style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <h3 style="margin:0;font-size:15px">⏱ Atrasos / Multas — ${sqLabel}</h3>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+            🏃 Treino:
+            <input type="number" min="0" step="0.1" value="${rTrain}" data-cfg-sq="${sq}" data-cfg-type="train"
+              style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center">
+            €/min
+          </label>
+          <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+            ⚽ Jogo:
+            <input type="number" min="0" step="0.1" value="${rGame}" data-cfg-sq="${sq}" data-cfg-type="game"
+              style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center">
+            €/min
+          </label>
+        </div>
+      </div>
+
+      <!-- Collective summary -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Treino (col.)</div>
+          <div style="font-size:18px;font-weight:700;color:${colTrain?'#e65100':'var(--muted)'}">${colTrain}m</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Jogo (col.)</div>
+          <div style="font-size:18px;font-weight:700;color:${colGame?'#1565c0':'var(--muted)'}">${colGame}m</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Multa total</div>
+          <div style="font-size:18px;font-weight:700;color:${colFine>0?'#b71c1c':'var(--muted)'}">${colFine.toFixed(2)}€</div>
+        </div>
+      </div>
+
+      <!-- Per-player table -->
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);text-align:left">
+              <th style="padding:8px 10px">Atleta</th>
+              <th style="padding:8px 10px;text-align:center">🏃 Treino</th>
+              <th style="padding:8px 10px;text-align:center">⚽ Jogo</th>
+              <th style="padding:8px 10px;text-align:center">Total min.</th>
+              <th style="padding:8px 10px;text-align:center">Multa</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    const hasAny=players.some(p=>(totals[p.id]?.train||0)+(totals[p.id]?.game||0)>0);
+    if(!hasAny){
+      html+=`<tr><td colspan="5" style="padding:16px;text-align:center;color:var(--muted)">Sem atrasos registados.</td></tr>`;
+    } else {
+      players.forEach(p=>{
+        const pt=totals[p.id]?.train||0;
+        const pg=totals[p.id]?.game||0;
+        if(!pt&&!pg) return; // skip zeroes
+        const fine=(pt*rTrain+pg*rGame);
+        html+=`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px 10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="av" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+              <span style="font-weight:500">${dn(p)}</span>
+            </div>
+          </td>
+          <td style="padding:8px 10px;text-align:center;color:${pt?'#e65100':'var(--muted)'};font-weight:${pt?'700':'400'}">${pt?pt+'m':'—'}</td>
+          <td style="padding:8px 10px;text-align:center;color:${pg?'#1565c0':'var(--muted)'};font-weight:${pg?'700':'400'}">${pg?pg+'m':'—'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:600">${pt+pg}m</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#b71c1c">${fine.toFixed(2)}€</td>
+        </tr>`;
+      });
+    }
+
+    html+=`</tbody></table></div>
+    </div>`;
+  });
+
+  html+=`</div>`;
+  container.innerHTML=html;
+
+  // Config inputs → save on blur/change
+  container.querySelectorAll('[data-cfg-sq]').forEach(inp=>{
+    const save=()=>{
+      const sq=inp.dataset.cfgSq;
+      const type=inp.dataset.cfgType;
+      if(!cfg[sq]) cfg[sq]={};
+      cfg[sq][type]=parseFloat(inp.value)||0;
+      localStorage.setItem(cfgKey,JSON.stringify(cfg));
+      // Re-render to update fine totals
+      renderTMFines();
+    };
+    inp.addEventListener('blur',save);
+    inp.addEventListener('change',save);
+  });
 }
 
 function renderKitTab(){
