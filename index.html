@@ -1343,9 +1343,23 @@ body.pm #v-pf{padding:30px}
         <div style="position:relative">
           <button class="btn btn-o btn-sm" id="btn-gcal-pdf" title="Exportar calendário de jogos em PDF">📄 PDF</button>
           <!-- Date range popover -->
-          <div id="gcal-pdf-popover" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;width:280px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200">
+          <div id="gcal-pdf-popover" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;width:290px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200">
             <div style="font-size:12px;font-weight:700;margin-bottom:12px">📄 Exportar Calendário</div>
-            <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;cursor:pointer">
+            <!-- Format selector -->
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Formato</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                <input type="radio" name="gcal-fmt" id="gcal-fmt-full" value="full" checked style="accent-color:var(--primary)">
+                Calendário completo (com resultados)
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                <input type="radio" name="gcal-fmt" id="gcal-fmt-list" value="list" style="accent-color:var(--primary)">
+                Lista de jogos (data, hora, escalão, local…)
+              </label>
+            </div>
+            <!-- Date range -->
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Período</div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;cursor:pointer">
               <input type="checkbox" id="gcal-all-dates" checked style="width:15px;height:15px;accent-color:var(--primary)">
               Calendário completo
             </label>
@@ -7338,14 +7352,18 @@ function renderSqGames(){
     document.getElementById('btn-gcal-gen').onclick=()=>{
       const from=allChk.checked?null:document.getElementById('gcal-from').value||null;
       const to=allChk.checked?null:document.getElementById('gcal-to').value||null;
+      const fmt=document.querySelector('input[name="gcal-fmt"]:checked')?.value||'full';
       popover.style.display='none';
-      generateGameCalendarPDF(squad,from,to);
+      generateGameCalendarPDF(squad,from,to,fmt);
     };
   }
 }
 
 // ── GAME CALENDAR PDF ─────────────────────────────────────────────────────────
-function generateGameCalendarPDF(sq, from, to){
+const WEEKDAYS_PT=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const MONTHS_LONG_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function generateGameCalendarPDF(sq, from, to, format='full'){
   let evs=DB.events(sq).filter(e=>e.type==='game'&&e.squad===sq).sort((a,b)=>a.date.localeCompare(b.date));
   if(from) evs=evs.filter(e=>e.date>=from);
   if(to)   evs=evs.filter(e=>e.date<=to);
@@ -7357,31 +7375,134 @@ function generateGameCalendarPDF(sq, from, to){
     ?`${from?fmtDate(from):'início'} — ${to?fmtDate(to):'fim'}`
     :'Calendário Completo';
 
-  const rows=evs.map((ev,i)=>{
-    const isPast=ev.date<today;
-    const ha=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
-    const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
-    const mr=ev.matchReport||{};
-    const evList=mr.events||[];
-    const goals=evList.filter(e=>e.type==='goal').length;
-    const conc=evList.filter(e=>e.type==='goal_conceded').length;
-    const hasResult=isPast&&evList.length>0;
-    const isHome=ev.homeAway!=='away';
-    const gf=isHome?goals:conc, ga=isHome?conc:goals;
-    const resultBadge=hasResult
-      ?`<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;color:#fff;background:${gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100'}">${gf}–${ga}</span>`
-      :'';
-    const bg=i%2===0?'#fff':'#f7f9fc';
-    return `<tr style="background:${bg}${isPast?';opacity:.7':''}">
-      <td style="padding:7px 10px;font-weight:700;white-space:nowrap">${fmtDate(ev.date)}${ev.time?`<br><span style="font-size:10px;font-weight:400;color:#888">${ev.time}</span>`:''}</td>
-      <td style="padding:7px 10px;white-space:nowrap">${ha}</td>
-      <td style="padding:7px 10px;font-weight:600">${ev.opponent||'—'} ${resultBadge}</td>
-      <td style="padding:7px 10px;font-size:11px;color:#555">${loc}</td>
-      <td style="padding:7px 10px;font-size:11px">${ev.competition||'—'}</td>
-    </tr>`;
-  }).join('');
+  // ── COMMON HEADER HTML ──────────────────────────────────────────────────────
+  const headerHtml=`
+<div class="header">
+  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
+  <div>
+    <div class="club">SC Vianense SAD</div>
+    <div><span class="squad-badge">${squadName}</span></div>
+    <div class="doc-label">${format==='list'?'Lista de Jogos':'Calendário de Jogos'}</div>
+  </div>
+</div>
+<div class="range-badge">${rangeLabel} · ${evs.length} jogo${evs.length!==1?'s':''}</div>`;
 
-  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+  const footerHtml=`<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')}</div>`;
+
+  let bodyContent='', pageSize='A4 landscape', html='';
+
+  if(format==='list'){
+    // ── LISTA DE JOGOS — formato limpo, leitura rápida ──────────────────────
+    const rows=evs.map((ev,i)=>{
+      const d=new Date(ev.date+'T00:00:00');
+      const weekday=WEEKDAYS_PT[d.getDay()];
+      const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MONTHS_LONG_PT[d.getMonth()]} ${d.getFullYear()}`;
+      const isAway=ev.homeAway==='away';
+      const haColor=isAway?'#c0392b':'#1a3d6e';
+      const haLabel=isAway?'FORA':'CASA';
+      const haIcon=isAway?'✈':'🏠';
+      const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
+      const rowBg=i%2===0?'#ffffff':'#f4f7fc';
+      const isPast=ev.date<today;
+      return `<tr style="background:${rowBg};${isPast?'opacity:.65':''}">
+        <td style="padding:11px 12px;white-space:nowrap;border-right:2px solid #e0e6f0">
+          <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.6px">${weekday}</div>
+          <div style="font-size:14px;font-weight:800;color:#1a3d6e;line-height:1.1">${dateStr}</div>
+          ${ev.time?`<div style="font-size:13px;font-weight:700;color:#333;margin-top:2px">⏰ ${ev.time}</div>`:`<div style="font-size:11px;color:#aaa;margin-top:2px">Hora a definir</div>`}
+        </td>
+        <td style="padding:11px 12px;border-right:1px solid #e0e6f0">
+          <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;color:#fff;background:${haColor};letter-spacing:.4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${haIcon} ${haLabel}</span>
+        </td>
+        <td style="padding:11px 12px;border-right:1px solid #e0e6f0">
+          <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;color:#1a3d6e;background:#e8eef8;-webkit-print-color-adjust:exact;print-color-adjust:exact">${squadName}</span>
+        </td>
+        <td style="padding:11px 12px;font-size:15px;font-weight:800;color:#111;border-right:1px solid #e0e6f0">${ev.opponent||'—'}</td>
+        <td style="padding:11px 12px;font-size:11px;color:#555;line-height:1.4">${loc}</td>
+      </tr>`;
+    }).join('');
+
+    bodyContent=`
+${headerHtml}
+<table>
+  <thead>
+    <tr>
+      <th style="width:200px">Data / Hora</th>
+      <th style="width:90px">Casa/Fora</th>
+      <th style="width:100px">Escalão</th>
+      <th>Adversário</th>
+      <th>Local</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${footerHtml}`;
+
+    pageSize='A4 portrait';
+    html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+<title>Lista de Jogos — SC Vianense SAD ${squadName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:20px 18px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header{display:flex;align-items:center;gap:14px;padding-bottom:12px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
+.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
+.club{font-size:17px;font-weight:800;color:#1a3d6e}
+.squad-badge{font-size:10px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:2px 9px;border-radius:10px;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.doc-label{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:3px}
+.range-badge{font-size:11px;color:#555;margin:8px 0 14px;font-style:italic}
+table{width:100%;border-collapse:collapse;margin-bottom:14px}
+thead tr{background:#1a3d6e;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+thead th{color:#fff;padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+tbody td{border-bottom:1px solid #d8e2f0;vertical-align:middle}
+.footer{text-align:center;font-size:9px;color:#bbb;margin-top:10px;padding-top:6px;border-top:1px solid #eee}
+@media print{
+  @page{size:A4 portrait;margin:12mm}
+  body{padding:0;max-width:100%}
+}
+</style></head><body>${bodyContent}</body></html>`;
+
+  } else {
+    // ── CALENDÁRIO COMPLETO — formato original com resultados ───────────────
+    const rows=evs.map((ev,i)=>{
+      const isPast=ev.date<today;
+      const ha=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
+      const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
+      const mr=ev.matchReport||{};
+      const evList=mr.events||[];
+      const goals=evList.filter(e=>e.type==='goal').length;
+      const conc=evList.filter(e=>e.type==='goal_conceded').length;
+      const hasResult=isPast&&evList.length>0;
+      const isHome=ev.homeAway!=='away';
+      const gf=isHome?goals:conc, ga=isHome?conc:goals;
+      const resultBadge=hasResult
+        ?`<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;color:#fff;background:${gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100'};-webkit-print-color-adjust:exact;print-color-adjust:exact">${gf}–${ga}</span>`
+        :'';
+      const bg=i%2===0?'#fff':'#f7f9fc';
+      return `<tr style="background:${bg}${isPast?';opacity:.7':''}">
+        <td style="padding:7px 10px;font-weight:700;white-space:nowrap">${fmtDate(ev.date)}${ev.time?`<br><span style="font-size:10px;font-weight:400;color:#888">${ev.time}</span>`:''}</td>
+        <td style="padding:7px 10px;white-space:nowrap">${ha}</td>
+        <td style="padding:7px 10px;font-weight:600">${ev.opponent||'—'} ${resultBadge}</td>
+        <td style="padding:7px 10px;font-size:11px;color:#555">${loc}</td>
+        <td style="padding:7px 10px;font-size:11px">${ev.competition||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    bodyContent=`
+${headerHtml}
+<table>
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Casa / Fora</th>
+      <th>Adversário</th>
+      <th>Local</th>
+      <th>Competição</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+${footerHtml}`;
+
+    html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
 <title>Calendário Jogos — SC Vianense SAD ${squadName}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -7400,34 +7521,13 @@ tbody td{border-bottom:1px solid #e8e8e8;vertical-align:middle}
   @page{size:A4 landscape;margin:10mm}
   body{padding:0;max-width:100%}
 }
-</style></head><body>
-<div class="header">
-  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
-  <div>
-    <div class="club">SC Vianense SAD</div>
-    <div><span class="squad-badge">${squadName}</span></div>
-    <div class="doc-label">Calendário de Jogos</div>
-  </div>
-</div>
-<div class="range-badge">${rangeLabel} · ${evs.length} jogo${evs.length!==1?'s':''}</div>
-<table>
-  <thead>
-    <tr>
-      <th>Data</th>
-      <th>Casa / Fora</th>
-      <th>Adversário</th>
-      <th>Local</th>
-      <th>Competição</th>
-    </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')}</div>
-</body></html>`;
+</style></head><body>${bodyContent}</body></html>`;
+  }
 
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
-  const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.html`;
+  const suffix=format==='list'?'_Lista':'_Completo';
+  const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}${suffix}_${new Date().toISOString().split('T')[0]}.html`;
   const a=document.createElement('a');
   a.href=url; a.download=fname; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),5000);
