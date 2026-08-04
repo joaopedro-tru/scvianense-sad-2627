@@ -693,9 +693,19 @@ body.pm #v-pf{padding:30px}
       <!-- Staff dashboard viewer -->
       <div id="d-admin-staff-picker" style="margin-bottom:16px"></div>
       <div id="d-admin-staff-view" style="display:none;margin-bottom:16px"></div>
-      <div class="card">
-        <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Próximos Aniversários</div>
-        <div id="d-birthdays"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+        <div class="card">
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Aniversários — <span style="color:#444">⚫ Eq. A</span></div>
+          <div id="d-birthdays-eqa"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Aniversários — <span style="color:var(--blue)">🔵 Sub-23</span></div>
+          <div id="d-birthdays-sub23"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎂 Aniversários — <span style="color:#b8860b">🟡 Sub-19</span></div>
+          <div id="d-birthdays-sub19"></div>
+        </div>
       </div>
       <div class="card" style="border:1.5px solid #ffc107;background:#fffdf0">
         <div style="font-size:13px;font-weight:700;margin-bottom:8px">🛠️ Ferramentas de Admin</div>
@@ -3352,7 +3362,10 @@ function renderDash(){
     wireColListeners();
   }
 
-  bdayCards(ps,document.getElementById('d-birthdays'),DB.staffProfiles(null));
+  ['eqa','sub23','sub19'].forEach(sq=>{
+    const el=document.getElementById('d-birthdays-'+sq);
+    if(el) bdayCards(DB.players(sq),el,DB.staffProfiles(sq));
+  });
 
   // ── Staff dashboard picker ────────────────────────────────────────────────
   const pickerEl=document.getElementById('d-admin-staff-picker');
