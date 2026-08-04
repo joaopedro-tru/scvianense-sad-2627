@@ -4919,9 +4919,10 @@ function exportCalPDF(){
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cpdf-sub23" ${initSquads.sub23?'checked':''}> Sub-23</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cpdf-sub19" ${initSquads.sub19?'checked':''}> Sub-19</label>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button id="cpdf-cancel" style="padding:9px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
-      <button id="cpdf-gen" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Gerar PDF</button>
+    <div style="border-top:1px solid #eee;margin-top:4px;padding-top:14px;display:flex;flex-direction:column;gap:8px">
+      <button id="cpdf-gen" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📅 Calendário mensal (grelha)</button>
+      <button id="cpdf-games" style="padding:9px 18px;background:#1a6b3a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">⚽ Lista de jogos do mês</button>
+      <button id="cpdf-cancel" style="padding:7px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#555">Cancelar</button>
     </div>
   </div>`;
   document.body.appendChild(selOverlay);
@@ -4931,6 +4932,12 @@ function exportCalPDF(){
     if(!selSquads.length){ toast('⚠️ Seleciona pelo menos um escalão'); return; }
     selOverlay.remove();
     _renderCalPDF(selSquads);
+  };
+  document.getElementById('cpdf-games').onclick=()=>{
+    const selSquads=['eqa','sub23','sub19'].filter(s=>document.getElementById('cpdf-'+s)?.checked);
+    if(!selSquads.length){ toast('⚠️ Seleciona pelo menos um escalão'); return; }
+    selOverlay.remove();
+    _renderGameListPDF(selSquads, calYear, calMonth);
   };
 }
 
@@ -5061,6 +5068,111 @@ async function _renderCalPDF(selSquads){
 
   doc.save(`calendario-scv-${calYear}-${String(calMonth+1).padStart(2,'0')}.pdf`);
   toast('✅ PDF descarregado!');
+}
+
+// ── GAME LIST PDF (jogos do mês em lista limpa) ────────────────────────────────
+function _renderGameListPDF(selSquads, year, month){
+  const mm=String(month+1).padStart(2,'0');
+  const from=`${year}-${mm}-01`;
+  const lastDay=new Date(year,month+1,0).getDate();
+  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+
+  // Collect games from selected squads, deduplicated
+  let evs=selSquads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
+    .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
+    .filter(e=>e.date>=from&&e.date<=to)
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+
+  if(!evs.length){ toast('⚠️ Sem jogos neste mês para os escalões selecionados.'); return; }
+
+  const multiSq=selSquads.length>1;
+  const squadLabel=selSquads.length===3?'Todos os escalões':selSquads.map(s=>({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[s])).join(' + ');
+  const monthLabel=`${MONTHS[month]} ${year}`;
+
+  const WEEKDAYS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const MONTHS_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const rows=evs.map((ev,i)=>{
+    const d=new Date(ev.date+'T00:00:00');
+    const weekday=WEEKDAYS[d.getDay()];
+    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MONTHS_FULL[d.getMonth()]} ${year}`;
+    const isAway=ev.homeAway==='away';
+    const haColor=isAway?'#b71c1c':'#1a3d6e';
+    const haLabel=isAway?'FORA':'CASA';
+    const haIcon=isAway?'✈':'⌂';
+    const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
+    const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'}[ev.squad]||ev.squad||'';
+    const sqColor={eqa:'#333',sub23:'#1a3d6e',sub19:'#7c6000'}[ev.squad]||'#555';
+    const rowBg=i%2===0?'#ffffff':'#f4f7fc';
+    return `<tr style="background:${rowBg}">
+      <td style="padding:12px 14px;border-right:2px solid #d0daea;white-space:nowrap;vertical-align:middle">
+        <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px">${weekday}</div>
+        <div style="font-size:15px;font-weight:800;color:#0e2444;line-height:1.15">${dateStr}</div>
+        ${ev.time
+          ?`<div style="font-size:13px;font-weight:700;color:#333;margin-top:3px">⏰ ${ev.time}</div>`
+          :`<div style="font-size:10px;color:#aaa;margin-top:3px;font-style:italic">hora a definir</div>`}
+      </td>
+      ${multiSq?`<td style="padding:12px 10px;text-align:center;border-right:1px solid #d0daea;vertical-align:middle">
+        <span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:800;color:#fff;background:${sqColor};letter-spacing:.3px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${sqLabel}</span>
+      </td>`:''}
+      <td style="padding:12px 10px;text-align:center;border-right:1px solid #d0daea;vertical-align:middle">
+        <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;color:#fff;background:${haColor};-webkit-print-color-adjust:exact;print-color-adjust:exact">${haIcon} ${haLabel}</span>
+      </td>
+      <td style="padding:12px 14px;font-size:17px;font-weight:800;color:#111;border-right:1px solid #d0daea;vertical-align:middle">${ev.opponent||'—'}</td>
+      <td style="padding:12px 14px;font-size:11px;color:#555;line-height:1.5;vertical-align:middle">${loc}</td>
+    </tr>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+<title>Jogos de ${monthLabel} — SC Vianense SAD</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:22px 18px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header{display:flex;align-items:center;gap:14px;padding-bottom:12px;margin-bottom:4px;border-bottom:3px solid #0e2444}
+.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
+.club{font-size:17px;font-weight:800;color:#0e2444}
+.meta{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-top:2px}
+.subtitle{font-size:11px;color:#555;margin:8px 0 16px;font-style:italic}
+table{width:100%;border-collapse:collapse;margin-bottom:12px}
+thead tr{background:#0e2444;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+thead th{color:#fff;padding:9px 14px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+tbody td{border-bottom:1px solid #cdd7e6;vertical-align:middle}
+.footer{text-align:center;font-size:9px;color:#bbb;margin-top:10px;padding-top:6px;border-top:1px solid #e8e8e8}
+@media print{
+  @page{size:A4 portrait;margin:12mm}
+  body{padding:0;max-width:100%}
+}
+</style></head><body>
+<div class="header">
+  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
+  <div>
+    <div class="club">SC Vianense SAD</div>
+    <div class="meta">⚽ Jogos de ${monthLabel}</div>
+  </div>
+</div>
+<div class="subtitle">${squadLabel} · ${evs.length} jogo${evs.length!==1?'s':''}</div>
+<table>
+  <thead>
+    <tr>
+      <th>Data / Hora</th>
+      ${multiSq?'<th>Escalão</th>':''}
+      <th>Casa / Fora</th>
+      <th>Adversário</th>
+      <th>Local</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')}</div>
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const fname=`Jogos_${monthLabel.replace(/\s/g,'_')}_${squadLabel.replace(/[\s/+]/g,'_')}.html`;
+  const a=document.createElement('a');
+  a.href=url; a.download=fname; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  toast('📄 Lista de jogos exportada!');
 }
 
 // Show back button in standalone (PWA) mode
