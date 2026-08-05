@@ -585,25 +585,9 @@ body.pm #v-pf{padding:30px}
   @page{ size:A4 landscape; margin:8mm }
 
   /* ── CONVOCATÓRIA PRINT ─────────────────────────────────────────────────── */
-  body.printing-conv *{ visibility:hidden }
-  body.printing-conv #pdf-conv-content,
-  body.printing-conv #pdf-conv-content *{ visibility:visible }
-  body.printing-conv #pdf-conv-content{
-    position:fixed!important;
-    inset:0!important;
-    width:100%!important;
-    max-width:100%!important;
-    background:#fff!important;
-    overflow:visible!important;
-    box-shadow:none!important;
-    border-radius:0!important;
-    padding:0!important;
-    margin:0!important;
-  }
-  body.printing-conv #pdf-conv-content *{
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
+  body>*:not(#conv-print-overlay){ display:none!important }
+  #conv-print-overlay{ position:static!important;overflow:visible!important;background:#fff!important }
+  #conv-print-overlay *{ -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important }
 }
 </style>
 </head>
@@ -9097,18 +9081,22 @@ function closePdfPreview(){
   if(c){ c.innerHTML=''; delete c._pdfTitle; }
 }
 document.getElementById('btn-download-conv-pdf').addEventListener('click',function(){
-  const el=document.getElementById('pdf-conv-content');
-  if(!el||!el.querySelector('.cvpdf')){ toast('⚠️ Sem conteúdo para imprimir.'); return; }
-  // Inject portrait @page rule (overrides calendar's landscape rule)
+  const content=document.getElementById('pdf-conv-content');
+  if(!content||!content.querySelector('.cvpdf')){ toast('⚠️ Sem conteúdo para imprimir.'); return; }
+  // Create full-page print overlay (same pattern as kit print)
+  const overlay=document.createElement('div');
+  overlay.id='conv-print-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:#fff;z-index:10000;overflow-y:auto';
+  overlay.innerHTML=content.innerHTML;
+  document.body.appendChild(overlay);
+  // Portrait A4 page rule (overrides calendar's landscape rule)
   const ps=document.createElement('style');
   ps.id='conv-print-page';
   ps.textContent='@page{size:A4 portrait;margin:10mm}';
   document.head.appendChild(ps);
-  document.body.classList.add('printing-conv');
   window.print();
-  // Cleanup after print dialog closes
   setTimeout(()=>{
-    document.body.classList.remove('printing-conv');
+    overlay.remove();
     const old=document.getElementById('conv-print-page');
     if(old) old.remove();
   },500);
