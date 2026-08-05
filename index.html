@@ -11837,10 +11837,17 @@ document.addEventListener('DOMContentLoaded',()=>{
       const u=getAppUsers().find(x=>x.email===fbUser.email);
       if(!u) return null;
       const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
-      // Guardar no Firestore para que o próximo login já não precise do email
+      // Guardar no Firestore para que o próximo login já não precise do email.
+      // A Cloud Function setUserClaims dispara após este set() e define
+      // role+squad como custom claims no JWT. O getIdToken(true) a seguir
+      // garante que o token é refrescado após um pequeno delay.
       if(firestoreDb){
         firestoreDb.collection('userProfiles').doc(fbUser.uid).set(profile)
-          .then(()=>console.log('✅ userProfile migrado:',u.user))
+          .then(()=>{
+            console.log('✅ userProfile migrado:',u.user);
+            // Aguarda Cloud Function definir os claims (~2s) e força refresh do token
+            setTimeout(()=>fbUser.getIdToken(true).catch(()=>{}), 2500);
+          })
           .catch(e=>console.warn('Save userProfile:',e));
       }
       return profile;
@@ -11855,6 +11862,9 @@ document.addEventListener('DOMContentLoaded',()=>{
             role:profile.role, squad:profile.squad||null, user:profile.user,
             staffRole:profile.staffRole||null, email:fbUser.email, uid:fbUser.uid
           }));
+          // Forçar refresh do JWT para carregar custom claims (role, squad)
+          // definidos pela Cloud Function setUserClaims. Não bloqueia o arranque da app.
+          fbUser.getIdToken(true).catch(()=>{});
           initCoordApp();
         } else {
           // Utilizador não mapeado — sair
