@@ -1948,39 +1948,11 @@ const FB_CONFIG = {
 // ════════════════════════════════════════════════════════
 
 // ── ACESSO / UTILIZADORES ─────────────────────────────────────────────────────
-/// Passwords geridas pelo Firebase Authentication — não são armazenadas aqui.
-// Email padrão: [user]@vianensesad.pt  (configurável no Firebase Console)
-const USERS = [
-  { user:'admin',    email:'joaopedroferreira90@gmail.com',    role:'admin' },
-  { user:'admin2',   email:'u2lezon@gmail.com',               role:'admin' },
-  { user:'sub19',    email:'ajgcm@sapo.pt',    role:'coach', squad:'sub19' },
-  { user:'sub23',    email:'guibe99@gmail.com',    role:'coach', squad:'sub23' },
-  { user:'eqa',      email:'eqa@vianensesad.pt',      role:'coach', squad:'eqa'   },
-  // ── Equipa técnica ────────────────────────────────────────
-  { user:'adj-eqa',  email:'adj-eqa@vianensesad.pt',    role:'staff', squad:'eqa',   staffRole:'adjunto'  },
-  { user:'adj-eqa-2',email:'adj-eqa-2@vianensesad.pt', role:'staff', squad:'eqa',   staffRole:'adjunto'  },
-  { user:'pf-eqa',   email:'pf-eqa@vianensesad.pt',    role:'staff', squad:'eqa',   staffRole:'condicionamento' },
-  { user:'gr-eqa',   email:'gr-eqa@vianensesad.pt',     role:'staff', squad:'eqa',   staffRole:'grcoach'  },
-  { user:'adj-19',   email:'adj-19@vianensesad.pt',     role:'staff', squad:'sub19', staffRole:'adjunto'  },
-  { user:'pf-19',    email:'pf-19@vianensesad.pt',      role:'staff', squad:'sub19', staffRole:'condicionamento' },
-  { user:'gr-19',    email:'jorgecorreia84@hotmail.com',  role:'staff', squad:'sub19', staffRole:'grcoach'  },
-  { user:'del-19',   email:'luisturma23@gmail.com',       role:'staff', squad:'sub19', staffRole:'delegado' },
-  { user:'adj-23',   email:'nuno.vegar@hotmail.com',     role:'staff',   squad:'sub23', staffRole:'adjunto'  },
-  { user:'adj-23-2',    email:'peresfilipe91@gmail.com',   role:'staff',   squad:'sub23', staffRole:'adjunto'  },
-  { user:'pf-23',       email:'pf-23@vianensesad.pt',      role:'staff',   squad:'sub23', staffRole:'condicionamento' },
-  { user:'gr-23',       email:'no_drums@hotmail.com',      role:'staff',   squad:'sub23', staffRole:'grcoach'  },
-  { user:'analista-eqa',  email:'joaoalex2003@gmail.com',        role:'staff', squad:'eqa',   staffRole:'analista' },
-  { user:'analista-19',   email:'analista-19@vianensesad.pt',   role:'staff', squad:'sub19', staffRole:'analista' },
-  { user:'analista-23',   email:'analista-23@vianensesad.pt',   role:'staff', squad:'sub23', staffRole:'analista' },
-  // ── Clínica / Saúde ───────────────────────────────────────
-  { user:'med-eqa',  email:'med-eqa@vianensesad.pt',   role:'medical', squad:'eqa'   },
-  { user:'med-19',   email:'med-19@vianensesad.pt',    role:'medical', squad:'sub19' },
-  { user:'med-23',   email:'med-23@vianensesad.pt',    role:'medical', squad:'sub23' },
-  // ── Team Manager ──────────────────────────────────────────
-  { user:'tm-eqa',   email:'tm-eqa@vianensesad.pt',         role:'teammanager', squad:'eqa'   },
-  { user:'tm-19',    email:'goncalojmrego@gmail.com',        role:'teammanager', squad:'sub19' },
-  { user:'tm-23',    email:'brunoarezes@vianensesad.pt',    role:'teammanager', squad:'sub23' },
-];
+// Fonte de verdade: coleção `app_users` no Firestore (carregada por loadAppUsers).
+// Este array é apenas um fallback de último recurso (Firestore indisponível).
+// Emails e dados sensíveis removidos — gerir utilizadores via Firebase Console
+// ou pelo painel de Contas na app (apenas admin).
+const USERS = [];
 
 // ── DYNAMIC APP_USERS ─────────────────────────────────────────────────────────
 // Runtime mirror of `app_users` Firestore collection. Starts null (unloaded).
@@ -2005,21 +1977,8 @@ async function loadAppUsers(){
   }catch(e){ console.warn('loadAppUsers:',e); }
 }
 
-async function seedAppUsersIfNeeded(){
-  if(!firestoreDb||!isAdmin()) return;
-  try{
-    // Upsert: para cada utilizador em USERS, cria o doc em Firestore se não existir
-    const snap=await firestoreDb.collection('app_users').get();
-    const existing=new Set(); snap.forEach(d=>existing.add(d.id));
-    const missing=USERS.filter(u=>!existing.has(u.user));
-    if(missing.length){
-      const batch=firestoreDb.batch();
-      missing.forEach(u=>{ batch.set(firestoreDb.collection('app_users').doc(u.user),{...u}); });
-      await batch.commit();
-      console.log(`✅ app_users: ${missing.length} utilizador(es) adicionado(s) ao Firestore.`);
-    }
-  }catch(e){ console.warn('seedAppUsersIfNeeded:',e); }
-}
+// seedAppUsersIfNeeded removido — USERS array esvaziado; gerir utilizadores
+// exclusivamente via Firestore (app_users) e Firebase Console.
 
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
@@ -11671,7 +11630,7 @@ function initCoordApp(){
       ]);
       // 3. Operações admin
       if(isAdmin()){
-        await seedAppUsersIfNeeded();
+        // seedAppUsersIfNeeded removido (USERS esvaziado)
         await seedSub23MKACalendar();
         await patchSub23MKATimes();
         await loadAppUsers();
