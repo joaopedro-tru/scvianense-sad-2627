@@ -5834,6 +5834,7 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
     const rec={
       athleteId:pid, eventId, eventType:ev?.type||'',
       date:ev?.date||new Date().toISOString().split('T')[0],
+      squad:ev?.squad||currentUser()?.squad||'',
       type, notes, addedBy:currentUser()?.user||''
     };
     if(type==='injury'){
