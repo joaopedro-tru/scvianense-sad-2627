@@ -1879,7 +1879,7 @@ body.pm #v-pf{padding:30px}
     <span style="flex:1;color:#aaa;font-size:13px;text-align:center">Pré-visualização</span>
     <button id="btn-download-conv-pdf" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">⬇️ Guardar PDF</button>
   </div>
-  <iframe id="pdf-preview-frame" style="flex:1;width:100%;border:none;background:#fff"></iframe>
+  <div id="pdf-preview-frame" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#e0e0e0;padding:16px"><div id="pdf-conv-content" style="max-width:680px;margin:0 auto;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.15)"></div></div>
 </div>
 
 <!-- ── PLAYER TOKEN EDIT SHEET ── -->
@@ -8949,62 +8949,50 @@ function generateConvocatoriaPDF(evId){
   const leftTeam=isHome?ourTeam:opponent;
   const rightTeam=isHome?opponent:ourTeam;
 
-  // Calcular zoom para garantir que tudo cabe numa página A4 (277mm de conteúdo)
-  // Estimativa de altura por secção (em mm, layout compacto):
-  const hasConc=!!(conv.concentrationTime||conv.concentrationPlace);
   const hasNotes=!!conv.notes;
-  const isEqaForZoom=ev.squad==='eqa';
-  const schedRowCount=[conv.scheduleBreakfast&&isEqaForZoom,conv.concentrationTime,conv.scheduleLunch,conv.scheduleArrival,conv.schedulePalestra,conv.scheduleGkWarmup,conv.scheduleWarmup,conv.scheduleDressing,ev.time].filter(Boolean).length;
-  const fixedMm=16/*header*/+18/*game*/+14/*schedule-header*/+(schedRowCount*5.5)+8/*footer*/+18/*gaps*/
-    +(hasNotes?14:0);
-  const rowMm=6.2; // altura de cada linha de atleta
-  const totalMm=fixedMm+convocados.length*rowMm;
-  const zoom=Math.min(1,parseFloat((275/totalMm).toFixed(4)));
 
   const dateSlash=ev.date?(ev.date.split('-').reverse().join('/')):'';
   const pdfTitle=`Convocatória - ${leftTeam} vs ${rightTeam}${dateSlash?' - '+dateSlash:''}`;
-  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>${pdfTitle}</title><style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:20px 18px;color:#111;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.header{display:flex;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
-.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
-.header-text .club{font-size:16px;font-weight:800;color:#1a3d6e}
-.header-text .squad{font-size:10px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:1px 8px;border-radius:10px;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.header-text .doc-label{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:3px}
-.game-box{border:2px solid #1a3d6e;border-radius:8px;padding:10px 16px;margin:10px 0;text-align:center;background:#f0f4fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.game-vs{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px}
-.game-team{font-size:13px;font-weight:800;color:#1a3d6e;flex:1}
-.game-team.left{text-align:right}
-.game-team.right{text-align:left}
-.game-vs-badge{background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.game-meta{font-size:10px;color:#555;display:flex;justify-content:center;flex-wrap:wrap}
-.game-meta span{padding:0 6px;border-right:1px solid #ccc}
-.game-meta span:last-child{border-right:none}
-.conc-box{background:#fff8e1;border-left:4px solid #e8b84b;padding:7px 12px;margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.conc-item .cl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#7a5f00;font-weight:700;margin-bottom:1px}
-.conc-item .cv{font-size:11px;font-weight:800;color:#333}
-table{width:100%;border-collapse:collapse;margin-bottom:10px}
-.pt th{background:#1a3d6e;color:#fff;padding:5px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pt td{padding:5px 10px;border-bottom:1px solid #e8e8e8;font-size:12px;vertical-align:middle}
-.pt tr:nth-child(even) td{background:#f5f8ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pt td:first-child{font-weight:800;color:#1a3d6e;font-size:13px;width:36px}
-.pt .pos-col{width:32px;font-size:10px;font-weight:700;color:#555;text-align:center}
-.pt .sig-col{width:110px}
-.pt .sig-col div{border-bottom:1px solid #aaa;height:17px;width:100%}
-.trav-check{display:inline-block;width:13px;height:13px;border:1.5px solid #333;border-radius:2px;text-align:center;font-size:10px;font-weight:900;line-height:12px;vertical-align:middle}
-.sch-box{border:1px solid #c8dcc8;border-radius:7px;padding:9px 12px;margin-bottom:10px}
-.sch-title{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:6px}
-.sch-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e0ece0;font-size:11px}
-.sch-row:last-child{border-bottom:none}
-.sch-time{font-weight:800;color:#1a5028;font-size:12px;min-width:44px;text-align:right}
-.obs-box{background:#f5f8ff;border-radius:7px;padding:8px 12px;margin-bottom:10px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.obs-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:4px}
-.footer{text-align:center;font-size:9px;color:#bbb;margin-top:8px;padding-top:6px;border-top:1px solid #eee}
-@media print{
-  @page{size:A4 portrait;margin:10mm}
-  body{padding:0;margin:0;max-width:100%;zoom:${zoom};overflow:hidden}
-}
-</style></head><body>
+  // Build scoped CSS (prefixed with .cvpdf to avoid leaking into app styles)
+  const css=`<style>
+.cvpdf *{box-sizing:border-box;margin:0;padding:0}
+.cvpdf{font-family:Arial,sans-serif;padding:20px 18px;color:#111;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .header{display:flex;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:4px;border-bottom:3px solid #1a3d6e}
+.cvpdf .header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
+.cvpdf .header-text .club{font-size:16px;font-weight:800;color:#1a3d6e}
+.cvpdf .header-text .squad{font-size:10px;font-weight:700;color:#fff;background:#1a3d6e;display:inline-block;padding:1px 8px;border-radius:10px;margin-top:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .header-text .doc-label{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-top:3px}
+.cvpdf .game-box{border:2px solid #1a3d6e;border-radius:8px;padding:10px 16px;margin:10px 0;text-align:center;background:#f0f4fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .game-vs{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px}
+.cvpdf .game-team{font-size:13px;font-weight:800;color:#1a3d6e;flex:1}
+.cvpdf .game-team.left{text-align:right}
+.cvpdf .game-team.right{text-align:left}
+.cvpdf .game-vs-badge{background:#1a3d6e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .game-meta{font-size:10px;color:#555;display:flex;justify-content:center;flex-wrap:wrap}
+.cvpdf .game-meta span{padding:0 6px;border-right:1px solid #ccc}
+.cvpdf .game-meta span:last-child{border-right:none}
+.cvpdf .conc-box{background:#fff8e1;border-left:4px solid #e8b84b;padding:7px 12px;margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .conc-item .cl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#7a5f00;font-weight:700;margin-bottom:1px}
+.cvpdf .conc-item .cv{font-size:11px;font-weight:800;color:#333}
+.cvpdf table{width:100%;border-collapse:collapse;margin-bottom:10px}
+.cvpdf .pt th{background:#1a3d6e;color:#fff;padding:5px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .pt td{padding:5px 10px;border-bottom:1px solid #e8e8e8;font-size:12px;vertical-align:middle}
+.cvpdf .pt tr:nth-child(even) td{background:#f5f8ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .pt td:first-child{font-weight:800;color:#1a3d6e;font-size:13px;width:36px}
+.cvpdf .pt .pos-col{width:32px;font-size:10px;font-weight:700;color:#555;text-align:center}
+.cvpdf .pt .sig-col{width:110px}
+.cvpdf .pt .sig-col div{border-bottom:1px solid #aaa;height:17px;width:100%}
+.cvpdf .trav-check{display:inline-block;width:13px;height:13px;border:1.5px solid #333;border-radius:2px;text-align:center;font-size:10px;font-weight:900;line-height:12px;vertical-align:middle}
+.cvpdf .sch-box{border:1px solid #c8dcc8;border-radius:7px;padding:9px 12px;margin-bottom:10px}
+.cvpdf .sch-title{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a6030;font-weight:700;margin-bottom:6px}
+.cvpdf .sch-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e0ece0;font-size:11px}
+.cvpdf .sch-row:last-child{border-bottom:none}
+.cvpdf .sch-time{font-weight:800;color:#1a5028;font-size:12px;min-width:44px;text-align:right}
+.cvpdf .obs-box{background:#f5f8ff;border-radius:7px;padding:8px 12px;margin-bottom:10px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .obs-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:4px}
+.cvpdf .footer{text-align:center;font-size:9px;color:#bbb;margin-top:8px;padding-top:6px;border-top:1px solid #eee}
+</style>`;
+  const inner=`<div class="cvpdf">
 <div class="header">
   <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
   <div class="header-text">
@@ -9076,26 +9064,22 @@ ${convocados.map(p=>{
 </tbody></table>
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
 <div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
-</body></html>`;
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const frame=document.getElementById('pdf-preview-frame');
-  if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl);}
-  frame._blobUrl=url;
-  frame.src=url;
+</div>`;
+  const contentDiv=document.getElementById('pdf-conv-content');
+  contentDiv.innerHTML=css+inner;
+  contentDiv._pdfTitle=pdfTitle;
   document.getElementById('mo-pdf-preview').style.display='flex';
 }
 function closePdfPreview(){
   document.getElementById('mo-pdf-preview').style.display='none';
-  const frame=document.getElementById('pdf-preview-frame');
-  if(frame._blobUrl){URL.revokeObjectURL(frame._blobUrl); frame._blobUrl=null;}
-  frame.src='';
+  const c=document.getElementById('pdf-conv-content');
+  if(c){ c.innerHTML=''; delete c._pdfTitle; }
 }
 document.getElementById('btn-download-conv-pdf').addEventListener('click',async function(){
   const btn=this;
-  const frame=document.getElementById('pdf-preview-frame');
-  const frameDoc=frame.contentDocument||frame.contentWindow?.document;
-  if(!frameDoc){ toast('⚠️ Sem conteúdo para guardar.'); return; }
+  const contentDiv=document.getElementById('pdf-conv-content');
+  const el=contentDiv&&contentDiv.querySelector('.cvpdf');
+  if(!el){ toast('⚠️ Sem conteúdo para guardar.'); return; }
   btn.disabled=true; btn.textContent='⏳ A gerar…';
   try{
     if(!window.html2pdf){
@@ -9106,17 +9090,14 @@ document.getElementById('btn-download-conv-pdf').addEventListener('click',async 
         document.head.appendChild(s);
       });
     }
-    const filename=(frameDoc.title||'Convocatória')+'.pdf';
-    // clone body, strip .no-print elements
-    const clone=frameDoc.body.cloneNode(true);
-    clone.querySelectorAll('.no-print').forEach(el=>el.remove());
+    const filename=(contentDiv._pdfTitle||'Convocatória')+'.pdf';
     await html2pdf().set({
       margin:[10,10,10,10],
       filename,
       image:{type:'jpeg',quality:0.98},
-      html2canvas:{scale:2,useCORS:true,logging:false},
+      html2canvas:{scale:2,useCORS:true,logging:false,allowTaint:true},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-    }).from(clone).save();
+    }).from(el).save();
   }catch(e){ toast('⚠️ Erro ao gerar PDF: '+e.message); }
   finally{ btn.disabled=false; btn.textContent='⬇️ Guardar PDF'; }
 });
