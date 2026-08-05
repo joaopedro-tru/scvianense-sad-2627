@@ -2269,7 +2269,7 @@ const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
 const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
 const COMPETITIONS={
   eqa:  ['Liga 3 Placard | 1ª Fase','Taça de Portugal','Jogo de Preparação'],
-  sub23:['Camp. Dist 2ª Div AFVC','Jogo de Preparação'],
+  sub23:['Campeonato MKA - AFVC','Jogo de Preparação'],
   sub19:['Camp. Dist Juniores "A" AFVC','Taça Juniores "A" AFVC','Jogo de Preparação'],
   both: ['Jogo de Preparação'],
 };
@@ -2548,6 +2548,7 @@ const COMP_ABBR=[
   [/Camp\. Dist\.? Juniores "A" AFVC/i, 'CDJ "A"'],
   [/Camp\. Dist\.? 2ª Div AFVC/i,'2ª Div'],
   [/2ª Div(?:is[aã]o)? AFVC/i,   '2ª Div'],
+  [/Campeonato MKA/i,             'MKA'],
 ];
 function abrevComp(c){ if(!c)return ''; for(const[re,ab]of COMP_ABBR){if(re.test(c))return ab;} return c; }
 
@@ -11488,13 +11489,13 @@ async function seedSub23MKACalendar(){
   ];
   const HOME_LOC='Estádio Dr. José de Matos nº2';
   const HOME_CITY='Viana do Castelo';
-  const COMP='Campeonato MKA · AFVC 2026';
+  const COMP='Campeonato MKA - AFVC';
 
   try{
     // Apanhar todos os jogos sub-23 MKA (processados por versões anteriores ou por processar)
     // ordenados por data ascendente
     const allGames=DB.events('sub23')
-      .filter(e=>e.type==='game'&&e.squad==='sub23'&&(!e.competition||e.competition===COMP))
+      .filter(e=>e.type==='game'&&e.squad==='sub23'&&(!e.competition||e.competition===COMP||e.competition==='Campeonato MKA · AFVC 2026'))
       .sort((a,b)=>a.date.localeCompare(b.date));
 
     if(!allGames.length){ localStorage.setItem(KEY,'1'); return; }
@@ -11589,6 +11590,33 @@ async function seedSub23MKACalendar(){
   } catch(e){ console.warn('seedSub23MKACalendar:',e); }
 }
 
+// ── PATCH: horas e nome da competição dos jogos Sub-23 MKA ─────────────────────
+// J1: 17:00 | J2-J26: 15:00 | J27-J30: 16:00 | J31-J34: 17:00
+async function patchSub23MKATimes(){
+  const KEY='scv_mka_sub23_times_v1';
+  if(localStorage.getItem(KEY)) return;
+  const COMP='Campeonato MKA - AFVC';
+  const OLD_COMP='Campeonato MKA · AFVC 2026';
+  function timeForRound(r){
+    if(r===1)          return '17:00';
+    if(r<=26)          return '15:00';
+    if(r<=30)          return '16:00';
+    return                    '17:00'; // J31-J34
+  }
+  try{
+    const games=DB.events('sub23')
+      .filter(e=>e.type==='game'&&e.squad==='sub23'&&e.round&&(e.competition===COMP||e.competition===OLD_COMP||!e.competition));
+    if(!games.length){ localStorage.setItem(KEY,'1'); return; }
+    let n=0;
+    for(const ev of games){
+      await DB.updateEvent(ev.id,{time:timeForRound(ev.round), competition:COMP});
+      n++;
+    }
+    localStorage.setItem(KEY,'1');
+    console.log(`✅ MKA Sub-23 times patch: ${n} jogo(s) actualizados.`);
+  } catch(e){ console.warn('patchSub23MKATimes:',e); }
+}
+
 function initCoordApp(){
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('sync-overlay').style.display='flex';
@@ -11631,6 +11659,7 @@ function initCoordApp(){
       if(isAdmin()){
         await seedAppUsersIfNeeded();
         await seedSub23MKACalendar();
+        await patchSub23MKATimes();
         await loadAppUsers();
         await syncPendingAthletes(true);
         checkPendingBadge();
