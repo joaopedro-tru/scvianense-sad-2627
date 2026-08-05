@@ -583,6 +583,27 @@ body.pm #v-pf{padding:30px}
   body.printing-cal .ce-meta{ display:block!important; font-size:6.5pt!important; opacity:.85; margin-top:1px }
 
   @page{ size:A4 landscape; margin:8mm }
+
+  /* ── CONVOCATÓRIA PRINT ─────────────────────────────────────────────────── */
+  body.printing-conv *{ visibility:hidden }
+  body.printing-conv #pdf-conv-content,
+  body.printing-conv #pdf-conv-content *{ visibility:visible }
+  body.printing-conv #pdf-conv-content{
+    position:fixed!important;
+    inset:0!important;
+    width:100%!important;
+    max-width:100%!important;
+    background:#fff!important;
+    overflow:visible!important;
+    box-shadow:none!important;
+    border-radius:0!important;
+    padding:0!important;
+    margin:0!important;
+  }
+  body.printing-conv #pdf-conv-content *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
 }
 </style>
 </head>
@@ -1877,7 +1898,7 @@ body.pm #v-pf{padding:30px}
   <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d0d1a;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1)">
     <button onclick="closePdfPreview()" style="background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">← Voltar</button>
     <span style="flex:1;color:#aaa;font-size:13px;text-align:center">Pré-visualização</span>
-    <button id="btn-download-conv-pdf" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">⬇️ Guardar PDF</button>
+    <button id="btn-download-conv-pdf" style="background:var(--green,#21d07a);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button>
   </div>
   <div id="pdf-preview-frame" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#e0e0e0;padding:16px"><div id="pdf-conv-content" style="max-width:680px;margin:0 auto;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.15)"></div></div>
 </div>
@@ -9075,31 +9096,22 @@ function closePdfPreview(){
   const c=document.getElementById('pdf-conv-content');
   if(c){ c.innerHTML=''; delete c._pdfTitle; }
 }
-document.getElementById('btn-download-conv-pdf').addEventListener('click',async function(){
-  const btn=this;
-  const contentDiv=document.getElementById('pdf-conv-content');
-  const el=contentDiv&&contentDiv.querySelector('.cvpdf');
-  if(!el){ toast('⚠️ Sem conteúdo para guardar.'); return; }
-  btn.disabled=true; btn.textContent='⏳ A gerar…';
-  try{
-    if(!window.html2pdf){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        s.onload=res; s.onerror=()=>rej(new Error('html2pdf load failed'));
-        document.head.appendChild(s);
-      });
-    }
-    const filename=(contentDiv._pdfTitle||'Convocatória')+'.pdf';
-    await html2pdf().set({
-      margin:[10,10,10,10],
-      filename,
-      image:{type:'jpeg',quality:0.98},
-      html2canvas:{scale:2,useCORS:true,logging:false,allowTaint:true},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-    }).from(el).save();
-  }catch(e){ toast('⚠️ Erro ao gerar PDF: '+e.message); }
-  finally{ btn.disabled=false; btn.textContent='⬇️ Guardar PDF'; }
+document.getElementById('btn-download-conv-pdf').addEventListener('click',function(){
+  const el=document.getElementById('pdf-conv-content');
+  if(!el||!el.querySelector('.cvpdf')){ toast('⚠️ Sem conteúdo para imprimir.'); return; }
+  // Inject portrait @page rule (overrides calendar's landscape rule)
+  const ps=document.createElement('style');
+  ps.id='conv-print-page';
+  ps.textContent='@page{size:A4 portrait;margin:10mm}';
+  document.head.appendChild(ps);
+  document.body.classList.add('printing-conv');
+  window.print();
+  // Cleanup after print dialog closes
+  setTimeout(()=>{
+    document.body.classList.remove('printing-conv');
+    const old=document.getElementById('conv-print-page');
+    if(old) old.remove();
+  },500);
 });
 
 document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
