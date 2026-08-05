@@ -1117,8 +1117,7 @@ body.pm #v-pf{padding:30px}
           <option value="sub23">Sub-23</option>
         </select>
         <span id="tm-kit-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
-        <button class="btn btn-o btn-sm" id="tm-kit-print" onclick="printKit()">🖨️ Imprimir</button>
-        <button class="btn btn-sm" style="background:var(--primary);color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
+        <button class="btn btn-sm" style="background:#111;color:#fff" onclick="exportRouparia()">📤 Exportar Rouparia</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden" id="tm-kit-card">
         <table id="tm-kit-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -10641,9 +10640,9 @@ function exportRouparia(){
     </style>
     <div class="kit-no-print" style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-bottom:1px solid #e0e0e0;position:sticky;top:0;background:#fff;z-index:1">
       <button onclick="document.getElementById('kit-print-overlay').remove()" style="padding:9px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Voltar</button>
-      <button onclick="window.print()" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+      <button id="btn-rouparia-download" onclick="downloadRoupariaPDF(this)" style="padding:9px 18px;background:#111;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">⬇️ Download PDF</button>
     </div>
-    <div style="padding:24px 20px;max-width:800px;margin:0 auto">
+    <div id="rouparia-pdf-content" style="padding:24px 20px;max-width:800px;margin:0 auto">
       <div style="background:#0e2444;color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:18px">
         <div style="font-size:18px;font-weight:800;font-family:Arial,sans-serif">SC Vianense SAD — Equipamentos</div>
         <div style="font-size:12px;color:#e8b84b;margin-top:4px;font-family:Arial,sans-serif">${squadLabel} · Gerado em ${new Date().toLocaleDateString('pt-PT')} · ${players.length} atletas</div>
@@ -10659,6 +10658,38 @@ function exportRouparia(){
       </div>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+async function downloadRoupariaPDF(btn){
+  if(btn){ btn.disabled=true; btn.textContent='⏳ A gerar…'; }
+  try{
+    if(!window.html2pdf){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        s.onload=res; s.onerror=()=>rej(new Error('html2pdf load failed'));
+        document.head.appendChild(s);
+      });
+    }
+    const src=document.getElementById('rouparia-pdf-content');
+    if(!src){ throw new Error('Conteúdo não encontrado'); }
+    // Build self-contained HTML string for pdf rendering (from(string) avoids offset issues)
+    const htmlStr=`<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style><div style="padding:16px 14px;width:100%">${src.innerHTML}</div>`;
+    const sq=document.getElementById('tm-kit-squad')?.value||'';
+    const sqLabel=sq&&SQUADS[sq]?'_'+(SQUADS[sq].replace(/\s+/g,'_')):'';
+    const dateStr=new Date().toLocaleDateString('pt-PT').replace(/\//g,'-');
+    await html2pdf().set({
+      margin:[8,8,8,8],
+      filename:`Rouparia${sqLabel}_${dateStr}.pdf`,
+      image:{type:'jpeg',quality:0.97},
+      html2canvas:{scale:2,useCORS:true,logging:false,allowTaint:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
+    }).from(htmlStr).save();
+  }catch(e){ toast('⚠️ Erro ao gerar PDF: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='⬇️ Download PDF'; } }
 }
 
 function renderTM(){
