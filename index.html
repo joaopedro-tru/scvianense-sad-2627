@@ -3270,11 +3270,15 @@ async function batchAnalyzeAllFichas(){
       const res=await fn({pdfText:text,currentObjectives:null,dayOfWeek:dow,squad:ev.squad,period,extractExercises:true});
       const d=res.data;
       const upd={};
-      if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
       if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length){
         upd.trainingExercises=d.exercises;
         const opm=computeObjectivesPerMoment(d.exercises);
         if(opm) upd.objectivesPerMoment=opm;
+        const msClient=computeMomentSummaryFromExercises(d.exercises);
+        if(msClient) upd.momentSummary=msClient;
+        else if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
+      } else if(d.momentSummary&&Object.keys(d.momentSummary).length){
+        upd.momentSummary=d.momentSummary;
       }
       const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
       if(primaryArr.length){
@@ -6294,23 +6298,34 @@ function renderTraining(){
     const exs=ev.trainingExercises;
     if(!exs||!exs.length) return '';
     const exCards=exs.map(ex=>{
-      const tc=ex.moment?TACTICS_TAXONOMY[ex.moment]:null;
-      const mColor=tc?tc.color:'#64748b';
-      const badge=tc?`<span style="background:${mColor};color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;flex-shrink:0">${tc.label}</span>`
-        :(ex.isWarmup?`<span style="background:#f1f5f9;color:#64748b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;flex-shrink:0">Ativação</span>`:
-          `<span style="background:#f1f5f9;color:#64748b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;flex-shrink:0">Livre</span>`);
+      const ms=exMoments(ex).filter(m=>m.key&&m.key!=='PF');
+      const isPF=ex.isWarmup||(!ms.length)||(ms.length===1&&ms[0].key==='PF');
+      // Cor da borda esquerda = primeiro momento tático (ou cinza para ativação)
+      const firstTc=ms[0]?TACTICS_TAXONOMY[ms[0].key]:null;
+      const borderColor=firstTc?firstTc.color:'#64748b';
+      // Badges de momento
+      const badges=isPF
+        ?`<span style="background:#f1f5f9;color:#64748b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;flex-shrink:0">${ex.isWarmup?'Ativação':'PF'}</span>`
+        :ms.map(m=>{ const tc=TACTICS_TAXONOMY[m.key]; return tc?`<span style="background:${tc.color};color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;flex-shrink:0">${tc.label}</span>`:'' }).join('');
       const dur=ex.duration?`<span style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;flex-shrink:0">⏱ ${ex.duration} min</span>`:'';
       const meta=[ex.players?`👥 ${ex.players}`:null,ex.space?`📐 ${ex.space}`:null].filter(Boolean).join(' · ');
-      const specs=ex.specificObjectives?.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${ex.specificObjectives.map(o=>`<span style="background:${mColor}18;color:${mColor};border:1px solid ${mColor}35;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">${o}</span>`).join('')}</div>`:'';
+      // Objetivos agrupados por momento (um bloco por momento)
+      const specsHTML=isPF?'':(ms.length===1&&ms[0].objectives?.length
+        // Momento único: pills simples
+        ?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${ms[0].objectives.map(o=>`<span style="background:${borderColor}18;color:${borderColor};border:1px solid ${borderColor}35;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">${o}</span>`).join('')}</div>`
+        // Múltiplos momentos: label + pills por momento
+        :ms.filter(m=>m.objectives?.length).map(m=>{ const tc=TACTICS_TAXONOMY[m.key]; const c=tc?tc.color:'#64748b';
+          return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px"><span style="font-size:9px;font-weight:700;color:${c};text-transform:uppercase;white-space:nowrap">${tc?.label||m.key}:</span>${m.objectives.map(o=>`<span style="background:${c}18;color:${c};border:1px solid ${c}35;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">${o}</span>`).join('')}</div>`;
+        }).join(''));
       const desc=ex.description?`<div style="font-size:12px;color:var(--muted);margin-top:7px;line-height:1.5;white-space:pre-line">${ex.description}</div>`:'';
-      return `<div style="border:1px solid var(--border);border-left:3px solid ${mColor};border-radius:0 8px 8px 0;padding:12px;margin-bottom:10px;${ex.isWarmup?'opacity:.7':''}">
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:${meta||specs||desc?'6px':'0'}">
-          ${badge}
-          <span style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${ex.title||'Exercício'}</span>
+      return `<div style="border:1px solid var(--border);border-left:3px solid ${borderColor};border-radius:0 8px 8px 0;padding:12px;margin-bottom:10px;${ex.isWarmup?'opacity:.7':''}">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:${meta||specsHTML||desc?'6px':'0'}">
+          ${badges}
+          <span style="font-size:13px;font-weight:600;flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis">${ex.title||'Exercício'}</span>
           ${dur}
         </div>
         ${meta?`<div style="font-size:11px;color:var(--muted);margin-bottom:2px">${meta}</div>`:''}
-        ${specs}${desc}
+        ${specsHTML}${desc}
       </div>`;
     }).join('');
     return `<div class="card" style="margin-top:18px">
@@ -10091,14 +10106,38 @@ let _fichaExercises=[];        // exercícios extraídos da IA
 let _momentSummary={};         // {OO:18, TOTD:16, SJ:19}
 let _objectivesPerMoment={};   // {OO:["VCJ","PBO"], TOTD:["RAP"]}
 
-// Agrega specificObjectives dos exercícios por momento (nunca mistura momentos diferentes)
+// Extrai a lista de momentos de um exercício (suporta formato novo moments[] e legado moment+specificObjectives)
+function exMoments(ex){
+  if(ex.moments?.length) return ex.moments; // novo formato: [{key,objectives}]
+  if(ex.moment) return [{key:ex.moment, objectives:ex.specificObjectives||[]}]; // legado
+  return [];
+}
+
+// Agrega objetivos por momento a partir dos exercícios
 function computeObjectivesPerMoment(exercises){
   const map={};
   (exercises||[]).forEach(ex=>{
-    if(!ex.moment||!ex.specificObjectives?.length) return;
-    if(!map[ex.moment]) map[ex.moment]=[];
-    ex.specificObjectives.forEach(o=>{ if(o&&!map[ex.moment].includes(o)) map[ex.moment].push(o); });
+    exMoments(ex).forEach(m=>{
+      if(!m.key||m.key==='PF'||m.key==='SJ') return;
+      if(!map[m.key]) map[m.key]=[];
+      (m.objectives||[]).forEach(o=>{ if(o&&!map[m.key].includes(o)) map[m.key].push(o); });
+    });
   });
+  return Object.keys(map).length?map:null;
+}
+
+// Calcula momentSummary a partir dos exercícios (duração dividida igualmente entre momentos)
+function computeMomentSummaryFromExercises(exercises){
+  const map={};
+  (exercises||[]).forEach(ex=>{
+    if(!ex.duration) return;
+    const ms=exMoments(ex).filter(m=>m.key&&m.key!=='PF'&&m.key!=='SJ');
+    if(!ms.length) return;
+    const perM=ex.duration/ms.length;
+    ms.forEach(m=>{ map[m.key]=(map[m.key]||0)+perM; });
+  });
+  // Arredondar a 1 casa decimal
+  Object.keys(map).forEach(k=>{ map[k]=Math.round(map[k]*10)/10; });
   return Object.keys(map).length?map:null;
 }
 let _fichaText='';
@@ -10554,11 +10593,16 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     const res=await fn({pdfText:text,currentObjectives:null,dayOfWeek:dow,squad:ev.squad,period,extractExercises:true});
     const d=res.data;
     const upd={};
-    if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
     if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length){
       upd.trainingExercises=d.exercises;
       const opm=computeObjectivesPerMoment(d.exercises);
       if(opm) upd.objectivesPerMoment=opm;
+      // Preferir momentSummary calculado do lado do cliente (divide corretamente por múltiplos momentos)
+      const msClient=computeMomentSummaryFromExercises(d.exercises);
+      if(msClient) upd.momentSummary=msClient;
+      else if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
+    } else if(d.momentSummary&&Object.keys(d.momentSummary).length){
+      upd.momentSummary=d.momentSummary;
     }
     const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
     if(primaryArr.length){
