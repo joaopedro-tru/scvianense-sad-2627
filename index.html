@@ -6310,6 +6310,11 @@ function renderTraining(){
     const squad=tp.squad==='both'?'sub23':tp.squad; // fallback if squad=both
     if(!confirm(`Integrar ${tp.name} no plantel de ${squad.toUpperCase()}?\n\nAs presenças em treinos anteriores serão migradas para o novo registo.\nCompleta os dados do atleta no separador Plantel.`)) return;
     const newId=uid();
+    // Descobrir a data do primeiro treino à experiência para usar como enrolledAt
+    const eventsWithTrial=DB.events().filter(ev=>ev.trialAttendance && tp.id in ev.trialAttendance && ev.date);
+    const firstTrialDate=eventsWithTrial.length>0
+      ? eventsWithTrial.map(ev=>ev.date).sort()[0]
+      : (tp.addedDate?tp.addedDate.slice(0,10):new Date().toISOString().slice(0,10));
     DB.addPlayer({
       id:newId,
       name:tp.name,
@@ -6326,7 +6331,7 @@ function renderTraining(){
       position2:null,
       position3:null,
       dominantFoot:null,
-      enrolledAt:new Date().toISOString().slice(0,10),
+      enrolledAt:firstTrialDate,
       previousClub:tp.notes||null,
       height:null,
       weight:null,
