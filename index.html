@@ -719,7 +719,9 @@ body.pm #v-pf{padding:30px}
           <button class="btn" onclick="document.getElementById('mo-gps-import').classList.add('open');document.getElementById('gps-preview').style.display='none';document.getElementById('btn-gps-confirm').style.display='none';document.getElementById('gps-file-name').textContent='';document.getElementById('gps-file-input').value=''" style="background:var(--blue);color:#fff;border:none;font-size:12px;padding:8px 16px">📡 Importar Presenças GPS</button>
           <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
           <button class="btn" onclick="exportBackup()" style="background:#1a3d6e;color:#fff;border:none;font-size:12px;padding:8px 16px">💾 Exportar Backup</button>
+          <button class="btn" id="btn-batch-analyze" onclick="batchAnalyzeAllFichas()" style="background:#1a8754;color:#fff;border:none;font-size:12px;padding:8px 16px">✨ Re-analisar todos os treinos</button>
         </div>
+        <div id="batch-analyze-status" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
         <div style="font-size:11px;color:var(--muted)">GPS: preenche presenças automaticamente a partir do Excel da Monitorização de Cargas (folha "Data"). · Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
       </div>
     </div>
@@ -3212,6 +3214,87 @@ function clearAllTrainingAnalyses(){
     count++;
   });
   toast(`✅ ${count} treino${count!==1?'s':''} limpo${count!==1?'s':''}. Podes re-analisar um a um.`);
+  renderDash();
+}
+
+async function batchAnalyzeAllFichas(){
+  const statusEl=document.getElementById('batch-analyze-status');
+  const btn=document.getElementById('btn-batch-analyze');
+
+  // Recolher treinos com ficha PDF
+  const allEvs=DB.events();
+  const targets=allEvs.filter(ev=>
+    ev.type==='training' &&
+    ev.fichaTreinoUrl &&
+    (ev.fichaTreinoFileName||ev.fichaTreinoUrl||'').toLowerCase().includes('.pdf')
+  ).sort((a,b)=>a.date.localeCompare(b.date));
+
+  if(!targets.length){
+    toast('ℹ️ Nenhum treino com ficha PDF encontrado.');
+    return;
+  }
+
+  if(!confirm(`Re-analisar ${targets.length} treino${targets.length!==1?'s':''} com ficha PDF?\n\nIsto irá actualizar momentSummary, exercícios e objectivesPerMoment de cada treino.\nDemora cerca de ${Math.ceil(targets.length*7/60)} minutos.`)) return;
+
+  btn.disabled=true;
+  statusEl.style.display='block';
+
+  let done=0, errors=0;
+  const total=targets.length;
+
+  function updateStatus(current){
+    const pct=Math.round(done/total*100);
+    const bar=`<div style="background:var(--border);border-radius:4px;height:6px;margin:6px 0"><div style="background:#1a8754;height:6px;border-radius:4px;width:${pct}%;transition:width .3s"></div></div>`;
+    statusEl.innerHTML=`<b>✨ A analisar treinos… ${done}/${total}</b>${bar}${current?`<div style="color:var(--muted);margin-top:2px">A processar: ${current}</div>`:''}${errors>0?`<div style="color:#e65100;margin-top:2px">⚠️ ${errors} erro${errors!==1?'s':''}</div>`:''}`;
+  }
+
+  for(const ev of targets){
+    const label=`${ev.date} — ${ev.squad?.toUpperCase()||''}`;
+    updateStatus(label);
+    try{
+      if(typeof pdfjsLib==='undefined') throw new Error('pdf.js não carregado');
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const resp=await fetch(ev.fichaTreinoUrl);
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const pdf=await pdfjsLib.getDocument({data:await resp.arrayBuffer()}).promise;
+      let text='';
+      for(let i=1;i<=pdf.numPages;i++){
+        const pg=await pdf.getPage(i);
+        const ct=await pg.getTextContent();
+        text+=ct.items.map(x=>x.str).join(' ')+'\n';
+      }
+      const dow=ev.date?['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][new Date(ev.date+'T12:00:00').getDay()]:'';
+      const month=ev.date?new Date(ev.date+'T12:00:00').getMonth():new Date().getMonth();
+      const period=(month>=5&&month<=7)?'preparatório':'competição';
+      const fn=firebase.app().functions('europe-west1').httpsCallable('analyzeTraining');
+      const res=await fn({pdfText:text,currentObjectives:null,dayOfWeek:dow,squad:ev.squad,period,extractExercises:true});
+      const d=res.data;
+      const upd={};
+      if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
+      if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length){
+        upd.trainingExercises=d.exercises;
+        const opm=computeObjectivesPerMoment(d.exercises);
+        if(opm) upd.objectivesPerMoment=opm;
+      }
+      const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
+      if(primaryArr.length){
+        upd.objectivePrimary=primaryArr;
+        const secKeys=mapToSecondaryThemes(d.secondary,d.primary);
+        if(secKeys.length) upd.objectiveSecondary=secKeys;
+      }
+      if(Object.keys(upd).length) DB.updateEvent(ev.id,upd);
+    }catch(e){
+      console.error(`Batch analyze error [${ev.id}]:`,e);
+      errors++;
+    }
+    done++;
+    updateStatus(null);
+    // Pausa entre chamadas para não exceder rate limits
+    if(done<total) await new Promise(r=>setTimeout(r,3000));
+  }
+
+  btn.disabled=false;
+  statusEl.innerHTML=`<b style="color:#1a8754">✅ Concluído — ${done-errors} treino${done-errors!==1?'s':''} analisado${done-errors!==1?'s':''}${errors>0?` · <span style="color:#e65100">${errors} erro${errors!==1?'s':''}</span>`:''}</b>`;
   renderDash();
 }
 
