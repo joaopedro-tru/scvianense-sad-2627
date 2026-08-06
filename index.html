@@ -2666,8 +2666,8 @@ function _squadLoadCards(cs, sfx=''){
   const allEvs=DB.events(cs);
   const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
   const gym5w=gymEvs.filter(e=>e.date>=cutoff5w);
-  // Treinos: inclui eventos com objectivePrimary OU momentSummary (para não depender só da análise AI)
-  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary||e.momentSummary)&&e.date<=today);
+  // Treinos: inclui eventos com momentSummary OU objectivePrimary (momentSummary tem prioridade)
+  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.momentSummary||e.objectivePrimary)&&e.date<=today);
   const train5w=trainEvs.filter(e=>e.date>=cutoff5w);
   function gymAgg(evs){
     const acc={};
@@ -2677,31 +2677,31 @@ function _squadLoadCards(cs, sfx=''){
     })});
     return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8);
   }
-  // Contagem de sessões por momento principal (suporta array novo e objeto antigo)
-  // Quando há múltiplos momentos, divide igualmente (0.5 para TO+TD, etc.)
-  function trainAggPrimary(evs){
+  // Agrega minutos por momento a partir de momentSummary de cada treino.
+  // Fallback para treinos sem momentSummary: usa objectivePrimary (conta como 1 sessão = ~1 unidade).
+  function trainAggMoments(evs){
     const acc={};
+    let hasMins=false;
     evs.forEach(ev=>{
-      const arr=normalizePrimaryArr(ev.objectivePrimary);
-      if(!arr.length) return;
-      const w=1/arr.length;
-      arr.forEach(k=>{ acc[k]=(acc[k]||0)+w; });
+      if(ev.momentSummary&&Object.keys(ev.momentSummary).length){
+        hasMins=true;
+        Object.entries(ev.momentSummary).forEach(([mk,mins])=>{
+          if(mins>0&&TACTICS_TAXONOMY[mk]) acc[mk]=(acc[mk]||0)+mins;
+        });
+      } else {
+        // treino antigo sem momentSummary — conta como sessão fracionada
+        const arr=normalizePrimaryArr(ev.objectivePrimary);
+        if(!arr.length) return;
+        const w=1/arr.length;
+        arr.forEach(k=>{ acc[k]=(acc[k]||0)+w; });
+      }
     });
-    return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
-  }
-  // Contagem de sessões por tema secundário (suporta array e formato antigo {moment:...})
-  function trainAggSecondary(evs){
-    const acc={};
-    evs.forEach(ev=>{
-      normalizeSecondaryArr(ev.objectiveSecondary).forEach(k=>{
-        if(SECONDARY_THEMES[k]) acc[k]=(acc[k]||0)+1;
-      });
-    });
-    return Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+    return { entries: Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a), hasMins };
   }
   const gd5=gymAgg(gym5w),gdS=gymAgg(gymEvs);
-  const tp5=trainAggPrimary(train5w),tpS=trainAggPrimary(trainEvs);
-  const ts5=trainAggSecondary(train5w),tsS=trainAggSecondary(trainEvs);
+  const {entries:tp5,hasMins:hm5}=trainAggMoments(train5w);
+  const {entries:tpS,hasMins:hmS}=trainAggMoments(trainEvs);
+  const unit5=hm5?'min':'sessões', unitS=hmS?'min':'sessões';
   if(!gd5.length&&!gdS.length&&!tp5.length&&!tpS.length) return '';
 
   // ── Gym donut (unchanged) ─────────────────────────────────────────────────
@@ -2784,14 +2784,14 @@ function _squadLoadCards(cs, sfx=''){
       </div>`;
     }).join('');
   }
-  function pieBlock(entries,colorFn,labelFn,tag,sz=130){
+  function pieBlock(entries,colorFn,labelFn,tag,sz=130,unit='min'){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
     return `<div style="display:flex;align-items:center;gap:12px">
         ${pieSVG(entries,colorFn,sz,tag)}
         <div style="flex:1;min-width:0">${pieLegend(entries,colorFn,labelFn,total)}</div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} sessões</div>`;
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} ${unit}</div>`;
   }
 
   // ── Toggle buttons ────────────────────────────────────────────────────────
@@ -2803,8 +2803,8 @@ function _squadLoadCards(cs, sfx=''){
     </div>`;
   }
 
-  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w');
-  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep');
+  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w',130,unit5);
+  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep',130,unitS);
   const noObjData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
   const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2867,20 +2867,33 @@ function attachObjChartListeners(cs, sfx=''){
   let _selectedKey=null;
   let _selectedTag=null;
 
-  function buildSecondaryPie(sessions, keyLabel, keyColor){
-    // collect all specificObjectives from exercises in matching sessions
+  function buildSecondaryPie(sessions, keyLabel, keyColor, momentKey){
+    // Recolhe objetivos específicos APENAS do momento selecionado:
+    // 1ª opção: objectivesPerMoment[momentKey] (mapeamento correto por momento)
+    // Fallback: specificObjectives de exercícios com ex.moment === momentKey
     const tally5={},tallyEp={};
     const now=new Date();
     const w5=new Date(now); w5.setDate(w5.getDate()-35);
     sessions.forEach(ev=>{
       const inW5=ev.date&&new Date(ev.date)>=w5;
-      (ev.trainingExercises||[]).forEach(ex=>{
-        (ex.specificObjectives||[]).forEach(tag=>{
+      // Preferir objectivesPerMoment se disponível
+      const opm=ev.objectivesPerMoment;
+      if(opm&&opm[momentKey]){
+        opm[momentKey].forEach(tag=>{
           if(!tag) return;
           tallyEp[tag]=(tallyEp[tag]||0)+1;
           if(inW5) tally5[tag]=(tally5[tag]||0)+1;
         });
-      });
+      } else {
+        // Fallback: filtrar exercícios pelo momento
+        (ev.trainingExercises||[]).filter(ex=>ex.moment===momentKey).forEach(ex=>{
+          (ex.specificObjectives||[]).forEach(tag=>{
+            if(!tag) return;
+            tallyEp[tag]=(tallyEp[tag]||0)+1;
+            if(inW5) tally5[tag]=(tally5[tag]||0)+1;
+          });
+        });
+      }
     });
     const e5=Object.entries(tally5).sort((a,b)=>b[1]-a[1]);
     const eEp=Object.entries(tallyEp).sort((a,b)=>b[1]-a[1]);
@@ -2958,16 +2971,18 @@ function attachObjChartListeners(cs, sfx=''){
       _selectedKey=key; _selectedTag=tag;
       allSlices.forEach(p=>p.style.opacity=(p.dataset.key===key?'1':'0.3'));
 
-      // gather matching sessions for this squad + primary key
+      // Recolhe sessões que trabalharam este momento (via momentSummary ou objectivePrimary legacy)
       const matchingSessions=DB.events(cs).filter(ev=>{
         if(ev.type!=='training') return false;
+        if(ev.momentSummary&&ev.momentSummary[key]>0) return true;
+        // fallback: treinos antigos sem momentSummary
         const arr=typeof normalizePrimaryArr==='function'?normalizePrimaryArr(ev.objectivePrimary):(ev.objectivePrimary||[]);
         return arr.includes(key);
       });
 
       const label=TACTICS_TAXONOMY[key]?.label||key;
       const color=TACTICS_TAXONOMY[key]?.color||'#64748b';
-      const html=buildSecondaryPie(matchingSessions,label,color);
+      const html=buildSecondaryPie(matchingSessions,label,color,key);
       if(html){
         secondaryCard.innerHTML=html;
         secondaryCard.style.display='block';
