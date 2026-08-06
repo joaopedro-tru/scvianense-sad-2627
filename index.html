@@ -2686,7 +2686,7 @@ function _squadLoadCards(cs, sfx=''){
       if(ev.momentSummary&&Object.keys(ev.momentSummary).length){
         hasMins=true;
         Object.entries(ev.momentSummary).forEach(([mk,mins])=>{
-          if(mins>0&&TACTICS_TAXONOMY[mk]) acc[mk]=(acc[mk]||0)+mins;
+          if(mins>0&&TACTICS_TAXONOMY[mk]&&mk!=='PF'&&mk!=='SJ') acc[mk]=(acc[mk]||0)+mins;
         });
       } else {
         // treino antigo sem momentSummary — conta como sessão fracionada
