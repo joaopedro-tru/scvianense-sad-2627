@@ -3189,11 +3189,11 @@ function exportBackup(){
 function clearAllTrainingAnalyses(){
   if(!confirm('Tens a certeza? Isto vai apagar objectivePrimary, objectiveSecondary, momentSummary e objectives de TODOS os treinos de todos os escalões. Esta ação não pode ser desfeita.')) return;
   const allEvs=DB.events(); // todos os escalões
-  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary||e.objectiveSecondary||e.momentSummary||e.objectives));
+  const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary||e.objectiveSecondary||e.momentSummary||e.objectives||e.objectivesPerMoment));
   if(!trainEvs.length){ toast('ℹ️ Não há análises para limpar.'); return; }
   let count=0;
   trainEvs.forEach(ev=>{
-    DB.updateEvent(ev.id,{objectivePrimary:null,objectiveSecondary:null,momentSummary:null,objectives:null});
+    DB.updateEvent(ev.id,{objectivePrimary:null,objectiveSecondary:null,momentSummary:null,objectives:null,objectivesPerMoment:null});
     count++;
   });
   toast(`✅ ${count} treino${count!==1?'s':''} limpo${count!==1?'s':''}. Podes re-analisar um a um.`);
@@ -5534,6 +5534,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   }
   _fichaExercises=ev?.trainingExercises?[...ev.trainingExercises]:[];
   _momentSummary=ev?.momentSummary?{...ev.momentSummary}:{};
+  _objectivesPerMoment=ev?.objectivesPerMoment?{...ev.objectivesPerMoment}:{};
   _fichaText='';
   document.getElementById('e-ficha-name').textContent='';
   document.getElementById('e-ai-status').style.display='none';
@@ -5612,7 +5613,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -6094,10 +6095,17 @@ function renderTraining(){
             }).join('');
             const legend=entries.map(([mk,mins])=>{
               const tc=TACTICS_TAXONOMY[mk]||{label:mk,color:'#64748b'};
-              return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
-                <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${tc.color}"></div>
-                <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${tc.label}</span>
-                <span style="font-size:11px;font-weight:700;white-space:nowrap">${mins}<span style="font-weight:400;color:var(--muted)">m</span></span>
+              const objs=(ev.objectivesPerMoment||{})[mk]||[];
+              const objPills=objs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px">${objs.map(o=>`<span style="background:${tc.color}18;color:${tc.color};border:1px solid ${tc.color}35;border-radius:3px;padding:0 5px;font-size:9px;font-weight:700;line-height:16px">${o}</span>`).join('')}</div>`:'';
+              return `<div style="display:flex;align-items:flex-start;gap:5px;margin-bottom:7px">
+                <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;margin-top:3px;background:${tc.color}"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${tc.label}</span>
+                    <span style="font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0">${mins}<span style="font-weight:400;color:var(--muted)">m</span></span>
+                  </div>
+                  ${objPills}
+                </div>
               </div>`;
             }).join('');
             return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
@@ -9981,8 +9989,20 @@ const REGIME_DEFAULTS={
 let _regimes=[];
 let _objPrimary=[];     // array de chaves de PRIMARY_MOMENTS
 let _objSecondary=[];   // array de chaves de SECONDARY_THEMES
-let _fichaExercises=[];   // exercícios extraídos da IA
-let _momentSummary={};    // {OO:18, TOTD:16, SJ:19}
+let _fichaExercises=[];        // exercícios extraídos da IA
+let _momentSummary={};         // {OO:18, TOTD:16, SJ:19}
+let _objectivesPerMoment={};   // {OO:["VCJ","PBO"], TOTD:["RAP"]}
+
+// Agrega specificObjectives dos exercícios por momento (nunca mistura momentos diferentes)
+function computeObjectivesPerMoment(exercises){
+  const map={};
+  (exercises||[]).forEach(ex=>{
+    if(!ex.moment||!ex.specificObjectives?.length) return;
+    if(!map[ex.moment]) map[ex.moment]=[];
+    ex.specificObjectives.forEach(o=>{ if(o&&!map[ex.moment].includes(o)) map[ex.moment].push(o); });
+  });
+  return Object.keys(map).length?map:null;
+}
 let _fichaText='';
 
 // ── GYM PLAN HELPERS ─────────────────────────────────────────────────────────
@@ -10437,7 +10457,11 @@ async function analyzeAndSaveFicha(url, fileName, eventId){
     const d=res.data;
     const upd={};
     if(d.momentSummary&&Object.keys(d.momentSummary).length) upd.momentSummary=d.momentSummary;
-    if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length) upd.trainingExercises=d.exercises;
+    if(d.exercises&&Array.isArray(d.exercises)&&d.exercises.length){
+      upd.trainingExercises=d.exercises;
+      const opm=computeObjectivesPerMoment(d.exercises);
+      if(opm) upd.objectivesPerMoment=opm;
+    }
     const primaryArr=canonicalizePrimaryMoments(d.primary?.moment);
     if(primaryArr.length){
       upd.objectivePrimary=primaryArr; // array de chaves PRIMARY_MOMENTS
@@ -10507,6 +10531,7 @@ async function analyzeTrainingAI(pdfText, currentObjectives){
     if(d.exercises&&Array.isArray(d.exercises)){
       _fichaExercises=d.exercises;
       _momentSummary=d.momentSummary||{};
+      _objectivesPerMoment=computeObjectivesPerMoment(d.exercises)||{};
     }
     if(!currentObjectives||d.mismatch){
       // Fix race condition: só sobrescreve se o treinador ainda não selecionou nada
