@@ -5976,6 +5976,7 @@ function renderTraining(){
         <div style="font-size:11px;color:#e65100;font-weight:600">À Experiência${tp.position?' · '+tp.position:''}${tp.notes?' · '+tp.notes:''}</div>
       </div>
       <button class="att-btn${present?' present':''}" data-trial-att="${tp.id}">${present?'✓ Presente':'— Ausente'}</button>
+      ${isAdmin()||staffRole()?`<button data-integrate-trial="${tp.id}" title="Integrar no plantel" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.35;padding:2px 6px;margin-left:4px;border-radius:5px;color:#1a7a3e" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.35">✔</button>`:''}
       ${isAdmin()||staffRole()?`<button data-del-trial="${tp.id}" title="Terminar experiência" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.35;padding:2px 6px;margin-left:4px;border-radius:5px" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.35">✕</button>`:''}
     </div>`;
   }).join('');
@@ -6301,6 +6302,47 @@ function renderTraining(){
     const tp=DB.getTrialPlayer(btn.dataset.delTrial);
     if(!confirm(`Terminar experiência de ${tp?.name||'este atleta'}?\nOs registos de treinos anteriores são mantidos.`)) return;
     await DB.removeTrialPlayer(btn.dataset.delTrial); renderTraining();
+  }));
+  // Integrar atleta à experiência no plantel oficial
+  document.querySelectorAll('[data-integrate-trial]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const tp=DB.getTrialPlayer(btn.dataset.integrateTrial);
+    if(!tp) return;
+    const squad=tp.squad==='both'?'sub23':tp.squad; // fallback if squad=both
+    if(!confirm(`Integrar ${tp.name} no plantel de ${squad.toUpperCase()}?\n\nSerá criado um registo básico. Completa os dados do atleta no separador Plantel.`)) return;
+    const newId=uid();
+    DB.addPlayer({
+      id:newId,
+      name:tp.name,
+      alcunha:null,
+      dob:null,
+      nationality:'Portuguesa',
+      nif:null,
+      phone:null,
+      email:null,
+      address:null,
+      squad,
+      squads:[squad],
+      position:tp.position||null,
+      position2:null,
+      position3:null,
+      dominantFoot:null,
+      enrolledAt:new Date().toISOString().slice(0,10),
+      previousClub:tp.notes||null,
+      height:null,
+      weight:null,
+      injuries:null,
+      shirtSize:null,
+      jerseyName:null,
+      jerseySize:null,
+      jerseyNumber:null,
+      number:null,
+      photoUrl:null,
+      ccUrl:null, ccFileName:null,
+      medUrl:null, medFileName:null,
+    });
+    await DB.removeTrialPlayer(tp.id);
+    toast(`✅ ${tp.name} integrado no plantel! Completa o perfil em Plantel.`);
+    renderTraining();
   }));
   // Staff attendance toggle
   document.querySelectorAll('[data-statt-user]').forEach(btn=>btn.addEventListener('click',()=>{
