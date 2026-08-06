@@ -718,6 +718,7 @@ body.pm #v-pf{padding:30px}
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <button class="btn" onclick="document.getElementById('mo-gps-import').classList.add('open');document.getElementById('gps-preview').style.display='none';document.getElementById('btn-gps-confirm').style.display='none';document.getElementById('gps-file-name').textContent='';document.getElementById('gps-file-input').value=''" style="background:var(--blue);color:#fff;border:none;font-size:12px;padding:8px 16px">📡 Importar Presenças GPS</button>
           <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
+          <button class="btn" onclick="exportBackup()" style="background:#1a3d6e;color:#fff;border:none;font-size:12px;padding:8px 16px">💾 Exportar Backup</button>
         </div>
         <div style="font-size:11px;color:var(--muted)">GPS: preenche presenças automaticamente a partir do Excel da Monitorização de Cargas (folha "Data"). · Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
       </div>
@@ -3164,6 +3165,25 @@ function confirmGPSImport(){
   _gpsImportData = null;
   toast('✅ '+updated+' treino'+(updated!==1?'s':'')+' atualizados — '+presencas+' presentes, '+ninscrito+' não inscritos.');
   if(view==='training') renderTraining();
+}
+
+function exportBackup(){
+  try{
+    const data={
+      exportedAt: new Date().toISOString(),
+      exportedBy: currentUser()?.user||'admin',
+      events:  JSON.parse(localStorage.getItem('scv_e')||'[]'),
+      players: JSON.parse(localStorage.getItem('scv_p')||'[]'),
+    };
+    const json=JSON.stringify(data,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const dateStr=new Date().toLocaleDateString('pt-PT').replace(/\//g,'-');
+    a.href=url; a.download=`scvianense_backup_${dateStr}.json`; a.click();
+    URL.revokeObjectURL(url);
+    toast(`✅ Backup exportado — ${data.events.length} eventos, ${data.players.length} jogadores`);
+  }catch(e){ toast('❌ Erro ao exportar: '+e.message); }
 }
 
 function clearAllTrainingAnalyses(){
@@ -11615,11 +11635,25 @@ function initCoordApp(){
       const listeners=await Promise.all([
         listenAndWait(firestoreDb.collection('players'), snap=>{
           const arr=[]; snap.forEach(d=>arr.push(d.data()));
-          if(arr.length>0) localStorage.setItem('scv_p',JSON.stringify(arr));
+          // Só substituir se FS devolveu pelo menos tantos registos quanto o local
+          // (evita sobrescrever com resultado parcial por rules restritivas)
+          const existingP=JSON.parse(localStorage.getItem('scv_p')||'[]');
+          if(arr.length>0 && arr.length>=existingP.length) localStorage.setItem('scv_p',JSON.stringify(arr));
+          else if(arr.length>0 && arr.length<existingP.length) console.warn(`⚠️ Firestore players (${arr.length}) < localStorage (${existingP.length}) — a manter dados locais`);
         }),
         listenAndWait(firestoreDb.collection('events'), snap=>{
           const arr=[]; snap.forEach(d=>arr.push(d.data()));
-          if(arr.length>0) localStorage.setItem('scv_e',JSON.stringify(arr));
+          // Proteção crítica: nunca sobrescrever com menos eventos do que o que já existe
+          const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]');
+          if(arr.length>0 && arr.length>=existingE.length){
+            localStorage.setItem('scv_e',JSON.stringify(arr));
+          } else if(arr.length>0 && arr.length<existingE.length){
+            // Merge: manter eventos locais que não vieram do Firestore (podem estar bloqueados por rules)
+            const fsIds=new Set(arr.map(e=>e.id));
+            const onlyLocal=existingE.filter(e=>!fsIds.has(e.id));
+            console.warn(`⚠️ Firestore events (${arr.length}) < localStorage (${existingE.length}) — a fazer merge (${onlyLocal.length} eventos só em local)`);
+            localStorage.setItem('scv_e',JSON.stringify([...arr,...onlyLocal]));
+          }
         }),
         listenAndWait(firestoreDb.collection('unavailability'), snap=>{
           const arr=[]; snap.forEach(d=>arr.push(d.data()));
