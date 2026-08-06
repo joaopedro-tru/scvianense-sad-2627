@@ -11877,11 +11877,14 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     async function tryLoginFirebase(){
       const password=pwIn.value;
-      const u=resolveUser(userIn.value);
-      if(!u){ errEl.textContent='Utilizador ou email não encontrado.'; pwIn.value=''; return; }
+      const input=userIn.value.trim();
+      // Tenta lookup username→email; se falhar e o input for email, usa diretamente
+      const u=resolveUser(input);
+      const email=u?.email||(input.includes('@')?input.toLowerCase():null);
+      if(!email){ errEl.textContent='Utilizador ou email não encontrado.'; pwIn.value=''; return; }
       loginBtn.disabled=true; loginBtn.textContent='A entrar…';
       try{
-        await firebaseAuth.signInWithEmailAndPassword(u.email, password);
+        await firebaseAuth.signInWithEmailAndPassword(email, password);
         // onAuthStateChanged tratará do resto
       }catch(err){
         let msg='Credenciais incorretas.';
