@@ -6308,7 +6308,7 @@ function renderTraining(){
     const tp=DB.getTrialPlayer(btn.dataset.integrateTrial);
     if(!tp) return;
     const squad=tp.squad==='both'?'sub23':tp.squad; // fallback if squad=both
-    if(!confirm(`Integrar ${tp.name} no plantel de ${squad.toUpperCase()}?\n\nSerá criado um registo básico. Completa os dados do atleta no separador Plantel.`)) return;
+    if(!confirm(`Integrar ${tp.name} no plantel de ${squad.toUpperCase()}?\n\nAs presenças em treinos anteriores serão migradas para o novo registo.\nCompleta os dados do atleta no separador Plantel.`)) return;
     const newId=uid();
     DB.addPlayer({
       id:newId,
@@ -6340,8 +6340,18 @@ function renderTraining(){
       ccUrl:null, ccFileName:null,
       medUrl:null, medFileName:null,
     });
+    // Migrar presenças em treinos: trialAttendance[tp.id] → attendance[newId]
+    let migratedCount=0;
+    DB.events().forEach(ev=>{
+      if(!ev.trialAttendance || !(tp.id in ev.trialAttendance)) return;
+      const wasPresent=ev.trialAttendance[tp.id]!==false;
+      const att={...(ev.attendance||{})};
+      att[newId]=wasPresent?true:'injust';
+      DB.updateEvent(ev.id,{attendance:att});
+      migratedCount++;
+    });
     await DB.removeTrialPlayer(tp.id);
-    toast(`✅ ${tp.name} integrado no plantel! Completa o perfil em Plantel.`);
+    toast(`✅ ${tp.name} integrado no plantel! ${migratedCount>0?`${migratedCount} treino(s) migrado(s). `:''}Completa o perfil em Plantel.`);
     renderTraining();
   }));
   // Staff attendance toggle
