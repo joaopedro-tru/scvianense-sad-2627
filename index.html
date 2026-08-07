@@ -2083,7 +2083,14 @@ const DB = {
   },
   deleteEvent(id){
     const d=this._d(); d.events=d.events.filter(x=>x.id!==id); this._s(d);
-    this._fse()?.doc(id).delete().catch(e=>console.error('FS deleteEvent:',e));
+    // Guardar IDs eliminados para evitar que o onSnapshot os restaure
+    const deleted=JSON.parse(localStorage.getItem('scv_deleted_events')||'[]');
+    if(!deleted.includes(id)){ deleted.push(id); localStorage.setItem('scv_deleted_events',JSON.stringify(deleted)); }
+    if(this._fse()){
+      this._fse().doc(id).delete()
+        .then(()=>{ console.log('FS deleteEvent OK:',id); })
+        .catch(e=>{ console.error('FS deleteEvent FAILED:',id,e); toast('⚠️ Erro ao eliminar da cloud — abre a consola para ver o erro.'); });
+    }
   },
   getEvent(id){ return this._d().events.find(x=>x.id===id) },
   getPlayer(id){ return this._d().players.find(x=>x.id===id) },
@@ -11866,15 +11873,18 @@ function initCoordApp(){
           else if(arr.length>0 && arr.length<existingP.length) console.warn(`⚠️ Firestore players (${arr.length}) < localStorage (${existingP.length}) — a manter dados locais`);
         }),
         listenAndWait(firestoreDb.collection('events'), snap=>{
-          const arr=[]; snap.forEach(d=>arr.push(d.data()));
+          let arr=[]; snap.forEach(d=>arr.push(d.data()));
+          // Filtrar eventos que o utilizador eliminou mas que a cloud ainda pode devolver
+          const deletedIds=new Set(JSON.parse(localStorage.getItem('scv_deleted_events')||'[]'));
+          if(deletedIds.size) arr=arr.filter(e=>!deletedIds.has(e.id));
           // Proteção crítica: nunca sobrescrever com menos eventos do que o que já existe
-          const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]');
+          const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]').filter(e=>!deletedIds.has(e.id));
           if(arr.length>0 && arr.length>=existingE.length){
             localStorage.setItem('scv_e',JSON.stringify(arr));
           } else if(arr.length>0 && arr.length<existingE.length){
             // Merge: manter eventos locais que não vieram do Firestore (podem estar bloqueados por rules)
             const fsIds=new Set(arr.map(e=>e.id));
-            const onlyLocal=existingE.filter(e=>!fsIds.has(e.id));
+            const onlyLocal=existingE.filter(e=>!fsIds.has(e.id)&&!deletedIds.has(e.id));
             console.warn(`⚠️ Firestore events (${arr.length}) < localStorage (${existingE.length}) — a fazer merge (${onlyLocal.length} eventos só em local)`);
             localStorage.setItem('scv_e',JSON.stringify([...arr,...onlyLocal]));
           }
