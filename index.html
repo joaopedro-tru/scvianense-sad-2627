@@ -7613,9 +7613,12 @@ function renderLiveStatsTab(ev){
 function getConvocados(){
   const ev=DB.getEvent(liveGameId); if(!ev) return [];
   const conv=ev.convocatoria||{players:{}};
-  const sq=DB.players(ev.squad==='both'?null:ev.squad);
-  const convs=sq.filter(p=>!!conv.players[p.id]);
-  const all=convs.length>0?convs:sq;
+  // Procura em todos os jogadores para incluir atletas de outros escalões
+  const allPlayers=DB.players();
+  const convs=allPlayers.filter(p=>!!conv.players[p.id]);
+  // Fallback: se não há convocatória definida, mostra apenas o escalão do jogo
+  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
+  const all=convs.length>0?convs:sqPlayers;
   return sortByPos(all);
 }
 function getTitulares(){
@@ -9485,8 +9488,10 @@ function saveTokEdit(){
 function generateConvocatoriaPDF(evId){
   const ev=DB.getEvent(evId); if(!ev)return;
   const conv=ev.convocatoria||{players:{},notes:'',concentrationTime:'',concentrationPlace:'',scheduleArrival:'',schedulePalestra:'',scheduleGkWarmup:'',scheduleWarmup:'',scheduleDressing:''};
-  const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
-  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>{
+  // Busca todos os jogadores (não só do escalão do jogo) para incluir
+  // atletas de outros escalões que possam estar na convocatória.
+  const allPlayers=DB.players();
+  const convocados=allPlayers.filter(p=>!!conv.players[p.id]).sort((a,b)=>{
     const pa=POS_ORDER.indexOf(a.position||''); const pb=POS_ORDER.indexOf(b.position||'');
     const po=(pa<0?99:pa)-(pb<0?99:pb);
     return po!==0?po:(a.number||99)-(b.number||99);
