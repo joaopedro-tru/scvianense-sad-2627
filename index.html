@@ -8941,7 +8941,9 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
 
 // ── RELATÓRIO (CAMPO HORIZONTAL + DRAG-AND-DROP) ──────────────────────────────
 function renderGameRelatorio(ev,sqPlayers,conv,mr){
-  const convocados=sqPlayers.filter(p=>!!conv.players[p.id]);
+  // allPlayers para incluir jogadores de outros escalões convocados
+  const allPlayers=DB.players();
+  const convocados=allPlayers.filter(p=>!!conv.players[p.id]);
   const lineup=mr.lineup||[];
   const ratings=mr.ratings||{};
   const evs=mr.events||[];
@@ -8965,8 +8967,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     return `<span style="display:inline-block;background:${bg};color:${col};font-size:${small?'9px':'9.5px'};font-weight:800;padding:1px 5px;border-radius:3px;line-height:1.7">${n%1===0?n+'.0':n}</span>`;
   }
 
-  // Titulares: quem está no lineup (independente da convocatória)
-  const tits=sortByPos(sqPlayers.filter(p=>lineup.includes(p.id)));
+  // Titulares: quem está no lineup — procura em todos os jogadores (inclui outros escalões)
+  const tits=sortByPos(allPlayers.filter(p=>lineup.includes(p.id)));
   // Suplentes: convocados que não estão no lineup
   const sups=sortByPos(convocados.filter(p=>!lineup.includes(p.id)));
 
