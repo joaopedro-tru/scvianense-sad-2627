@@ -12272,6 +12272,11 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
+    // Team Manager vê monitorização mas não os links de partilha
+    document.getElementById('nsl-monitoring').style.display='';
+    document.getElementById('nl-monitoring').style.display='';
+    document.getElementById('nl-pse-link').style.display='none';
+    document.getElementById('nl-wellness-link').style.display='none';
     if(u.squad){
       const allSquads=['eqa','sub19','sub23'];
       allSquads.filter(s=>s!==u.squad).forEach(other=>{
