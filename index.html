@@ -704,7 +704,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
-  <div id="sb-foot">SC Vianense SAD © 2026<br><span id="sb-build" style="font-size:10px;opacity:.45"></span></div>
+  <div id="sb-foot"><span id="sb-user">SC Vianense SAD © 2026</span><br><span id="sb-build" style="font-size:10px;opacity:.45"></span></div>
 </aside>
 
 <!-- MAIN -->
@@ -2672,7 +2672,9 @@ function convName(p){
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
 const APP_BUILD='2026-08-07';
-document.addEventListener('DOMContentLoaded',()=>{ const el=document.getElementById('sb-build'); if(el) el.textContent='v'+APP_BUILD; });
+document.addEventListener('DOMContentLoaded',()=>{
+  const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
+});
 let _toastTimer=null;
 function toast(m){
   const t=document.getElementById('toast');
@@ -12326,9 +12328,9 @@ function applyRoleUI(){
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
-    const foot=document.getElementById('sb-foot');
     const profile=DB.getStaffProfile(u.user);
-    if(foot) foot.textContent=`${profile?.name||'Treinador'} · ${SQUADS[u.squad]||u.squad}`;
+    const sbUser=document.getElementById('sb-user');
+    if(sbUser) sbUser.textContent=`${profile?.name||'Treinador'} · ${SQUADS[u.squad]||u.squad}`;
   } else if(u.role==='staff'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
@@ -12346,10 +12348,10 @@ function applyRoleUI(){
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
-    const foot=document.getElementById('sb-foot');
     const profile=DB.getStaffProfile(u.user);
     const roleName=profile?STAFF_ROLES_LABEL[profile.staffRole]||staffRoleName():staffRoleName()||'Staff';
-    if(foot) foot.textContent=`${profile?.name||roleName} · ${SQUADS[u.squad]||u.squad}`;
+    const sbUser=document.getElementById('sb-user');
+    if(sbUser) sbUser.textContent=`${profile?.name||roleName} · ${SQUADS[u.squad]||u.squad}`;
   } else if(u.role==='medical'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
@@ -12367,9 +12369,9 @@ function applyRoleUI(){
     allSquads.filter(s=>s!==u.squad).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
-    const foot=document.getElementById('sb-foot');
     const profile=DB.getStaffProfile(u.user);
-    if(foot) foot.textContent=`${profile?.name||'Clínica'} · ${SQUADS[u.squad]||u.squad}`;
+    const sbUser=document.getElementById('sb-user');
+    if(sbUser) sbUser.textContent=`${profile?.name||'Clínica'} · ${SQUADS[u.squad]||u.squad}`;
   } else if(u.role==='teammanager'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
@@ -12387,9 +12389,9 @@ function applyRoleUI(){
         document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
       });
     }
-    const foot=document.getElementById('sb-foot');
     const profile=DB.getStaffProfile(u.user);
-    if(foot) foot.textContent=`${profile?.name||'Team Manager'} · ${SQUADS[u.squad]||''}`;
+    const sbUser=document.getElementById('sb-user');
+    if(sbUser) sbUser.textContent=`${profile?.name||'Team Manager'} · ${SQUADS[u.squad]||''}`;
   } else if(u.role==='admin'){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
