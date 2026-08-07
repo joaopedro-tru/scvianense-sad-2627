@@ -7600,6 +7600,7 @@ function renderLiveStatsTab(ev){
         </div>
       </div>
       ${total_shots>0?`<div style="font-size:11px;color:var(--muted)">Eficácia: <strong style="color:var(--primary)">${Math.round(goals/total_shots*100)}%</strong></div>`:''}
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Faltas cometidas: <strong>${fouls}</strong></div>
     </div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🆚 Adversário</div>
@@ -7625,7 +7626,7 @@ function renderLiveStatsTab(ev){
     </div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎯 Bola / Disciplina</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:6px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
         <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
           <div style="font-size:20px;font-weight:800;color:var(--ok)">${ball_won}</div>
           <div style="font-size:10px;color:var(--muted)">Recup.</div>
@@ -7633,10 +7634,6 @@ function renderLiveStatsTab(ev){
         <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
           <div style="font-size:20px;font-weight:800;color:#e74c3c">${ball_lost}</div>
           <div style="font-size:10px;color:var(--muted)">Perdas</div>
-        </div>
-        <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
-          <div style="font-size:20px;font-weight:800;color:#e67e22">${fouls}</div>
-          <div style="font-size:10px;color:var(--muted)">F. Com.</div>
         </div>
         <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
           <div style="font-size:20px;font-weight:800;color:#f39c12">${yellows}</div>
