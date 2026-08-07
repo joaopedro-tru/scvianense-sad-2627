@@ -1769,6 +1769,21 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   </div>
 </div>
 
+<!-- MODAL: SQUAD LINK PICKER -->
+<div class="mo" id="mo-squad-picker">
+  <div class="md" style="max-width:320px">
+    <div class="mh">
+      <h2 id="mo-squad-picker-title">Escolhe o escalão</h2>
+      <button class="mc" onclick="document.getElementById('mo-squad-picker').classList.remove('open')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:8px 0">
+      <button class="btn" id="sqp-sub23" style="font-size:15px;padding:12px 16px;text-align:left;border-radius:8px">🔗 Sub-23</button>
+      <button class="btn" id="sqp-sub19" style="font-size:15px;padding:12px 16px;text-align:left;border-radius:8px">🔗 Sub-19</button>
+      <button class="btn" id="sqp-eqa"   style="font-size:15px;padding:12px 16px;text-align:left;border-radius:8px">🔗 Equipa A</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: EVENT -->
 <div class="mo" id="mo-event">
   <div class="md" style="max-width:460px">
@@ -9527,32 +9542,52 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
   const url=location.href.split('?')[0]+'?mode=public';
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado! Partilha com os atletas.')).catch(()=>prompt('Copia e partilha este link:',url));
 });
-document.getElementById('nl-pse-link').addEventListener('click',()=>{
-  const sq=coachSquad();
-  if(sq){
-    // Coach só tem acesso ao seu escalão — copia diretamente
-    const url=location.href.split('?')[0]+`?mode=pse&squad=${sq}`;
-    navigator.clipboard.writeText(url).then(()=>toast(`🔗 Link PSE (${SQUADS[sq]||sq}) copiado!`)).catch(()=>prompt('Link PSE:',url));
-  } else {
-    // Admin — mostrar opções para escolher escalão
-    const base=location.href.split('?')[0];
-    const opts=[['Sub-23','sub23'],['Sub-19','sub19'],['Equipa A','eqa']];
-    const msg=opts.map(([l,k])=>`${l}: ${base}?mode=pse&squad=${k}`).join('\n');
-    prompt('Links PSE por escalão (copia o que precisas):', msg);
+// Squad picker modal — shared by PSE and Wellness link buttons
+(function(){
+  const SQUAD_LABELS={sub23:'Sub-23',sub19:'Sub-19',eqa:'Equipa A'};
+  let _sqpMode='pse'; // 'pse' | 'wellness'
+  const modal=document.getElementById('mo-squad-picker');
+  const title=document.getElementById('mo-squad-picker-title');
+
+  function openPicker(mode){
+    _sqpMode=mode;
+    title.textContent=mode==='pse'?'Link PSE — escalão':'Link Bem-Estar — escalão';
+    modal.classList.add('open');
   }
-});
-document.getElementById('nl-wellness-link').addEventListener('click',()=>{
-  const sq=coachSquad();
-  if(sq){
-    const url=location.href.split('?')[0]+`?mode=wellness&squad=${sq}`;
-    navigator.clipboard.writeText(url).then(()=>toast(`💤 Link Bem-Estar (${SQUADS[sq]||sq}) copiado!`)).catch(()=>prompt('Link Bem-Estar:',url));
-  } else {
-    const base=location.href.split('?')[0];
-    const opts=[['Sub-23','sub23'],['Sub-19','sub19'],['Equipa A','eqa']];
-    const msg=opts.map(([l,k])=>`${l}: ${base}?mode=wellness&squad=${k}`).join('\n');
-    prompt('Links Bem-Estar por escalão (copia o que precisas):', msg);
-  }
-});
+
+  ['sub23','sub19','eqa'].forEach(sq=>{
+    document.getElementById('sqp-'+sq).addEventListener('click',()=>{
+      const base=location.href.split('?')[0];
+      const url=`${base}?mode=${_sqpMode}&squad=${sq}`;
+      const label=SQUAD_LABELS[sq]||sq;
+      const emoji=_sqpMode==='pse'?'🔗':'💤';
+      navigator.clipboard.writeText(url)
+        .then(()=>toast(`${emoji} Link ${_sqpMode==='pse'?'PSE':'Bem-Estar'} (${label}) copiado!`))
+        .catch(()=>prompt(`Link ${_sqpMode==='pse'?'PSE':'Bem-Estar'} ${label}:`,url));
+      modal.classList.remove('open');
+    });
+  });
+
+  document.getElementById('nl-pse-link').addEventListener('click',()=>{
+    const sq=coachSquad();
+    if(sq){
+      const url=location.href.split('?')[0]+`?mode=pse&squad=${sq}`;
+      navigator.clipboard.writeText(url).then(()=>toast(`🔗 Link PSE (${SQUAD_LABELS[sq]||sq}) copiado!`)).catch(()=>prompt('Link PSE:',url));
+    } else {
+      openPicker('pse');
+    }
+  });
+
+  document.getElementById('nl-wellness-link').addEventListener('click',()=>{
+    const sq=coachSquad();
+    if(sq){
+      const url=location.href.split('?')[0]+`?mode=wellness&squad=${sq}`;
+      navigator.clipboard.writeText(url).then(()=>toast(`💤 Link Bem-Estar (${SQUAD_LABELS[sq]||sq}) copiado!`)).catch(()=>prompt('Link Bem-Estar:',url));
+    } else {
+      openPicker('wellness');
+    }
+  });
+})();
 document.getElementById('nl-monitoring').addEventListener('click',()=>nav('monitoring'));
 // Close modals on overlay click
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open') }));
