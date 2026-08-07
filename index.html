@@ -7550,6 +7550,7 @@ function renderLiveStatsTab(ev){
     </div>`;
   }
   const goals=evs.filter(e=>e.type==='goal').length;
+  const goalsRegular=evs.filter(e=>e.type==='goal'&&!e.ownGoal).length; // autogolos não contam como remate
   const conceded=evs.filter(e=>e.type==='goal_conceded').length;
   const shots_on=evs.filter(e=>e.type==='shot_on').length;
   const shots_off=evs.filter(e=>e.type==='shot_off').length;
@@ -7558,7 +7559,7 @@ function renderLiveStatsTab(ev){
   const ball_lost=evs.filter(e=>e.type==='ball_lost').length;
   const yellows=evs.filter(e=>e.type==='yellow'||e.type==='yellow2').length;
   const reds=evs.filter(e=>e.type==='red'||e.type==='yellow2').length;
-  const total_shots=goals+shots_on+shots_off;
+  const total_shots=goalsRegular+shots_on+shots_off;
   const opp_shot_on=ctrs.opp_shot_on||0;
   const opp_shot_off=ctrs.opp_shot_off||0;
   const foul_suffered=ctrs.foul_suffered||0;
@@ -7599,7 +7600,7 @@ function renderLiveStatsTab(ev){
           <div style="font-size:10px;color:var(--muted)">Oport.</div>
         </div>
       </div>
-      ${total_shots>0?`<div style="font-size:11px;color:var(--muted)">Eficácia: <strong style="color:var(--primary)">${Math.round(goals/total_shots*100)}%</strong></div>`:''}
+      ${total_shots>0?`<div style="font-size:11px;color:var(--muted)">Eficácia: <strong style="color:var(--primary)">${Math.round(goalsRegular/total_shots*100)}%</strong></div>`:''}
       <div style="font-size:11px;color:var(--muted);margin-top:6px">Faltas cometidas: <strong>${fouls}</strong></div>
     </div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
