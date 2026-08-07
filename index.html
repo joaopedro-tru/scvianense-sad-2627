@@ -605,10 +605,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
 
   @page{ size:A4 landscape; margin:8mm }
 
-  /* ── CONVOCATÓRIA PRINT ─────────────────────────────────────────────────── */
-  body>*:not(#conv-print-overlay){ display:none!important }
-  #conv-print-overlay{ position:static!important;overflow:visible!important;background:#fff!important }
-  #conv-print-overlay *{ -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important }
+  /* Convocatória: impressa numa janela separada — sem regras aqui */
 }
 </style>
 </head>
@@ -9634,23 +9631,42 @@ function closePdfPreview(){
 document.getElementById('btn-download-conv-pdf').addEventListener('click',function(){
   const content=document.getElementById('pdf-conv-content');
   if(!content||!content.querySelector('.cvpdf')){ toast('⚠️ Sem conteúdo para imprimir.'); return; }
-  // Create full-page print overlay (same pattern as kit print)
-  const overlay=document.createElement('div');
-  overlay.id='conv-print-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:#fff;z-index:10000;overflow-y:auto';
-  overlay.innerHTML=content.innerHTML;
-  document.body.appendChild(overlay);
-  // Portrait A4 page rule (overrides calendar's landscape rule)
-  const ps=document.createElement('style');
-  ps.id='conv-print-page';
-  ps.textContent='@page{size:A4 portrait;margin:10mm}';
-  document.head.appendChild(ps);
-  window.print();
-  setTimeout(()=>{
-    overlay.remove();
-    const old=document.getElementById('conv-print-page');
-    if(old) old.remove();
-  },500);
+  const title=(content._pdfTitle||'Convocatória SC Vianense').replace(/</g,'&lt;');
+
+  // Abre janela isolada — sem conflitos de CSS com a app
+  const win=window.open('','_blank','width=850,height=1100');
+  if(!win){ toast('⚠️ Permite janelas popup para imprimir.'); return; }
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+@page{size:A4 portrait;margin:0}
+html,body{margin:0;padding:0;background:#fff}
+#pw{width:210mm;padding:7mm;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div id="pw">${content.innerHTML}</div>
+<script>
+window.addEventListener('load',function(){
+  var inner=document.querySelector('.cvpdf');
+  if(inner){
+    // Altura disponível: A4 menos margens (7mm cada) = 283mm ≈ 1069px a 96dpi
+    var avail=1069;
+    var h=inner.scrollHeight;
+    if(h>avail){
+      inner.style.zoom=(avail/h).toFixed(4);
+    }
+  }
+  setTimeout(function(){window.print();},250);
+});
+<\/script>
+</body>
+</html>`);
+  win.document.close();
 });
 
 document.getElementById('btn-edit-game').addEventListener('click',()=>openEventModal(DB.getEvent(gameEventId)));
