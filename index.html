@@ -1321,13 +1321,14 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:56px;height:56px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
       <h1>SC Vianense SAD</h1>
       <p style="opacity:.85">PSE — Percepção Subjetiva de Esforço</p>
+      <div id="pse-squad-badge" style="display:inline-block;margin-top:8px;background:rgba(255,255,255,.2);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700"></div>
     </div>
     <div class="card">
       <div id="pse-success" style="display:none;background:#d4edda;color:#155724;padding:16px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center;font-size:15px">✅ Submetido com sucesso! Obrigado.</div>
       <form id="pse-form" onsubmit="submitPSE(event)">
         <div class="fg" style="margin-bottom:18px">
-          <label style="font-weight:700;font-size:13px">Nome *</label>
-          <input type="text" id="pse-name" required placeholder="O teu nome completo" style="font-size:15px;padding:10px 12px">
+          <label style="font-weight:700;font-size:13px">Número de Camisola *</label>
+          <input type="number" id="pse-name" required min="1" max="99" placeholder="Ex: 7" style="font-size:32px;font-weight:800;padding:12px 16px;text-align:center;letter-spacing:2px;width:100%">
         </div>
         <div class="fg" style="margin-bottom:18px">
           <label style="font-weight:700;font-size:13px">Data do Treino *</label>
@@ -1361,13 +1362,14 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:56px;height:56px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
       <h1>SC Vianense SAD</h1>
       <p style="opacity:.85">Questionário de Saúde e Bem-Estar</p>
+      <div id="well-squad-badge" style="display:inline-block;margin-top:8px;background:rgba(255,255,255,.2);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700"></div>
     </div>
     <div class="card">
       <div id="well-success" style="display:none;background:#d4edda;color:#155724;padding:16px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center;font-size:15px">✅ Submetido com sucesso! Bom treino hoje.</div>
       <form id="well-form" onsubmit="submitWellness(event)">
         <div class="fg" style="margin-bottom:18px">
-          <label style="font-weight:700;font-size:13px">Nome *</label>
-          <input type="text" id="well-name" required placeholder="O teu nome completo" style="font-size:15px;padding:10px 12px">
+          <label style="font-weight:700;font-size:13px">Número de Camisola *</label>
+          <input type="number" id="well-name" required min="1" max="99" placeholder="Ex: 7" style="font-size:32px;font-weight:800;padding:12px 16px;text-align:center;letter-spacing:2px;width:100%">
         </div>
         <div class="fg" style="margin-bottom:18px">
           <label style="font-weight:700;font-size:13px">Data *</label>
@@ -1445,6 +1447,9 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
             <div class="bp-chip" data-bp="Pulso" onclick="toggleBP(this)">Pulso</div>
             <div class="bp-chip" data-bp="Mão" onclick="toggleBP(this)">Mão</div>
             <div class="bp-chip" data-bp="Outro" onclick="toggleBP(this)">Outro</div>
+          </div>
+          <div id="bp-outro-wrap" style="display:none;margin-top:10px">
+            <input type="text" id="bp-outro-text" placeholder="Descreve a zona…" style="font-size:14px;padding:8px 12px;width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
           </div>
         </div>
 
@@ -9523,14 +9528,30 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado! Partilha com os atletas.')).catch(()=>prompt('Copia e partilha este link:',url));
 });
 document.getElementById('nl-pse-link').addEventListener('click',()=>{
-  const sq=coachSquad()||'sub23';
-  const url=location.href.split('?')[0]+`?mode=pse&squad=${sq}`;
-  navigator.clipboard.writeText(url).then(()=>toast('🔗 Link PSE copiado!')).catch(()=>prompt('Link PSE:',url));
+  const sq=coachSquad();
+  if(sq){
+    // Coach só tem acesso ao seu escalão — copia diretamente
+    const url=location.href.split('?')[0]+`?mode=pse&squad=${sq}`;
+    navigator.clipboard.writeText(url).then(()=>toast(`🔗 Link PSE (${SQUADS[sq]||sq}) copiado!`)).catch(()=>prompt('Link PSE:',url));
+  } else {
+    // Admin — mostrar opções para escolher escalão
+    const base=location.href.split('?')[0];
+    const opts=[['Sub-23','sub23'],['Sub-19','sub19'],['Equipa A','eqa']];
+    const msg=opts.map(([l,k])=>`${l}: ${base}?mode=pse&squad=${k}`).join('\n');
+    prompt('Links PSE por escalão (copia o que precisas):', msg);
+  }
 });
 document.getElementById('nl-wellness-link').addEventListener('click',()=>{
-  const sq=coachSquad()||'sub23';
-  const url=location.href.split('?')[0]+`?mode=wellness&squad=${sq}`;
-  navigator.clipboard.writeText(url).then(()=>toast('💤 Link Bem-Estar copiado!')).catch(()=>prompt('Link Bem-Estar:',url));
+  const sq=coachSquad();
+  if(sq){
+    const url=location.href.split('?')[0]+`?mode=wellness&squad=${sq}`;
+    navigator.clipboard.writeText(url).then(()=>toast(`💤 Link Bem-Estar (${SQUADS[sq]||sq}) copiado!`)).catch(()=>prompt('Link Bem-Estar:',url));
+  } else {
+    const base=location.href.split('?')[0];
+    const opts=[['Sub-23','sub23'],['Sub-19','sub19'],['Equipa A','eqa']];
+    const msg=opts.map(([l,k])=>`${l}: ${base}?mode=wellness&squad=${k}`).join('\n');
+    prompt('Links Bem-Estar por escalão (copia o que precisas):', msg);
+  }
 });
 document.getElementById('nl-monitoring').addEventListener('click',()=>nav('monitoring'));
 // Close modals on overlay click
@@ -11623,6 +11644,7 @@ function refreshKitDuplicates(){
 // ══════════════════════════════════════════════════════════════════════════════
 // PSE FORM
 // ══════════════════════════════════════════════════════════════════════════════
+
 const PSE_LABELS={1:'Esforço Mínimo',2:'Muito Fraco',3:'Fraco',4:'Moderado',5:'Médio',6:'Moderadamente Forte',7:'Forte',8:'Muito Forte',9:'Perto do Máximo',10:'Máximo'};
 const WELL_SLEEP_LABELS={1:'Muito bom — sono regenerativo',2:'',3:'Bom — sono não totalmente regenerativo',4:'',5:'Mau — acordei várias vezes',6:'',7:'Muito mau — não consegui dormir'};
 const WELL_STRESS_LABELS={1:'Muito baixo — psicologicamente estável',2:'',3:'Baixo — algum stress acumulado',4:'',5:'Alto — psicologicamente instável',6:'',7:'Muito alto — extremo cansaço acumulado'};
@@ -11642,14 +11664,14 @@ function selectPSE(v){
 
 async function submitPSE(e){
   e.preventDefault();
-  const name=document.getElementById('pse-name').value.trim();
+  const jerseyNumber=parseInt(document.getElementById('pse-name').value);
   const date=document.getElementById('pse-date').value;
   const pse=+document.getElementById('pse-value').value;
-  if(!name||!date||!pse){ toast('Preenche todos os campos.'); return; }
+  if(!jerseyNumber||jerseyNumber<1||jerseyNumber>99||!date||!pse){ toast('Preenche todos os campos.'); return; }
   const btn=e.target.querySelector('[type=submit]');
   btn.disabled=true; btn.textContent='A enviar…';
   try{
-    await DB.addPSE({playerName:name, squad:_pseSquad, date, pse});
+    await DB.addPSE({jerseyNumber, squad:_pseSquad, date, pse});
     document.getElementById('pse-success').style.display='';
     e.target.reset();
     document.querySelectorAll('.pse-btn').forEach(b=>{ b.classList.remove('selected'); b.style.background='var(--bg)'; });
@@ -11683,21 +11705,31 @@ function selectWell(field, v){
 
 function toggleBP(el){
   el.classList.toggle('selected');
+  if(el.dataset.bp==='Outro'){
+    const wrap=document.getElementById('bp-outro-wrap');
+    const txt=document.getElementById('bp-outro-text');
+    if(wrap){ wrap.style.display=el.classList.contains('selected')?'':'none'; }
+    if(txt&&!el.classList.contains('selected')) txt.value='';
+  }
 }
 
 async function submitWellness(e){
   e.preventDefault();
-  const name=document.getElementById('well-name').value.trim();
+  const jerseyNumber=parseInt(document.getElementById('well-name').value);
   const date=document.getElementById('well-date').value;
   const sleep=+document.getElementById('well-sleep').value;
   const stress=+document.getElementById('well-stress').value;
   const soreness=+document.getElementById('well-soreness').value;
-  if(!name||!date||!sleep||!stress||!soreness){ toast('Preenche todos os campos obrigatórios.'); return; }
-  const affectedAreas=[...document.querySelectorAll('.bp-chip.selected')].map(el=>el.dataset.bp);
+  if(!jerseyNumber||jerseyNumber<1||jerseyNumber>99||!date||!sleep||!stress||!soreness){ toast('Preenche todos os campos obrigatórios.'); return; }
+  const outroTxt=(document.getElementById('bp-outro-text')?.value||'').trim();
+  const affectedAreas=[...document.querySelectorAll('.bp-chip.selected')].map(el=>{
+    if(el.dataset.bp==='Outro'&&outroTxt) return outroTxt;
+    return el.dataset.bp;
+  });
   const btn=e.target.querySelector('[type=submit]');
   btn.disabled=true; btn.textContent='A enviar…';
   try{
-    await DB.addWellness({playerName:name, squad:_wellSquad, date, sleepQuality:sleep, stressLevel:stress, muscleSoreness:soreness, affectedAreas});
+    await DB.addWellness({jerseyNumber, squad:_wellSquad, date, sleepQuality:sleep, stressLevel:stress, muscleSoreness:soreness, affectedAreas});
     document.getElementById('well-success').style.display='';
     e.target.reset();
     ['sleep-scale','stress-scale','soreness-scale'].forEach(id=>{
@@ -11706,6 +11738,10 @@ async function submitWellness(e){
     ['well-sleep','well-stress','well-soreness'].forEach(id=>document.getElementById(id).value='');
     ['sleep-lbl','stress-lbl','soreness-lbl'].forEach(id=>document.getElementById(id).textContent='');
     document.querySelectorAll('.bp-chip').forEach(c=>c.classList.remove('selected'));
+    const outrWrap=document.getElementById('bp-outro-wrap');
+    if(outrWrap) outrWrap.style.display='none';
+    const outrTxt=document.getElementById('bp-outro-text');
+    if(outrTxt) outrTxt.value='';
     Object.assign(_wellVals,{sleep:0,stress:0,soreness:0});
   }catch(err){ toast('Erro ao submeter. Tenta novamente.'); console.error(err); }
   btn.disabled=false; btn.textContent='Submeter →';
@@ -11749,58 +11785,73 @@ async function renderMonitoring(){
   const el=document.getElementById('mon-content');
   el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar…</div>';
 
+  // Helper: resolve jersey number → player name/info
+  const sqPlayers=DB.players(sq);
+  const resolvePlayer=(jerseyNumber)=>{
+    const p=sqPlayers.find(p=>(p.number||p.jerseyNumber)==jerseyNumber);
+    return p?{name:dn(p),id:p.id}:{name:`#${jerseyNumber}`,id:null};
+  };
+
   if(_monTab==='pse'){
     const entries=await DB.getPSEEntries(sq, sinceStr);
-    // Group by player name, show latest + 7-day avg
-    const byPlayer={};
+    // Group by jerseyNumber (fallback: playerName para dados antigos)
+    const byKey={};
     entries.forEach(e=>{
-      if(!byPlayer[e.playerName]) byPlayer[e.playerName]=[];
-      byPlayer[e.playerName].push(e);
+      const k=e.jerseyNumber!=null?String(e.jerseyNumber):(e.playerName||'?');
+      if(!byKey[k]) byKey[k]=[];
+      byKey[k].push(e);
     });
-    // Sort: no data last, then by name
-    const names=Object.keys(byPlayer).sort();
-    if(!names.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
+    const keys=Object.keys(byKey).sort((a,b)=>(+a||999)-(+b||999));
+    if(!keys.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
 
-    // Also get players from squad for players with no data yet
-    const sqPlayers=DB.players(sq);
+    const last7start=new Date(date); last7start.setDate(last7start.getDate()-6);
+    const last7str=last7start.toISOString().slice(0,10);
 
-    const cards=names.map(name=>{
-      const list=byPlayer[name].sort((a,b)=>b.date.localeCompare(a.date));
+    const cards=keys.map(k=>{
+      const list=byKey[k].sort((a,b)=>b.date.localeCompare(a.date));
       const latest=list[0];
-      const last7=list.filter(e=>e.date>=new Date(new Date(date).setDate(new Date(date).getDate()-6)).toISOString().slice(0,10));
-      const avg7=last7.length?(last7.reduce((a,b)=>a+b.pse,0)/last7.length).toFixed(1):null;
+      const jerseyNumber=latest.jerseyNumber;
+      const {name}=jerseyNumber!=null?resolvePlayer(jerseyNumber):{name:latest.playerName||k};
+      const last7=list.filter(e=>e.date>=last7str);
+      const avg7=last7.length?(last7.reduce((s,e)=>s+e.pse,0)/last7.length).toFixed(1):null;
       const c=pseColor(latest.pse);
-      const miniBar=list.slice(0,7).reverse().map(e=>`<div title="${e.date}: ${e.pse}" style="width:${Math.round(e.pse/10*100)}%;height:4px;background:${pseColor(e.pse)};border-radius:2px;min-width:3px"></div>`).join('');
+      const miniBar=list.slice(0,7).reverse().map(e=>`<div title="${e.date}: PSE ${e.pse}" style="width:${Math.round(e.pse/10*100)}%;height:4px;background:${pseColor(e.pse)};border-radius:2px;min-width:3px"></div>`).join('');
       return `<div class="mon-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <div class="mon-badge" style="background:${c}22;color:${c}">${latest.pse}</div>
           <div>
             <div class="mon-card-name">${name}</div>
-            <div style="font-size:10px;color:var(--muted)">${latest.date}${avg7?` · Méd. 7d: ${avg7}`:''}</div>
+            <div style="font-size:10px;color:var(--muted)">${jerseyNumber!=null?`#${jerseyNumber} · `:''}${latest.date}${avg7?` · Méd. 7d: ${avg7}`:''}</div>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:2px">${miniBar}</div>
       </div>`;
     }).join('');
 
-    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${names.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
+    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${keys.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
   } else {
     const entries=await DB.getWellnessEntries(sq, sinceStr);
-    const byPlayer={};
+    const byKey={};
     entries.forEach(e=>{
-      if(!byPlayer[e.playerName]) byPlayer[e.playerName]=[];
-      byPlayer[e.playerName].push(e);
+      const k=e.jerseyNumber!=null?String(e.jerseyNumber):(e.playerName||'?');
+      if(!byKey[k]) byKey[k]=[];
+      byKey[k].push(e);
     });
-    const names=Object.keys(byPlayer).sort();
-    if(!names.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
+    const keys=Object.keys(byKey).sort((a,b)=>(+a||999)-(+b||999));
+    if(!keys.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
 
-    const cards=names.map(name=>{
-      const list=byPlayer[name].sort((a,b)=>b.date.localeCompare(a.date));
+    const cards=keys.map(k=>{
+      const list=byKey[k].sort((a,b)=>b.date.localeCompare(a.date));
       const lat=list[0];
+      const jerseyNumber=lat.jerseyNumber;
+      const {name}=jerseyNumber!=null?resolvePlayer(jerseyNumber):{name:lat.playerName||k};
       const cs=wellColor(lat.sleepQuality), cst=wellColor(lat.stressLevel), cm=wellColor(lat.muscleSoreness);
       const areas=(lat.affectedAreas||[]).length?`<div style="font-size:10px;color:#ef4444;margin-top:4px">⚠️ ${lat.affectedAreas.join(', ')}</div>`:'';
       return `<div class="mon-card">
-        <div class="mon-card-name">${name}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          ${jerseyNumber!=null?`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">#${jerseyNumber}</div>`:''}
+          <div class="mon-card-name">${name}</div>
+        </div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:8px">${lat.date}</div>
         <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cs}22;color:${cs}">${lat.sleepQuality}</div><span>😴 Sono</span></div>
         <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cst}22;color:${cst}">${lat.stressLevel}</div><span>🧠 Stress</span></div>
@@ -11809,7 +11860,7 @@ async function renderMonitoring(){
       </div>`;
     }).join('');
 
-    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${names.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
+    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${keys.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
   }
 }
 
@@ -12492,9 +12543,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.classList.add('pm');
     _pseSquad=params.get('squad')||'sub23';
     nav('pse-form');
-    // Pre-fill date with today
     const todayStr=new Date().toISOString().slice(0,10);
     document.getElementById('pse-date').value=todayStr;
+    const SQUAD_NAMES={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
+    const pseBadge=document.getElementById('pse-squad-badge');
+    if(pseBadge){ const lbl=SQUAD_NAMES[_pseSquad]||_pseSquad; pseBadge.textContent=lbl; pseBadge.style.display=lbl?'inline-block':'none'; }
     return;
   }
   if(params.get('mode')==='wellness'){
@@ -12502,8 +12555,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.classList.add('pm');
     _wellSquad=params.get('squad')||'sub23';
     nav('wellness-form');
-    const todayStr=new Date().toISOString().slice(0,10);
-    document.getElementById('well-date').value=todayStr;
+    // Data por defeito = ontem (preenchido de manhã, referente ao treino do dia anterior)
+    const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
+    document.getElementById('well-date').value=yesterday.toISOString().slice(0,10);
+    const SQUAD_NAMES={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
+    const wellBadge=document.getElementById('well-squad-badge');
+    if(wellBadge){ const lbl=SQUAD_NAMES[_wellSquad]||_wellSquad; wellBadge.textContent=lbl; wellBadge.style.display=lbl?'inline-block':'none'; }
     return;
   }
 
