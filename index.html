@@ -7062,7 +7062,10 @@ function sortMin(e){ return e.extra?(e.minute||0)+(e.extra||0)*0.01:(e.minute||0
 
 function liveEvLabel(e){
   function pn(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
-  if(e.type==='goal') return `⚽ <strong>Golo</strong> — ${pn(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
+  if(e.type==='goal'){
+    if(e.ownGoal) return `🔄 <strong>Autogolo</strong>${e.opponentName?` — ${e.opponentName}`:'<span style="color:var(--muted);font-size:11px"> (adversário)</span>'}`;
+    return `⚽ <strong>Golo</strong> — ${pn(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
+  }
   if(e.type==='goal_conceded') return '🥅 <strong>Golo Sofrido</strong>';
   if(e.type==='yellow') return `🟡 <strong>Amarelo</strong> — ${pn(e.playerId)}`;
   if(e.type==='yellow2') return `🟡🔴 <strong>2º Amarelo</strong> — ${pn(e.playerId)}`;
@@ -7762,13 +7765,30 @@ function openLivePicker(type){
 
     // ── GOAL ───────────────────────────────────────────────────────────────
     if(type==='goal'){
-      if(step==='init'){
-        livePending.step='scorer';
+      if(step==='init'){ livePending.step='scorer'; showStep(); return; }
+      if(step==='own-name'){
+        titleEl.textContent='🔄 Autogolo — jogador adversário (opcional)';
+        bodyEl.innerHTML=`
+          <div style="padding:8px 4px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Nome do jogador adversário (opcional)</label>
+            <input id="lv-opp-name" type="text" placeholder="Ex: Jogador Adversário"
+              style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:15px;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
+            <button id="lv-own-save" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center">Guardar Autogolo</button>
+          </div>`;
+        document.getElementById('lv-own-save').addEventListener('click',()=>{
+          const name=document.getElementById('lv-opp-name').value.trim();
+          if(name) livePending.data.opponentName=name;
+          saveLiveEvent();
+        });
+        setTimeout(()=>document.getElementById('lv-opp-name')?.focus(),80);
+      } else if(step==='scorer'){
         playerList('⚽ Quem marcou?', pid=>{
           livePending.data.playerId=pid;
           livePending.step='assist';
           showStep();
-        });
+        }, '🔄 Autogolo (adversário)', ()=>{ livePending.data.ownGoal=true; livePending.step='own-name'; showStep(); });
+        const skipBtn=document.getElementById('pp-skip');
+        if(skipBtn){ skipBtn.style.borderColor='#e67e22'; skipBtn.style.color='#e67e22'; }
       } else if(step==='assist'){
         playerList('Assistência (opcional)',
           pid=>{ livePending.data.assistId=pid; saveLiveEvent(); },
@@ -8563,6 +8583,7 @@ function renderGameGR(ev, sqPlayers, conv, mr){
 // ── ADJUNTO TAB ───────────────────────────────────────────────────────────────
 const ADJ_EVENT_TYPES=[
   {key:'golo',       label:'Golo',         icon:'⚽', color:'#2e7d32'},
+  {key:'autogolo',   label:'Autogolo',     icon:'🔄', color:'#e67e22'},
   {key:'assist',     label:'Assistência',  icon:'🅰️', color:'#1565c0'},
   {key:'yellow',     label:'Amarelo',      icon:'🟨', color:'#f9a825'},
   {key:'red',        label:'Vermelho',     icon:'🟥', color:'#c0392b'},
@@ -8956,8 +8977,10 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
       if(e.type==='goal'){ ourG++; const a=isHome?ourG:theirG,b=isHome?theirG:ourG; scoreBadge=`<span class="sum-score-badge">${a} — ${b}</span>`; }
       else if(e.type==='goal_conceded'){ theirG++; const a=isHome?ourG:theirG,b=isHome?theirG:ourG; scoreBadge=`<span class="sum-score-badge">${a} — ${b}</span>`; }
       let desc='';
-      if(e.type==='goal') desc=`⚽ <strong>${pn(e.playerId)}</strong>${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
-      else if(e.type==='goal_conceded') desc='🥅 <span style="color:var(--muted)">Golo sofrido</span>';
+      if(e.type==='goal'){
+        if(e.ownGoal) desc=`🔄 <strong>Autogolo</strong>${e.opponentName?` <span style="color:var(--muted);font-size:11px">(${e.opponentName})</span>`:''}`;
+        else desc=`⚽ <strong>${pn(e.playerId)}</strong>${e.assistId?` <span style="color:var(--muted);font-size:11px">(${pn(e.assistId)})</span>`:''}`;
+      } else if(e.type==='goal_conceded') desc='🥅 <span style="color:var(--muted)">Golo sofrido</span>';
       else if(e.type==='yellow') desc=`🟡 ${pn(e.playerId)}`;
       else if(e.type==='yellow2') desc=`🟡🔴 ${pn(e.playerId)} <span style="color:var(--muted);font-size:11px">(2º amarelo)</span>`;
       else if(e.type==='red') desc=`🔴 ${pn(e.playerId)} <span style="color:var(--muted);font-size:11px">(direto)</span>`;
@@ -9397,6 +9420,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
             <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
               <select id="me-type" style="${iStyle};cursor:pointer">
                 <option value="goal">⚽ Golo</option>
+                <option value="own_goal">🔄 Autogolo (adv.)</option>
                 <option value="goal_conceded">🥅 Golo Sofrido</option>
                 <option value="yellow">🟡 Cartão Amarelo</option>
                 <option value="red">🔴 Cartão Vermelho</option>
@@ -9466,6 +9490,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     const t=meType.value;
     const sel=`style="${iStyle};cursor:pointer"`;
     if(t==='goal') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Marcador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Assistência (opc.)</label><select id="me-p2" ${sel}>${pOpt(convocados,'Nenhuma')}</select></div>`;
+    else if(t==='own_goal') meExtra.innerHTML=`<div style="flex:1;min-width:200px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador adversário (opc.)</label><input id="me-opp-name" type="text" placeholder="Nome..." style="${iStyle}"></div>`;
     else if(t==='yellow') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
     else if(t==='red') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label><select id="me-red-type" ${sel}><option value="direct">Direto</option><option value="double_yellow">Duplo Amarelo</option></select></div>`;
     else if(t==='sub') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Sai</label><select id="me-p-out" ${sel}>${pOpt(subOut,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Entra</label><select id="me-p-in" ${sel}>${pOpt(subIn,'Jogador...')}</select></div>`;
@@ -9481,6 +9506,9 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     if(t==='goal'){
       const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o marcador'); return; }
       ne.playerId=p1; const p2=document.getElementById('me-p2')?.value; if(p2)ne.assistId=p2;
+    } else if(t==='own_goal'){
+      ne.type='goal'; ne.ownGoal=true;
+      const oppName=document.getElementById('me-opp-name')?.value.trim(); if(oppName) ne.opponentName=oppName;
     } else if(t==='yellow'){
       const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o jogador'); return; }
       ne.playerId=p1;
