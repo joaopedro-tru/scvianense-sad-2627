@@ -9056,10 +9056,11 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const nYel2=evs.filter(e=>e.type==='yellow2').length;
   const nRed=evs.filter(e=>e.type==='red').length;
   const nSub=evs.filter(e=>e.type==='sub').length;
+  const ctrs=mr.counters||{};
   const nShotOn=evs.filter(e=>e.type==='shot_on').length;
   const nShotOff=evs.filter(e=>e.type==='shot_off').length;
   const nFoulC=evs.filter(e=>e.type==='foul_committed').length;
-  const nFoulS=evs.filter(e=>e.type==='foul_suffered').length;
+  const nFoulS=ctrs.foul_suffered||0;  // armazenado em counters, não em events
   const nBallWon=evs.filter(e=>e.type==='ball_won').length;
   const nBallLost=evs.filter(e=>e.type==='ball_lost').length;
   function relStatCell(icon,label,val){
@@ -9081,12 +9082,12 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ${nYel2?relStatCell('🟡🔴','Duplo Am.',nYel2):''}
       ${relStatCell('🔴','Vermelhos',nRed)}
       ${relStatCell('🔄','Subs',nSub)}
-      ${(nShotOn||nShotOff)?relStatCell('🎯','Rem. Golo',nShotOn):''}
-      ${(nShotOn||nShotOff)?relStatCell('💨','Rem. Fora',nShotOff):''}
-      ${(nFoulC||nFoulS)?relStatCell('⚡','F. Com.',nFoulC):''}
-      ${(nFoulC||nFoulS)?relStatCell('🤕','F. Sof.',nFoulS):''}
-      ${(nBallWon||nBallLost)?relStatCell('✊','Recuper.',nBallWon):''}
-      ${(nBallWon||nBallLost)?relStatCell('❌','Perdas',nBallLost):''}
+      ${relStatCell('🎯','Rem. Golo',nShotOn)}
+      ${relStatCell('💨','Rem. Fora',nShotOff)}
+      ${relStatCell('⚡','F. Com.',nFoulC)}
+      ${relStatCell('🤕','F. Sof.',nFoulS)}
+      ${relStatCell('✊','Recuper.',nBallWon)}
+      ${relStatCell('❌','Perdas',nBallLost)}
     </div>
   </div>`;
 
