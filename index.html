@@ -12436,6 +12436,62 @@ function applyRoleUI(){
   }
 }
 
+// ── CALENDAR CLEANUP ──────────────────────────────────────────────────────────
+// Rules:
+//  1. eqa training events up to 2026-08-31 WITHOUT a fichaTreinoUrl — delete
+//     (seeded pre-season trainings with no data attached)
+//  2. Liga 3 eqa games WITHOUT an opponent — delete (seed placeholders)
+//  3. Liga 3 eqa games WITH an opponent — keep; but if two fall on the same
+//     weekend (dates within 3 days), keep only the richest one
+function cleanupSeededEqaGames(){
+  const KEY='scv_cleanup_eqa_v1';
+  if(localStorage.getItem(KEY)) return;
+  const all=DB.events();
+  const toDelete=new Set();
+
+  // Rule 1: eqa trainings up to end of August without a training sheet
+  all.forEach(e=>{
+    if(e.squad==='eqa' && e.type==='training' && e.date && e.date<='2026-08-31' && !e.fichaTreinoUrl){
+      toDelete.add(e.id);
+    }
+  });
+
+  // Rule 2 & 3: Liga 3 eqa games
+  const liga3=all.filter(e=>
+    e.squad==='eqa' && e.type==='game' && e.competition && /liga.?3/i.test(e.competition)
+  );
+
+  // Delete placeholders (no opponent set)
+  liga3.forEach(e=>{ if(!e.opponent) toDelete.add(e.id); });
+
+  // Among games WITH an opponent, group by weekend (dates within 3 days = same jornada)
+  const withOpponent=liga3.filter(e=>e.opponent && !toDelete.has(e.id))
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+  // Group into weekends
+  const groups=[];
+  withOpponent.forEach(g=>{
+    const last=groups[groups.length-1];
+    if(!last){ groups.push([g]); return; }
+    const d0=new Date(last[last.length-1].date+'T12:00:00');
+    const d1=new Date(g.date+'T12:00:00');
+    if(Math.round((d1-d0)/86400000)<=3) last.push(g);
+    else groups.push([g]);
+  });
+
+  // Within each group with duplicates, keep the richest
+  const richness=e=>Object.values(e).filter(v=>v!=null&&v!=='').length;
+  groups.forEach(grp=>{
+    if(grp.length<2) return;
+    const sorted=[...grp].sort((a,b)=>richness(b)-richness(a));
+    sorted.slice(1).forEach(e=>toDelete.add(e.id));
+  });
+
+  toDelete.forEach(id=>DB.deleteEvent(id));
+  if(toDelete.size) console.log(`🧹 cleanupSeededEqaGames: ${toDelete.size} evento(s) removido(s).`);
+  localStorage.setItem(KEY,'1');
+}
+
 // ── LIGA 3 SEED ───────────────────────────────────────────────────────────────
 function deduplicateCalendarEvents(){
   // Runs once to remove duplicate events created by seed functions running multiple times.
@@ -12728,6 +12784,7 @@ function initCoordApp(){
     } else {
       seedIfEmpty();
     }
+    cleanupSeededEqaGames();
     deduplicateCalendarEvents();
     backfillGRAttendance();
     document.getElementById('sync-overlay').style.display='none';
