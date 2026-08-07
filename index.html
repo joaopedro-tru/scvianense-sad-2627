@@ -271,6 +271,9 @@ select.si{cursor:pointer}
 /* TOAST */
 .toast{position:fixed;bottom:22px;right:22px;background:var(--green-d);color:#fff;padding:11px 18px;border-radius:8px;font-size:13.5px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .28s;pointer-events:none;max-width:320px}
 .toast.show{opacity:1;transform:translateY(0)}
+.toast.has-action{pointer-events:auto;display:flex;align-items:center;gap:10px}
+.toast-btn{background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.4);color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+.toast-btn:hover{background:rgba(255,255,255,.38)}
 
 /* EMPTY STATE */
 .es{text-align:center;padding:56px 20px;color:var(--muted)}
@@ -701,7 +704,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
-  <div id="sb-foot">SC Vianense SAD © 2026</div>
+  <div id="sb-foot">SC Vianense SAD © 2026<br><span id="sb-build" style="font-size:10px;opacity:.45"></span></div>
 </aside>
 
 <!-- MAIN -->
@@ -2272,9 +2275,14 @@ const DB = {
   addEvent(e){
     const d=this._d(); e.id=uid(); d.events.push(e); this._s(d);
     if(this._fse()){
-      this._fse().doc(e.id).set(e).catch(err=>{
+      const snap={...e};
+      this._fse().doc(snap.id).set(snap).catch(err=>{
         console.error('FS addEvent:',err);
-        toast('⚠️ Evento guardado localmente mas falhou na cloud. Será re-enviado no próximo arranque.');
+        toastAction('⚠️ Evento não chegou à cloud.','Tentar novamente',()=>{
+          this._fse().doc(snap.id).set(snap)
+            .then(()=>toast('✅ Sincronizado!'))
+            .catch(()=>toast('❌ Falhou de novo. Será re-enviado no próximo arranque.'));
+        });
       });
     }
     return e;
@@ -2283,9 +2291,14 @@ const DB = {
     const d=this._d(); const i=d.events.findIndex(x=>x.id===id);
     if(i>-1){
       d.events[i]={...d.events[i],...u,id}; this._s(d);
-      this._fse()?.doc(id).set(d.events[i]).catch(err=>{
+      const snap={...d.events[i]};
+      this._fse()?.doc(id).set(snap).catch(err=>{
         console.error('FS updateEvent:',err);
-        toast('⚠️ Alteração guardada localmente mas falhou na cloud. Será re-enviada no próximo arranque.');
+        toastAction('⚠️ Alteração não chegou à cloud.','Tentar novamente',()=>{
+          this._fse()?.doc(id).set(snap)
+            .then(()=>toast('✅ Sincronizado!'))
+            .catch(()=>toast('❌ Falhou de novo. Será re-enviado no próximo arranque.'));
+        });
       });
     }
   },
@@ -2658,7 +2671,28 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800) }
+const APP_BUILD='2026-08-07';
+document.addEventListener('DOMContentLoaded',()=>{ const el=document.getElementById('sb-build'); if(el) el.textContent='v'+APP_BUILD; });
+let _toastTimer=null;
+function toast(m){
+  const t=document.getElementById('toast');
+  clearTimeout(_toastTimer);
+  t.classList.remove('has-action'); t.innerHTML=''; t.textContent=m;
+  t.classList.add('show');
+  _toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+function toastAction(m, btnLabel, onAction, dur=9000){
+  const t=document.getElementById('toast');
+  clearTimeout(_toastTimer);
+  t.innerHTML=`<span>${m}</span><button class="toast-btn">${btnLabel}</button>`;
+  t.classList.add('show','has-action');
+  t.querySelector('.toast-btn').addEventListener('click',()=>{
+    t.classList.remove('show','has-action');
+    clearTimeout(_toastTimer);
+    onAction();
+  });
+  _toastTimer=setTimeout(()=>t.classList.remove('show','has-action'), dur);
+}
 function row(l,v){ if(!v||v==='—'||v===''||v===undefined||v===null)return ''; return `<div class="dr"><span class="dl">${l}</span><span class="dv">${v}</span></div>` }
 function shortName(name){ if(!name)return name; const p=name.split('.'); return p[p.length-1] }
 
