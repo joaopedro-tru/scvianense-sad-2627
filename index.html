@@ -8303,6 +8303,9 @@ function renderGame(){
   const conv=ev.convocatoria||{players:{},formation:'',notes:'',concentrationTime:'',concentrationPlace:''};
   const mr=ev.matchReport||{events:[]};
   const clock=mr.matchClock||{phase:'pre'};
+  const gameFinished=(clock.phase==='finished');
+  // GR e Adjunto só ficam visíveis após o jogo terminar
+  if(!gameFinished && (gameTab==='gr'||gameTab==='adj')) gameTab='pre';
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
@@ -8312,8 +8315,9 @@ function renderGame(){
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
       <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
+      ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
-      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
+      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>`:''}
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
