@@ -2271,12 +2271,23 @@ const DB = {
   },
   addEvent(e){
     const d=this._d(); e.id=uid(); d.events.push(e); this._s(d);
-    this._fse()?.doc(e.id).set(e).catch(err=>console.error('FS addEvent:',err));
+    if(this._fse()){
+      this._fse().doc(e.id).set(e).catch(err=>{
+        console.error('FS addEvent:',err);
+        toast('⚠️ Evento guardado localmente mas falhou na cloud. Será re-enviado no próximo arranque.');
+      });
+    }
     return e;
   },
   updateEvent(id,u){
     const d=this._d(); const i=d.events.findIndex(x=>x.id===id);
-    if(i>-1){ d.events[i]={...d.events[i],...u,id}; this._s(d); this._fse()?.doc(id).set(d.events[i]).catch(e=>console.error('FS updateEvent:',e)); }
+    if(i>-1){
+      d.events[i]={...d.events[i],...u,id}; this._s(d);
+      this._fse()?.doc(id).set(d.events[i]).catch(err=>{
+        console.error('FS updateEvent:',err);
+        toast('⚠️ Alteração guardada localmente mas falhou na cloud. Será re-enviada no próximo arranque.');
+      });
+    }
   },
   deleteEvent(id){
     const d=this._d(); d.events=d.events.filter(x=>x.id!==id); this._s(d);
@@ -12601,19 +12612,25 @@ function initCoordApp(){
         }),
         listenAndWait(firestoreDb.collection('events'), snap=>{
           let arr=[]; snap.forEach(d=>arr.push(d.data()));
-          // Filtrar eventos que o utilizador eliminou mas que a cloud ainda pode devolver
+          // Excluir eventos eliminados localmente
           const deletedIds=new Set(JSON.parse(localStorage.getItem('scv_deleted_events')||'[]'));
-          if(deletedIds.size) arr=arr.filter(e=>!deletedIds.has(e.id));
-          // Proteção crítica: nunca sobrescrever com menos eventos do que o que já existe
+          arr=arr.filter(e=>!deletedIds.has(e.id));
           const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]').filter(e=>!deletedIds.has(e.id));
-          if(arr.length>0 && arr.length>=existingE.length){
-            localStorage.setItem('scv_e',JSON.stringify(arr));
-          } else if(arr.length>0 && arr.length<existingE.length){
-            // Merge: manter eventos locais que não vieram do Firestore (podem estar bloqueados por rules)
-            const fsIds=new Set(arr.map(e=>e.id));
-            const onlyLocal=existingE.filter(e=>!fsIds.has(e.id)&&!deletedIds.has(e.id));
-            console.warn(`⚠️ Firestore events (${arr.length}) < localStorage (${existingE.length}) — a fazer merge (${onlyLocal.length} eventos só em local)`);
-            localStorage.setItem('scv_e',JSON.stringify([...arr,...onlyLocal]));
+          const fsIds=new Set(arr.map(e=>e.id));
+          // Eventos locais que não chegaram ao Firestore (escrita falhou, offline, etc.)
+          const orphaned=existingE.filter(e=>!fsIds.has(e.id));
+          if(orphaned.length>0){
+            console.warn(`🔄 ${orphaned.length} evento(s) local(ais) sem confirmação na cloud — a re-enviar...`);
+            orphaned.forEach(e=>
+              firestoreDb.collection('events').doc(e.id).set(e)
+                .then(()=>console.log('✅ evento re-sincronizado:',e.id))
+                .catch(err=>console.error('❌ falhou re-sync evento:',e.id,err))
+            );
+          }
+          // Actualizar localStorage: cloud é fonte de verdade + órfãos a aguardar confirmação
+          // Só substituir se cloud devolveu algo (arr vazio = possível falha de leitura)
+          if(arr.length>0 || existingE.length===0){
+            localStorage.setItem('scv_e',JSON.stringify([...arr,...orphaned]));
           }
         }),
         listenAndWait(firestoreDb.collection('unavailability'), snap=>{
