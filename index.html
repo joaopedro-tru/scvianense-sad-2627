@@ -9945,12 +9945,27 @@ async function uploadFile(file, refId, type){
 // Resolve com a função unsubscribe após o PRIMEIRO snapshot chegar,
 // o que permite usar em Promise.all no startup sem bloquear para sempre.
 // Chamadas subsequentes do listener mantêm o localStorage sempre atualizado.
-function listenAndWait(colRef, onData){
+function listenAndWait(colRef, onData, timeoutMs=10000){
   return new Promise((resolve)=>{
     let resolved=false;
+    const timer=setTimeout(()=>{
+      if(!resolved){
+        resolved=true;
+        console.warn('⏱ listenAndWait timeout (dados locais em uso):',colRef.path||'');
+        resolve(null);
+      }
+    }, timeoutMs);
     const unsub=colRef.onSnapshot(
-      snap=>{ onData(snap); if(!resolved){ resolved=true; resolve(unsub); } },
-      err=>{ console.warn('Listener error:',colRef.path||'',err); if(!resolved){ resolved=true; resolve(null); } }
+      snap=>{
+        clearTimeout(timer);
+        onData(snap);
+        if(!resolved){ resolved=true; resolve(unsub); }
+      },
+      err=>{
+        clearTimeout(timer);
+        console.warn('Listener error:',colRef.path||'',err);
+        if(!resolved){ resolved=true; resolve(null); }
+      }
     );
   });
 }
@@ -12702,6 +12717,16 @@ function initCoordApp(){
           if(arr.length>0 || existingE.length===0){
             localStorage.setItem('scv_e',JSON.stringify([...arr,...orphaned]));
           }
+          // Re-render automático quando chegam dados de outros utilizadores
+          // (só após o arranque — o overlay escondido indica que a app está pronta)
+          const overlay=document.getElementById('sync-overlay');
+          if(overlay && overlay.style.display==='none'){
+            if(view==='live' && !livePending) renderLive();
+            else if(view==='game') renderGame();
+            else if(view==='matchday') renderMatchDay();
+            else if(view==='dashboard') renderDash();
+            else if(view==='calendar') renderCal();
+          }
         }),
         listenAndWait(firestoreDb.collection('unavailability'), snap=>{
           const arr=[]; snap.forEach(d=>arr.push(d.data()));
@@ -12710,11 +12735,15 @@ function initCoordApp(){
       ]);
       window._fsListeners=(window._fsListeners||[]).concat(listeners.filter(Boolean));
       // 2b. One-shot reads para coleções estáticas (raramente mudam)
-      await Promise.all([
-        DB.syncClinicalFromFirestore(),
-        DB.syncStaffProfilesFromFirestore(),
-        DB.syncAthleteDocsFromFirestore(),
-        DB.syncTrialFromFirestore(),
+      // Timeout de 6s para não bloquear o arranque em ligações lentas
+      await Promise.race([
+        Promise.all([
+          DB.syncClinicalFromFirestore(),
+          DB.syncStaffProfilesFromFirestore(),
+          DB.syncAthleteDocsFromFirestore(),
+          DB.syncTrialFromFirestore(),
+        ]),
+        new Promise(r=>setTimeout(()=>{ console.warn('⏱ one-shot syncs timeout'); r(); }, 6000)),
       ]);
       // 3. Operações admin
       if(isAdmin()){
