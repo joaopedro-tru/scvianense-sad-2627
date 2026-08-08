@@ -12680,6 +12680,23 @@ function initCoordApp(){
   setupPhotoZone('sp-photo-circle','sp-photo-input','sp-photo-initials',null);
   applyRoleUI();
   (async()=>{
+    // Timeout master: se qualquer operação bloquear, a app arranca na mesma
+    // com os dados do localStorage. Os listeners activos continuam a sincronizar
+    // em background e o re-render automático actualiza a UI quando chegarem dados.
+    let _started=false;
+    const _finish=()=>{
+      if(_started) return; _started=true;
+      deduplicateCalendarEvents();
+      backfillGRAttendance();
+      document.getElementById('sync-overlay').style.display='none';
+      nav('dashboard');
+    };
+    const _masterTimer=setTimeout(()=>{
+      console.warn('⏱ initCoordApp: timeout master — a arrancar com dados locais');
+      _finish();
+    }, 15000);
+
+    try{
     if(firestoreDb){
       // 1. Migração primeiro (pode escrever dados que os listeners vão ler)
       await migrateLocalToFirestore();
@@ -12757,10 +12774,8 @@ function initCoordApp(){
     } else {
       seedIfEmpty();
     }
-    deduplicateCalendarEvents();
-    backfillGRAttendance();
-    document.getElementById('sync-overlay').style.display='none';
-    nav('dashboard');
+    }catch(e){ console.error('initCoordApp sync error:',e); }
+    finally{ clearTimeout(_masterTimer); _finish(); }
   })();
 }
 
