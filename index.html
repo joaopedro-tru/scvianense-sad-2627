@@ -708,6 +708,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <span id="sb-user">SC Vianense SAD © 2026</span><br>
     <span style="display:flex;align-items:center;gap:8px;margin-top:4px">
       <span id="sb-build" style="font-size:10px;opacity:.45"></span>
+      <span id="sync-status" title="A aguardar dados do servidor…" style="font-size:10px;color:rgba(255,200,0,.7);cursor:default;transition:color .4s">⏳</span>
       <button id="btn-force-sync" title="Descarregar da cloud (sobrescreve dados locais)" onclick="forceSyncFromCloud()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;padding:0;line-height:1" aria-label="Sincronizar da cloud">⟳</button>
     </span>
   </div>
@@ -2896,6 +2897,22 @@ function nav(v,opts={}){
       liveTempLineup=new Set(_mr.lineup||[]);
     }
     show('v-live'); renderLive();
+    // Fresh read do evento no Firestore para garantir convocatória actualizada
+    if(firestoreDb && liveGameId){
+      firestoreDb.collection('events').doc(liveGameId).get().then(doc=>{
+        if(!doc.exists) return;
+        const fresh=doc.data();
+        const evs=JSON.parse(localStorage.getItem('scv_e')||'[]');
+        const idx=evs.findIndex(e=>e.id===liveGameId);
+        if(idx>=0){
+          const loc=evs[idx];
+          // Firestore tem convocatória e restantes campos; local pode ter matchReport mais recente
+          evs[idx]={...fresh, matchReport: loc.matchReport||fresh.matchReport};
+        } else { evs.push(fresh); }
+        localStorage.setItem('scv_e',JSON.stringify(evs));
+        renderLive(); // re-render com dados frescos
+      }).catch(err=>console.warn('Fresh game read:',err));
+    }
   }
   else if(v==='help'){ show('v-help'); setActive('[data-view="help"]'); renderHelp() }
   else if(v==='public-form'){ show('v-pf') }
@@ -9972,6 +9989,25 @@ async function syncFromFirestore(showToast=false){
 }
 
 
+function updateSyncStatus(status){
+  const el=document.getElementById('sync-status');
+  if(!el) return;
+  if(status==='synced'){
+    const t=new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+    el.textContent='●';
+    el.title=`Sincronizado às ${t}`;
+    el.style.color='rgba(100,255,150,.55)';
+  } else if(status==='cache'){
+    el.textContent='⏳';
+    el.title='A aguardar dados do servidor…';
+    el.style.color='rgba(255,200,0,.7)';
+  } else {
+    el.textContent='!';
+    el.title='Erro na ligação ao servidor';
+    el.style.color='rgba(255,100,100,.7)';
+  }
+}
+
 async function forceSyncFromCloud(){
   const btn=document.getElementById('btn-force-sync');
   if(btn){ btn.textContent='…'; btn.style.opacity='.7'; }
@@ -12459,32 +12495,36 @@ function initCoordApp(){
       else if(view==='calendar') renderCal();
     };
 
-    const unsubP=firestoreDb.collection('players').onSnapshot(snap=>{
+    const unsubP=firestoreDb.collection('players').onSnapshot({includeMetadataChanges:true}, snap=>{
       const arr=[]; snap.forEach(d=>arr.push(d.data()));
-      const existingP=JSON.parse(localStorage.getItem('scv_p')||'[]');
-      if(arr.length>0 && arr.length>=existingP.length){
+      const fromCache=snap.metadata.fromCache;
+      if(!fromCache && arr.length>0){
+        // Dados do servidor: Firestore é autoritativo (propaga remoções)
         localStorage.setItem('scv_p',JSON.stringify(arr));
         _rerender();
-      } else if(arr.length>0 && arr.length<existingP.length){
-        console.warn(`⚠️ FS players (${arr.length}) < local (${existingP.length}) — a manter dados locais`);
+      } else if(fromCache && arr.length>0){
+        // Dados de cache: só actualiza se não reduz a lista (evitar apagar dados locais recentes)
+        const existingP=JSON.parse(localStorage.getItem('scv_p')||'[]');
+        if(arr.length>=existingP.length){ localStorage.setItem('scv_p',JSON.stringify(arr)); _rerender(); }
       }
     }, err=>console.warn('players listener:',err));
 
-    const unsubE=firestoreDb.collection('events').onSnapshot(snap=>{
+    const unsubE=firestoreDb.collection('events').onSnapshot({includeMetadataChanges:true}, snap=>{
+      const fromCache=snap.metadata.fromCache;
+      updateSyncStatus(fromCache?'cache':'synced');
+
       let arr=[]; snap.forEach(d=>arr.push(d.data()));
       const deletedIds=new Set(JSON.parse(localStorage.getItem('scv_deleted_events')||'[]'));
       arr=arr.filter(e=>!deletedIds.has(e.id));
       const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]').filter(e=>!deletedIds.has(e.id));
       const localById=Object.fromEntries(existingE.map(e=>[e.id,e]));
-      // Merge: para cada evento do Firestore, verificar se o local tem matchReport
-      // que ainda não chegou à cloud (ex: registo de jogo sem ligação).
-      // Nesse caso o local vence e é re-enviado ao Firestore.
-      // IMPORTANTE: não re-enviamos eventos locais que não estão no Firestore
-      // ("orphaned") — podem ter sido legitimamente eliminados noutro device.
+
+      // Merge: Firestore é autoritativo.
+      // Excepção: se o local tem matchReport e o Firestore não tem, o local vence
+      // (registo de jogo feito sem ligação que ainda não chegou à cloud).
       const merged=arr.map(fsEv=>{
         const loc=localById[fsEv.id];
         if(!loc) return fsEv;
-        // Local tem matchReport e Firestore não → local é mais recente
         if(loc.matchReport && !fsEv.matchReport){
           console.warn(`🔄 matchReport local mais rico para evento ${fsEv.id} — a sincronizar...`);
           firestoreDb.collection('events').doc(fsEv.id).set(loc)
@@ -12495,11 +12535,20 @@ function initCoordApp(){
         return fsEv;
       });
 
-      if(arr.length>0 || existingE.length===0){
+      // Quando temos dados do servidor (não cache), confiamos totalmente no Firestore:
+      // eventos locais que não estão no Firestore foram eliminados noutro device.
+      if(!fromCache){
+        localStorage.setItem('scv_e',JSON.stringify(merged));
+        _rerender();
+      } else if(arr.length>0 || existingE.length===0){
+        // Cache: só actualiza se tivermos dados (evita apagar eventos locais com snapshot vazio)
         localStorage.setItem('scv_e',JSON.stringify(merged));
         _rerender();
       }
-    }, err=>console.warn('events listener:',err));
+    }, err=>{
+      console.warn('events listener:',err);
+      updateSyncStatus('error');
+    });
 
     const unsubU=firestoreDb.collection('unavailability').onSnapshot(snap=>{
       const arr=[]; snap.forEach(d=>arr.push(d.data()));
