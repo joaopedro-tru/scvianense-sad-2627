@@ -2893,7 +2893,31 @@ function nav(v,opts={}){
   else if(v==='sq-trainings'){ squad=opts.squad||squad; show('v-sq-trainings'); setActive(`[data-view="sq-trainings"][data-squad="${squad}"]`); renderSqTrainings() }
   else if(v==='sq-gym'){ squad=opts.squad||squad; show('v-sq-gym'); setActive(`[data-view="sq-gym"][data-squad="${squad}"]`); renderSqGym() }
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
-  else if(v==='game'){ if(opts.id)gameEventId=opts.id; show('v-game'); renderGame() }
+  else if(v==='game'){
+    if(opts.id) gameEventId=opts.id;
+    show('v-game'); renderGame();
+    // Fresh read do Firestore para garantir matchReport e convocatória actualizados
+    if(firestoreDb && gameEventId){
+      firestoreDb.collection('events').doc(gameEventId).get().then(doc=>{
+        if(!doc.exists) return;
+        const fresh=doc.data();
+        const evs=JSON.parse(localStorage.getItem('scv_e')||'[]');
+        const idx=evs.findIndex(e=>e.id===gameEventId);
+        if(idx>=0){
+          const loc=evs[idx];
+          // Preservar matchReport local se Firestore não tiver (registo sem ligação)
+          if(loc.matchReport && !fresh.matchReport){
+            firestoreDb.collection('events').doc(gameEventId).set({...fresh,matchReport:loc.matchReport})
+              .then(()=>toast('✅ Dados do jogo sincronizados.'))
+              .catch(err=>console.error('❌ game sync:',err));
+          }
+          evs[idx]={...fresh, matchReport:loc.matchReport||fresh.matchReport};
+        } else { evs.push(fresh); }
+        localStorage.setItem('scv_e',JSON.stringify(evs));
+        renderGame();
+      }).catch(err=>console.warn('Fresh game read:',err));
+    }
+  }
   else if(v==='matchday'){ show('v-matchday'); setActive('[data-view="matchday"]'); renderMatchDay() }
   else if(v==='weekly-plan'){
     show('v-weekly-plan'); setActive('[data-view="weekly-plan"]');
@@ -3733,11 +3757,13 @@ function renderDash(){
     const isToday=ev.date===today;
     const opponent=ev.opponent||'Adversário';
     const ha=ev.homeAway==='away'?'✈️':'🏠';
+    const mr=ev.matchReport||{};
+    const evList=mr.events||[];
+    const gameWasPlayed=evList.length>0||(mr.matchClock?.phase==='finished');
     let badge='';
-    if(isPast){
-      const mr=ev.matchReport||{};
-      const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
-      const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
+    if(isPast||(isToday&&gameWasPlayed)){
+      const gf=evList.filter(e=>e.type==='goal').length;
+      const ga=evList.filter(e=>e.type==='goal_conceded').length;
       const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
       const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
       badge=`<div style="padding:3px 8px;border-radius:6px;background:${res.c};color:#fff;font-size:11px;font-weight:700;flex-shrink:0">${res.l} ${scoreStr}</div>`;
@@ -7126,22 +7152,24 @@ function renderMatchDay(){
     const goals=evs.filter(e=>e.type==='goal').length;
     const conc=evs.filter(e=>e.type==='goal_conceded').length;
     const hasEvs=evs.length>0;
+    const isFinished=mr.matchClock?.phase==='finished';
+    const gameWasPlayed=hasEvs||isFinished;
     const isHome=g.homeAway!=='away';
     const scoreA=isHome?goals:conc, scoreB=isHome?conc:goals;
-    const teamA=isHome?'SC Vianense SAD':g.opponent||'Adversário';
-    const teamB=isHome?g.opponent||'Adversário':'SC Vianense SAD';
     const squadColor=g.squad==='eqa'?'#333':g.squad==='sub19'?'#b8860b':'var(--blue)';
-    return `<div class="md-card${hasEvs?' live-active':''}" data-live-gm="${g.id}">
+    const resultCol=goals>conc?'#2e7d32':goals<conc?'#c0392b':'#e65100';
+    return `<div class="md-card${gameWasPlayed?' live-active':''}" data-live-gm="${g.id}">
       <div class="md-info">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
           <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e8eef7;color:${squadColor}">${SQUADS[g.squad]||g.squad}</span>
           ${g.competition?`<span style="font-size:10px;color:var(--muted)">${g.competition}</span>`:''}
+          ${isFinished?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${resultCol};color:#fff">${goals>conc?'V':goals<conc?'D':'E'}</span>`:''}
         </div>
         <div class="md-opp">${g.homeAway==='away'?'✈️ ':'🏠 '}vs ${g.opponent||'—'}</div>
         <div class="md-meta">${g.time?g.time+' · ':''}${g.location||'—'}</div>
       </div>
-      ${hasEvs?`<div class="md-score">${scoreA}<span style="font-size:18px;letter-spacing:0;opacity:.5"> — </span>${scoreB}</div>`:''}
-      <button class="md-go">${hasEvs?'▶ Continuar':'▶ Iniciar'}</button>
+      ${gameWasPlayed?`<div class="md-score">${scoreA}<span style="font-size:18px;letter-spacing:0;opacity:.5"> — </span>${scoreB}</div>`:''}
+      <button class="md-go">${isFinished?'📊 Ver Registo':hasEvs?'▶ Continuar':'▶ Iniciar'}</button>
     </div>`;
   }).join('');
   el.querySelectorAll('[data-live-gm]').forEach(el=>el.addEventListener('click',()=>nav('live',{id:el.dataset.liveGm})));
@@ -8170,7 +8198,21 @@ function renderSqGames(){
     const hasConv=conv&&convCount>0;
     const haLabel=ev.homeAway==='away'?'✈️':'🏠';
     const compMeta=ev.competition?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#e8eef7;color:var(--green-d);font-weight:600;flex-shrink:0">${ev.competition}</span>`:'';
-    return sep+`<div class="ei${isPast?' past':''}" style="cursor:pointer" data-gm-id="${ev.id}">
+    const mr=ev.matchReport||{};
+    const evList=mr.events||[];
+    const gameWasPlayed=evList.length>0||(mr.matchClock?.phase==='finished');
+    let resultBadge='';
+    if((isPast||ev.date===today)&&gameWasPlayed){
+      const gf=evList.filter(e=>e.type==='goal').length;
+      const ga=evList.filter(e=>e.type==='goal_conceded').length;
+      const score=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
+      const col=gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100';
+      const lbl=gf>ga?'V':gf<ga?'D':'E';
+      resultBadge=`<span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:700;background:${col};color:#fff">${lbl} ${score}</span>`;
+    } else if(!isPast&&ev.date!==today){
+      resultBadge=`<span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;background:#e8eef7;color:var(--muted)">📋 ${hasConv?convCount:'✗'}</span>`;
+    }
+    return sep+`<div class="ei${isPast||ev.date===today?' past':''}" style="cursor:pointer" data-gm-id="${ev.id}">
       <div class="etd gm"></div>
       <div class="einfo" style="min-width:0">
         <div class="etitle">${haLabel} ${fmtDate(ev.date)} · vs ${ev.opponent||'—'}</div>
@@ -8178,9 +8220,7 @@ function renderSqGames(){
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
         ${compMeta}
-        <span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;${hasConv?'background:#d4edda;color:#155724':'background:#fde8e8;color:#b02020'}">
-          ${hasConv?`📋 ${convCount}`:'📋 ✗'}
-        </span>
+        ${resultBadge}
       </div>
     </div>`;
   }).join('');
