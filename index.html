@@ -2897,7 +2897,8 @@ function nav(v,opts={}){
       liveTempLineup=new Set(_mr.lineup||[]);
     }
     show('v-live'); renderLive();
-    // Fresh read do evento no Firestore para garantir convocatória actualizada
+    // Fresh read do evento no Firestore: garante convocatória actualizada
+    // e recupera matchReport local que não chegou à cloud.
     if(firestoreDb && liveGameId){
       firestoreDb.collection('events').doc(liveGameId).get().then(doc=>{
         if(!doc.exists) return;
@@ -2906,11 +2907,19 @@ function nav(v,opts={}){
         const idx=evs.findIndex(e=>e.id===liveGameId);
         if(idx>=0){
           const loc=evs[idx];
-          // Firestore tem convocatória e restantes campos; local pode ter matchReport mais recente
-          evs[idx]={...fresh, matchReport: loc.matchReport||fresh.matchReport};
+          if(loc.matchReport && !fresh.matchReport){
+            // Local tem stats que não chegaram ao Firestore → re-enviar agora
+            console.warn('🔄 matchReport local não está no Firestore — a re-enviar...');
+            const toSync={...fresh, matchReport:loc.matchReport};
+            firestoreDb.collection('events').doc(liveGameId).set(toSync)
+              .then(()=>{ console.log('✅ matchReport recuperado'); toast('✅ Stats do jogo sincronizadas com a cloud.'); })
+              .catch(err=>{ console.error('❌ matchReport re-send falhou:',err); toast('⚠️ Não foi possível enviar as stats para a cloud.'); });
+          }
+          // Merge: convocatória e campos vêm do Firestore; matchReport local prevalece se existir
+          evs[idx]={...fresh, matchReport:loc.matchReport||fresh.matchReport};
         } else { evs.push(fresh); }
         localStorage.setItem('scv_e',JSON.stringify(evs));
-        renderLive(); // re-render com dados frescos
+        renderLive();
       }).catch(err=>console.warn('Fresh game read:',err));
     }
   }
