@@ -708,7 +708,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <span id="sb-user">SC Vianense SAD © 2026</span><br>
     <span style="display:flex;align-items:center;gap:8px;margin-top:4px">
       <span id="sb-build" style="font-size:10px;opacity:.45"></span>
-      <button id="btn-force-sync" title="Sincronizar com cloud" onclick="forceSyncFromCloud()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;padding:0;line-height:1" aria-label="Sincronizar">⟳</button>
+      <button id="btn-force-sync" title="Descarregar da cloud (sobrescreve dados locais)" onclick="forceSyncFromCloud()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;padding:0;line-height:1" aria-label="Sincronizar da cloud">⟳</button>
+      <button id="btn-push-local" title="Enviar dados locais para a cloud" onclick="pushLocalToCloud()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;padding:0;line-height:1" aria-label="Enviar para cloud">⬆</button>
     </span>
   </div>
 </aside>
@@ -9971,6 +9972,31 @@ async function syncFromFirestore(showToast=false){
   } catch(e){ console.error('syncFromFirestore:',e); if(showToast) toast('❌ Erro ao sincronizar.'); }
 }
 
+async function pushLocalToCloud(){
+  if(!firestoreDb){ toast('⚠️ Firestore não disponível.'); return; }
+  const btn=document.getElementById('btn-push-local');
+  if(btn){ btn.textContent='…'; btn.style.opacity='.7'; }
+  try{
+    const events=JSON.parse(localStorage.getItem('scv_e')||'[]');
+    const players=JSON.parse(localStorage.getItem('scv_p')||'[]');
+    const items=[
+      ...events.map(e=>({col:'events',id:e.id,data:e})),
+      ...players.map(p=>({col:'players',id:p.id,data:p})),
+    ];
+    for(let i=0;i<items.length;i+=400){
+      const batch=firestoreDb.batch();
+      items.slice(i,i+400).forEach(({col,id,data})=>batch.set(firestoreDb.collection(col).doc(id),data));
+      await batch.commit();
+    }
+    toast(`✅ ${events.length} eventos e ${players.length} atletas enviados para a cloud`);
+  } catch(e){
+    console.error('pushLocalToCloud:',e);
+    toast('❌ Erro ao enviar dados para a cloud. Verifica a ligação.');
+  } finally{
+    if(btn){ btn.textContent='⬆'; btn.style.opacity=''; }
+  }
+}
+
 async function forceSyncFromCloud(){
   const btn=document.getElementById('btn-force-sync');
   if(btn){ btn.textContent='…'; btn.style.opacity='.7'; }
@@ -12474,8 +12500,10 @@ function initCoordApp(){
       const deletedIds=new Set(JSON.parse(localStorage.getItem('scv_deleted_events')||'[]'));
       arr=arr.filter(e=>!deletedIds.has(e.id));
       const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]').filter(e=>!deletedIds.has(e.id));
+      const localById=Object.fromEntries(existingE.map(e=>[e.id,e]));
       const fsIds=new Set(arr.map(e=>e.id));
-      // Eventos locais sem confirmação na cloud — re-enviar
+
+      // Eventos locais que não existem no Firestore — re-enviar (ex: write falhou)
       const orphaned=existingE.filter(e=>!fsIds.has(e.id));
       if(orphaned.length>0){
         console.warn(`🔄 ${orphaned.length} evento(s) local(ais) a re-enviar...`);
@@ -12485,8 +12513,26 @@ function initCoordApp(){
             .catch(err=>console.error('❌ re-sync falhou:',e.id,err))
         );
       }
+
+      // Merge: para cada evento do Firestore, verificar se o local tem dados
+      // mais ricos (ex: matchReport registado durante o jogo que não chegou à cloud).
+      // Se sim, a versão local vence e é re-enviada ao Firestore.
+      const merged=arr.map(fsEv=>{
+        const loc=localById[fsEv.id];
+        if(!loc) return fsEv;
+        // Local tem matchReport e Firestore não → local é mais recente
+        if(loc.matchReport && !fsEv.matchReport){
+          console.warn(`🔄 matchReport local mais rico para evento ${fsEv.id} — a sincronizar...`);
+          firestoreDb.collection('events').doc(fsEv.id).set(loc)
+            .then(()=>console.log('✅ matchReport sincronizado:',fsEv.id))
+            .catch(err=>console.error('❌ matchReport sync falhou:',fsEv.id,err));
+          return loc;
+        }
+        return fsEv;
+      });
+
       if(arr.length>0 || existingE.length===0){
-        localStorage.setItem('scv_e',JSON.stringify([...arr,...orphaned]));
+        localStorage.setItem('scv_e',JSON.stringify([...merged,...orphaned]));
         _rerender();
       }
     }, err=>console.warn('events listener:',err));
