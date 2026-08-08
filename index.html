@@ -9974,6 +9974,10 @@ async function syncFromFirestore(showToast=false){
 async function forceSyncFromCloud(){
   const btn=document.getElementById('btn-force-sync');
   if(btn){ btn.textContent='…'; btn.style.opacity='.7'; }
+  // Limpar scv_deleted_events: o Firestore é a fonte de verdade numa sync forçada.
+  // IDs aqui ficam bloqueados pelo onSnapshot mesmo que o evento tenha sido
+  // re-adicionado ao Firestore (ex: apagado por um cleanup entretanto removido).
+  localStorage.removeItem('scv_deleted_events');
   await syncFromFirestore(true);
   if(btn){ btn.textContent='⟳'; btn.style.opacity=''; }
   // Re-render a view activa
@@ -9982,6 +9986,8 @@ async function forceSyncFromCloud(){
   else if(view==='matchday') renderMatchDay();
   else if(view==='dashboard') renderDash();
   else if(view==='calendar') renderCal();
+  else if(view==='sq-games') renderSqGames();
+  else if(view==='sq-trainings') renderSqTrainings();
   else if(view==='squad') renderSquad();
 }
 
