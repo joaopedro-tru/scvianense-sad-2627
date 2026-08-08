@@ -1605,6 +1605,35 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   </div>
 </main>
 
+<!-- MODAL: SAÍDA DE ATLETA -->
+<div class="mo" id="mo-departure">
+  <div class="md" style="max-width:420px">
+    <div class="mh"><h2>Registar Saída</h2><button class="mc" onclick="closeDepartureModal()">✕</button></div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">DATA DE SAÍDA</label>
+        <input type="date" id="dep-date" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">MOTIVO</label>
+        <select id="dep-reason" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text)">
+          <option value="">— Selecionar motivo —</option>
+          <option value="transfer">Transferência</option>
+          <option value="contract_end">Fim de Contrato</option>
+          <option value="termination">Rescisão</option>
+          <option value="loan">Empréstimo</option>
+          <option value="injury">Lesão / Situação Médica</option>
+          <option value="other">Outro</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button onclick="closeDepartureModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;font-size:14px;color:var(--text)">Cancelar</button>
+        <button id="btn-dep-save" onclick="saveDeparture()" style="flex:1;padding:10px;border:none;border-radius:8px;background:var(--red,#c0392b);color:#fff;cursor:pointer;font-size:14px;font-weight:600">Confirmar Saída</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: PLAYER -->
 <div class="mo" id="mo-player">
   <div class="md">
@@ -2264,7 +2293,7 @@ const DB = {
   _s(d){ localStorage.setItem('scv_p',JSON.stringify(d.players)); localStorage.setItem('scv_e',JSON.stringify(d.events)) },
   _fsp(){ return firestoreDb?.collection('players') },
   _fse(){ return firestoreDb?.collection('events') },
-  players(squad){ const p=this._d().players; return squad?p.filter(x=>playerInSquad(x,squad)):p },
+  players(squad,{includeInactive=false}={}){ const p=this._d().players; let ps=includeInactive?p:p.filter(x=>x.status!=='inactive'); return squad?ps.filter(x=>playerInSquad(x,squad)):ps },
   events(squad){ const e=this._d().events; if(!squad||squad==='all')return e; return e.filter(x=>x.squad===squad||x.squad==='both') },
   addPlayer(p){
     const d=this._d(); p.ca=new Date().toISOString(); d.players.push(p); this._s(d);
@@ -3966,13 +3995,14 @@ function setSqView(mode){
 
 function renderSquad(){
   const allPs=DB.players(squad);
+  const inactivePs=DB.players(squad,{includeInactive:true}).filter(p=>p.status==='inactive');
   const search=document.getElementById('p-search')?.value?.toLowerCase()||'';
   const posF=document.getElementById('p-pos-filter')?.value||'';
   let ps=[...allPs];
   if(search)ps=ps.filter(p=>dn(p).toLowerCase().includes(search)||p.name.toLowerCase().includes(search));
   if(posF)ps=ps.filter(p=>p.position===posF);
   document.getElementById('sq-title').textContent=SQUADS[squad]||'Plantel';
-  document.getElementById('sq-sub').textContent=`${allPs.length} atleta${allPs.length!==1?'s':''}`;
+  document.getElementById('sq-sub').textContent=`${allPs.length} atleta${allPs.length!==1?'s':''}${inactivePs.length?` · ${inactivePs.length} saído${inactivePs.length!==1?'s':''}`:'' }`;
 
   const grid=document.getElementById('p-grid');
   const pitchEl=document.getElementById('p-pitch');
@@ -3984,12 +4014,38 @@ function renderSquad(){
   }
   grid.style.display=''; pitchEl.style.display='none'; sf.style.display='';
 
-  if(ps.length===0){ grid.innerHTML=`<div class="es" style="grid-column:1/-1"><div class="ei2">👥</div><h3>Nenhum atleta</h3><p>Clica em "+ Adicionar Atleta" para começar.</p></div>`; return }
-  grid.innerHTML=sortByPos(ps).map(p=>{
+  function playerCard(p,inactive=false){
     const allPos=[p.position,p.position2,p.position3].filter(Boolean);
     const posLabel=allPos.length?allPos.map(x=>POS[x]||x).join(' · '):'—';
-    return `<div class="pc" data-pid="${p.id}">${p.number?`<span class="pnb">#${p.number}</span>`:''}<div class="av">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div><div class="pn">${dn(p)}</div><div class="pp">${posLabel}</div>${age(p.dob)!==null?`<div class="pa">${age(p.dob)} anos</div>`:''}</div>`;
-  }).join('');
+    const dep=p.departure||{};
+    const depLabel=dep.date?`Saiu em ${fmtDate(dep.date)}${dep.reason?' · '+(DEPARTURE_REASONS[dep.reason]||dep.reason):''}`:null;
+    return `<div class="pc${inactive?' pc-inactive':''}" data-pid="${p.id}" style="${inactive?'opacity:.55;':''}">
+      ${p.number?`<span class="pnb">#${p.number}</span>`:''}
+      <div class="av">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
+      <div class="pn">${dn(p)}</div>
+      <div class="pp">${posLabel}</div>
+      ${inactive&&depLabel?`<div class="pa" style="font-size:10px;color:var(--muted)">${depLabel}</div>`:age(p.dob)!==null?`<div class="pa">${age(p.dob)} anos</div>`:''}
+    </div>`;
+  }
+
+  if(ps.length===0&&inactivePs.length===0){ grid.innerHTML=`<div class="es" style="grid-column:1/-1"><div class="ei2">👥</div><h3>Nenhum atleta</h3><p>Clica em "+ Adicionar Atleta" para começar.</p></div>`; return }
+
+  let html=sortByPos(ps).map(p=>playerCard(p,false)).join('');
+
+  if(inactivePs.length>0){
+    const inactiveId='sq-inactive-'+squad;
+    html+=`<div style="grid-column:1/-1;margin-top:24px">
+      <button id="btn-toggle-inactive-${squad}" onclick="(function(){const g=document.getElementById('${inactiveId}');const b=document.getElementById('btn-toggle-inactive-${squad}');const open=g.style.display!=='none';g.style.display=open?'none':'grid';b.querySelector('.dep-ch').textContent=open?'▶':'▼';})()"
+        style="background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:0 0 10px 0;display:flex;align-items:center;gap:6px">
+        <span class="dep-ch">▶</span> Saídos (${inactivePs.length})
+      </button>
+      <div id="${inactiveId}" style="display:none;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">
+        ${sortByPos(inactivePs).map(p=>playerCard(p,true)).join('')}
+      </div>
+    </div>`;
+  }
+
+  grid.innerHTML=html;
   grid.querySelectorAll('.pc').forEach(c=>c.addEventListener('click',()=>nav('player',{id:c.dataset.pid})));
 }
 
@@ -4371,8 +4427,18 @@ function renderPlayer(){
     <button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>
   </div>`;
 
+  const isInactive=p.status==='inactive';
+  const dep=p.departure||{};
+  const departureCard=isInactive?`
+    <div class="card" style="border-left:3px solid var(--red,#c0392b)">
+      <h3 style="color:var(--red,#c0392b);margin-bottom:10px">🚪 Saída do Plantel</h3>
+      ${row('Data de Saída',dep.date?fmtDate(dep.date):null)}
+      ${row('Motivo',dep.reason?DEPARTURE_REASONS[dep.reason]||dep.reason:null)}
+    </div>`:'';
+
   const dadosHTML=`
     <div class="ds">
+      ${departureCard}
       <div class="card"><h3>Dados Pessoais</h3>
         ${row('Data de Nascimento',fmtDate(p.dob))}
         ${row('Nacionalidade',p.nationality)}
@@ -4414,11 +4480,16 @@ function renderPlayer(){
         <h2>${dn(p)}</h2>
         ${p.alcunha?`<div style="font-size:12px;color:var(--muted);margin-top:1px;margin-bottom:2px">${p.name}</div>`:''}
         <div class="bgs">
+          ${isInactive?`<span class="bg" style="background:var(--red,#c0392b);color:#fff;font-weight:700">SAÍDO</span>`:''}
           ${pSquads.map(s=>`<span class="bg bg-g">${SQUADS[s]||s}</span>`).join('')||`<span class="bg bg-g">—</span>`}
           ${[p.position,p.position2,p.position3].filter(Boolean).map(x=>`<span class="bg bg-pos">${x}</span>`).join('')}
           ${p.number?`<span class="bg bg-n">#${p.number}</span>`:''}
           ${a!==null?`<span class="bg bg-n">${a} anos</span>`:''}
         </div>
+        ${isAdmin()?`<div style="margin-top:10px">${isInactive
+          ?`<button onclick="reactivatePlayer()" style="font-size:12px;padding:5px 12px;border:1px solid var(--green);border-radius:6px;background:none;color:var(--green);cursor:pointer">✅ Reativar no Plantel</button>`
+          :`<button onclick="openDepartureModal()" style="font-size:12px;padding:5px 12px;border:1px solid var(--red,#c0392b);border-radius:6px;background:none;color:var(--red,#c0392b);cursor:pointer">🚪 Registar Saída</button>`
+        }</div>`:''}
       </div>
     </div>
     ${tabBar}
@@ -4698,6 +4769,39 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
     submitBtn.innerHTML='Guardar Atleta';
   }
 });
+
+// ── SAÍDA DE ATLETA ───────────────────────────────────────────────────────────
+const DEPARTURE_REASONS={transfer:'Transferência',contract_end:'Fim de Contrato',termination:'Rescisão',loan:'Empréstimo',injury:'Lesão / Situação Médica',other:'Outro'};
+
+function openDepartureModal(){
+  if(!player) return;
+  const dep=player.departure||{};
+  document.getElementById('dep-date').value=dep.date||new Date().toISOString().split('T')[0];
+  document.getElementById('dep-reason').value=dep.reason||'';
+  document.getElementById('mo-departure').classList.add('open');
+}
+function closeDepartureModal(){ document.getElementById('mo-departure').classList.remove('open'); }
+
+function saveDeparture(){
+  if(!player) return;
+  const date=document.getElementById('dep-date').value;
+  const reason=document.getElementById('dep-reason').value;
+  if(!date){ toast('⚠️ Indica a data de saída.'); return; }
+  if(!reason){ toast('⚠️ Indica o motivo da saída.'); return; }
+  DB.updatePlayer(player.id,{status:'inactive',departure:{date,reason}});
+  player={...player,status:'inactive',departure:{date,reason}};
+  closeDepartureModal();
+  toast(`✅ ${dn(player)} registado como saído.`);
+  renderPlayer();
+}
+
+function reactivatePlayer(){
+  if(!player||!confirm(`Reativar ${dn(player)} no plantel?`)) return;
+  DB.updatePlayer(player.id,{status:'active',departure:null});
+  player={...player,status:'active',departure:null};
+  toast(`✅ ${dn(player)} reativado no plantel.`);
+  renderPlayer();
+}
 
 document.getElementById('btn-del-player').addEventListener('click',()=>{
   if(!player||!confirm(`Eliminar ${player.name}?`))return;
