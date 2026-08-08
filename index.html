@@ -3721,20 +3721,27 @@ function renderDash(){
     const today=now.toISOString().split('T')[0];
     const pastGames=es.filter(e=>e.type==='game'&&e.date<today);
     const pastTrainings=es.filter(e=>e.type==='training'&&e.date<today);
-    // Calcular vitórias: contar jogos com mais golos marcados que sofridos
-    const wins=pastGames.filter(g=>{
-      const mr=g.matchReport||{events:[]};
-      const goals=(mr.events||[]).filter(me=>me.type==='goal').length;
-      const conceded=(mr.events||[]).filter(me=>me.type==='goal_conceded').length;
-      return goals>conceded;
-    }).length;
-    const winPct=pastGames.length>0?Math.round(wins/pastGames.length*100):null;
+    function gameRecord(games){
+      let v=0,e=0,d=0;
+      games.forEach(g=>{
+        const mr=g.matchReport||{events:[]};
+        const gf=(mr.events||[]).filter(me=>me.type==='goal').length;
+        const ga=(mr.events||[]).filter(me=>me.type==='goal_conceded').length;
+        if(gf>ga) v++; else if(gf<ga) d++; else if((mr.events||[]).length>0) e++;
+      });
+      return {v,e,d,total:games.length};
+    }
+    const officialGames=pastGames.filter(g=>{ const gt=getGameType(g); return gt==='league'||gt==='cup'; });
+    const friendlyGames=pastGames.filter(g=>getGameType(g)==='friendly');
+    const recOff=gameRecord(officialGames);
+    const recFri=gameRecord(friendlyGames);
+    const winPct=recOff.total>0?Math.round(recOff.v/recOff.total*100):null;
     const squadColor=cs==='eqa'?'#333':cs==='sub19'?'#b8860b':'var(--blue)';
     document.getElementById('d-coach-stats').innerHTML=`
       <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${squadColor}">${ps.length}</div><div class="ss">${SQUADS[cs]}</div></div>
       <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss">esta época</div></div>
-      <div class="sc"><div class="sl">Jogos Realizados</div><div class="sv">${pastGames.length}</div><div class="ss">esta época</div></div>
-      <div class="sc"><div class="sl">% Vitórias</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">${wins} vitória${wins!==1?'s':''} em ${pastGames.length} jogo${pastGames.length!==1?'s':''}</div></div>`;
+      <div class="sc"><div class="sl">🏆 Jogos Oficiais</div><div class="sv">${recOff.total}</div><div class="ss" style="color:var(--green);font-weight:600">${recOff.total?`${recOff.v}V ${recOff.e}E ${recOff.d}D`:'sem jogos'}</div></div>
+      <div class="sc"><div class="sl">% Vitórias Oficiais</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">⚽ Preparação: ${recFri.total?`${recFri.v}V ${recFri.e}E ${recFri.d}D`:'sem jogos'}</div></div>`;
     const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
     const uEl=document.getElementById('d-coach-upcoming');
     uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
@@ -4268,22 +4275,29 @@ function renderPlayer(){
   // ── Compute stats (por escalão) ────────────────────────────────
   const allEvs=DB.events();
   const pSquads=playerSquads(p);
-  function computeSquadStats(sq){
+  // typeFilter: null=todos, 'official'=liga+taça, 'friendly'=preparação
+  function computeSquadStats(sq, typeFilter=null){
     let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0;
     const ratings=[];
-    allEvs.filter(ev=>!sq||ev.squad===sq||(!sq&&true)).forEach(ev=>{
+    allEvs.filter(ev=>!sq||ev.squad===sq).forEach(ev=>{
       if(ev.type==='training'){
+        if(typeFilter) return; // treinos não têm tipo de jogo
         if(sq&&ev.squad!==sq) return;
-        { const s=effectiveAtt(ev.attendance||{},pid,ev.date); if(s===true||s==='condicionado') trainAttended++; }
+        const s=effectiveAtt(ev.attendance||{},pid,ev.date); if(s===true||s==='condicionado') trainAttended++;
       } else if(ev.type==='game'){
         if(sq&&ev.squad!==sq) return;
+        if(typeFilter){
+          const gt=getGameType(ev);
+          const isOff=gt==='league'||gt==='cup';
+          if(typeFilter==='official'&&!isOff) return;
+          if(typeFilter==='friendly'&&isOff) return;
+        }
         const conv=!!(ev.convocatoria?.players?.[pid]);
         if(conv) gamesConv++;
         const mr=ev.matchReport||{};
         const evList=mr.events||[];
         const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
         const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
-        const subbedOut=evList.some(e=>e.type==='sub'&&e.playerOutId===pid);
         if(hasRating||subbedIn) gamesPlayed++;
         evList.forEach(e=>{
           if(e.type==='goal'&&e.playerId===pid) goals++;
@@ -4297,9 +4311,10 @@ function renderPlayer(){
     const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
     return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
   }
-  // Use combined stats for GR and for single-squad players; per-squad when multi
   const statsAll=computeSquadStats(null);
   const {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating}=statsAll;
+  const statsOff=computeSquadStats(null,'official');
+  const statsFri=computeSquadStats(null,'friendly');
 
   // GR stats (only for GR position players)
   let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
@@ -4394,15 +4409,25 @@ function renderPlayer(){
                 </div>
               </div>`;
             }).join('<div style="height:1px;background:var(--border);margin:8px 0"></div>')
-          : `<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
-              ${statBox('Treinos',trainAttended,'presenças')}${statBox('Convocado',gamesConv,'jogos')}${statBox('Jogou',gamesPlayed,'jogos')}${statBox('Média',avgRating??'—','nota')}
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:12px">
-              ${statBox('Golos',goals,'')}${statBox('Assist.',assists,'')}${statBox('Amarelos',yellows,'')}${statBox('Vermelhos',reds,'')}
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr)">
-              ${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}${statBox('Faltas',totalFouls,'')}
-            </div>`}
+          : (()=>{
+              function gameStatsBlock(st, label, accent){
+                return `<div style="border:1.5px solid ${accent}22;border-radius:10px;padding:10px 4px 4px;position:relative;margin-bottom:10px">
+                  <div style="position:absolute;top:-9px;left:12px;background:var(--card,#fff);padding:0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accent}">${label}</div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:4px">
+                    ${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+                    ${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}${statBox('Nota Média',st.avgRating??'—','')}${statBox('','')}
+                  </div>
+                </div>`;
+              }
+              return `<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);margin-bottom:14px">
+                ${statBox('Treinos',trainAttended,'presenças')}${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}
+              </div>
+              ${gameStatsBlock(statsOff,'🏆 Oficiais','var(--primary,#1a56db)')}
+              ${statsOff.gamesConv===0&&statsOff.gamesPlayed===0?'':`<div style="height:4px"></div>`}
+              ${gameStatsBlock(statsFri,'⚽ Preparação','var(--muted,#888)')}`;
+            })()}
       </div>`;
 
     if(!gameRecords.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados.</div>`;
@@ -4410,7 +4435,11 @@ function renderPlayer(){
     const th=(t,align='center')=>`<th style="padding:6px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:${align};white-space:nowrap">${t}</th>`;
     const td=(content,extra='')=>`<td style="padding:6px 5px;vertical-align:top;${extra}">${content}</td>`;
 
-    const rows=gameRecords.map(({ev,gls,ast,ylw,red,sOn,sOff,fouls,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subInMin,subOutMin,minsPlayed,goalEvs,assistEvs,yellowEvs,redEv,shotOnEvs,shotOffEvs,foulEvs})=>{
+    function buildRow({ev,gls,ast,ylw,red,sOn,sOff,fouls,rating,scoreStr,result,resultColor,played,conv,isStarter,subbedIn,subInMin,subOutMin,minsPlayed,goalEvs,assistEvs,yellowEvs,redEv,shotOnEvs,shotOffEvs,foulEvs}){
+      const gt=getGameType(ev);
+      const tipoBadge=gt==='cup'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#7c3aed22;color:#7c3aed">Taça</span>`
+        :gt==='friendly'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#88888822;color:#666">Prep.</span>`
+        :`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#1a56db22;color:#1a56db">Liga</span>`;
       const roleStr=played
         ?(isStarter
           ?`<span style="color:var(--ok);font-size:11px;font-weight:700">Tit.${subOutMin?`<br><span style="font-size:9px;color:var(--muted)">↓${subOutMin}'</span>`:''}</span>`
@@ -4418,7 +4447,7 @@ function renderPlayer(){
         :`<span style="color:var(--muted);font-size:10px">Conv.</span>`;
       const minsStr=minsPlayed!==null?`<span style="font-size:11px;font-weight:600">${minsPlayed}'</span>`:'—';
       return `<tr style="border-bottom:1px solid var(--border)">
-        ${td(`<span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>`)}
+        ${td(`<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>${tipoBadge}</div>`)}
         ${td(`<span style="font-size:12px;font-weight:600">${ev.homeAway==='away'?'✈️':'🏠'} ${ev.opponent||'—'}</span>`,'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
         ${td(`<span style="font-size:12px;font-weight:700;color:${resultColor}">${result||''}${result?' ':''}</span><span style="font-size:12px;font-weight:600">${scoreStr}</span>`,'text-align:center')}
         ${td(roleStr,'text-align:center')}
@@ -4432,7 +4461,19 @@ function renderPlayer(){
         ${td(redEv?evCell([redEv],'🔴',''):'')}
         ${td(rating!==null?`<span style="background:var(--green);color:#fff;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">${rating.toFixed(1)}</span>`:'','text-align:center')}
       </tr>`;
-    }).join('');
+    }
+
+    const officialRecs=gameRecords.filter(r=>{ const gt=getGameType(r.ev); return gt==='league'||gt==='cup'; });
+    const friendlyRecs=gameRecords.filter(r=>getGameType(r.ev)==='friendly');
+
+    function sectionHeader(label){
+      return `<tr><td colspan="13" style="padding:10px 8px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);background:var(--bg)">${label}</td></tr>`;
+    }
+
+    const allRows=[
+      ...(officialRecs.length?[sectionHeader('🏆 Jogos Oficiais'),...officialRecs.map(buildRow)]:[]),
+      ...(friendlyRecs.length?[sectionHeader('⚽ Preparação'),...friendlyRecs.map(buildRow)]:[]),
+    ].join('');
 
     return aggregateSummary+`
       <div class="card" style="padding:0;overflow:hidden">
@@ -4441,7 +4482,7 @@ function renderPlayer(){
             <thead><tr style="background:var(--bg);border-bottom:2px solid var(--border)">
               ${th('Data','left')}${th('Adversário','left')}${th('Res.')}${th('Papel')}${th('Min')}${th('⚽')}${th('🅰️')}${th('🎯')}${th('💨')}${th('⚡')}${th('🟡')}${th('🔴')}${th('Nota')}
             </tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${allRows}</tbody>
           </table>
         </div>
       </div>`;
