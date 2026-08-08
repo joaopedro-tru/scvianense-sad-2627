@@ -704,7 +704,13 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
   <div id="btn-logout" class="nl" style="margin-bottom:4px;color:rgba(255,255,255,.45)"><span class="ic">🔒</span> Sair</div>
-  <div id="sb-foot"><span id="sb-user">SC Vianense SAD © 2026</span><br><span id="sb-build" style="font-size:10px;opacity:.45"></span></div>
+  <div id="sb-foot">
+    <span id="sb-user">SC Vianense SAD © 2026</span><br>
+    <span style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <span id="sb-build" style="font-size:10px;opacity:.45"></span>
+      <button id="btn-force-sync" title="Sincronizar com cloud" onclick="forceSyncFromCloud()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:13px;padding:0;line-height:1" aria-label="Sincronizar">⟳</button>
+    </span>
+  </div>
 </aside>
 
 <!-- MAIN -->
@@ -9963,6 +9969,20 @@ async function syncFromFirestore(showToast=false){
     }
     if(showToast) toast(`✅ Sincronizado — ${players.length} atletas, ${events.length} eventos`);
   } catch(e){ console.error('syncFromFirestore:',e); if(showToast) toast('❌ Erro ao sincronizar.'); }
+}
+
+async function forceSyncFromCloud(){
+  const btn=document.getElementById('btn-force-sync');
+  if(btn){ btn.textContent='…'; btn.style.opacity='.7'; }
+  await syncFromFirestore(true);
+  if(btn){ btn.textContent='⟳'; btn.style.opacity=''; }
+  // Re-render a view activa
+  if(view==='live'&&!livePending) renderLive();
+  else if(view==='game') renderGame();
+  else if(view==='matchday') renderMatchDay();
+  else if(view==='dashboard') renderDash();
+  else if(view==='calendar') renderCal();
+  else if(view==='squad') renderSquad();
 }
 
 // Migração única: sobe dados do localStorage para o Firestore
