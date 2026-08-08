@@ -1659,12 +1659,12 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <div class="fg"><label>Morada</label><input type="text" id="f-addr"></div>
       <div class="fst">Dados Desportivos</div>
       <div class="fr">
-        <div class="fg"><label>Escalão(ões) *</label>
-          <div id="f-squads-wrap" style="display:flex;gap:14px;padding:8px 0;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-eqa"> Equipa A</label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-sub23"> Sub-23</label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="f-sq-sub19"> Sub-19</label>
-          </div>
+        <div class="fg"><label>Escalão *</label>
+          <select id="f-squad">
+            <option value="eqa">Equipa A</option>
+            <option value="sub23">Sub-23</option>
+            <option value="sub19">Sub-19</option>
+          </select>
         </div>
         <div class="fg"><label>Posição Principal</label>
           <select id="f-pos">
@@ -2281,10 +2281,9 @@ function compressImage(file, maxPx=600, quality=0.70) {
 
 
 // ── PLAYER SQUAD HELPERS ──────────────────────────────────────────────────────
-// Suporte a atleta em múltiplos escalões simultaneamente.
-// squads[] tem prioridade; squad (string) é mantido para compatibilidade.
-function playerSquads(p){ return (Array.isArray(p.squads)&&p.squads.length)?p.squads:(p.squad?[p.squad]:[]) }
-function playerInSquad(p,sq){ return playerSquads(p).includes(sq) }
+// Cada atleta pertence a um só escalão (p.squad). squads[] mantido só para retro-compatibilidade.
+function playerSquads(p){ return p.squad?[p.squad]:(Array.isArray(p.squads)&&p.squads.length?[p.squads[0]]:[]) }
+function playerInSquad(p,sq){ return (p.squad||(p.squads&&p.squads[0]))===sq }
 
 // ── DATA LAYER (localStorage cache + Firestore cloud) ─────────────────────────
 // Leituras: localStorage (rápido/síncrono). Escritas: localStorage + Firestore em paralelo.
@@ -4275,6 +4274,7 @@ function renderPlayer(){
   // ── Compute stats (por escalão) ────────────────────────────────
   const allEvs=DB.events();
   const pSquads=playerSquads(p);
+  const primarySq=pSquads[0]||squad;
   // typeFilter: null=todos, 'official'=liga+taça, 'friendly'=preparação
   function computeSquadStats(sq, typeFilter=null){
     let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0;
@@ -4311,10 +4311,15 @@ function renderPlayer(){
     const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
     return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
   }
-  const statsAll=computeSquadStats(null);
+  const statsAll=computeSquadStats(primarySq);
   const {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating}=statsAll;
-  const statsOff=computeSquadStats(null,'official');
-  const statsFri=computeSquadStats(null,'friendly');
+  const statsOff=computeSquadStats(primarySq,'official');
+  const statsFri=computeSquadStats(primarySq,'friendly');
+  // Outras participações (outros escalões)
+  const otherSqStats=computeSquadStats(null);
+  const otherTrainAttended=otherSqStats.trainAttended-trainAttended;
+  const otherGamesConv=otherSqStats.gamesConv-statsAll.gamesConv;
+  const otherGamesPlayed=otherSqStats.gamesPlayed-statsAll.gamesPlayed;
 
   // GR stats (only for GR position players)
   let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
@@ -4394,40 +4399,33 @@ function renderPlayer(){
     const totalShotOff=gameRecords.reduce((s,r)=>s+r.sOff,0);
     const totalFouls=gameRecords.reduce((s,r)=>s+r.fouls,0);
 
+    // Bloco visual de stats de jogo (oficial ou preparação), reutilizável
+    function gameStatsBlock(st, label, accent){
+      return `<div style="border:1.5px solid ${accent}22;border-radius:10px;padding:10px 4px 4px;position:relative;margin-bottom:10px">
+        <div style="position:absolute;top:-9px;left:12px;background:var(--card,#fff);padding:0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accent}">${label}</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:4px">
+          ${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+          ${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}${statBox('Nota Média',st.avgRating??'—','')}${statBox('','')}
+        </div>
+      </div>`;
+    }
+
     const aggregateSummary=`
       <div class="card" style="margin-bottom:0">
-        ${pSquads.length>1
-          ? pSquads.map(sq=>{
-              const st=computeSquadStats(sq);
-              return `<div style="margin-bottom:10px">
-                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">${SQUADS[sq]}</div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:8px">
-                  ${statBox('Treinos',st.trainAttended,'presenças')}${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Média',st.avgRating??'—','nota')}
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-                  ${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}
-                </div>
-              </div>`;
-            }).join('<div style="height:1px;background:var(--border);margin:8px 0"></div>')
-          : (()=>{
-              function gameStatsBlock(st, label, accent){
-                return `<div style="border:1.5px solid ${accent}22;border-radius:10px;padding:10px 4px 4px;position:relative;margin-bottom:10px">
-                  <div style="position:absolute;top:-9px;left:12px;background:var(--card,#fff);padding:0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accent}">${label}</div>
-                  <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:4px">
-                    ${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}
-                  </div>
-                  <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-                    ${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}${statBox('Nota Média',st.avgRating??'—','')}${statBox('','')}
-                  </div>
-                </div>`;
-              }
-              return `<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);margin-bottom:14px">
-                ${statBox('Treinos',trainAttended,'presenças')}${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}
-              </div>
-              ${gameStatsBlock(statsOff,'🏆 Oficiais','var(--primary,#1a56db)')}
-              ${statsOff.gamesConv===0&&statsOff.gamesPlayed===0?'':`<div style="height:4px"></div>`}
-              ${gameStatsBlock(statsFri,'⚽ Preparação','var(--muted,#888)')}`;
-            })()}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);margin-bottom:14px">
+          ${statBox('Treinos',trainAttended,'presenças')}${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}
+        </div>
+        ${gameStatsBlock(statsOff,'🏆 Oficiais','var(--primary,#1a56db)')}
+        ${gameStatsBlock(statsFri,'⚽ Preparação','var(--muted,#888)')}
+        ${(otherTrainAttended>0||otherGamesConv>0||otherGamesPlayed>0)?`
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🔄 Outras Participações</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr)">
+            ${statBox('Treinos',otherTrainAttended,'presenças')}${statBox('Convocado',otherGamesConv,'jogos')}${statBox('Jogou',otherGamesPlayed,'jogos')}
+          </div>
+        </div>`:''}
       </div>`;
 
     if(!gameRecords.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados.</div>`;
@@ -4440,6 +4438,8 @@ function renderPlayer(){
       const tipoBadge=gt==='cup'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#7c3aed22;color:#7c3aed">Taça</span>`
         :gt==='friendly'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#88888822;color:#666">Prep.</span>`
         :`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#1a56db22;color:#1a56db">Liga</span>`;
+      const sqColor=ev.squad==='eqa'?'#333':ev.squad==='sub19'?'#b8860b':'var(--blue)';
+      const squadBadge=ev.squad!==primarySq?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:${sqColor}18;color:${sqColor}">${SQUADS[ev.squad]||ev.squad}</span>`:'';
       const roleStr=played
         ?(isStarter
           ?`<span style="color:var(--ok);font-size:11px;font-weight:700">Tit.${subOutMin?`<br><span style="font-size:9px;color:var(--muted)">↓${subOutMin}'</span>`:''}</span>`
@@ -4447,7 +4447,7 @@ function renderPlayer(){
         :`<span style="color:var(--muted);font-size:10px">Conv.</span>`;
       const minsStr=minsPlayed!==null?`<span style="font-size:11px;font-weight:600">${minsPlayed}'</span>`:'—';
       return `<tr style="border-bottom:1px solid var(--border)">
-        ${td(`<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>${tipoBadge}</div>`)}
+        ${td(`<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>${tipoBadge}${squadBadge}</div>`)}
         ${td(`<span style="font-size:12px;font-weight:600">${ev.homeAway==='away'?'✈️':'🏠'} ${ev.opponent||'—'}</span>`,'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
         ${td(`<span style="font-size:12px;font-weight:700;color:${resultColor}">${result||''}${result?' ':''}</span><span style="font-size:12px;font-weight:600">${scoreStr}</span>`,'text-align:center')}
         ${td(roleStr,'text-align:center')}
@@ -4463,16 +4463,19 @@ function renderPlayer(){
       </tr>`;
     }
 
-    const officialRecs=gameRecords.filter(r=>{ const gt=getGameType(r.ev); return gt==='league'||gt==='cup'; });
-    const friendlyRecs=gameRecords.filter(r=>getGameType(r.ev)==='friendly');
-
     function sectionHeader(label){
       return `<tr><td colspan="13" style="padding:10px 8px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);background:var(--bg)">${label}</td></tr>`;
     }
 
+    // Separar registos: escalão principal vs outros escalões
+    const primaryRecs=gameRecords.filter(r=>r.ev.squad===primarySq);
+    const otherRecs=gameRecords.filter(r=>r.ev.squad!==primarySq);
+    const officialRecs=primaryRecs.filter(r=>{ const gt=getGameType(r.ev); return gt==='league'||gt==='cup'; });
+    const friendlyRecs=primaryRecs.filter(r=>getGameType(r.ev)==='friendly');
     const allRows=[
       ...(officialRecs.length?[sectionHeader('🏆 Jogos Oficiais'),...officialRecs.map(buildRow)]:[]),
       ...(friendlyRecs.length?[sectionHeader('⚽ Preparação'),...friendlyRecs.map(buildRow)]:[]),
+      ...(otherRecs.length?[sectionHeader('🔄 Outras Participações'),...otherRecs.map(buildRow)]:[]),
     ].join('');
 
     return aggregateSummary+`
@@ -4517,7 +4520,7 @@ function renderPlayer(){
       <div class="card"><h3>Dados Desportivos</h3>
         ${row('Posição',[p.position,p.position2,p.position3].filter(Boolean).map(x=>POS[x]||x).join(' · ')||null)}
         ${row('Pé Dominante',FEET[p.dominantFoot])}
-        ${row('Escalão',pSquads.map(s=>SQUADS[s]||s).join(' / ')||null)}
+        ${row('Escalão',SQUADS[primarySq]||primarySq||null)}
         ${row('Clube Anterior',p.previousClub)}
         ${row('Data de Inscrição',p.enrolledAt?fmtDate(p.enrolledAt):null)}
         ${(()=>{const _d=DB.getAthleteDoc(pid)||{};const jn=p.jerseyName||_d.jerseyName;const js=p.jerseySize||_d.jerseySize;const jnum=p.jerseyNumber??_d.jerseyNumber;if(!jn&&!js&&!jnum)return'';return`<div style="border-top:1px solid var(--border);margin:8px 0;grid-column:1/-1"></div><div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--primary);padding-bottom:4px">🎽 Equipamento</div>${row('Nome na Camisola',jn?`<span style="font-weight:700;letter-spacing:1px">${jn}</span>`:null)}${row('Tamanho',js||null)}${row('Nº Camisola',jnum!=null?`#${jnum}`:null)}`;})()}
@@ -4740,8 +4743,9 @@ function openPlayerModal(p=null){
   f('f-email').value=p?.email||'';
   f('f-addr').value=p?.address||'';
   const _sq = coachSquad();
-  const _pSquads=p?playerSquads(p):(_sq?[_sq]:(squad?[squad]:['sub19']));
-  ['eqa','sub23','sub19'].forEach(s=>{const el=document.getElementById('f-sq-'+s);if(el){el.checked=_pSquads.includes(s);el.disabled=!!_sq;}});
+  const _defaultSq=p?playerSquads(p)[0]:(_sq||squad||'sub19');
+  const sqEl=document.getElementById('f-squad');
+  if(sqEl){sqEl.value=_defaultSq||'sub19';sqEl.disabled=!!_sq;}
   f('f-pos').value=p?.position||'';
   f('f-pos2').value=p?.position2||'';
   f('f-pos3').value=p?.position3||'';
@@ -4791,8 +4795,7 @@ document.getElementById('mo-p-form').addEventListener('submit', async e=>{
       id:pid,
       name:f('f-name'),alcunha:f('f-alias').trim()||null,dob:f('f-dob'),nationality:f('f-nat'),nif:f('f-nif'),
       phone:f('f-phone'),email:f('f-email'),address:f('f-addr'),
-      squads:(()=>{const ss=['eqa','sub23','sub19'].filter(s=>document.getElementById('f-sq-'+s)?.checked);if(!ss.length){toast('⚠️ Seleciona pelo menos um escalão');throw new Error('no squad');}return ss;})(),
-      squad:(()=>{const ss=['eqa','sub23','sub19'].filter(s=>document.getElementById('f-sq-'+s)?.checked);return ss[0]||'sub19';})(),
+      squad:(()=>{const s=document.getElementById('f-squad')?.value;if(!s){toast('⚠️ Seleciona um escalão');throw new Error('no squad');}return s;})(),
       position:f('f-pos'),position2:f('f-pos2')||null,position3:f('f-pos3')||null,dominantFoot:f('f-foot'),
       enrolledAt:f('f-enrolled'),previousClub:document.getElementById('f-renewal').checked?'Renovação':f('f-prevclub'),height:f('f-h'),weight:f('f-w'),
       injuries:f('f-inj'),shirtSize:f('f-shirt-size')||null,
