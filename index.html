@@ -440,6 +440,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
 /* ── MOBILE HAMBURGER ──────────────────────────────────── */
 #mob-menu-btn{display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--green-d);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #mob-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99}
+#gcal-pdf-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:298}
 
 /* ── LAYOUT 2-COL HELPER ─────────────────────────────── */
 .g2col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
@@ -524,6 +525,10 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   /* Admin dashboard — mobile: tabs */
   #d-admin-tab-bar{display:flex}
   #d-admin-cols{display:block!important;margin-bottom:14px!important}
+
+  /* PDF popover → bottom sheet on mobile */
+  #gcal-pdf-popover{position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;max-width:100%!important;border-radius:16px 16px 0 0!important;max-height:80vh;overflow-y:auto;z-index:300!important}
+  #gcal-pdf-backdrop{display:block}
 }
 
 /* Tablet: 2-column dashboard */
@@ -647,6 +652,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
 <!-- MOBILE HAMBURGER + BACKDROP -->
 <button id="mob-menu-btn" aria-label="Menu">☰</button>
 <div id="mob-backdrop"></div>
+<div id="gcal-pdf-backdrop"></div>
 
 <!-- SIDEBAR -->
 <aside id="sb">
@@ -8276,14 +8282,18 @@ function renderSqGames(){
   const allChk=document.getElementById('gcal-all-dates');
   const rangeGrp=document.getElementById('gcal-range-grp');
   if(pdfBtn&&popover){
-    pdfBtn.onclick=(e)=>{ e.stopPropagation(); popover.style.display=popover.style.display==='none'?'block':'none'; };
-    document.addEventListener('click',(e)=>{ if(!popover.contains(e.target)&&e.target!==pdfBtn) popover.style.display='none'; },{capture:false,once:false});
+    const pdfBackdrop=document.getElementById('gcal-pdf-backdrop');
+    function showPopover(){ popover.style.display='block'; if(pdfBackdrop) pdfBackdrop.style.display='block'; }
+    function hidePopover(){ popover.style.display='none'; if(pdfBackdrop) pdfBackdrop.style.display='none'; }
+    pdfBtn.onclick=(e)=>{ e.stopPropagation(); popover.style.display==='none'?showPopover():hidePopover(); };
+    if(pdfBackdrop) pdfBackdrop.onclick=()=>hidePopover();
+    document.addEventListener('click',(e)=>{ if(!popover.contains(e.target)&&e.target!==pdfBtn) hidePopover(); },{capture:false,once:false});
     allChk.onchange=()=>{ rangeGrp.style.display=allChk.checked?'none':'block'; };
     document.getElementById('btn-gcal-gen').onclick=()=>{
       const from=allChk.checked?null:document.getElementById('gcal-from').value||null;
       const to=allChk.checked?null:document.getElementById('gcal-to').value||null;
       const fmt=document.querySelector('input[name="gcal-fmt"]:checked')?.value||'full';
-      popover.style.display='none';
+      hidePopover();
       generateGameCalendarPDF(squad,from,to,fmt);
     };
   }
