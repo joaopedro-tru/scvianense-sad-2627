@@ -2315,6 +2315,22 @@ const DB = {
       const arr=[]; snap.forEach(d=>arr.push(d.data())); return arr;
     }catch(e){ console.error('getWellnessEntries:',e); return []; }
   },
+  async deletePSE(id){
+    if(!firestoreDb) return;
+    await firestoreDb.collection('pse_entries').doc(id).delete().catch(e=>console.error('FS deletePSE:',e));
+  },
+  async deleteWellness(id){
+    if(!firestoreDb) return;
+    await firestoreDb.collection('wellness_entries').doc(id).delete().catch(e=>console.error('FS deleteWellness:',e));
+  },
+  async updatePSEJersey(id, jerseyNumber){
+    if(!firestoreDb) return;
+    await firestoreDb.collection('pse_entries').doc(id).update({jerseyNumber}).catch(e=>console.error('FS updatePSEJersey:',e));
+  },
+  async updateWellnessJersey(id, jerseyNumber){
+    if(!firestoreDb) return;
+    await firestoreDb.collection('wellness_entries').doc(id).update({jerseyNumber}).catch(e=>console.error('FS updateWellnessJersey:',e));
+  },
   getPlayer(id){ return this._d().players.find(x=>x.id===id) },
   // ── Clinical Records ─────────────────────────────────────────────────────────
   _fscr(){ return firestoreDb?.collection('clinicalRecords') },
@@ -12182,6 +12198,11 @@ async function renderMonitoring(){
 
   const fmtTime=(iso)=>iso?new Date(iso).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):null;
   const crossBadge=(sq2)=>sq2?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:#1a56db18;color:#1a56db;margin-left:4px">${SQUADS[sq2]||sq2}</span>`:'';
+  const canEdit=isAdmin()||isStaff();
+  const actBar=(id,type)=>canEdit?`<div style="display:flex;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+    <button onclick="monEditJersey('${id}','${type}',this)" style="flex:1;padding:4px 0;font-size:11px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer">✏️ Nº camisola</button>
+    <button onclick="monDeleteEntry('${id}','${type}')" style="padding:4px 8px;font-size:11px;border:1px solid #fca5a5;border-radius:6px;background:none;color:#dc2626;cursor:pointer">🗑️</button>
+  </div>`:'';
 
   // Daily team average summary block
   const avgBlock=(avg,count,label,color)=>`
@@ -12225,6 +12246,7 @@ async function renderMonitoring(){
           </div>
         </div>
         <div style="display:flex;gap:2px">${miniBar}</div>
+        ${actBar(e.id,'pse')}
       </div>`;
     });
 
@@ -12270,12 +12292,49 @@ async function renderMonitoring(){
         <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cst}22;color:${cst}">${e.stressLevel}</div><span>🧠 Stress</span></div>
         <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cm}22;color:${cm}">${e.muscleSoreness}</div><span>💪 Dores</span></div>
         ${areas}
+        ${actBar(e.id,'wellness')}
       </div>`;
     });
 
     const noData=dayEntries.length===0?`<div style="color:var(--muted);padding:20px;font-size:13px">Sem respostas Bem-Estar para ${fmtDate(date)}.</div>`:'';
     el.innerHTML=avgBlock(dayAvgNum,dayEntries.length,'Média Bem-Estar do Dia',avgWellColor)+`<div class="mon-grid">${cards.join('')}</div>`+noData;
   }
+}
+
+async function monDeleteEntry(id, type){
+  if(!confirm('Eliminar este registo?')) return;
+  try{
+    if(type==='pse') await DB.deletePSE(id);
+    else await DB.deleteWellness(id);
+    toast('🗑️ Registo eliminado');
+    renderMonitoring();
+  }catch(e){ toast('❌ Erro ao eliminar.'); console.error(e); }
+}
+
+function monEditJersey(id, type, btn){
+  // Toggle inline edit UI
+  const card=btn.closest('.mon-card');
+  if(card.querySelector('.mon-jersey-edit')) { card.querySelector('.mon-jersey-edit').remove(); return; }
+  const wrap=document.createElement('div');
+  wrap.className='mon-jersey-edit';
+  wrap.style.cssText='display:flex;gap:6px;margin-top:8px';
+  wrap.innerHTML=`<input type="number" min="1" max="99" placeholder="Novo nº" style="flex:1;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)">
+    <button style="padding:5px 12px;background:var(--green-d);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">✓</button>`;
+  const inp=wrap.querySelector('input');
+  const ok=wrap.querySelector('button');
+  ok.onclick=async()=>{
+    const jn=parseInt(inp.value);
+    if(!jn||jn<1||jn>99){ toast('⚠️ Nº inválido (1–99)'); return; }
+    ok.disabled=true; ok.textContent='…';
+    try{
+      if(type==='pse') await DB.updatePSEJersey(id,jn);
+      else await DB.updateWellnessJersey(id,jn);
+      toast('✅ Nº de camisola atualizado');
+      renderMonitoring();
+    }catch(e){ toast('❌ Erro ao atualizar.'); console.error(e); ok.disabled=false; ok.textContent='✓'; }
+  };
+  card.appendChild(wrap);
+  inp.focus();
 }
 
 function renderHelp(){
