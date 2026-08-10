@@ -12163,89 +12163,118 @@ async function renderMonitoring(){
   const sq=document.getElementById('mon-squad').value||coachSquad()||'sub23';
   const date=document.getElementById('mon-date').value||(new Date().toISOString().slice(0,10));
 
-  // Calc "since" = 28 days ago for history
   const since=new Date(date); since.setDate(since.getDate()-27);
   const sinceStr=since.toISOString().slice(0,10);
 
   const el=document.getElementById('mon-content');
   el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar…</div>';
 
-  // Helper: resolve jersey number → player name/info
+  // Resolve jersey → player, including cross-squad players
   const sqPlayers=DB.players(sq);
-  const resolvePlayer=(jerseyNumber)=>{
-    const p=sqPlayers.find(p=>(p.number||p.jerseyNumber)==jerseyNumber);
-    return p?{name:dn(p),id:p.id}:{name:`#${jerseyNumber}`,id:null};
+  const allActivePlayers=DB.players(null);
+  const resolvePlayer=(jn)=>{
+    let p=sqPlayers.find(p=>(p.number||p.jerseyNumber)==jn);
+    if(p) return {name:dn(p),id:p.id,crossSquad:false,otherSq:null};
+    p=allActivePlayers.find(p=>(p.number||p.jerseyNumber)==jn);
+    if(p) return {name:dn(p),id:p.id,crossSquad:true,otherSq:p.squad};
+    return {name:`#${jn}`,id:null,crossSquad:false,otherSq:null};
   };
 
+  const fmtTime=(iso)=>iso?new Date(iso).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):null;
+  const crossBadge=(sq2)=>sq2?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:#1a56db18;color:#1a56db;margin-left:4px">${SQUADS[sq2]||sq2}</span>`:'';
+
+  // Daily team average summary block
+  const avgBlock=(avg,count,label,color)=>`
+    <div style="background:var(--card);border:1.5px solid ${color}33;border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:16px;margin-bottom:16px">
+      <div style="font-size:32px;font-weight:800;color:${color};line-height:1">${avg??'—'}</div>
+      <div>
+        <div style="font-size:13px;font-weight:700">${label}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${count} resposta${count!==1?'s':''} · ${fmtDate(date)}</div>
+      </div>
+    </div>`;
+
   if(_monTab==='pse'){
-    const entries=await DB.getPSEEntries(sq, sinceStr);
-    // Group by jerseyNumber (fallback: playerName para dados antigos)
+    const allEntries=await DB.getPSEEntries(sq, sinceStr);
+    // Day view: only selected date, sorted by PSE desc (most concern first)
+    const dayEntries=allEntries.filter(e=>e.date===date).sort((a,b)=>b.pse-a.pse);
+    // 28-day history grouped by player key
     const byKey={};
-    entries.forEach(e=>{
-      const k=e.jerseyNumber!=null?String(e.jerseyNumber):(e.playerName||'?');
+    allEntries.forEach(e=>{
+      const k=String(e.jerseyNumber??e.playerName??'?');
       if(!byKey[k]) byKey[k]=[];
       byKey[k].push(e);
     });
-    const keys=Object.keys(byKey).sort((a,b)=>(+a||999)-(+b||999));
-    if(!keys.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
 
-    const last7start=new Date(date); last7start.setDate(last7start.getDate()-6);
-    const last7str=last7start.toISOString().slice(0,10);
+    const dayAvg=dayEntries.length?(dayEntries.reduce((s,e)=>s+e.pse,0)/dayEntries.length).toFixed(1):null;
+    const avgColor=pseColor(dayAvg);
 
-    const cards=keys.map(k=>{
-      const list=byKey[k].sort((a,b)=>b.date.localeCompare(a.date));
-      const latest=list[0];
-      const jerseyNumber=latest.jerseyNumber;
-      const {name}=jerseyNumber!=null?resolvePlayer(jerseyNumber):{name:latest.playerName||k};
-      const last7=list.filter(e=>e.date>=last7str);
-      const avg7=last7.length?(last7.reduce((s,e)=>s+e.pse,0)/last7.length).toFixed(1):null;
-      const c=pseColor(latest.pse);
-      const miniBar=list.slice(0,7).reverse().map(e=>`<div title="${e.date}: PSE ${e.pse}" style="width:${Math.round(e.pse/10*100)}%;height:4px;background:${pseColor(e.pse)};border-radius:2px;min-width:3px"></div>`).join('');
+    const cards=dayEntries.map(e=>{
+      const jn=e.jerseyNumber;
+      const {name,crossSquad,otherSq}=jn!=null?resolvePlayer(jn):{name:e.playerName||'?',crossSquad:false,otherSq:null};
+      const c=pseColor(e.pse);
+      const key=String(jn??e.playerName??'?');
+      const hist=(byKey[key]||[]).sort((a,b)=>a.date.localeCompare(b.date));
+      const miniBar=hist.slice(-7).map(h=>`<div title="${h.date}: PSE ${h.pse}" style="flex:1;height:4px;background:${pseColor(h.pse)};border-radius:2px;min-width:3px"></div>`).join('');
+      const t=fmtTime(e.createdAt);
       return `<div class="mon-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <div class="mon-badge" style="background:${c}22;color:${c}">${latest.pse}</div>
-          <div>
-            <div class="mon-card-name">${name}</div>
-            <div style="font-size:10px;color:var(--muted)">${jerseyNumber!=null?`#${jerseyNumber} · `:''}${latest.date}${avg7?` · Méd. 7d: ${avg7}`:''}</div>
+          <div class="mon-badge" style="background:${c}22;color:${c}">${e.pse}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${crossBadge(otherSq)}</div>
+            <div style="font-size:10px;color:var(--muted)">${jn!=null?`#${jn}`:''}${t?` · ${t}`:''}</div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:2px">${miniBar}</div>
+        <div style="display:flex;gap:2px">${miniBar}</div>
       </div>`;
-    }).join('');
+    });
 
-    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${keys.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
+    const noData=dayEntries.length===0?`<div style="color:var(--muted);padding:20px;font-size:13px">Sem respostas PSE para ${fmtDate(date)}.</div>`:'';
+    el.innerHTML=avgBlock(dayAvg,dayEntries.length,'PSE Média do Dia',avgColor)+`<div class="mon-grid">${cards.join('')}</div>`+noData;
+
   } else {
-    const entries=await DB.getWellnessEntries(sq, sinceStr);
+    const allEntries=await DB.getWellnessEntries(sq, sinceStr);
+    // Day view: only selected date, sorted by concern desc (stress+soreness+sleep desc)
+    const dayEntries=allEntries.filter(e=>e.date===date).sort((a,b)=>{
+      const scoreA=(a.stressLevel||0)+(a.muscleSoreness||0)+(a.sleepQuality||0);
+      const scoreB=(b.stressLevel||0)+(b.muscleSoreness||0)+(b.sleepQuality||0);
+      return scoreB-scoreA;
+    });
     const byKey={};
-    entries.forEach(e=>{
-      const k=e.jerseyNumber!=null?String(e.jerseyNumber):(e.playerName||'?');
+    allEntries.forEach(e=>{
+      const k=String(e.jerseyNumber??e.playerName??'?');
       if(!byKey[k]) byKey[k]=[];
       byKey[k].push(e);
     });
-    const keys=Object.keys(byKey).sort((a,b)=>(+a||999)-(+b||999));
-    if(!keys.length){ el.innerHTML='<div style="color:var(--muted);padding:20px">Sem dados para '+sq+' nos últimos 28 dias.</div>'; return; }
 
-    const cards=keys.map(k=>{
-      const list=byKey[k].sort((a,b)=>b.date.localeCompare(a.date));
-      const lat=list[0];
-      const jerseyNumber=lat.jerseyNumber;
-      const {name}=jerseyNumber!=null?resolvePlayer(jerseyNumber):{name:lat.playerName||k};
-      const cs=wellColor(lat.sleepQuality), cst=wellColor(lat.stressLevel), cm=wellColor(lat.muscleSoreness);
-      const areas=(lat.affectedAreas||[]).length?`<div style="font-size:10px;color:#ef4444;margin-top:4px">⚠️ ${lat.affectedAreas.join(', ')}</div>`:'';
+    // Composite avg: average of all three indicators for the day
+    const dayAvgNum=dayEntries.length
+      ?((dayEntries.reduce((s,e)=>s+(e.sleepQuality||0)+(e.stressLevel||0)+(e.muscleSoreness||0),0))/(dayEntries.length*3)).toFixed(1)
+      :null;
+    const avgWellColor=wellColor(dayAvgNum);
+
+    const cards=dayEntries.map(e=>{
+      const jn=e.jerseyNumber;
+      const {name,crossSquad,otherSq}=jn!=null?resolvePlayer(jn):{name:e.playerName||'?',crossSquad:false,otherSq:null};
+      const cs=wellColor(e.sleepQuality), cst=wellColor(e.stressLevel), cm=wellColor(e.muscleSoreness);
+      const areas=(e.affectedAreas||[]).length?`<div style="font-size:10px;color:#ef4444;margin-top:4px">⚠️ ${e.affectedAreas.join(', ')}</div>`:'';
+      const t=fmtTime(e.createdAt);
       return `<div class="mon-card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          ${jerseyNumber!=null?`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">#${jerseyNumber}</div>`:''}
-          <div class="mon-card-name">${name}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          ${jn!=null?`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">#${jn}</div>`:''}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${crossBadge(otherSq)}</div>
+            ${t?`<div style="font-size:10px;color:var(--muted)">${t}</div>`:''}
+          </div>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">${lat.date}</div>
-        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cs}22;color:${cs}">${lat.sleepQuality}</div><span>😴 Sono</span></div>
-        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cst}22;color:${cst}">${lat.stressLevel}</div><span>🧠 Stress</span></div>
-        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cm}22;color:${cm}">${lat.muscleSoreness}</div><span>💪 Dores</span></div>
+        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cs}22;color:${cs}">${e.sleepQuality}</div><span>😴 Sono</span></div>
+        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cst}22;color:${cst}">${e.stressLevel}</div><span>🧠 Stress</span></div>
+        <div class="mon-row"><div class="mon-badge" style="width:26px;height:26px;font-size:12px;background:${cm}22;color:${cm}">${e.muscleSoreness}</div><span>💪 Dores</span></div>
         ${areas}
       </div>`;
-    }).join('');
+    });
 
-    el.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${keys.length} atletas com dados (últimos 28 dias)</div><div class="mon-grid">${cards}</div>`;
+    const noData=dayEntries.length===0?`<div style="color:var(--muted);padding:20px;font-size:13px">Sem respostas Bem-Estar para ${fmtDate(date)}.</div>`:'';
+    el.innerHTML=avgBlock(dayAvgNum,dayEntries.length,'Média Bem-Estar do Dia',avgWellColor)+`<div class="mon-grid">${cards.join('')}</div>`+noData;
   }
 }
 
