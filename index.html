@@ -688,8 +688,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <hr class="nd">
     <div class="nsl">Atletas</div>
     <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
-    <div class="nl" id="nl-availlink"><span class="ic">📆</span> Link de Disponibilidade</div>
-    <div class="nl" id="nl-unavailabilities" data-view="unavailabilities"><span class="ic">🚫</span> Indisponibilidades</div>
+    <div class="nl" id="nl-unavailabilities" data-view="unavailabilities"><span class="ic">📆</span> Indisponibilidades</div>
     <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
     <hr class="nd">
     <div class="nsl" id="nsl-monitoring">Monitorização</div>
@@ -1201,76 +1200,6 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <div class="fg" style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Confirmar nova password</label><input type="password" id="myp-pw-confirm" class="si" style="max-width:100%;width:100%" placeholder="Repetir nova password" autocomplete="new-password"></div>
       <div id="myp-pw-err" style="color:#c0392b;font-size:12px;margin-bottom:10px;font-weight:600;min-height:16px"></div>
       <button class="btn btn-p" id="myp-pw-save">Alterar Password</button>
-    </div>
-  </div>
-
-  <!-- AVAILABILITY FORM (public) -->
-  <div class="view" id="v-avail">
-    <div class="pfh">
-      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:64px;height:64px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
-      <h1>SC Vianense SAD</h1>
-      <p>Declaração de Indisponibilidade — indica os períodos em que não estarás disponível</p>
-    </div>
-    <div class="card">
-      <div id="av-success" style="display:none;background:#d4edda;color:#155724;padding:14px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center">
-        ✅ Período de indisponibilidade registado com sucesso. Obrigado!
-      </div>
-      <form id="av-form">
-        <div class="fst">Quem és?</div>
-        <div class="fr">
-          <div class="fg">
-            <label>Tipo *</label>
-            <select id="av-type" required onchange="avTypeChange()">
-              <option value="">Selecionar...</option>
-              <option value="athlete">Atleta</option>
-              <option value="staff">Equipa Técnica / Clínica</option>
-            </select>
-          </div>
-          <div class="fg">
-            <label>Escalão *</label>
-            <select id="av-squad" required onchange="avSquadChange()">
-              <option value="">Selecionar...</option>
-              <option value="eqa">Equipa A</option>
-              <option value="sub23">Sub-23</option>
-              <option value="sub19">Sub-19</option>
-              <option value="ambos">Ambos</option>
-            </select>
-          </div>
-        </div>
-        <!-- Atleta: selecionar nome da lista -->
-        <div class="fg" id="av-athlete-wrap" style="display:none">
-          <label>Nome *</label>
-          <select id="av-athlete-name" required>
-            <option value="">— seleciona o teu escalão primeiro —</option>
-          </select>
-        </div>
-        <!-- Staff: pick from profiles -->
-        <div class="fg" id="av-staff-wrap" style="display:none">
-          <label>Nome *</label>
-          <select id="av-staff-profile-sel">
-            <option value="">— seleciona o teu escalão primeiro —</option>
-          </select>
-          <p style="font-size:11px;color:var(--muted);margin-top:5px">Não encontras o teu nome? Pede ao coordenador para criar o teu perfil.</p>
-        </div>
-        <div class="fst">Período de Indisponibilidade</div>
-        <div class="fr">
-          <div class="fg"><label>De (data início) *</label><input type="date" id="av-from" required></div>
-          <div class="fg"><label>Até (data fim) *</label><input type="date" id="av-until" required></div>
-        </div>
-        <div class="fg"><label>Motivo *</label>
-          <select id="av-type-unavail" required style="padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text);width:100%" onchange="document.getElementById('av-reason').placeholder=this.value==='outro'?'Ex: férias, doença, obrigação escolar...':'Ex: rotura, entorse, fratura...'">
-            <option value="">— Selecionar —</option>
-            <option value="lesao">🤕 Lesão</option>
-            <option value="outro">📋 Outro (férias, doença, escolar...)</option>
-          </select>
-        </div>
-        <div class="fg"><label>Observações <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
-          <input type="text" id="av-reason" placeholder="Observações...">
-        </div>
-        <div class="fa">
-          <button type="submit" class="btn btn-p" id="av-submit-btn">✓ Submeter</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -2234,6 +2163,9 @@ function staffRole(){ return currentUser()?.staffRole||null; }
 function staffRoleName(){ const r=staffRole(); return STAFF_ROLES_LABEL[r]||r||null; }
 function canSeeClinical(){ return isAdmin()||isMedical(); }
 function canViewClinicalSummary(){ return ['admin','coach','staff','medical'].includes(currentUser()?.role); }
+// Any logged-in staff can see/manage unavailabilities; only admin+medical can add lesão
+function canManageUnavail(){ return ['admin','coach','staff','medical','teammanager'].includes(currentUser()?.role); }
+function canManageLesao(){ return isAdmin()||isMedical(); }
 
 // ── FIREBASE INIT ─────────────────────────────────────────────────────────────
 const FB_READY = Object.values(FB_CONFIG).every(v => v.trim() !== '');
@@ -2935,7 +2867,6 @@ function nav(v,opts={}){
   else if(v==='unavailabilities'){ show('v-unavailabilities'); setActive('[data-view="unavailabilities"]'); renderUnavailabilities() }
   else if(v==='staff'){ show('v-staff'); setActive('[data-view="staff"]'); renderStaff() }
   else if(v==='staff-form'){ show('v-sf') }
-  else if(v==='availability-form'){ show('v-avail') }
   else if(v==='live'){
     if(opts.id){ liveGameId=opts.id; }
     if(opts.step){ liveStep=opts.step; }
@@ -4538,7 +4469,7 @@ function renderPlayer(){
         ${p.injuries?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Lesões / Observações</div><div style="font-size:13px">${p.injuries}</div></div>`:''}
       </div>
       ${canViewClinicalSummary()?buildPlayerClinicalCard(pid):''}
-      ${isAdmin()?buildPlayerUnavailCard(pid):''}
+      ${canManageUnavail()?buildPlayerUnavailCard(pid):''}
       ${p.position==='GR'&&grGames>0?`
       <div class="card">
         <h3 style="margin-bottom:12px">🥅 GR — Resumo em Jogo</h3>
@@ -5444,10 +5375,6 @@ document.getElementById('nl-stafflink').addEventListener('click',()=>{
   const url=location.href.split('?')[0]+'?mode=staff-form';
   navigator.clipboard.writeText(url).then(()=>toast('🔗 Link do staff copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
 });
-document.getElementById('nl-availlink').addEventListener('click',()=>{
-  const url=location.href.split('?')[0]+'?mode=availability';
-  navigator.clipboard.writeText(url).then(()=>toast('📆 Link de disponibilidade copiado!')).catch(()=>prompt('Copia e partilha este link:',url));
-});
 
 // ── UNAVAILABILITY ────────────────────────────────────────────────────────────
 
@@ -5478,7 +5405,9 @@ function buildUnavailabilityAlert(date, playerIds, squad){
 }
 
 function buildPlayerUnavailCard(pid){
-  if(!isAdmin()) return '';
+  if(!canManageUnavail()) return '';
+  const canDel=canManageLesao(); // admin + medical can delete; others view-only on deletions
+  const canLesao=canManageLesao(); // only admin + medical can register lesão
   const recs=DB.getUnavailability(pid).sort((a,b)=>a.startDate.localeCompare(b.startDate));
   const rows=recs.length
     ?recs.map(r=>{
@@ -5488,10 +5417,11 @@ function buildPlayerUnavailCard(pid){
         :`<span style="font-size:10px;font-weight:700;color:#fff;background:#d97706;padding:1px 7px;border-radius:4px;white-space:nowrap">📋 Outro</span>`;
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;font-size:13px">${badge} <strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
-        <button class="btn btn-d btn-sm" data-del-unavail="${r.id}">🗑️</button>
+        ${canDel?`<button class="btn btn-d btn-sm" data-del-unavail="${r.id}">🗑️</button>`:''}
       </div>`;
     }).join('')
     :'<p style="color:var(--muted);font-size:13px;font-style:italic">Nenhum período declarado.</p>';
+  const lesaoOpt=canLesao?`<option value="lesao">🤕 Lesão</option>`:'';
   return `<div class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📆 Indisponibilidades</h3>
     ${rows}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
@@ -5503,7 +5433,7 @@ function buildPlayerUnavailCard(pid){
         </div>
         <select id="addunavail-type" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)" onchange="document.getElementById('addunavail-reason').placeholder=this.value==='outro'?'Ex: férias, doença, obrigação escolar...':'Ex: rotura, entorse, fratura...'">
           <option value="">— Motivo —</option>
-          <option value="lesao">🤕 Lesão</option>
+          ${lesaoOpt}
           <option value="outro">📋 Outro (férias, doença, escolar...)</option>
         </select>
         <input type="text" id="addunavail-reason" placeholder="Observações (opcional)" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none">
@@ -5538,100 +5468,6 @@ function bindUnavailHandlers(){
   });
 }
 
-// Availability form (public)
-function avTypeChange(){
-  const t=document.getElementById('av-type').value;
-  document.getElementById('av-athlete-wrap').style.display=t==='athlete'?'':'none';
-  document.getElementById('av-staff-wrap').style.display=t==='staff'?'':'none';
-  const athleteNameSel=document.getElementById('av-athlete-name');
-  const staffProfileSel=document.getElementById('av-staff-profile-sel');
-  if(t==='athlete'){ athleteNameSel.required=true; staffProfileSel.required=false; }
-  else if(t==='staff'){ athleteNameSel.required=false; staffProfileSel.required=true; }
-  else{ athleteNameSel.required=false; staffProfileSel.required=false; }
-  // Reset squad and trigger reload
-  avSquadChange();
-}
-
-async function avSquadChange(){
-  const type=document.getElementById('av-type').value;
-  const squad=document.getElementById('av-squad').value;
-
-  if(type==='athlete'){
-    if(!squad) return;
-    const sel=document.getElementById('av-athlete-name');
-    sel.innerHTML='<option value="">A carregar...</option>';
-    let players=[];
-    if(firestoreDb){
-      try{
-        const q=squad==='ambos'?firestoreDb.collection('players').get():firestoreDb.collection('players').where('squad','==',squad).get();
-        const snap=await q; snap.forEach(d=>players.push(d.data()));
-      }catch(e){ players=DB.players(squad==='ambos'?null:squad); }
-    } else { players=DB.players(squad==='ambos'?null:squad); }
-    players.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    sel.innerHTML='<option value="">Selecionar...</option>'+players.map(p=>`<option value="${p.id}" data-name="${(p.alcunha||p.name).replace(/"/g,'&quot;')}">${p.alcunha?p.alcunha+' ('+p.name+')':p.name}</option>`).join('');
-
-  } else if(type==='staff'){
-    // Use staff profiles stored locally/Firestore
-    const sel=document.getElementById('av-staff-profile-sel');
-    if(!sel) return;
-    let profiles=[];
-    if(firestoreDb){
-      try{
-        const snap=await firestoreDb.collection('staff_profiles').get();
-        snap.forEach(d=>profiles.push(d.data()));
-      }catch(e){ profiles=DB.staffProfiles(null); }
-    } else { profiles=DB.staffProfiles(null); }
-    if(squad&&squad!=='ambos') profiles=profiles.filter(p=>p.squad===squad||p.squad==='ambos');
-    profiles.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    sel.innerHTML='<option value="">Selecionar...</option>'+profiles.map(p=>`<option value="${p.id}" data-name="${p.name.replace(/"/g,'&quot;')}">${p.name} (${STAFF_ROLES_LABEL[p.staffRole]||p.staffRole||'—'})</option>`).join('');
-  }
-}
-
-(function avFormInit(){
-  const form=document.getElementById('av-form');
-  if(!form) return;
-  form.addEventListener('submit',async e=>{
-    e.preventDefault();
-    const type=document.getElementById('av-type').value;
-    const squad=document.getElementById('av-squad').value;
-    const from=document.getElementById('av-from').value;
-    const until=document.getElementById('av-until').value;
-    const unavailType=document.getElementById('av-type-unavail').value;
-    const reason=document.getElementById('av-reason').value.trim();
-    if(!type||!squad||!from||!until||!unavailType){ toast('⚠️ Preenche todos os campos obrigatórios'); return; }
-    if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
-    const btn=document.getElementById('av-submit-btn');
-    btn.disabled=true; btn.innerHTML='<span class="spin"></span> A enviar...';
-    let personId,personName;
-    if(type==='athlete'){
-      const sel=document.getElementById('av-athlete-name');
-      personId=sel.value; personName=sel.options[sel.selectedIndex]?.dataset?.name||sel.options[sel.selectedIndex]?.text||'';
-      if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
-    } else {
-      const sel=document.getElementById('av-staff-profile-sel');
-      personId=sel.value; personName=sel.options[sel.selectedIndex]?.dataset?.name||sel.options[sel.selectedIndex]?.text||'';
-      if(!personId){ toast('⚠️ Seleciona o teu nome'); btn.disabled=false; btn.textContent='✓ Submeter'; return; }
-    }
-    try{
-      const rec={personId,personName,personType:type,squad,startDate:from,endDate:until,type:unavailType,reason};
-      if(firestoreDb){
-        rec.id=crypto.randomUUID(); rec.createdAt=new Date().toISOString();
-        await firestoreDb.collection('unavailability').doc(rec.id).set(rec);
-      } else {
-        await DB.addUnavailability(rec);
-        if(rec.personType==='athlete') applyUnavailToTrainings(rec.personId,rec.startDate,rec.endDate,rec.type);
-      }
-      document.getElementById('av-success').style.display='';
-      form.reset();
-      document.getElementById('av-athlete-wrap').style.display='none';
-      document.getElementById('av-staff-wrap').style.display='none';
-    } catch(err){
-      toast('❌ Erro ao enviar. Tenta novamente.');
-      console.error(err);
-    }
-    btn.disabled=false; btn.textContent='✓ Submeter';
-  });
-})();
 
 // ── CALENDAR PDF EXPORT ───────────────────────────────────────────────────────
 function exportCalPDF(){
@@ -12608,7 +12444,6 @@ function applyRoleUI(){
   } else if(u.role==='staff'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
-    document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
@@ -12629,7 +12464,6 @@ function applyRoleUI(){
   } else if(u.role==='medical'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
-    document.getElementById('nl-availlink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='none';
@@ -12902,11 +12736,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(params.get('mode')==='staff-form'){
     document.getElementById('login-overlay').classList.add('hidden');
     document.body.classList.add('pm'); nav('staff-form');
-    return;
-  }
-  if(params.get('mode')==='availability'){
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.body.classList.add('pm'); nav('availability-form');
     return;
   }
   if(params.get('mode')==='pse'){
