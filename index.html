@@ -6580,14 +6580,14 @@ function renderTraining(){
     </div>`;
 
   const extraSection=otherSquads.map(sq=>{
-    const avail=DB.players(sq).filter(p=>!extras.includes(p.id));
+    const avail=sortByPos(DB.players(sq).filter(p=>!extras.includes(p.id)));
     if(!avail.length) return '';
     return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <button class="btn btn-o btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">+ Adicionar atletas ${SQUADS[sq]}</button>
       <div style="display:none;margin-top:10px">
         ${avail.map(p=>`<div class="att-row">
           <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
-          <div style="flex:1;font-size:13px">${dn(p)} <span style="font-size:11px;color:var(--muted)">${POS[p.position]||''}</span></div>
+          <div style="flex:1;font-size:13px">${dn(p)} <span style="font-size:11px;color:var(--muted)">${[p.number?'#'+p.number:'',POS[p.position]||''].filter(Boolean).join(' · ')}</span></div>
           <button class="btn btn-o btn-sm" data-conv-pid="${p.id}">+ Adicionar</button>
         </div>`).join('')}
       </div>
