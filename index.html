@@ -6484,8 +6484,11 @@ function countPresent(att, players, date){
 function renderTraining(){
   const ev=DB.getEvent(trainingEventId); if(!ev){ nav('calendar'); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad).filter(p=>!p.enrolledAt||ev.date>=p.enrolledAt);
-  const otherSquad=ev.squad==='sub19'?'sub23':ev.squad==='sub23'?'sub19':null;
-  const otherAvailAll=otherSquad?DB.players(otherSquad):[];
+  // Escalões adjacentes: eqa↔sub23↔sub19
+  const _SADJ=['eqa','sub23','sub19'];
+  const _sqIdx=_SADJ.indexOf(ev.squad);
+  const otherSquads=_sqIdx>=0?_SADJ.filter((_,i)=>Math.abs(i-_sqIdx)===1):[];
+  const otherAvailAll=otherSquads.flatMap(sq=>DB.players(sq));
   const extras=ev.extraPlayers||[];
   const extraObjs=extras.map(id=>DB.getPlayer(id)).filter(Boolean);
   const allPl=[...sqPlayers,...extraObjs];
@@ -6535,7 +6538,7 @@ function renderTraining(){
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${dn(p)}</div>
-        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[otherSquad]}</span>`:''}</div>
+        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${POS[p.position]||'—'}${isExtra?` · <span style="color:var(--blue)">${SQUADS[p.squad]||p.squad}</span>`:''}</div>
       </div>
       ${lateBadge}
       <button class="att-btn${info.cls?' '+info.cls:''}" data-att-pid="${p.id}">${info.label}</button>
@@ -6576,18 +6579,20 @@ function renderTraining(){
       </div>
     </div>`;
 
-  const otherAvail=otherAvailAll.filter(p=>!extras.includes(p.id));
-  const extraSection=otherAvail.length?`
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-      <button class="btn btn-o btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">+ Adicionar atletas ${SQUADS[otherSquad]}</button>
+  const extraSection=otherSquads.map(sq=>{
+    const avail=DB.players(sq).filter(p=>!extras.includes(p.id));
+    if(!avail.length) return '';
+    return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <button class="btn btn-o btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">+ Adicionar atletas ${SQUADS[sq]}</button>
       <div style="display:none;margin-top:10px">
-        ${otherAvail.map(p=>`<div class="att-row">
+        ${avail.map(p=>`<div class="att-row">
           <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
           <div style="flex:1;font-size:13px">${dn(p)} <span style="font-size:11px;color:var(--muted)">${POS[p.position]||''}</span></div>
           <button class="btn btn-o btn-sm" data-conv-pid="${p.id}">+ Adicionar</button>
         </div>`).join('')}
       </div>
-    </div>`:'';
+    </div>`;
+  }).join('');
 
   // GR Training section
   const canEditGR = isAdmin() || staffRole()==='grcoach';
