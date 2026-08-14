@@ -2662,7 +2662,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-14';
+const APP_BUILD='2026-08-14c';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -8465,6 +8465,30 @@ function renderGame(){
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
+
+  // Prefetch cross-squad convocados missing from local cache.
+  // Firestore "get by doc ID" may be allowed even when collection queries are restricted.
+  // Runs on any tab so that pos/sumario/relatorio also see cross-squad players.
+  if(firestoreDb){
+    const knownIds=new Set(DB.players().map(p=>p.id));
+    const missing=Object.keys(conv.players||{}).filter(id=>conv.players[id]&&!knownIds.has(id));
+    if(missing.length){
+      Promise.all(missing.map(id=>firestoreDb.collection('players').doc(id).get()))
+        .then(docs=>{
+          const found=docs.filter(d=>d.exists).map(d=>d.data());
+          if(found.length){
+            const cur=JSON.parse(localStorage.getItem('scv_p')||'[]');
+            const curIds=new Set(cur.map(p=>p.id));
+            const toAdd=found.filter(p=>!curIds.has(p.id));
+            if(toAdd.length){
+              localStorage.setItem('scv_p',JSON.stringify([...cur,...toAdd]));
+              renderGame(); // re-render com os novos atletas
+            }
+          }
+        })
+        .catch(e=>console.warn('prefetch convocados cross-squad:',e));
+    }
+  }
 }
 
 // ── GR ANALYSIS TAB ───────────────────────────────────────────────────────────
