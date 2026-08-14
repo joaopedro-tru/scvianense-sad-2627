@@ -6583,8 +6583,8 @@ function renderTraining(){
     const avail=sortByPos(DB.players(sq).filter(p=>!extras.includes(p.id)));
     if(!avail.length) return '';
     return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-      <button class="btn btn-o btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">+ Adicionar atletas ${SQUADS[sq]}</button>
-      <div style="display:none;margin-top:10px">
+      <button class="btn btn-o btn-sm" data-extra-sq-toggle="${sq}" onclick="const p=document.querySelector('[data-extra-sq-panel=\\'${sq}\\']');if(p)p.style.display=p.style.display==='none'?'block':'none'">+ Adicionar atletas ${SQUADS[sq]}</button>
+      <div data-extra-sq-panel="${sq}" style="display:none;margin-top:10px">
         ${avail.map(p=>`<div class="att-row">
           <div class="av" style="width:32px;height:32px;font-size:12px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
           <div style="flex:1;font-size:13px">${dn(p)} <span style="font-size:11px;color:var(--muted)">${[p.number?'#'+p.number:'',POS[p.position]||''].filter(Boolean).join(' · ')}</span></div>
@@ -6966,13 +6966,21 @@ function renderTraining(){
     renderTraining();
   }));
 
-  // Convocar extra player
+  // Convocar extra player (preserva scroll e painéis abertos)
   document.querySelectorAll('[data-conv-pid]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.convPid;
     const ex=[...(DB.getEvent(trainingEventId).extraPlayers||[])];
     if(!ex.includes(pid))ex.push(pid);
     DB.updateEvent(trainingEventId,{extraPlayers:ex});
+    const sy=window.scrollY;
+    const openPanels=new Set([...document.querySelectorAll('[data-extra-sq-panel]')]
+      .filter(el=>el.style.display!=='none').map(el=>el.dataset.extraSqPanel));
     renderTraining();
+    openPanels.forEach(sq=>{
+      const panel=document.querySelector(`[data-extra-sq-panel="${sq}"]`);
+      if(panel) panel.style.display='block';
+    });
+    requestAnimationFrame(()=>window.scrollTo(0,sy));
   }));
 
   // Ficha upload (só existe para treinos de campo)
