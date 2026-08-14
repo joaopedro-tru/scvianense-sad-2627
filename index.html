@@ -10086,19 +10086,18 @@ async function syncFromFirestore(showToast=false){
   if(!firestoreDb) return;
   try {
     const sq=coachSquad(); // null para admin; escalão para outros roles
-    const pQ=sq?firestoreDb.collection('players').where('squad','==',sq):firestoreDb.collection('players');
+    // Players: sem filtro — todos os utilizadores autenticados lêem todos os atletas
+    // Events: filtrado pelo escalão para não-admin (regras Firestore)
     const eQ=sq?firestoreDb.collection('events').where('squad','in',[sq,'both']):firestoreDb.collection('events');
-    const [pSnap,eSnap]=await Promise.all([pQ.get(),eQ.get()]);
+    const [pSnap,eSnap]=await Promise.all([firestoreDb.collection('players').get(),eQ.get()]);
     const players=[]; pSnap.forEach(d=>players.push(d.data()));
     const events=[];  eSnap.forEach(d=>events.push(d.data()));
+    if(players.length>0) localStorage.setItem('scv_p',JSON.stringify(players));
     if(sq){
-      // Squad-filtrado: preservar dados de outros escalões no cache local
-      const existingP=JSON.parse(localStorage.getItem('scv_p')||'[]').filter(p=>p.squad!==sq);
+      // Events squad-filtrado: preservar eventos de outros escalões no cache
       const existingE=JSON.parse(localStorage.getItem('scv_e')||'[]').filter(e=>e.squad!==sq&&e.squad!=='both');
-      localStorage.setItem('scv_p',JSON.stringify([...existingP,...players]));
       localStorage.setItem('scv_e',JSON.stringify([...existingE,...events]));
-    } else if(players.length>0 || events.length>0){
-      localStorage.setItem('scv_p',JSON.stringify(players));
+    } else if(events.length>0){
       localStorage.setItem('scv_e',JSON.stringify(events));
     }
     if(showToast) toast(`✅ Sincronizado — ${players.length} atletas, ${events.length} eventos`);
@@ -12674,20 +12673,28 @@ function initCoordApp(){
 
   if(firestoreDb){
     // ── Listeners em tempo real ────────────────────────────────────────────────
+    // Debounce para evitar re-renders duplos quando players+events chegam ao mesmo tempo
+    let _rerenderTimer=null;
     const _rerender=()=>{
-      if(view==='live'&&!livePending) renderLive();
-      else if(view==='game') renderGame();
-      else if(view==='matchday') renderMatchDay();
-      else if(view==='dashboard') renderDash();
-      else if(view==='calendar') renderCal();
+      clearTimeout(_rerenderTimer);
+      _rerenderTimer=setTimeout(()=>{
+        if(view==='live'&&!livePending) renderLive();
+        else if(view==='game') renderGame();
+        else if(view==='matchday') renderMatchDay();
+        else if(view==='dashboard') renderDash();
+        else if(view==='calendar') renderCal();
+        else if(view==='squad') renderSquad();
+        else if(view==='sq-trainings') renderSqTrainings();
+        else if(view==='sq-games') renderSqGames();
+        else if(view==='sq-gym') renderSqGym();
+        else if(view==='player') renderPlayer();
+        // 'training' não faz auto-rerender para não interromper registo de presenças
+      },200);
     };
 
-    // Utilizadores não-admin só podem ler os documentos do seu escalão (regras Firestore).
-    // Admin (coachSquad()===null) lê a coleção completa.
+    // Players: todos os utilizadores autenticados podem ler toda a coleção.
+    // Events e unavailability: não-admin filtra pelo seu escalão (regras Firestore).
     const mySquad=coachSquad();
-    const playersQ=mySquad
-      ? firestoreDb.collection('players').where('squad','==',mySquad)
-      : firestoreDb.collection('players');
     const eventsQ=mySquad
       ? firestoreDb.collection('events').where('squad','in',[mySquad,'both'])
       : firestoreDb.collection('events');
@@ -12695,27 +12702,17 @@ function initCoordApp(){
       ? firestoreDb.collection('unavailability').where('squad','==',mySquad)
       : firestoreDb.collection('unavailability');
 
-    const unsubP=playersQ.onSnapshot({includeMetadataChanges:true}, snap=>{
+    const unsubP=firestoreDb.collection('players').onSnapshot({includeMetadataChanges:true}, snap=>{
       const arr=[]; snap.forEach(d=>arr.push(d.data()));
       const fromCache=snap.metadata.fromCache;
       const existingP=JSON.parse(localStorage.getItem('scv_p')||'[]');
       if(!fromCache && arr.length>0){
-        // Dados do servidor: Firestore é autoritativo (propaga remoções)
-        if(mySquad){
-          // Squad-filtrado: preservar atletas de outros escalões no cache
-          const others=existingP.filter(p=>p.squad!==mySquad);
-          localStorage.setItem('scv_p',JSON.stringify([...others,...arr]));
-        } else {
-          localStorage.setItem('scv_p',JSON.stringify(arr));
-        }
+        // Dados do servidor: substituir cache completo
+        localStorage.setItem('scv_p',JSON.stringify(arr));
         _rerender();
       } else if(fromCache && arr.length>0){
         // Dados de cache: actualiza de forma conservadora
-        if(mySquad){
-          const others=existingP.filter(p=>p.squad!==mySquad);
-          localStorage.setItem('scv_p',JSON.stringify([...others,...arr]));
-          _rerender();
-        } else if(arr.length>=existingP.length){
+        if(arr.length>=existingP.length){
           localStorage.setItem('scv_p',JSON.stringify(arr));
           _rerender();
         }
@@ -12758,6 +12755,8 @@ function initCoordApp(){
           localStorage.setItem('scv_e',JSON.stringify(merged));
         }
         _rerender();
+        // Na view de treino não auto-renderiza (pode interromper registo) — avisa o utilizador
+        if(view==='training') toast('🔄 Dados atualizados — toca ⟳ para refrescar.');
       } else if(arr.length>0 || existingE.length===0){
         // Cache: só actualiza se tivermos dados (evita apagar eventos locais com snapshot vazio)
         if(mySquad){
