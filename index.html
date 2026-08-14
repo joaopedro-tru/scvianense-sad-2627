@@ -2380,6 +2380,9 @@ const DB = {
     return rec;
   },
   async deleteUnavailability(id){
+    // Se houver registo clínico ligado (source='unavailability'), eliminar também
+    const linked=this._cr().find(r=>r.unavailId===id&&r.source==='unavailability');
+    if(linked) await this.deleteClinicalRecord(linked.id).catch(()=>{});
     const arr=this._unavail().filter(r=>r.id!==id); this._sunavail(arr);
     if(this._funavail()) await this._funavail().doc(id).delete().catch(e=>console.error('FS delUnavail:',e));
   },
@@ -5477,7 +5480,22 @@ function bindUnavailHandlers(){
     if(until<from){ toast('⚠️ A data de fim não pode ser anterior à de início'); return; }
     if(!type){ toast('⚠️ Seleciona o motivo'); return; }
     const p=DB.getPlayer(pid);
-    await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,type,reason});
+    const unavailRec=await DB.addUnavailability({personId:pid,personName:dn(p),personType:'athlete',squad:p.squad,startDate:from,endDate:until,type,reason});
+    // Lesão → criar registo clínico automaticamente para aparecer no histórico
+    if(type==='lesao'){
+      await DB.addClinicalRecord({
+        athleteId:pid,
+        type:'injury',
+        date:from,
+        estimatedRecoveryDate:until,
+        actualRecoveryDate:'',
+        diagnostico:'',
+        treatment:'',
+        notes:reason||'',
+        source:'unavailability',
+        unavailId:unavailRec?.id||''
+      });
+    }
     applyUnavailToTrainings(pid,from,until,type);
     renderPlayer();
     toast('✅ Período adicionado');
@@ -8799,6 +8817,9 @@ function renderGamePre(ev,sqPlayers,conv){
       :'';
     const activeInj=getActiveInjury(p.id, ev.date);
     const injBadge=activeInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`:'';
+    const convBtn=(activeInj&&!isConv)
+      ?`<button class="att-btn" data-inj-pid="${p.id}" style="background:#fde8e8;color:#b71c1c;border-color:#f5c6c6;min-width:96px">🤕 Lesionado</button>`
+      :`<button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>`;
     return `<div class="att-row">
       <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
       <div style="flex:1;min-width:0">
@@ -8806,7 +8827,7 @@ function renderGamePre(ev,sqPlayers,conv){
         <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
       </div>
       ${travBtn}
-      <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
+      ${convBtn}
     </div>`;
   }).join('');
   // Outros escalões
@@ -8821,13 +8842,18 @@ function renderGamePre(ev,sqPlayers,conv){
     const sqConvCount=players.filter(p=>!!conv.players[p.id]).length;
     const rows=players.map(p=>{
       const isConv=!!conv.players[p.id];
+      const oInj=getActiveInjury(p.id, ev.date);
+      const oInjBadge=oInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`:'';
+      const oConvBtn=(oInj&&!isConv)
+        ?`<button class="att-btn" data-inj-pid="${p.id}" style="background:#fde8e8;color:#b71c1c;border-color:#f5c6c6;min-width:96px">🤕 Lesionado</button>`
+        :`<button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>`;
       return `<div class="att-row">
         <div class="av" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600">${convName(p)}</div>
+          <div style="font-size:13px;font-weight:600">${convName(p)}${oInjBadge}</div>
           <div style="font-size:11px;color:var(--muted)">${POS[p.position]||'—'}${p.number?' · #'+p.number:''}</div>
         </div>
-        <button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>
+        ${oConvBtn}
       </div>`;
     }).join('');
     return `<details style="margin-top:8px"${sqConvCount>0?' open':''}>
@@ -8949,6 +8975,15 @@ function renderGamePre(ev,sqPlayers,conv){
     else c.players[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   }));
+  // Botão lesionado bloqueado — sugerir editar lesão
+  document.querySelectorAll('[data-inj-pid]').forEach(btn=>btn.addEventListener('click',()=>{
+    const pid=btn.dataset.injPid;
+    const p=DB.getPlayer(pid);
+    const nome=p?dn(p):'Este atleta';
+    if(confirm(`🤕 ${nome} tem uma lesão ativa e não pode ser convocado.\n\nPara o disponibilizar, edita a data de recuperação na ficha clínica do perfil.\n\nAbrir perfil agora?`)){
+      nav('player',{id:pid});
+    }
+  }));
   document.querySelectorAll('[data-gtrav]').forEach(btn=>btn.addEventListener('click',()=>{
     if(btn.disabled) return;
     const pid=btn.dataset.gtrav;
@@ -8960,9 +8995,10 @@ function renderGamePre(ev,sqPlayers,conv){
   }));
   document.getElementById('btn-conv-all').addEventListener('click',()=>{
     const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
-    const allConved=sqPlayers.every(p=>!!c.players[p.id]);
-    if(allConved){ sqPlayers.forEach(p=>delete c.players[p.id]); }
-    else { sqPlayers.forEach(p=>{ c.players[p.id]=true; }); }
+    const available=sqPlayers.filter(p=>!getActiveInjury(p.id,ev.date));
+    const allConved=available.every(p=>!!c.players[p.id]);
+    if(allConved){ available.forEach(p=>delete c.players[p.id]); }
+    else { available.forEach(p=>{ c.players[p.id]=true; }); }
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   });
   document.getElementById('btn-save-conv').addEventListener('click',()=>{
