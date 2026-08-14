@@ -12940,9 +12940,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.classList.add('pm');
     _wellSquad=params.get('squad')||'sub23';
     nav('wellness-form');
-    // Data por defeito = ontem (preenchido de manhã, referente ao treino do dia anterior)
-    const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
-    document.getElementById('well-date').value=yesterday.toISOString().slice(0,10);
+    // Data por defeito = hoje
+    document.getElementById('well-date').value=new Date().toISOString().slice(0,10);
     const SQUAD_NAMES={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
     const wellBadge=document.getElementById('well-squad-badge');
     if(wellBadge){ const lbl=SQUAD_NAMES[_wellSquad]||_wellSquad; wellBadge.textContent=lbl; wellBadge.style.display=lbl?'inline-block':'none'; }
