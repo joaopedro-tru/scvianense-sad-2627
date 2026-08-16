@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16g';
+const APP_BUILD='2026-08-16h';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3837,9 +3837,9 @@ function renderDash(){
     const ha=ev.homeAway==='away'?'✈️':'🏠';
     const mr=ev.matchReport||{};
     const evList=mr.events||[];
-    const gameWasPlayed=evList.length>0||(mr.matchClock?.phase==='finished');
+    const gameClosed=mr.matchClock?.phase==='finished';
     let badge='';
-    if(isPast||(isToday&&gameWasPlayed)){
+    if(isPast||(isToday&&gameClosed)){
       const gf=evList.filter(e=>e.type==='goal').length;
       const ga=evList.filter(e=>e.type==='goal_conceded').length;
       const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
@@ -5975,13 +5975,49 @@ function renderCal(){
     c.addEventListener('click',()=>openEventModal(null,c.dataset.date));
     c.querySelectorAll('.ce').forEach(ev=>ev.addEventListener('click',e=>{e.stopPropagation();showEventDetail(ev.dataset.eid)}));
   });
-  const monthEvs=allEvents.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d.getFullYear()===calYear&&d.getMonth()===calMonth }).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
+  const todayStr=(new Date()).toISOString().split('T')[0];
+  const monthGames=allEvents.filter(e=>{
+    if(e.type!=='game') return false;
+    const d=new Date(e.date+'T00:00:00');
+    return d.getFullYear()===calYear&&d.getMonth()===calMonth;
+  }).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
   const lEl=document.getElementById('cal-list');
   // Build conflict banners
   const conflictHTML=_overlaps.map(([a,b])=>`<div class="conflict-banner"><div class="cb-icon">⚠️</div><div class="cb-body"><div class="cb-title">Conflito de estádio — ${fmtDate(a.date)}</div><div class="cb-row">🏠 ${evLabel(a)} · ${a.time||'hora?'} (até ~${(()=>{const[h,m]=a.time.split(':').map(Number);const e=new Date(0,0,0,h,m+120);return String(e.getHours()).padStart(2,'0')+':'+String(e.getMinutes()).padStart(2,'0')})()})</div><div class="cb-row">🏠 ${evLabel(b)} · ${b.time||'hora?'}</div><div class="cb-row" style="margin-top:4px;font-size:11px;opacity:.8">📍 ${a.location}</div></div></div>`).join('');
-  lEl.innerHTML=(conflictHTML?conflictHTML:'')+(monthEvs.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos neste mês.</p>':
-    monthEvs.map(ev=>`<div class="ei"><div class="etd ${ev.type==='game'?'gm':ev.type==='gym'?'gym':'tr'}"></div><div class="einfo"><div class="etitle">${evLabel(ev)}</div><div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>${ev.notes?`<div class="emeta">${ev.notes}</div>`:''}</div><span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span><button class="btn btn-sm btn-g" data-del-event="${ev.id}" style="flex-shrink:0">🗑️</button></div>`).join(''));
-  lEl.querySelectorAll('[data-del-event]').forEach(b=>b.addEventListener('click',()=>deleteEvent(b.dataset.delEvent)));
+  const gamesHTML=monthGames.length===0?'<p style="color:var(--muted);font-size:13px">Sem jogos neste mês.</p>':
+    monthGames.map(ev=>{
+      const d=new Date(ev.date+'T00:00:00');
+      const isPast=ev.date<todayStr;
+      const isToday=ev.date===todayStr;
+      const mr=ev.matchReport||{};
+      const evList=mr.events||[];
+      const gameClosed=mr.matchClock?.phase==='finished';
+      const showResult=isPast||(isToday&&gameClosed);
+      const ha=ev.homeAway==='away'?'✈️':'🏠';
+      const opponent=ev.opponent||'Adversário';
+      let badge='';
+      if(showResult){
+        const gf=evList.filter(me=>me.type==='goal').length;
+        const ga=evList.filter(me=>me.type==='goal_conceded').length;
+        const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
+        const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
+        badge=`<span style="padding:2px 7px;border-radius:5px;background:${res.c};color:#fff;font-size:11px;font-weight:700;flex-shrink:0">${res.l} ${scoreStr}</span>`;
+      } else if(isToday){
+        badge=`<span style="padding:2px 7px;border-radius:5px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;flex-shrink:0">Hoje</span>`;
+      }
+      return `<div class="ei" style="cursor:pointer" onclick="nav('game',{id:'${ev.id}'})">
+        <div class="etd gm"></div>
+        <div class="einfo" style="flex:1;min-width:0">
+          <div class="etitle" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ha} ${opponent}</span>
+            ${badge}
+          </div>
+          <div class="emeta">${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}${ev.competition?' · '+ev.competition:''}</div>
+        </div>
+        <span class="esb ${ev.squad}">${SQUADS[ev.squad]}</span>
+      </div>`;
+    }).join('');
+  lEl.innerHTML=(conflictHTML?conflictHTML:'')+gamesHTML;
 }
 
 function showEventDetail(id){
