@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16d';
+const APP_BUILD='2026-08-16e';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3043,6 +3043,11 @@ function _squadLoadCards(cs, sfx=''){
   const {entries:tp5,hasMins:hm5}=trainAggMoments(train5w);
   const {entries:tpS,hasMins:hmS}=trainAggMoments(trainEvs);
   const unit5=hm5?'min':'sessões', unitS=hmS?'min':'sessões';
+  // Contagem total de treinos (com e sem análise) para o footer dos gráficos
+  const allPastTr=allEvs.filter(e=>e.type==='training'&&e.date<=today);
+  const allPast5w=allPastTr.filter(e=>e.date>=cutoff5w);
+  const noAn5w=allPast5w.length-train5w.length;
+  const noAnEp=allPastTr.length-trainEvs.length;
   if(!gd5.length&&!gdS.length&&!tp5.length&&!tpS.length) return '';
 
   // ── Gym donut (unchanged) ─────────────────────────────────────────────────
@@ -3125,14 +3130,15 @@ function _squadLoadCards(cs, sfx=''){
       </div>`;
     }).join('');
   }
-  function pieBlock(entries,colorFn,labelFn,tag,sz=130,unit='min'){
+  function pieBlock(entries,colorFn,labelFn,tag,sz=130,unit='min',footer=null){
     if(!entries.length) return '';
     const total=entries.reduce((s,[,v])=>s+v,0);
+    const defaultFooter=`<div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} ${unit}</div>`;
     return `<div style="display:flex;align-items:center;gap:12px">
         ${pieSVG(entries,colorFn,sz,tag)}
         <div style="flex:1;min-width:0">${pieLegend(entries,colorFn,labelFn,total)}</div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${Number.isInteger(total)?total:total.toFixed(1)} ${unit}</div>`;
+      ${footer!==null?footer:defaultFooter}`;
   }
 
   // ── Toggle buttons ────────────────────────────────────────────────────────
@@ -3144,8 +3150,12 @@ function _squadLoadCards(cs, sfx=''){
     </div>`;
   }
 
-  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w',130,unit5);
-  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep',130,unitS);
+  function trFooter(analyzed,noAn){
+    const noAnHtml=noAn>0?` · <span style="color:#e65100;font-weight:700">${noAn} sem análise</span>`:'';
+    return `<div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right">${analyzed} treino${analyzed!==1?'s':''} analisados${noAnHtml}</div>`;
+  }
+  const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w',130,unit5,trFooter(train5w.length,noAn5w));
+  const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep',130,unitS,trFooter(trainEvs.length,noAnEp));
   const noObjData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
   const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -3794,10 +3804,9 @@ function renderDash(){
     const recFri=gameRecord(friendlyGames);
     const winPct=recOff.total>0?Math.round(recOff.v/recOff.total*100):null;
     const squadColor=cs==='eqa'?'#333':cs==='sub19'?'#b8860b':'var(--blue)';
-    const trainingsNoAnalysis=pastTrainings.filter(e=>!e.momentSummary&&!e.objectivePrimary).length;
     document.getElementById('d-coach-stats').innerHTML=`
       <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${squadColor}">${ps.length}</div><div class="ss">${SQUADS[cs]}</div></div>
-      <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss" style="${trainingsNoAnalysis>0?'color:#e65100;font-weight:600':''}">${trainingsNoAnalysis>0?`${trainingsNoAnalysis} sem análise`:'todos analisados ✓'}</div></div>
+      <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss">esta época</div></div>
       <div class="sc"><div class="sl">🏆 Jogos Oficiais</div><div class="sv">${recOff.total}</div><div class="ss" style="color:var(--green);font-weight:600">${recOff.total?`${recOff.v}V ${recOff.e}E ${recOff.d}D`:'sem jogos'}</div></div>
       <div class="sc"><div class="sl">% Vitórias Oficiais</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">⚽ Preparação: ${recFri.total?`${recFri.v}V ${recFri.e}E ${recFri.d}D`:'sem jogos'}</div></div>`;
     const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
