@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16f';
+const APP_BUILD='2026-08-16g';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -2807,8 +2807,8 @@ function trainingLabel(ev){
   if(ev.type==='gym') return `🏋️ Ginásio`;
   // Determina o escalão de referência (usa variável global squad se treino for 'both')
   const sq=ev.squad==='both'?squad:ev.squad;
-  // Número do treino na época (todos os treinos deste escalão ordenados por data)
-  const allTr=DB.events(sq).filter(e=>e.type==='training').sort((a,b)=>a.date.localeCompare(b.date));
+  // Número do treino na época (ordenado por data e hora — bi-diários pela hora)
+  const allTr=DB.events(sq).filter(e=>e.type==='training').sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||'')));
   const idx=allTr.findIndex(e=>e.id===ev.id);
   const num=idx>=0?idx+1:'?';
   // Próximo jogo após este treino (mesmo escalão ou 'both')
