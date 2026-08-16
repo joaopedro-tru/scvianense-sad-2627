@@ -2484,7 +2484,7 @@ const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Latera
 const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
 const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
 const COMPETITIONS={
-  eqa:  ['Liga 3 Placard | 1ª Fase','Taça de Portugal','Jogo de Preparação'],
+  eqa:  ['Liga 3 Placard Série A 26/27','Taça de Portugal','Jogo de Preparação'],
   sub23:['Campeonato MKA - AFVC','Jogo de Preparação'],
   sub19:['Camp. Dist Juniores "A" AFVC','Taça Juniores "A" AFVC','Jogo de Preparação'],
   both: ['Jogo de Preparação'],
@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16';
+const APP_BUILD='2026-08-16b';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3663,6 +3663,27 @@ function renderAdminLoadCharts(){
 }
 
 // ── COMPETITION PERFORMANCE STATS ────────────────────────────────────────────
+function abbrevCompName(name){
+  if(!name) return '—';
+  let s=name.trim();
+  // Abbreviate common terms
+  s=s.replace(/\bliga\b/gi,'L.');
+  s=s.replace(/\btaça\b/gi,'T.');
+  s=s.replace(/\bcampeonato\b/gi,'Camp.');
+  s=s.replace(/\bnacional\b/gi,'Nac.');
+  s=s.replace(/\bdistrital\b/gi,'Distr.');
+  s=s.replace(/\bregional\b/gi,'Reg.');
+  s=s.replace(/\bassociação de futebol\b/gi,'AF');
+  s=s.replace(/\bassociação\b/gi,'Ass.');
+  s=s.replace(/\bjuniores?\b/gi,'Jun.');
+  s=s.replace(/\bjuvenis\b/gi,'Juv.');
+  s=s.replace(/\biniiciados?\b/gi,'Ini.');
+  s=s.replace(/\brevelação\b/gi,'Rev.');
+  s=s.replace(/\bsub-?(\d+)\b/gi,'S$1');
+  s=s.replace(/\s{2,}/g,' ').trim();
+  return s.length>20?s.slice(0,19)+'…':s;
+}
+
 // squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
 function buildSquadPerfHTML(squads, events, today){
   const SQ_COLOR={eqa:'#444',sub23:'var(--blue)',sub19:'#b8860b'};
@@ -3671,49 +3692,53 @@ function buildSquadPerfHTML(squads, events, today){
     const sqGames=events.filter(e=>e.type==='game'&&(cs?e.squad===cs:true)&&e.date<today);
     const official=sqGames.filter(g=>{const gt=getGameType(g);return gt==='league'||gt==='cup';});
     if(!official.length) return '';
-    // group by competition
-    const byComp={};
+    // Group by competition (normalise key for grouping, preserve original name for display)
+    const byComp={};    // key=normalised, value={display, v,e,d,gf,ga}
     official.forEach(g=>{
-      const comp=g.competition||'Sem competição';
-      if(!byComp[comp]) byComp[comp]={v:0,e:0,d:0,gf:0,ga:0};
+      const raw=(g.competition||'Sem competição').trim();
+      const key=raw.toLowerCase();
+      if(!byComp[key]) byComp[key]={display:raw,v:0,e:0,d:0,gf:0,ga:0};
       const mr=g.matchReport||{};
       const evs=mr.events||[];
       const hasResult=evs.length>0||(mr.matchClock&&mr.matchClock.phase==='finished');
       if(!hasResult) return;
       const scored=evs.filter(me=>me.type==='goal').length;
       const conceded=evs.filter(me=>me.type==='goal_conceded').length;
-      byComp[comp].gf+=scored; byComp[comp].ga+=conceded;
-      if(scored>conceded) byComp[comp].v++;
-      else if(scored<conceded) byComp[comp].d++;
-      else byComp[comp].e++;
+      byComp[key].gf+=scored; byComp[key].ga+=conceded;
+      if(scored>conceded) byComp[key].v++;
+      else if(scored<conceded) byComp[key].d++;
+      else byComp[key].e++;
     });
-    const comps=Object.entries(byComp)
-      .map(([comp,s])=>({comp,...s,pts:s.v*3+s.e,played:s.v+s.e+s.d}))
+    const comps=Object.values(byComp)
+      .map(s=>({...s,pts:s.v*3+s.e,played:s.v+s.e+s.d}))
       .filter(s=>s.played>0)
       .sort((a,b)=>b.pts-a.pts||b.v-a.v);
     if(!comps.length) return '';
-    const hdrStyle='font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:center';
-    const header=`<div style="display:grid;grid-template-columns:1fr repeat(6,36px);gap:2px 6px;padding:4px 0 6px;border-bottom:2px solid var(--border)">
+    const col=color||SQ_COLOR[cs]||'var(--primary)';
+    // Columns: comp(flex) | V(26) | E(26) | D(26) | GM(26) | GS(26) | Pts(32)
+    const grid='grid-template-columns:1fr 26px 26px 26px 26px 26px 32px';
+    const hdrStyle='font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:center';
+    const header=`<div style="display:grid;${grid};gap:2px 5px;padding:4px 0 6px;border-bottom:2px solid var(--border)">
       <div style="${hdrStyle};text-align:left">Competição</div>
       <div style="${hdrStyle}">V</div><div style="${hdrStyle}">E</div><div style="${hdrStyle}">D</div>
       <div style="${hdrStyle}">GM</div><div style="${hdrStyle}">GS</div><div style="${hdrStyle}">Pts</div>
     </div>`;
-    const rows=comps.map(s=>`<div style="display:grid;grid-template-columns:1fr repeat(6,36px);gap:2px 6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.comp}</div>
+    const rows=comps.map(s=>`<div style="display:grid;${grid};gap:2px 5px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.display}">${abbrevCompName(s.display)}</div>
       <div style="text-align:center;font-size:12px;font-weight:700;color:#2e7d32">${s.v}</div>
       <div style="text-align:center;font-size:12px;font-weight:700;color:#e65100">${s.e}</div>
       <div style="text-align:center;font-size:12px;font-weight:700;color:#c0392b">${s.d}</div>
-      <div style="text-align:center;font-size:12px;color:var(--muted)">${s.gf}</div>
-      <div style="text-align:center;font-size:12px;color:var(--muted)">${s.ga}</div>
-      <div style="text-align:center;font-size:15px;font-weight:800;color:${color||SQ_COLOR[cs]||'var(--primary)'}">${s.pts}</div>
+      <div style="text-align:center;font-size:11px;color:var(--muted)">${s.gf}</div>
+      <div style="text-align:center;font-size:11px;color:var(--muted)">${s.ga}</div>
+      <div style="text-align:center;font-size:15px;font-weight:800;color:${col}">${s.pts}</div>
     </div>`).join('');
     return `<div class="card" style="margin:0">
-      <div style="font-size:13px;font-weight:700;color:${color||SQ_COLOR[cs]};margin-bottom:10px">${icon||SQ_ICON[cs]||''} ${label} — Performance Oficial</div>
+      <div style="font-size:13px;font-weight:700;color:${col};margin-bottom:10px">${icon||SQ_ICON[cs]||''} ${label} — Performance Oficial</div>
       ${header}${rows}
     </div>`;
   }).filter(Boolean);
   if(!cards.length) return '';
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">${cards.join('')}</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">${cards.join('')}</div>`;
 }
 
 function renderDash(){
