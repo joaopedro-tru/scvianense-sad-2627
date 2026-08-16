@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16e';
+const APP_BUILD='2026-08-16f';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -8160,6 +8160,7 @@ function renderSqTrainings(){
   // index trainings by date for this month
   const byDate={};
   allEvs.forEach(ev=>{ if(!byDate[ev.date])byDate[ev.date]=[]; byDate[ev.date].push(ev); });
+  const sortByTime=arr=>[...arr].sort((a,b)=>{if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});
 
   let cells='';
   for(let i=0;i<total;i++){
@@ -8168,7 +8169,7 @@ function renderSqTrainings(){
     else if(i>=dow+dim){ day=i-dow-dim+1; const m2=sqtrMonth===11?0:sqtrMonth+1,y2=sqtrMonth===11?sqtrYear+1:sqtrYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
     else{ day=i-dow+1; ds=`${sqtrYear}-${String(sqtrMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
     const isT=ds===today;
-    const dayTrs=byDate[ds]||[];
+    const dayTrs=sortByTime(byDate[ds]||[]);
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
     const dots=dayTrs.map(ev=>{
       const isPast=ev.date<today||(ev.date===today&&ev.time&&(([h,m])=>h*60+m<=nowMin)(ev.time.split(':').map(Number)));
@@ -8210,6 +8211,7 @@ function renderSqGym(){
 
   const byDate={};
   allEvs.forEach(ev=>{ if(!byDate[ev.date])byDate[ev.date]=[]; byDate[ev.date].push(ev); });
+  const sortByTime=arr=>[...arr].sort((a,b)=>{if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});
 
   let cells='';
   for(let i=0;i<total;i++){
@@ -8218,7 +8220,7 @@ function renderSqGym(){
     else if(i>=dow+dim){ day=i-dow-dim+1; const m2=sqgymMonth===11?0:sqgymMonth+1,y2=sqgymMonth===11?sqgymYear+1:sqgymYear; ds=`${y2}-${String(m2+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; other=true; }
     else{ day=i-dow+1; ds=`${sqgymYear}-${String(sqgymMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
     const isT=ds===today;
-    const dayGyms=byDate[ds]||[];
+    const dayGyms=sortByTime(byDate[ds]||[]);
     const numEl=isT?`<div class="cdn tdn">${day}</div>`:`<div class="cdn">${day}</div>`;
     const dots=dayGyms.map(ev=>{
       const isPast=ev.date<today||(ev.date===today&&ev.time&&(([h,m])=>h*60+m<=nowMin)(ev.time.split(':').map(Number)));
