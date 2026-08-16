@@ -758,6 +758,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
           <button class="btn" onclick="exportBackup()" style="background:#1a3d6e;color:#fff;border:none;font-size:12px;padding:8px 16px">💾 Exportar Backup</button>
           <button class="btn" id="btn-batch-analyze" onclick="batchAnalyzeAllFichas()" style="background:#1a8754;color:#fff;border:none;font-size:12px;padding:8px 16px">✨ Re-analisar todos os treinos</button>
+          <button class="btn" onclick="(()=>{const r=retroAddShotOnForGoals();toast(r.addedEvents>0?'✅ '+r.addedEvents+' remates adicionados em '+r.updatedGames+' jogos.':'ℹ️ Jogos já atualizados — nada a fazer.');})()" style="background:#5b2d8e;color:#fff;border:none;font-size:12px;padding:8px 16px">⚽→🎯 Remates retroativos</button>
         </div>
         <div id="batch-analyze-status" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
         <div style="font-size:11px;color:var(--muted)">GPS: preenche presenças automaticamente a partir do Excel da Monitorização de Cargas (folha "Data"). · Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
@@ -2664,7 +2665,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16b';
+const APP_BUILD='2026-08-16c';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3540,6 +3541,28 @@ function exportBackup(){
     URL.revokeObjectURL(url);
     toast(`✅ Backup exportado — ${data.events.length} eventos, ${data.players.length} jogadores`);
   }catch(e){ toast('❌ Erro ao exportar: '+e.message); }
+}
+
+function retroAddShotOnForGoals(){
+  const allGames=DB.events().filter(e=>e.type==='game');
+  let updatedGames=0, addedEvents=0;
+  allGames.forEach(game=>{
+    const mr=JSON.parse(JSON.stringify(game.matchReport||{events:[]}));
+    const evs=mr.events||[];
+    // IDs de golos que já têm shot_on gerado automaticamente
+    const coveredGoalIds=new Set(evs.filter(e=>e.fromGoal&&e.goalId).map(e=>e.goalId));
+    const goals=evs.filter(e=>e.type==='goal'&&!e.ownGoal&&e.playerId);
+    const toAdd=goals.filter(g=>!coveredGoalIds.has(g.id));
+    if(!toAdd.length) return;
+    toAdd.forEach(g=>{
+      evs.push({id:uid(),minute:g.minute,...(g.period?{period:g.period}:{}),type:'shot_on',playerId:g.playerId,fromGoal:true,goalId:g.id});
+      addedEvents++;
+    });
+    mr.events=evs;
+    DB.updateEvent(game.id,{matchReport:mr});
+    updatedGames++;
+  });
+  return {updatedGames,addedEvents};
 }
 
 function clearAllTrainingAnalyses(){
@@ -8094,6 +8117,10 @@ function saveLiveEvent(){
   if(_period) ne.period=_period;
   const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
   cur.events=[...(cur.events||[]),ne];
+  // Golo (não autogolo) conta automaticamente como remate à baliza
+  if(type==='goal'&&!ne.ownGoal&&ne.playerId){
+    cur.events.push({id:uid(),minute:ne.minute,...(ne.period?{period:ne.period}:{}),type:'shot_on',playerId:ne.playerId,fromGoal:true,goalId:ne.id});
+  }
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
