@@ -732,6 +732,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <!-- ADMIN DASHBOARD -->
     <div id="d-admin-content">
       <div id="d-admin-cols"></div>
+      <div id="d-perf-admin" style="margin-bottom:16px"></div>
       <!-- Staff dashboard viewer -->
       <div id="d-admin-staff-picker" style="margin-bottom:16px"></div>
       <div id="d-admin-staff-view" style="display:none;margin-bottom:16px"></div>
@@ -765,6 +766,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <!-- COACH DASHBOARD -->
     <div id="d-coach-content" style="display:none">
       <div class="sg" id="d-coach-stats"></div>
+      <div id="d-perf-coach" style="margin-bottom:14px"></div>
       <div id="d-staff-load"></div>
       <div class="g2col">
         <div class="card">
@@ -2662,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-14c';
+const APP_BUILD='2026-08-16';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3660,6 +3662,60 @@ function renderAdminLoadCharts(){
   squads.forEach(cs=>attachObjChartListeners(cs,'-adm-'+cs));
 }
 
+// ── COMPETITION PERFORMANCE STATS ────────────────────────────────────────────
+// squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
+function buildSquadPerfHTML(squads, events, today){
+  const SQ_COLOR={eqa:'#444',sub23:'var(--blue)',sub19:'#b8860b'};
+  const SQ_ICON={eqa:'⚫',sub23:'🔵',sub19:'🟡'};
+  const cards=squads.map(({cs,label,color,icon})=>{
+    const sqGames=events.filter(e=>e.type==='game'&&(cs?e.squad===cs:true)&&e.date<today);
+    const official=sqGames.filter(g=>{const gt=getGameType(g);return gt==='league'||gt==='cup';});
+    if(!official.length) return '';
+    // group by competition
+    const byComp={};
+    official.forEach(g=>{
+      const comp=g.competition||'Sem competição';
+      if(!byComp[comp]) byComp[comp]={v:0,e:0,d:0,gf:0,ga:0};
+      const mr=g.matchReport||{};
+      const evs=mr.events||[];
+      const hasResult=evs.length>0||(mr.matchClock&&mr.matchClock.phase==='finished');
+      if(!hasResult) return;
+      const scored=evs.filter(me=>me.type==='goal').length;
+      const conceded=evs.filter(me=>me.type==='goal_conceded').length;
+      byComp[comp].gf+=scored; byComp[comp].ga+=conceded;
+      if(scored>conceded) byComp[comp].v++;
+      else if(scored<conceded) byComp[comp].d++;
+      else byComp[comp].e++;
+    });
+    const comps=Object.entries(byComp)
+      .map(([comp,s])=>({comp,...s,pts:s.v*3+s.e,played:s.v+s.e+s.d}))
+      .filter(s=>s.played>0)
+      .sort((a,b)=>b.pts-a.pts||b.v-a.v);
+    if(!comps.length) return '';
+    const hdrStyle='font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:center';
+    const header=`<div style="display:grid;grid-template-columns:1fr repeat(6,36px);gap:2px 6px;padding:4px 0 6px;border-bottom:2px solid var(--border)">
+      <div style="${hdrStyle};text-align:left">Competição</div>
+      <div style="${hdrStyle}">V</div><div style="${hdrStyle}">E</div><div style="${hdrStyle}">D</div>
+      <div style="${hdrStyle}">GM</div><div style="${hdrStyle}">GS</div><div style="${hdrStyle}">Pts</div>
+    </div>`;
+    const rows=comps.map(s=>`<div style="display:grid;grid-template-columns:1fr repeat(6,36px);gap:2px 6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.comp}</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#2e7d32">${s.v}</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#e65100">${s.e}</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#c0392b">${s.d}</div>
+      <div style="text-align:center;font-size:12px;color:var(--muted)">${s.gf}</div>
+      <div style="text-align:center;font-size:12px;color:var(--muted)">${s.ga}</div>
+      <div style="text-align:center;font-size:15px;font-weight:800;color:${color||SQ_COLOR[cs]||'var(--primary)'}">${s.pts}</div>
+    </div>`).join('');
+    return `<div class="card" style="margin:0">
+      <div style="font-size:13px;font-weight:700;color:${color||SQ_COLOR[cs]};margin-bottom:10px">${icon||SQ_ICON[cs]||''} ${label} — Performance Oficial</div>
+      ${header}${rows}
+    </div>`;
+  }).filter(Boolean);
+  if(!cards.length) return '';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">${cards.join('')}</div>`;
+}
+
 function renderDash(){
   const now=new Date();
   document.getElementById('d-date').textContent=`${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
@@ -3702,6 +3758,10 @@ function renderDash(){
       upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
     bdayCards(ps,document.getElementById('d-coach-birthdays'),DB.staffProfiles(cs));
     renderStaffLoadCharts(cs);
+    const sqIcon=cs==='eqa'?'⚫':cs==='sub23'?'🔵':'🟡';
+    const sqColor=cs==='eqa'?'#444':cs==='sub23'?'var(--blue)':'#b8860b';
+    const perfCoachEl=document.getElementById('d-perf-coach');
+    if(perfCoachEl) perfCoachEl.innerHTML=buildSquadPerfHTML([{cs,label:SQUADS[cs],color:sqColor,icon:sqIcon}],es,today);
     return;
   }
 
@@ -3813,6 +3873,13 @@ function renderDash(){
     const el=document.getElementById('d-birthdays-'+sq);
     if(el) bdayCards(DB.players(sq),el,DB.staffProfiles(sq));
   });
+
+  // ── Competition performance stats (admin sees all squads) ─────────────────
+  const perfAdminEl=document.getElementById('d-perf-admin');
+  if(perfAdminEl){
+    const allSquads=ADMIN_SQUADS.map(({cs,icon,color})=>({cs,label:SQUADS[cs],color,icon}));
+    perfAdminEl.innerHTML=buildSquadPerfHTML(allSquads,es,today);
+  }
 
   // ── Staff dashboard picker ────────────────────────────────────────────────
   const pickerEl=document.getElementById('d-admin-staff-picker');
