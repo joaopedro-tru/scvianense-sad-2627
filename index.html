@@ -28,6 +28,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --green:#1a3d6e;--green-l:#2557a7;--green-d:#0e2444;
+  --primary:#1a3d6e;
   --gold:#e8b84b;--bg:#f2f4f7;--sw:240px;
   --text:#1a1a1a;--muted:#666;--border:#d8dde8;--card:#fff;
   --red:#c0392b;--blue:#2980b9;--ok:#27ae60;
@@ -754,14 +755,12 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <div style="font-size:13px;font-weight:700;margin-bottom:8px">🛠️ Ferramentas de Admin</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Operações de manutenção de dados — usar com cuidado.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn" onclick="document.getElementById('mo-gps-import').classList.add('open');document.getElementById('gps-preview').style.display='none';document.getElementById('btn-gps-confirm').style.display='none';document.getElementById('gps-file-name').textContent='';document.getElementById('gps-file-input').value=''" style="background:var(--blue);color:#fff;border:none;font-size:12px;padding:8px 16px">📡 Importar Presenças GPS</button>
           <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
           <button class="btn" onclick="exportBackup()" style="background:#1a3d6e;color:#fff;border:none;font-size:12px;padding:8px 16px">💾 Exportar Backup</button>
           <button class="btn" id="btn-batch-analyze" onclick="batchAnalyzeAllFichas()" style="background:#1a8754;color:#fff;border:none;font-size:12px;padding:8px 16px">✨ Re-analisar todos os treinos</button>
-          <button class="btn" onclick="(()=>{const r=retroAddShotOnForGoals();toast(r.addedEvents>0?'✅ '+r.addedEvents+' remates adicionados em '+r.updatedGames+' jogos.':'ℹ️ Jogos já atualizados — nada a fazer.');})()" style="background:#5b2d8e;color:#fff;border:none;font-size:12px;padding:8px 16px">⚽→🎯 Remates retroativos</button>
         </div>
         <div id="batch-analyze-status" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
-        <div style="font-size:11px;color:var(--muted)">GPS: preenche presenças automaticamente a partir do Excel da Monitorização de Cargas (folha "Data"). · Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
+        <div style="font-size:11px;color:var(--muted)">Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
       </div>
     </div>
     <!-- COACH DASHBOARD -->
@@ -2665,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16c';
+const APP_BUILD='2026-08-16d';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -3795,9 +3794,10 @@ function renderDash(){
     const recFri=gameRecord(friendlyGames);
     const winPct=recOff.total>0?Math.round(recOff.v/recOff.total*100):null;
     const squadColor=cs==='eqa'?'#333':cs==='sub19'?'#b8860b':'var(--blue)';
+    const trainingsNoAnalysis=pastTrainings.filter(e=>!e.momentSummary&&!e.objectivePrimary).length;
     document.getElementById('d-coach-stats').innerHTML=`
       <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${squadColor}">${ps.length}</div><div class="ss">${SQUADS[cs]}</div></div>
-      <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss">esta época</div></div>
+      <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss" style="${trainingsNoAnalysis>0?'color:#e65100;font-weight:600':''}">${trainingsNoAnalysis>0?`${trainingsNoAnalysis} sem análise`:'todos analisados ✓'}</div></div>
       <div class="sc"><div class="sl">🏆 Jogos Oficiais</div><div class="sv">${recOff.total}</div><div class="ss" style="color:var(--green);font-weight:600">${recOff.total?`${recOff.v}V ${recOff.e}E ${recOff.d}D`:'sem jogos'}</div></div>
       <div class="sc"><div class="sl">% Vitórias Oficiais</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">⚽ Preparação: ${recFri.total?`${recFri.v}V ${recFri.e}E ${recFri.d}D`:'sem jogos'}</div></div>`;
     const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
