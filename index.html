@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16i';
+const APP_BUILD='2026-08-16j';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9514,6 +9514,10 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const nFoulS=ctrs.foul_suffered||0;  // armazenado em counters, não em events
   const nBallWon=evs.filter(e=>e.type==='ball_won').length;
   const nBallLost=evs.filter(e=>e.type==='ball_lost').length;
+  const nCornersFor=ctrs.corners_for||0;
+  const nCornersAgainst=ctrs.corners_against||0;
+  const nOffsidesFor=ctrs.offsides_for||0;   // foras a favor (adv. em fora)
+  const nOffsidesAgainst=ctrs.offsides_against||0; // foras contra (nós em fora)
   function relStatCell(icon,label,val){
     return `<div style="text-align:center;padding:10px 6px;background:var(--bg);border-radius:8px;min-width:75px;flex:1">
       <div style="font-size:18px;line-height:1.4">${icon}</div>
@@ -9539,6 +9543,10 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ${relStatCell('🤕','F. Sof.',nFoulS)}
       ${relStatCell('✊','Recuper.',nBallWon)}
       ${relStatCell('❌','Perdas',nBallLost)}
+      ${relStatCell('🚩','Cantos N.',nCornersFor)}
+      ${relStatCell('🚩','Cantos Adv.',nCornersAgainst)}
+      ${relStatCell('⛳','Foras N.',nOffsidesAgainst)}
+      ${relStatCell('⛳','Foras Adv.',nOffsidesFor)}
     </div>
   </div>`;
 
@@ -9647,6 +9655,8 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ...(nShotOn||nShotOff?[['Remates enquadrados', nShotOn],['Remates fora', nShotOff]]:[]),
       ...(nFoulC||nFoulS?[['Faltas cometidas', nFoulC],['Faltas sofridas', nFoulS]]:[]),
       ...(nBallWon||nBallLost?[['Recuperacoes de bola', nBallWon],['Perdas de bola', nBallLost]]:[]),
+      ...(nCornersFor||nCornersAgainst?[['Cantos a favor', nCornersFor],['Cantos adversario', nCornersAgainst]]:[]),
+      ...(nOffsidesAgainst||nOffsidesFor?[['Foras de jogo (nossos)', nOffsidesAgainst],['Foras de jogo (adversario)', nOffsidesFor]]:[]),
     ];
     statRows.forEach(([label,val])=>{
       doc.setFont('helvetica','normal'); doc.text(label, 20, y);
