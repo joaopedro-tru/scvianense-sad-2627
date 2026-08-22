@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16h';
+const APP_BUILD='2026-08-16i';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -7603,6 +7603,8 @@ function renderLiveGeralTab(ev){
       <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">&#10060;</span>Perda de Bola</div>
       <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">&#9889;</span>Falta Cometida</div>
       ${ctr('chance_for','Oport. Clara a Favor','&#10003;')}
+      ${ctr('corners_for','Cantos a Favor','🚩')}
+      ${ctr('offsides_against','Foras de Jogo','⛳')}
     </div>
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Advers&#225;rio</div>
     <div class="lv-btns">
@@ -7611,6 +7613,8 @@ function renderLiveGeralTab(ev){
       ${ctr('opp_shot_off','Remates Fora','&#128168;')}
       ${ctr('foul_suffered','Faltas Sofridas','&#9889;')}
       ${ctr('chance_against','Oport. Clara Contra','&#9888;&#65039;')}
+      ${ctr('corners_against','Cantos Contra','🚩')}
+      ${ctr('offsides_for','Foras de Jogo','⛳')}
     </div>
     <div class="lv-tl">
       <div class="lv-tl-head">
@@ -7802,6 +7806,10 @@ function renderLiveStatsTab(ev){
   const foul_suffered=ctrs.foul_suffered||0;
   const chance_for=ctrs.chance_for||0;
   const chance_against=ctrs.chance_against||0;
+  const corners_for=ctrs.corners_for||0;
+  const corners_against=ctrs.corners_against||0;
+  const offsides_for=ctrs.offsides_for||0;
+  const offsides_against=ctrs.offsides_against||0;
   const opp_total_shots=conceded+opp_shot_on+opp_shot_off;
   const tc=document.getElementById('live-tab-content');
   tc.innerHTML=`
@@ -7861,6 +7869,37 @@ function renderLiveStatsTab(ev){
         </div>
       </div>
       <div style="font-size:11px;color:var(--muted)">Faltas sofridas: <strong>${foul_suffered}</strong></div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚩 Cantos / Foras</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">NÓS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
+              <div style="font-size:20px;font-weight:800;color:var(--primary)">${corners_for}</div>
+              <div style="font-size:10px;color:var(--muted)">Cantos</div>
+            </div>
+            <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
+              <div style="font-size:20px;font-weight:800;color:var(--muted)">${offsides_against}</div>
+              <div style="font-size:10px;color:var(--muted)">Foras</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">ADVERSÁRIO</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
+              <div style="font-size:20px;font-weight:800;color:#c0392b">${corners_against}</div>
+              <div style="font-size:10px;color:var(--muted)">Cantos</div>
+            </div>
+            <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px">
+              <div style="font-size:20px;font-weight:800;color:var(--muted)">${offsides_for}</div>
+              <div style="font-size:10px;color:var(--muted)">Foras</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎯 Bola / Disciplina</div>
@@ -9715,6 +9754,49 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       </div>
     </div>
     <div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📊 Estatísticas</h3>
+        ${(()=>{
+          const posEvs=mr.events||[];
+          const posCtrs=mr.counters||{};
+          const pgGoals=posEvs.filter(e=>e.type==='goal'&&!e.ownGoal).length;
+          const pgShots_on=posEvs.filter(e=>e.type==='shot_on').length;
+          const pgShots_off=posEvs.filter(e=>e.type==='shot_off').length;
+          const pgTotal=pgGoals+pgShots_on+pgShots_off;
+          const pgFouls=posEvs.filter(e=>e.type==='foul_committed').length;
+          const pgYellows=posEvs.filter(e=>e.type==='yellow'||e.type==='yellow2').length;
+          const pgReds=posEvs.filter(e=>e.type==='red'||e.type==='yellow2').length;
+          const pgCorF=posCtrs.corners_for||0;
+          const pgCorA=posCtrs.corners_against||0;
+          const pgOffF=posCtrs.offsides_for||0;
+          const pgOffA=posCtrs.offsides_against||0;
+          const pgChF=posCtrs.chance_for||0;
+          const pgChA=posCtrs.chance_against||0;
+          const pgOppSOn=posCtrs.opp_shot_on||0;
+          const pgOppSOff=posCtrs.opp_shot_off||0;
+          const pgOppTotal=goalsConceded+pgOppSOn+pgOppSOff;
+          const statRow=(label,us,them)=>`<div style="display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:4px;margin:5px 0">
+            <span style="text-align:center;font-size:15px;font-weight:800;color:var(--primary)">${us}</span>
+            <span style="text-align:center;font-size:11px;color:var(--muted)">${label}</span>
+            <span style="text-align:center;font-size:15px;font-weight:800;color:#c0392b">${them}</span>
+          </div>`;
+          return `<div style="margin-bottom:4px">
+            <div style="display:grid;grid-template-columns:40px 1fr 40px;gap:4px;margin-bottom:6px">
+              <span style="text-align:center;font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase">NÓS</span>
+              <span></span>
+              <span style="text-align:center;font-size:10px;font-weight:700;color:#c0392b;text-transform:uppercase">ADV</span>
+            </div>
+            ${statRow('Remates',pgTotal,pgOppTotal)}
+            ${statRow('À Baliza',pgShots_on,pgOppSOn)}
+            ${statRow('Cantos',pgCorF,pgCorA)}
+            ${statRow('Foras de Jogo',pgOffA,pgOffF)}
+            ${statRow('Oportunidades',pgChF,pgChA)}
+            ${statRow('Faltas',pgFouls,posCtrs.foul_suffered||0)}
+            ${statRow('Amarelos',pgYellows,'—')}
+            ${statRow('Vermelhos',pgReds,'—')}
+          </div>`;
+        })()}
+      </div>
       <div class="card" style="margin-bottom:18px">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Eventos da Partida</h3>
         <div style="background:#f5f8ff;border-radius:8px;padding:13px;margin-bottom:16px">
