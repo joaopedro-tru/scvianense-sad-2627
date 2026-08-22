@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16k';
+const APP_BUILD='2026-08-22a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -2769,7 +2769,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter='all', sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados';
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter=['eqa','sub23','sub19'], sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados';
 // Navigation stack — replaces flat _backView/_backSquad
 const _navStack=[];
 let _navBack=false; // prevents stack push during back navigation
@@ -5638,7 +5638,7 @@ function exportCalPDF(){
   const selOverlay=document.createElement('div');
   selOverlay.id='kit-print-overlay';
   selOverlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
-  const initSquads={'eqa':calFilter==='eqa'||calFilter==='all','sub23':calFilter==='sub23'||calFilter==='all','sub19':calFilter==='sub19'||calFilter==='all'};
+  const initSquads={'eqa':calFilter.includes('eqa'),'sub23':calFilter.includes('sub23'),'sub19':calFilter.includes('sub19')};
   selOverlay.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:300px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
     <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:#0e2444">📄 Exportar Calendário — ${MONTHS[calMonth]} ${calYear}</div>
     <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:10px">Escalões a incluir:</div>
@@ -5931,7 +5931,18 @@ function getGameOverlaps(events){
 
 function renderCal(){
   document.getElementById('cal-label').textContent=`${MONTHS[calMonth]} ${calYear}`;
-  const allEvents=calFilter==='all'?DB.events():DB.events(calFilter);
+  // Update filter button active states
+  const ALL_SQ=['eqa','sub23','sub19'];
+  const isAll=ALL_SQ.every(s=>calFilter.includes(s));
+  document.getElementById('cal-filters').querySelectorAll('.ftb').forEach(b=>{
+    const f=b.dataset.filter;
+    if(f==='all') b.classList.toggle('active',isAll);
+    else b.classList.toggle('active',calFilter.includes(f));
+  });
+  // Merge events from all active squads (deduped by id)
+  const _evMap=new Map();
+  calFilter.forEach(sq=>DB.events(sq).forEach(e=>_evMap.set(e.id,e)));
+  const allEvents=[..._evMap.values()];
   const first=new Date(calYear,calMonth,1);
   let dow=first.getDay()-1; if(dow<0)dow=6;
   const dim=new Date(calYear,calMonth+1,0).getDate();
@@ -6283,7 +6294,18 @@ document.getElementById('btn-confirm-del-series').addEventListener('click',funct
 document.getElementById('cal-prev').addEventListener('click',()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--} renderCal() });
 document.getElementById('cal-next').addEventListener('click',()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++} renderCal() });
 document.getElementById('cal-filters').querySelectorAll('.ftb').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('.ftb').forEach(x=>x.classList.remove('active')); b.classList.add('active'); calFilter=b.dataset.filter; renderCal();
+  const f=b.dataset.filter;
+  if(f==='all'){
+    calFilter=['eqa','sub23','sub19'];
+  } else {
+    const idx=calFilter.indexOf(f);
+    if(idx>=0){
+      if(calFilter.length>1) calFilter=calFilter.filter(x=>x!==f); // don't deselect last
+    } else {
+      calFilter=[...calFilter,f];
+    }
+  }
+  renderCal();
 }));
 
 // ── EVENT MODAL ───────────────────────────────────────────────────────────────
