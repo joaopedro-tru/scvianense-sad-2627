@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-16j';
+const APP_BUILD='2026-08-16k';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -7981,7 +7981,14 @@ function getOffFieldPlayers(){
 }
 
 function openLivePicker(type){
-  livePending={type,step:type==='finish'?'motm':'minute',data:{}};
+  const autoMin=getMatchMinute(DB.getEvent(liveGameId)?.matchReport?.matchClock)||0;
+  // Golo sofrido não precisa de mais dados — guarda diretamente
+  if(type==='goal_conceded'){
+    livePending={type,step:'done',data:{_minute:autoMin}};
+    saveLiveEvent();
+    return;
+  }
+  livePending={type,step:type==='finish'?'motm':'init',data:{_minute:autoMin}};
   const mo=document.getElementById('mo-live');
   document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
 
@@ -7989,43 +7996,6 @@ function openLivePicker(type){
     const {type,step,data}=livePending;
     const titleEl=document.getElementById('mo-live-title');
     const bodyEl=document.getElementById('mo-live-body');
-
-    // ── MINUTE INPUT ────────────────────────────────────────────────────────
-    if(step==='minute'){
-      titleEl.textContent='⏱ Minuto do evento';
-      const autoMin=getMatchMinute(DB.getEvent(liveGameId)?.matchReport?.matchClock);
-      bodyEl.innerHTML=`
-        <div style="padding:8px 4px">
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Minuto${autoMin?' (pré-preenchido pelo relógio)':''}</label>
-          <input id="lv-min-base" type="number" min="1" max="200" value="${autoMin||''}" placeholder="Ex: 23"
-            style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:22px;font-weight:700;text-align:center;box-sizing:border-box;font-family:inherit;margin-bottom:14px">
-          <div id="lv-min-preview" style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;min-height:18px"></div>
-          <button id="lv-min-confirm" class="btn btn-p" style="width:100%;padding:14px;font-size:15px;justify-content:center" ${autoMin?'':'disabled'}>Confirmar →</button>
-        </div>`;
-
-      const baseInp=document.getElementById('lv-min-base');
-      const previewEl=document.getElementById('lv-min-preview');
-      const confirmBtn=document.getElementById('lv-min-confirm');
-
-      function updatePreview(){
-        const v=parseInt(baseInp.value)||0;
-        confirmBtn.disabled=!(v>=1);
-        if(!v){ previewEl.textContent=''; return; }
-        const display=v>90?`90+${v-90}'`:`${v}'`;
-        previewEl.textContent=v>90?`→ será apresentado como ${display}`:'';
-      }
-
-      baseInp.addEventListener('input', updatePreview);
-
-      confirmBtn.addEventListener('click',()=>{
-        const base=parseInt(baseInp.value)||0;
-        livePending.data._minute=base;
-        if(type==='goal_conceded'){ saveLiveEvent(); return; }
-        livePending.step='init'; showStep();
-      });
-      setTimeout(()=>baseInp.focus(),80);
-      return;
-    }
 
     function playerList(label,onSelect,skipLabel=null,onSkip=null,players=null){
       titleEl.textContent=label;
