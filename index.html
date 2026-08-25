@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-22a';
+const APP_BUILD='2026-08-22b';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -13118,6 +13118,9 @@ async function openAccountsModal(){
         style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
         Guardar
       </button>
+      ${u.role!=='admin'?`<button onclick="removeAccount('${u.user}',this)"
+        style="padding:5px 10px;background:#fde8e8;color:#b02020;border:1px solid #f5c6c6;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0"
+        title="Remover acesso">🗑️</button>`:''}
     </div>`).join('');
 
   // Async: fetch userProfiles to show migration status per user
@@ -13153,6 +13156,22 @@ async function openAccountsModal(){
 
 function closeAccountsModal(){
   document.getElementById('mo-accounts').classList.remove('open');
+}
+
+async function removeAccount(userId, btn){
+  if(!confirm(`Remover acesso de "${userId}"?\n\nEsta ação revoga o acesso imediatamente. O utilizador não conseguirá fazer login.`)) return;
+  btn.disabled=true; btn.textContent='…';
+  try{
+    if(firestoreDb) await firestoreDb.collection('app_users').doc(userId).delete();
+    const arr=getAppUsers().filter(x=>x.user!==userId);
+    _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+    toast(`✅ Acesso de "${userId}" removido`);
+    // Remove the row from UI
+    btn.closest('div[style]').remove();
+  }catch(e){
+    toast('❌ '+(e.message||'Erro ao remover'));
+    btn.disabled=false; btn.textContent='🗑️';
+  }
 }
 
 async function saveAccountEmail(userId, btn){
