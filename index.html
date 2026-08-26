@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26a';
+const APP_BUILD='2026-08-26b';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -13154,10 +13154,89 @@ async function openAccountsModal(){
       });
     }catch(e){ console.warn('userProfiles migration check:',e); }
   }
+
+  // Secção "Nova Conta" no fundo
+  const newSection=document.createElement('div');
+  newSection.style.cssText='margin-top:18px;padding-top:14px;border-top:2px solid var(--border)';
+  newSection.innerHTML=`
+    <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Nova Conta</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Username</label>
+        <input id="nc-user" type="text" placeholder="ex: pf-eqa"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Email (opcional)</label>
+        <input id="nc-email" type="email" placeholder="email@exemplo.com"
+          style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Função</label>
+        <select id="nc-role" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+          <option value="coach">Treinador</option>
+          <option value="staff" selected>Staff</option>
+          <option value="medical">Clínica</option>
+          <option value="teammanager">Team Manager</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Escalão</label>
+        <select id="nc-squad" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+          <option value="eqa">Equipa A</option>
+          <option value="sub23">Sub-23</option>
+          <option value="sub19">Sub-19</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Cargo de staff</label>
+        <select id="nc-staffrole" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+          <option value="">— nenhum —</option>
+          <option value="headcoach">Treinador Principal</option>
+          <option value="adjunto">Adjunto</option>
+          <option value="grcoach">Treinador de GR</option>
+          <option value="analista">Analista</option>
+          <option value="condicionamento">Preparador Físico</option>
+          <option value="fisio">Fisioterapeuta</option>
+          <option value="enfermeiro">Enfermeiro</option>
+          <option value="massagista">Massagista</option>
+          <option value="delegado">Delegado</option>
+          <option value="teammanager">Team Manager</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <button onclick="createAccount(this)"
+      style="width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      + Criar Conta
+    </button>`;
+  list.appendChild(newSection);
 }
 
 function closeAccountsModal(){
   document.getElementById('mo-accounts').classList.remove('open');
+}
+
+async function createAccount(btn){
+  const userId=(document.getElementById('nc-user')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
+  const email=(document.getElementById('nc-email')?.value||'').trim().toLowerCase();
+  const role=document.getElementById('nc-role')?.value||'staff';
+  const squad=document.getElementById('nc-squad')?.value||'eqa';
+  const staffRole=document.getElementById('nc-staffrole')?.value||'';
+  if(!userId){ toast('❌ Username obrigatório'); return; }
+  if(getAppUsers().find(x=>x.user===userId)){ toast('❌ Username já existe'); return; }
+  btn.disabled=true; btn.textContent='…';
+  const newUser={user:userId, role, squad, email, ...(staffRole?{staffRole}:{})};
+  try{
+    if(firestoreDb) await firestoreDb.collection('app_users').doc(userId).set(newUser);
+    _appUsers=[...getAppUsers(), newUser];
+    localStorage.setItem('scv_au',JSON.stringify(_appUsers));
+    toast(`✅ Conta "${userId}" criada`);
+    openAccountsModal();
+  }catch(e){
+    toast('❌ '+(e.message||'Erro ao criar'));
+    btn.disabled=false; btn.textContent='+ Criar Conta';
+  }
 }
 
 async function removeAccount(userId, btn){
