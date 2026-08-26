@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26d';
+const APP_BUILD='2026-08-26f';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -10476,7 +10476,8 @@ function openAccountSetup(username){
   // Prefere email do perfil de staff; fallback para app_users; último recurso: email interno
   const sp=DB.staffProfiles(null).find(p=>p.username===username);
   const u=getAppUsers().find(x=>x.user===username);
-  const displayEmail=(sp?.email||'').trim().toLowerCase()||(u?.email)||`${username}@vianensesad.pt`;
+  // Prioridade: app_users (email configurado pelo admin) → perfil staff → fallback interno
+  const displayEmail=(u?.email||'').trim().toLowerCase()||(sp?.email||'').trim().toLowerCase()||`${username}@vianensesad.pt`;
   if(!u && !sp){ toast('Utilizador não encontrado.'); return; }
   const mo=document.getElementById('mo-acct');
   document.getElementById('mo-acct-desc').textContent=`Conta: ${username} (${displayEmail})`;
@@ -10498,7 +10499,9 @@ function openAccountSetup(username){
     btn.disabled=true; btn.textContent='A processar…';
     // Prefere email pessoal do perfil de staff; fallback para app_users
     const spNow=DB.staffProfiles(null).find(p=>p.username===username);
-    const currentEmail=(spNow?.email||'').trim().toLowerCase()||getAppUsers().find(x=>x.user===username)?.email||`${username}@vianensesad.pt`;
+    const uNow=getAppUsers().find(x=>x.user===username);
+    // Prioridade: app_users → perfil staff → fallback interno
+    const currentEmail=(uNow?.email||'').trim().toLowerCase()||(spNow?.email||'').trim().toLowerCase()||`${username}@vianensesad.pt`;
     try{
       const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST',
@@ -13116,7 +13119,7 @@ async function openAccountsModal(){
           placeholder="${u.disabled?'Novo email para reatribuição':'email@exemplo.com'}">
       </div>
       <button onclick="saveAccountEmail('${u.user}',this)"
-        style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
+        style="padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
         ${u.disabled?'Re-ativar':'Guardar'}
       </button>
       ${u.role!=='admin'&&!u.disabled?`<button onclick="removeAccount('${u.user}',this)"
@@ -13206,7 +13209,7 @@ async function openAccountsModal(){
       </div>
     </div>
     <button onclick="createAccount(this)"
-      style="width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      style="width:100%;padding:8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
       + Criar Conta
     </button>`;
   list.appendChild(newSection);
@@ -13223,6 +13226,7 @@ async function createAccount(btn){
   const squad=document.getElementById('nc-squad')?.value||'eqa';
   const staffRole=document.getElementById('nc-staffrole')?.value||'';
   if(!userId){ toast('❌ Username obrigatório'); return; }
+  if(!email||!email.includes('@')){ toast('❌ Email obrigatório'); return; }
   if(getAppUsers().find(x=>x.user===userId)){ toast('❌ Username já existe'); return; }
   btn.disabled=true; btn.textContent='…';
   const newUser={user:userId, role, squad, email, ...(staffRole?{staffRole}:{})};
