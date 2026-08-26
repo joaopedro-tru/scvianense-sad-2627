@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-22b';
+const APP_BUILD='2026-08-26a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -5261,21 +5261,22 @@ async function renderStaff(){
       const profile=DB.getStaffProfile(u.user);
       const role=userStaffRole(u);
       const isMed=MEDICAL_ROLES.includes(role);
+      const isDisabled=u.disabled===true;
       const av=profile?.photoUrl
-        ?`<img src="${profile.photoUrl}" style="width:100%;height:100%;object-fit:cover">`
+        ?`<img src="${profile.photoUrl}" style="width:100%;height:100%;object-fit:cover${isDisabled?';filter:grayscale(1)':''}">`
         :`<span style="font-size:13px;font-weight:700">${profile?spIni(profile.name):(isMed?'🏥':role==='grcoach'?'🥅':'🎽')}</span>`;
-      const bg=isMed?'#c0392b':role==='headcoach'?'#1a3d6e':'var(--green)';
-      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      const bg=isDisabled?'#aaa':isMed?'#c0392b':role==='headcoach'?'#1a3d6e':'var(--green)';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);${isDisabled?'opacity:0.55':''}">
         <div style="width:40px;height:40px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;overflow:hidden">${av}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13.5px;font-weight:700">${profile?.name||'<span style="color:var(--muted);font-weight:400;font-style:italic">Sem perfil</span>'}</div>
+          <div style="font-size:13.5px;font-weight:700">${profile?.name||'<span style="color:var(--muted);font-weight:400;font-style:italic">Sem perfil</span>'}${isDisabled?' <span style="font-size:10px;background:#fde8e8;color:#b02020;border:1px solid #f5c6c6;border-radius:4px;padding:1px 5px;vertical-align:middle">Sem acesso</span>':''}</div>
           <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}${profile?.license?' · '+profile.license:''}</div>
           <div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">user: <strong>${u.user}</strong></div>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
-          ${!profile?`<button class="btn btn-g btn-sm" onclick="copyStaffLink('${u.user}')" title="Copiar link pessoal do formulário">🔗</button>`:''}
-          <button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>
+          ${!profile&&!isDisabled?`<button class="btn btn-g btn-sm" onclick="copyStaffLink('${u.user}')" title="Copiar link pessoal do formulário">🔗</button>`:''}
+          ${!isDisabled?`<button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>`:''}
         </div>
       </div>`;
     }).join('');
@@ -13103,24 +13104,25 @@ async function openAccountsModal(){
       A verificar estado de migração…
     </div>`+
     users.map(u=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);${u.disabled?'opacity:0.6':''}">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;margin-bottom:4px">
           <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px">${u.user}</code>
           <span style="color:var(--muted);font-size:11px;margin-left:4px">${ROLE_LABELS[u.role]||u.role}${u.squad?' · '+u.squad:''}</span>
+          ${u.disabled?'<span style="font-size:10px;background:#fde8e8;color:#b02020;border:1px solid #f5c6c6;border-radius:4px;padding:1px 5px;margin-left:4px">Sem acesso</span>':''}
           <span data-migbadge="${u.user}" title="A verificar…" style="font-size:11px;margin-left:4px;opacity:0.4">⏳</span>
         </div>
         <input type="email" value="${u.email||''}" data-user="${u.user}"
           style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box"
-          placeholder="email@exemplo.com">
+          placeholder="${u.disabled?'Novo email para reatribuição':'email@exemplo.com'}">
       </div>
       <button onclick="saveAccountEmail('${u.user}',this)"
         style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
-        Guardar
+        ${u.disabled?'Re-ativar':'Guardar'}
       </button>
-      ${u.role!=='admin'?`<button onclick="removeAccount('${u.user}',this)"
+      ${u.role!=='admin'&&!u.disabled?`<button onclick="removeAccount('${u.user}',this)"
         style="padding:5px 10px;background:#fde8e8;color:#b02020;border:1px solid #f5c6c6;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0"
-        title="Remover acesso">🗑️</button>`:''}
+        title="Revogar acesso">🗑️</button>`:''}
     </div>`).join('');
 
   // Async: fetch userProfiles to show migration status per user
@@ -13159,17 +13161,22 @@ function closeAccountsModal(){
 }
 
 async function removeAccount(userId, btn){
-  if(!confirm(`Remover acesso de "${userId}"?\n\nEsta ação revoga o acesso imediatamente. O utilizador não conseguirá fazer login.`)) return;
+  if(!confirm(`Revogar acesso de "${userId}"?\n\nO utilizador não conseguirá fazer login mas o perfil mantém-se para reatribuição futura.`)) return;
   btn.disabled=true; btn.textContent='…';
   try{
-    if(firestoreDb) await firestoreDb.collection('app_users').doc(userId).delete();
-    const arr=getAppUsers().filter(x=>x.user!==userId);
+    if(firestoreDb){
+      // Desativar em app_users (bloqueia fallback + UI)
+      await firestoreDb.collection('app_users').doc(userId).update({disabled:true, email:''});
+      // Desativar em userProfiles (bloqueia login pós-migração)
+      const upSnap=await firestoreDb.collection('userProfiles').where('user','==',userId).get();
+      upSnap.forEach(d=>d.ref.update({disabled:true}));
+    }
+    const arr=getAppUsers().map(x=>x.user===userId?{...x,disabled:true,email:''}:x);
     _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
-    toast(`✅ Acesso de "${userId}" removido`);
-    // Remove the row from UI
-    btn.closest('div[style]').remove();
+    toast(`✅ Acesso de "${userId}" revogado`);
+    openAccountsModal(); // refresh
   }catch(e){
-    toast('❌ '+(e.message||'Erro ao remover'));
+    toast('❌ '+(e.message||'Erro ao revogar'));
     btn.disabled=false; btn.textContent='🗑️';
   }
 }
@@ -13181,22 +13188,36 @@ async function saveAccountEmail(userId, btn){
   if(!newEmail||!newEmail.includes('@')){ toast('❌ Email inválido'); return; }
   const u=getAppUsers().find(x=>x.user===userId);
   if(!u) return;
-  if(u.email===newEmail){ toast('Sem alterações'); return; }
+  const isReactivating=u.disabled===true;
+  if(!isReactivating&&u.email===newEmail){ toast('Sem alterações'); return; }
 
   btn.disabled=true; btn.textContent='…';
   try{
-    const fn=firebase.app().functions('europe-west1').httpsCallable('updateUserEmail');
-    const res=await fn({userId, newEmail});
-    if(res.data?.success){
-      const arr=getAppUsers().map(x=>x.user===userId?{...x,email:newEmail}:x);
+    if(isReactivating){
+      // Re-ativar: remover disabled, definir novo email em app_users e userProfiles
+      if(firestoreDb){
+        await firestoreDb.collection('app_users').doc(userId).update({disabled:firebase.firestore.FieldValue.delete(), email:newEmail});
+        const upSnap=await firestoreDb.collection('userProfiles').where('user','==',userId).get();
+        upSnap.forEach(d=>d.ref.update({disabled:firebase.firestore.FieldValue.delete()}));
+      }
+      const arr=getAppUsers().map(x=>x.user===userId?{...x,disabled:undefined,email:newEmail}:x).map(x=>{const {disabled,...rest}=x; return x.disabled===undefined?rest:x;});
       _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
-      toast('✅ Email atualizado');
-      btn.textContent='✓';
-      setTimeout(()=>{ btn.disabled=false; btn.textContent='Guardar'; },2500);
+      toast(`✅ Acesso de "${userId}" re-ativado`);
+      openAccountsModal();
+    } else {
+      const fn=firebase.app().functions('europe-west1').httpsCallable('updateUserEmail');
+      const res=await fn({userId, newEmail});
+      if(res.data?.success){
+        const arr=getAppUsers().map(x=>x.user===userId?{...x,email:newEmail}:x);
+        _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+        toast('✅ Email atualizado');
+        btn.textContent='✓';
+        setTimeout(()=>{ btn.disabled=false; btn.textContent='Guardar'; },2500);
+      }
     }
   }catch(e){
     toast('❌ '+(e.message||'Erro ao atualizar'));
-    btn.disabled=false; btn.textContent='Guardar';
+    btn.disabled=false; btn.textContent=isReactivating?'Re-ativar':'Guardar';
   }
 }
 
@@ -13260,6 +13281,8 @@ document.addEventListener('DOMContentLoaded',()=>{
           const doc=await firestoreDb.collection('userProfiles').doc(fbUser.uid).get();
           if(doc.exists){
             const data=doc.data();
+            // Conta desativada pelo admin — bloquear acesso
+            if(data.disabled===true) return null;
             // Re-escrever silenciosamente para disparar a Cloud Function setUserClaims
             // e garantir que os JWT custom claims (role, squad) estão sempre frescos.
             // A função verifica internamente se houve mudança; se não houve, não faz nada.
@@ -13272,7 +13295,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       }
       // 2. Fallback: USERS array por email (pré-migração)
       const u=getAppUsers().find(x=>x.email===fbUser.email);
-      if(!u) return null;
+      if(!u||u.disabled===true) return null;
       const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
       // Guardar no Firestore para que o próximo login já não precise do email.
       // A Cloud Function setUserClaims dispara após este set() e define
@@ -13313,7 +13336,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     // Resolve user by username OR email
-    function resolveUser(input){ const v=input.trim().toLowerCase(); const au=getAppUsers(); return au.find(x=>x.user===v)||au.find(x=>x.email===v); }
+    function resolveUser(input){ const v=input.trim().toLowerCase(); const au=getAppUsers().filter(x=>!x.disabled); return au.find(x=>x.user===v)||au.find(x=>x.email===v); }
 
     // Mostrar "Esqueci a password" quando utilizador digitar o username ou email
     userIn.addEventListener('input',()=>{
