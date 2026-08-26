@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26c';
+const APP_BUILD='2026-08-26d';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -8548,14 +8548,13 @@ tbody td{border-bottom:1px solid #e8e8e8;vertical-align:middle}
 </style></head><body>${bodyContent}</body></html>`;
   }
 
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const suffix=format==='list'?'_Lista':'_Completo';
-  const fname=`Calendario_Jogos_${squadName.replace(/\s/g,'_')}${suffix}_${new Date().toISOString().split('T')[0]}.html`;
-  const a=document.createElement('a');
-  a.href=url; a.download=fname; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
-  toast('📄 Calendário exportado!');
+  const win=window.open('','_blank');
+  if(!win){ toast('❌ Pop-up bloqueado. Permite pop-ups para esta página.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{ win.print(); },600);
+  toast('📄 Diálogo de impressão aberto — escolhe "Guardar como PDF".');
 }
 
 // ── GAME DETAIL (TABS: PRÉ-JOGO / PÓS-JOGO) ──────────────────────────────────
