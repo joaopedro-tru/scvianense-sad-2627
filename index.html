@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26f';
+const APP_BUILD='2026-08-26g';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -13376,7 +13376,19 @@ document.addEventListener('DOMContentLoaded',()=>{
         }catch(e){ console.warn('userProfiles lookup:',e); }
       }
       // 2. Fallback: USERS array por email (pré-migração)
-      const u=getAppUsers().find(x=>x.email===fbUser.email);
+      // Se a cache ainda está vazia (race condition no arranque), buscar fresh do Firestore
+      let u=getAppUsers().find(x=>x.email===fbUser.email);
+      if(!u && firestoreDb){
+        try{
+          console.log('resolveProfile: cache vazia, a buscar app_users do Firestore…');
+          const snap=await firestoreDb.collection('app_users').get();
+          if(!snap.empty){
+            const arr=[]; snap.forEach(d=>arr.push(d.data()));
+            _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+            u=arr.find(x=>x.email===fbUser.email);
+          }
+        }catch(e){ console.warn('resolveProfile fresh fetch:',e); }
+      }
       if(!u||u.disabled===true) return null;
       const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
       // Guardar no Firestore para que o próximo login já não precise do email.
