@@ -2664,7 +2664,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26g';
+const APP_BUILD='2026-08-26j';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -4199,17 +4199,40 @@ function renderPitch(allPs){
     roleZones[role]=isMob?{left:ay,top:100-ax}:{left:ax,top:ay};
   });
 
-  // Group players by normalized display position
+  // Group players by normalized display position.
+  // Garante que todos os jogadores aparecem no campo, mesmo em formações que não
+  // têm o slot exato — usa a zona mais próxima como fallback.
+  const formRoles=new Set(Object.keys(roleZones));
+  // Zona numérica de cada posição (usado para calcular proximidade)
+  const zoneOf=r=>r==='GR'?0:['LD','DC','LE'].includes(r)?1:['ALD','ALE'].includes(r)?1.5:r==='MD'?2:r==='MC'?3:r==='MO'?4:['ED','EE'].includes(r)?5:['PL','AV'].includes(r)?6:3;
+  // Retorna o role da formação mais próximo da posição dada
+  function closestFormRole(pos){
+    const pz=zoneOf(pos);
+    let best=null,bestD=999;
+    formRoles.forEach(r=>{ const d=Math.abs(zoneOf(r)-pz); if(d<bestD){bestD=d;best=r;} });
+    return best;
+  }
+  function effectivePos(p){
+    if(!p.position) return closestFormRole('MC'); // sem posição → centro
+    const dp=getDisplayPos(p);
+    if(formRoles.has(dp)) return dp;
+    if(dp!==p.position && formRoles.has(p.position)) return p.position;
+    // Todas as posições do jogador — tenta encontrar alguma que exista na formação
+    const allPos=[p.position,p.position2,p.position3].filter(Boolean);
+    const exact=allPos.find(pos=>formRoles.has(pos));
+    if(exact) return exact;
+    // Fallback: zona mais próxima da posição principal
+    return closestFormRole(p.position);
+  }
   const byPos={};
   allPs.forEach(p=>{
-    const dp=getDisplayPos(p);
-    if(!dp)return;
-    (byPos[dp]=byPos[dp]||[]).push(p);
+    const ep=effectivePos(p);
+    if(!ep)return;
+    (byPos[ep]=byPos[ep]||[]).push(p);
   });
 
-  // Players whose position has no slot in the current formation
-  const formRoles=new Set(Object.keys(roleZones));
-  const outsiders=allPs.filter(p=>!p.position||!formRoles.has(p.position));
+  // Com o fallback por proximidade, todos os jogadores ficam mapeados
+  const outsiders=[];
 
   function sn(name){
     if(!name)return '—';
@@ -5138,22 +5161,31 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     try{
       if(!FB_READY||!FB_CONFIG.apiKey) throw new Error('Firebase não configurado.');
 
+      // Validar email antes de chamar a API
+      const emailToUse=(u.email||'').trim().toLowerCase();
+      if(!emailToUse||!emailToUse.includes('@'))
+        throw new Error(`Email não configurado para esta conta (${u.user}). Pede ao admin para definir o email em Gerir Contas.`);
+
       // 1. Criar conta Firebase Auth com o email configurado pelo admin
       const authRes=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:u.email, password:pw, returnSecureToken:false})
+        body:JSON.stringify({email:emailToUse, password:pw, returnSecureToken:true})
       });
       const authData=await authRes.json();
+      console.log('accounts:signUp response:', JSON.stringify(authData?.error||'OK'));
       if(authData.error){
         if(authData.error.message==='EMAIL_EXISTS'){
           document.getElementById('sf-already').style.display='block';
           return;
         }
-        throw new Error(authData.error.message);
+        const msg=authData.error.message||'Erro desconhecido';
+        if(msg==='OPERATION_NOT_ALLOWED') throw new Error('Login por email+password não está ativo no Firebase. Contacta o admin.');
+        if(msg.includes('WEAK_PASSWORD')) throw new Error('Password demasiado fraca. Usa pelo menos 6 caracteres variados.');
+        throw new Error('Firebase: '+msg);
       }
 
       // 2. Sign in para Firestore aceitar escritas autenticadas
-      await firebaseAuth.signInWithEmailAndPassword(u.email, pw);
+      await firebaseAuth.signInWithEmailAndPassword(emailToUse, pw);
 
       // 3. Guardar foto se existir
       let photoUrl=null;
