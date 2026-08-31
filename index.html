@@ -751,17 +751,6 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <div id="d-birthdays-sub19"></div>
         </div>
       </div>
-      <div class="card" style="border:1.5px solid #ffc107;background:#fffdf0">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">🛠️ Ferramentas de Admin</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Operações de manutenção de dados — usar com cuidado.</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn" onclick="clearAllTrainingAnalyses()" style="background:#e65100;color:#fff;border:none;font-size:12px;padding:8px 16px">🗑️ Limpar análises de treino</button>
-          <button class="btn" onclick="exportBackup()" style="background:#1a3d6e;color:#fff;border:none;font-size:12px;padding:8px 16px">💾 Exportar Backup</button>
-          <button class="btn" id="btn-batch-analyze" onclick="batchAnalyzeAllFichas()" style="background:#1a8754;color:#fff;border:none;font-size:12px;padding:8px 16px">✨ Re-analisar todos os treinos</button>
-        </div>
-        <div id="batch-analyze-status" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
-        <div style="font-size:11px;color:var(--muted)">Limpar análises: remove objectivePrimary, momentSummary, etc. mas mantém fichas e exercícios.</div>
-      </div>
     </div>
     <!-- COACH DASHBOARD -->
     <div id="d-coach-content" style="display:none">
@@ -2664,7 +2653,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26j';
+const APP_BUILD='2026-08-26l';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -12962,6 +12951,8 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
+    // Admin vê monitorização e os links de partilha PSE/Bem-Estar
+    monSection.forEach(el=>el&&(el.style.display=''));
   }
 }
 
