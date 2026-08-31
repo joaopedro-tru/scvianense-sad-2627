@@ -2295,7 +2295,10 @@ const DB = {
       if(since) q=q.where('date','>=',since);
       const snap=await q.orderBy('date','desc').get();
       const arr=[]; snap.forEach(d=>arr.push(d.data())); return arr;
-    }catch(e){ console.error('getPSEEntries:',e); return []; }
+    }catch(e){
+      console.error('getPSEEntries:',e);
+      return [{_error: e.code||e.message}];
+    }
   },
   async getWellnessEntries(squad, since){
     if(!firestoreDb) return [];
@@ -2304,7 +2307,10 @@ const DB = {
       if(since) q=q.where('date','>=',since);
       const snap=await q.orderBy('date','desc').get();
       const arr=[]; snap.forEach(d=>arr.push(d.data())); return arr;
-    }catch(e){ console.error('getWellnessEntries:',e); return []; }
+    }catch(e){
+      console.error('getWellnessEntries:',e);
+      return [{_error: e.code||e.message}];
+    }
   },
   async deletePSE(id){
     if(!firestoreDb) return;
@@ -2653,7 +2659,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-08-26l';
+const APP_BUILD='2026-08-26m';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -12572,6 +12578,19 @@ async function renderMonitoring(){
 
   if(_monTab==='pse'){
     const allEntries=await DB.getPSEEntries(sq, sinceStr);
+    // Verificar erro de Firestore (permissões ou índice em falta)
+    if(allEntries[0]?._error){
+      const err=allEntries[0]._error;
+      const isPerms=err.includes('permission')||err.includes('PERMISSION');
+      const isIndex=err.includes('index')||err.includes('INDEX')||err.includes('requires an index');
+      el.innerHTML=`<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px;font-size:13px;color:#856404">
+        <strong>⚠️ Não foi possível carregar os dados PSE.</strong><br>
+        ${isPerms?'Faltam permissões Firestore — adiciona <code>pse_entries</code> às Security Rules (ver instruções anteriores).':''}
+        ${isIndex?'Falta um índice composto no Firestore — abre a consola do browser, copia o link de criação do índice que aparece no erro e cria-o.':''}
+        ${(!isPerms&&!isIndex)?`Erro: <code>${err}</code>`:''}
+      </div>`;
+      return;
+    }
     // Day view: only selected date, sorted by PSE desc (most concern first)
     const dayEntries=allEntries.filter(e=>e.date===date).sort((a,b)=>b.pse-a.pse);
     // 28-day history grouped by player key
@@ -12611,6 +12630,18 @@ async function renderMonitoring(){
 
   } else {
     const allEntries=await DB.getWellnessEntries(sq, sinceStr);
+    if(allEntries[0]?._error){
+      const err=allEntries[0]._error;
+      const isPerms=err.includes('permission')||err.includes('PERMISSION');
+      const isIndex=err.includes('index')||err.includes('INDEX')||err.includes('requires an index');
+      el.innerHTML=`<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px;font-size:13px;color:#856404">
+        <strong>⚠️ Não foi possível carregar os dados de Bem-Estar.</strong><br>
+        ${isPerms?'Faltam permissões Firestore — adiciona <code>wellness_entries</code> às Security Rules.':''}
+        ${isIndex?'Falta um índice composto no Firestore — abre a consola do browser, copia o link de criação do índice que aparece no erro e cria-o.':''}
+        ${(!isPerms&&!isIndex)?`Erro: <code>${err}</code>`:''}
+      </div>`;
+      return;
+    }
     // Day view: only selected date, sorted by concern desc (stress+soreness+sleep desc)
     const dayEntries=allEntries.filter(e=>e.date===date).sort((a,b)=>{
       const scoreA=(a.stressLevel||0)+(a.muscleSoreness||0)+(a.sleepQuality||0);
