@@ -9142,15 +9142,23 @@ Sê técnico, objetivo e conciso. Usa markdown.`;
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+      mode:'cors',
+      credentials:'omit',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-calls':'true'
+      },
       body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,messages:[{role:'user',content:prompt}]})
     });
     if(!res.ok){
       const ed=await res.json().catch(()=>({}));
       const em=ed?.error?.message||`HTTP ${res.status}`;
-      if(res.status===401) throw new Error('Chave API inválida. Verifica em 🔑 Chave API.');
-      if(res.status===429) throw new Error('Limite de requisições atingido. Tenta em breve.');
-      throw new Error(em);
+      if(res.status===401) throw new Error('Chave API inválida (401). Verifica em 🔑 Chave API.');
+      if(res.status===429) throw new Error('Limite de requisições atingido (429). Tenta em breve.');
+      if(res.status===403) throw new Error('Acesso negado (403). Verifica as permissões da chave API.');
+      throw new Error(`Erro ${res.status}: ${em}`);
     }
     const data=await res.json();
     const analysis=data.content?.[0]?.text||'Sem resposta.';
@@ -9170,6 +9178,7 @@ Sê técnico, objetivo e conciso. Usa markdown.`;
 
 function renderGameAnaliseIA(ev,sqPlayers,conv,mr){
   const el=document.getElementById('gm-tab-content');
+  const isAdm=isAdmin();
   const apiKey=localStorage.getItem('scv_anthropic_key')||'';
   const saved=mr.aiAnalysis;
   const savedTs=mr.aiAnalysisTs;
@@ -9178,24 +9187,38 @@ function renderGameAnaliseIA(ev,sqPlayers,conv,mr){
     el.innerHTML=`<div style="padding:4px 0 20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <h3 style="font-size:14px;font-weight:700;color:var(--fg);margin:0">🤖 Análise IA do Jogo</h3>
-        <div style="display:flex;gap:8px">
+        ${isAdm?`<div style="display:flex;gap:8px">
           <button id="ia-config-key" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer">🔑</button>
           <button id="ia-regen" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">↺ Regenerar</button>
-        </div>
+        </div>`:''}
       </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13.5px;line-height:1.75;color:var(--fg)">${simpleMarkdown(saved)}</div>
       <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right">Gerada em ${savedTs?new Date(savedTs).toLocaleString('pt-PT'):'—'}</p>
     </div>`;
-    el.querySelector('#ia-config-key').onclick=()=>showApiKeyModal();
-    el.querySelector('#ia-regen').onclick=()=>{
-      const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
-      delete curMr.aiAnalysis; delete curMr.aiAnalysisTs;
-      DB.updateEvent(gameEventId,{matchReport:curMr});
-      renderGame();
-    };
+    if(isAdm){
+      el.querySelector('#ia-config-key').onclick=()=>showApiKeyModal();
+      el.querySelector('#ia-regen').onclick=()=>{
+        const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+        delete curMr.aiAnalysis; delete curMr.aiAnalysisTs;
+        DB.updateEvent(gameEventId,{matchReport:curMr});
+        renderGame();
+      };
+    }
     return;
   }
 
+  // Sem análise gerada
+  if(!isAdm){
+    el.innerHTML=`<div style="padding:4px 0 20px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:40px 20px;text-align:center">
+        <div style="font-size:36px;margin-bottom:12px">🤖</div>
+        <p style="font-size:14px;color:var(--muted)">Análise ainda não gerada.<br>Aguarda que o admin gere a análise.</p>
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Admin — mostrar painel de geração
   el.innerHTML=`<div style="padding:4px 0 20px">
     <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px 20px;text-align:center">
       <div style="font-size:42px;margin-bottom:12px">🤖</div>
