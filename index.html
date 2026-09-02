@@ -8644,7 +8644,7 @@ function renderGame(){
   const clock=mr.matchClock||{phase:'pre'};
   const gameFinished=(clock.phase==='finished');
   // GR e Adjunto só ficam visíveis após o jogo terminar
-  if(!gameFinished && (gameTab==='gr'||gameTab==='adj')) gameTab='pre';
+  if(!gameFinished && (gameTab==='gr'||gameTab==='adj'||gameTab==='analise')) gameTab='pre';
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
@@ -8656,7 +8656,8 @@ function renderGame(){
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
       ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
-      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>`:''}
+      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
+      <button class="tab-btn${gameTab==='analise'?' tab-active':''}" data-tab="analise">🤖 Análise IA</button>`:''}
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
@@ -8686,6 +8687,7 @@ function renderGame(){
   if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
   else if(gameTab==='gr') renderGameGR(ev,sqPlayers,conv,mr);
   else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
+  else if(gameTab==='analise') renderGameAnaliseIA(ev,sqPlayers,conv,mr);
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
@@ -9053,6 +9055,164 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
     DB.updateEvent(gameEventId,{matchReport:curMr});
     renderGameAdjunto(ev,sqPlayers,conv,DB.getEvent(gameEventId).matchReport||{});
   }));
+}
+
+// ── ANÁLISE IA ────────────────────────────────────────────────────────────────
+function simpleMarkdown(md){
+  return md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h4 style="font-size:13px;font-weight:700;margin:14px 0 4px;color:var(--fg)">$1</h4>')
+    .replace(/^## (.+)$/gm,'<h3 style="font-size:15px;font-weight:700;margin:18px 0 6px;color:var(--fg)">$1</h3>')
+    .replace(/^# (.+)$/gm,'<h2 style="font-size:17px;font-weight:700;margin:20px 0 8px;color:var(--fg)">$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^- (.+)$/gm,'<li style="margin:3px 0">$1</li>')
+    .replace(/(<li[\s\S]*?<\/li>)/g,'<ul style="padding-left:18px;margin:6px 0">$1</ul>')
+    .replace(/\n\n/g,'</p><p style="margin:8px 0">')
+    .replace(/^/,'<p style="margin:0">')
+    .replace(/$/,'</p>');
+}
+
+function showApiKeyModal(cb){
+  const cur=localStorage.getItem('scv_anthropic_key')||'';
+  const m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML=`<div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <h3 style="font-size:16px;font-weight:700;margin:0 0 8px;color:var(--fg)">🔑 Chave API Anthropic</h3>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.5">Guardada localmente neste dispositivo. Usada apenas para gerar análises IA de jogo.<br><a href="https://console.anthropic.com/account/keys" target="_blank" style="color:var(--accent)">Obter chave →</a></p>
+    <input id="_ak" type="password" placeholder="sk-ant-..." value="${cur}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin-bottom:14px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="_akc" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">Cancelar</button>
+      <button id="_aks" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.querySelector('#_akc').onclick=()=>m.remove();
+  m.querySelector('#_aks').onclick=()=>{
+    const k=m.querySelector('#_ak').value.trim();
+    k?localStorage.setItem('scv_anthropic_key',k):localStorage.removeItem('scv_anthropic_key');
+    m.remove(); if(cb)cb(); else renderGame();
+  };
+}
+
+async function generateGameAnalysisIA(ev,sqPlayers,conv,mr){
+  const apiKey=localStorage.getItem('scv_anthropic_key');
+  if(!apiKey){ toast('❌ Chave API não configurada'); return; }
+  const el=document.getElementById('gm-tab-content');
+  el.innerHTML=`<div style="padding:60px 20px;text-align:center"><div class="spinner" style="margin:0 auto"></div><p style="color:var(--muted);margin-top:18px;font-size:14px">A gerar análise IA…<br><span style="font-size:12px">Aguarda alguns segundos</span></p></div>`;
+
+  const score=mr.score||{};
+  const events=(mr.events||[]).map(e=>`${e.min||'?'}' ${e.type||''}${e.player?' ('+e.player+')':''}${e.note?' — '+e.note:''}`).join('\n')||'Sem eventos registados';
+  const ratings=Object.entries(mr.ratings||{}).map(([pid,r])=>{
+    const pl=sqPlayers.find(p=>p.id===pid||p.player===pid);
+    const nm=pl?(pl.name||pl.player):pid;
+    const rv=typeof r==='object'?r.rating:r;
+    const nt=typeof r==='object'?r.note:'';
+    return `${nm}: ${rv||'—'}/10${nt?' ('+nt+')':''}`;
+  }).join('\n')||'Sem avaliações';
+  const obs=Object.entries(mr.staffObs||{}).map(([usr,o])=>`[${o.role||usr}]: ${o.text||''}`).join('\n\n')||'Sem observações da equipa técnica';
+
+  const prompt=`És um assistente especializado em análise de futebol. Analisa este jogo do SC Vianense e gera um relatório técnico em português.
+
+## Dados do Jogo
+- Data: ${ev.date||'N/A'} | Escalão: ${ev.squad||'N/A'}
+- Formação: ${conv.formation||'N/A'}
+- Resultado: SC Vianense ${score.home??'?'} — ${score.away??'?'} ${ev.opponent||'adversário'}
+
+## Eventos
+${events}
+
+## Avaliações dos Jogadores
+${ratings}
+
+## Observações da Equipa Técnica
+${obs}
+
+---
+Gera um relatório com estas secções:
+1. **Síntese do Jogo** — 2-3 frases sobre resultado e contexto
+2. **Análise Táctica** — organização, transições, pontos fortes/fracos
+3. **Destaques Individuais** — jogadores que se destacaram (positivo e negativo)
+4. **Análise dos Eventos** — golos, cartões, substituições e impacto no jogo
+5. **Sugestões para Treino** — 3-5 áreas específicas a trabalhar baseadas nas lacunas observadas
+6. **Conclusão** — 1-2 frases finais
+
+Sê técnico, objetivo e conciso. Usa markdown.`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok){
+      const ed=await res.json().catch(()=>({}));
+      const em=ed?.error?.message||`HTTP ${res.status}`;
+      if(res.status===401) throw new Error('Chave API inválida. Verifica em 🔑 Chave API.');
+      if(res.status===429) throw new Error('Limite de requisições atingido. Tenta em breve.');
+      throw new Error(em);
+    }
+    const data=await res.json();
+    const analysis=data.content?.[0]?.text||'Sem resposta.';
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+    curMr.aiAnalysis=analysis; curMr.aiAnalysisTs=new Date().toISOString();
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    toast('✅ Análise gerada!'); renderGame();
+  }catch(e){
+    el.innerHTML=`<div style="padding:20px">
+      <div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:12px;padding:16px;color:#721c24;font-size:13px;margin-bottom:14px">
+        <strong>❌ Erro ao gerar análise</strong><br>${e.message}
+      </div>
+      <button onclick="renderGame()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">← Voltar</button>
+    </div>`;
+  }
+}
+
+function renderGameAnaliseIA(ev,sqPlayers,conv,mr){
+  const el=document.getElementById('gm-tab-content');
+  const apiKey=localStorage.getItem('scv_anthropic_key')||'';
+  const saved=mr.aiAnalysis;
+  const savedTs=mr.aiAnalysisTs;
+
+  if(saved){
+    el.innerHTML=`<div style="padding:4px 0 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="font-size:14px;font-weight:700;color:var(--fg);margin:0">🤖 Análise IA do Jogo</h3>
+        <div style="display:flex;gap:8px">
+          <button id="ia-config-key" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer">🔑</button>
+          <button id="ia-regen" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">↺ Regenerar</button>
+        </div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13.5px;line-height:1.75;color:var(--fg)">${simpleMarkdown(saved)}</div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right">Gerada em ${savedTs?new Date(savedTs).toLocaleString('pt-PT'):'—'}</p>
+    </div>`;
+    el.querySelector('#ia-config-key').onclick=()=>showApiKeyModal();
+    el.querySelector('#ia-regen').onclick=()=>{
+      const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+      delete curMr.aiAnalysis; delete curMr.aiAnalysisTs;
+      DB.updateEvent(gameEventId,{matchReport:curMr});
+      renderGame();
+    };
+    return;
+  }
+
+  el.innerHTML=`<div style="padding:4px 0 20px">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px 20px;text-align:center">
+      <div style="font-size:42px;margin-bottom:12px">🤖</div>
+      <h3 style="font-size:16px;font-weight:700;margin:0 0 8px;color:var(--fg)">Análise IA do Jogo</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 20px;line-height:1.6;max-width:340px;margin-left:auto;margin-right:auto">Relatório automático com análise táctica, desempenho individual e sugestões de treino, gerado a partir de todos os dados do jogo.</p>
+      ${!apiKey?`<div style="background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.4);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:var(--fg);text-align:left">
+        <strong>⚙️ Precisas de uma chave API da Anthropic</strong><br>
+        Gratuita para começar · <a href="https://console.anthropic.com/account/keys" target="_blank" style="color:var(--accent)">Obter chave →</a>
+      </div>`:''}
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button id="ia-set-key" style="padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:13px;cursor:pointer">🔑 ${apiKey?'Alterar Chave':'Configurar Chave'}</button>
+        <button id="ia-gen" ${!apiKey?'disabled':''} style="padding:10px 22px;border-radius:10px;border:none;background:${apiKey?'var(--green)':'var(--border)'};color:${apiKey?'#fff':'var(--muted)'};font-size:14px;font-weight:600;cursor:${apiKey?'pointer':'not-allowed'}">✨ Gerar Análise</button>
+      </div>
+    </div>
+  </div>`;
+  el.querySelector('#ia-set-key').onclick=()=>showApiKeyModal(()=>renderGame());
+  if(apiKey) el.querySelector('#ia-gen').onclick=()=>generateGameAnalysisIA(ev,sqPlayers,conv,mr);
 }
 
 function renderGamePre(ev,sqPlayers,conv){
@@ -9693,7 +9853,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const staffObs=mr.staffObs||{};
   const cu=currentUser();
   const myUser=cu?.user||null;
-  const canWriteObs=isStaff()||isAdmin();
+  const canWriteObs=isStaff()||isAdmin()||currentUser()?.role==='coach';
   const myObs=myUser?staffObs[myUser]||{}:{};
   const obsCards=Object.entries(staffObs).map(([usr,obs])=>{
     const u=getAppUsers().find(x=>x.user===usr);
@@ -13072,6 +13232,21 @@ function initCoordApp(){
             .then(()=>console.log('✅ matchReport sincronizado:',fsEv.id))
             .catch(err=>console.error('❌ matchReport sync falhou:',fsEv.id,err));
           return loc;
+        }
+        // Ambos têm matchReport: mesclar staffObs (local pode ter dados mais recentes ainda não confirmados pelo Firestore)
+        if(loc.matchReport && fsEv.matchReport){
+          const localObs=loc.matchReport.staffObs||{};
+          const fsObs=fsEv.matchReport.staffObs||{};
+          const mergedObs={...fsObs};
+          Object.entries(localObs).forEach(([usr,obs])=>{
+            if(!mergedObs[usr]||(obs.ts&&(!mergedObs[usr].ts||obs.ts>mergedObs[usr].ts)))
+              mergedObs[usr]=obs;
+          });
+          const localAiAnalysis=loc.matchReport.aiAnalysis;
+          const fsAiAnalysis=fsEv.matchReport.aiAnalysis;
+          const mergedAiAnalysis=fsAiAnalysis||(localAiAnalysis||undefined);
+          const mergedAiTs=fsEv.matchReport.aiAnalysisTs||(loc.matchReport.aiAnalysisTs||undefined);
+          return {...fsEv,matchReport:{...fsEv.matchReport,staffObs:mergedObs,...(mergedAiAnalysis?{aiAnalysis:mergedAiAnalysis,aiAnalysisTs:mergedAiTs}:{})}};
         }
         return fsEv;
       });
