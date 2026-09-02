@@ -5,20 +5,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, apiKey } = req.body;
+  const { prompt, apiKey, workspaceId } = req.body;
 
   if (!prompt || !apiKey) {
     return res.status(400).json({ error: 'Missing prompt or apiKey' });
   }
 
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    };
+    if (workspaceId) headers['anthropic-workspace-id'] = workspaceId;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers,
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,

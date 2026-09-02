@@ -2659,7 +2659,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-02b';
+const APP_BUILD='2026-09-02c';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9075,12 +9075,16 @@ function simpleMarkdown(md){
 
 function showApiKeyModal(cb){
   const cur=localStorage.getItem('scv_anthropic_key')||'';
+  const curWs=localStorage.getItem('scv_anthropic_ws')||'';
   const m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   m.innerHTML=`<div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <h3 style="font-size:16px;font-weight:700;margin:0 0 8px;color:var(--fg)">🔑 Chave API Anthropic</h3>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.5">Guardada localmente neste dispositivo. Usada apenas para gerar análises IA de jogo.<br><a href="https://console.anthropic.com/account/keys" target="_blank" style="color:var(--accent)">Obter chave →</a></p>
-    <input id="_ak" type="password" placeholder="sk-ant-..." value="${cur}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin-bottom:14px">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5">Guardada localmente neste dispositivo.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">Obter chave →</a></p>
+    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Chave API</label>
+    <input id="_ak" type="password" placeholder="sk-ant-..." value="${cur}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin:4px 0 12px">
+    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Workspace ID <span style="font-weight:400;text-transform:none">(opcional — só para chaves identity-linked)</span></label>
+    <input id="_aws" type="text" placeholder="wrkspc_..." value="${curWs}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin:4px 0 16px">
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button id="_akc" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">Cancelar</button>
       <button id="_aks" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Guardar</button>
@@ -9090,7 +9094,9 @@ function showApiKeyModal(cb){
   m.querySelector('#_akc').onclick=()=>m.remove();
   m.querySelector('#_aks').onclick=()=>{
     const k=m.querySelector('#_ak').value.trim();
+    const ws=m.querySelector('#_aws').value.trim();
     k?localStorage.setItem('scv_anthropic_key',k):localStorage.removeItem('scv_anthropic_key');
+    ws?localStorage.setItem('scv_anthropic_ws',ws):localStorage.removeItem('scv_anthropic_ws');
     m.remove(); if(cb)cb(); else renderGame();
   };
 }
@@ -9140,10 +9146,11 @@ Gera um relatório com estas secções:
 Sê técnico, objetivo e conciso. Usa markdown.`;
 
   try{
+    const workspaceId=localStorage.getItem('scv_anthropic_ws')||'';
     const res=await fetch('/api/analyze',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt,apiKey})
+      body:JSON.stringify({prompt,apiKey,...(workspaceId?{workspaceId}:{})})
     });
     if(!res.ok){
       const ed=await res.json().catch(()=>({}));
