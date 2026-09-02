@@ -2659,7 +2659,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-02a';
+const APP_BUILD='2026-09-02b';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9140,28 +9140,21 @@ Gera um relatório com estas secções:
 Sê técnico, objetivo e conciso. Usa markdown.`;
 
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('/api/analyze',{
       method:'POST',
-      mode:'cors',
-      credentials:'omit',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-calls':'true'
-      },
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,messages:[{role:'user',content:prompt}]})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt,apiKey})
     });
     if(!res.ok){
       const ed=await res.json().catch(()=>({}));
-      const em=ed?.error?.message||`HTTP ${res.status}`;
+      const em=ed?.error||`HTTP ${res.status}`;
       if(res.status===401) throw new Error('Chave API inválida (401). Verifica em 🔑 Chave API.');
       if(res.status===429) throw new Error('Limite de requisições atingido (429). Tenta em breve.');
       if(res.status===403) throw new Error('Acesso negado (403). Verifica as permissões da chave API.');
       throw new Error(`Erro ${res.status}: ${em}`);
     }
     const data=await res.json();
-    const analysis=data.content?.[0]?.text||'Sem resposta.';
+    const analysis=data.text||'Sem resposta.';
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
     curMr.aiAnalysis=analysis; curMr.aiAnalysisTs=new Date().toISOString();
     DB.updateEvent(gameEventId,{matchReport:curMr});
