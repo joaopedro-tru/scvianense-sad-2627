@@ -2,8 +2,7 @@
 // SC Vianense SAD — Service Worker
 // Estratégia: network-first para HTML, cache-first para assets estáticos
 // ─────────────────────────────────────────────────────────────────
-const CACHE_NAME = 'scv-v2';
-
+const CACHE_NAME = 'scv-v3';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg',
@@ -12,7 +11,6 @@ const STATIC_ASSETS = [
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js',
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js',
 ];
-
 // ── INSTALL: pré-carrega apenas assets estáticos (não o HTML) ────
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -21,7 +19,6 @@ self.addEventListener('install', event => {
       .then(() => self.skipWaiting())
   );
 });
-
 // ── ACTIVATE: remove caches antigos ─────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
@@ -32,26 +29,23 @@ self.addEventListener('activate', event => {
       .then(() => self.clients.claim())
   );
 });
-
 // ── FETCH ────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
-
-  // Deixa passar: Firebase APIs
+  // Deixa passar: Firebase APIs + Anthropic API (chamadas diretas do browser)
   if (
     url.includes('firestore.googleapis.com') ||
     url.includes('firebasestorage.app') ||
     url.includes('identitytoolkit.googleapis.com') ||
     url.includes('securetoken.googleapis.com') ||
-    url.includes('radiogeice.com')
+    url.includes('radiogeice.com') ||
+    url.includes('api.anthropic.com')
   ) {
     return;
   }
-
   // HTML → network-first: garante que um refresh busca sempre a versão mais recente
   const isHTML = event.request.mode === 'navigate' ||
     event.request.headers.get('accept')?.includes('text/html');
-
   if (isHTML) {
     event.respondWith(
       fetch(event.request)
@@ -65,7 +59,6 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-
   // Assets estáticos (Firebase SDK, ícones) → cache-first
   event.respondWith(
     caches.match(event.request).then(cached => {
