@@ -696,6 +696,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-monitoring" data-view="monitoring"><span class="ic">📈</span> PSE & Bem-Estar</div>
     <div class="nl" id="nl-pse-link"><span class="ic">🔗</span> Link PSE</div>
     <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
+    <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
     <hr class="nd">
     <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
     <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
@@ -1388,6 +1389,24 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <button type="submit" class="btn btn-p" style="width:100%;margin-top:8px;padding:14px;font-size:15px">Submeter →</button>
       </form>
     </div>
+  </div>
+
+  <!-- BILHETES FORM (public) -->
+  <div class="view" id="v-bilhetes-form">
+    <div class="pfh" style="background:linear-gradient(135deg,#0f2027,#1a3a5c)">
+      <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" style="width:56px;height:56px;object-fit:contain;margin-bottom:10px;mix-blend-mode:screen" onerror="this.style.display='none'">
+      <h1>SC Vianense SAD</h1>
+      <p style="opacity:.85">Pedido de Bilhetes — Equipa A</p>
+    </div>
+    <div class="card" id="bilhetes-form-content"></div>
+  </div>
+
+  <!-- BILHETES ADMIN VIEW -->
+  <div class="view" id="v-bilhetes">
+    <div class="tb">
+      <div><h1>🎟️ Bilhetes Equipa A</h1><div class="sub">Pedidos Sub-23 e Sub-19</div></div>
+    </div>
+    <div id="v-bilhetes-content" style="padding-bottom:60px"></div>
   </div>
 
   <!-- MONITORING VIEW (staff) -->
@@ -2277,6 +2296,19 @@ const DB = {
     }
   },
   getEvent(id){ return this._d().events.find(x=>x.id===id) },
+  // ── Bilhetes ─────────────────────────────────────────────────────────────────
+  async addBilhete(entry){
+    entry.id=uid(); entry.createdAt=new Date().toISOString();
+    if(firestoreDb) await firestoreDb.collection('bilhetes_requests').doc(entry.id).set(entry).catch(e=>console.error('FS addBilhete:',e));
+    return entry;
+  },
+  async getBilhetes(gameId){
+    if(!firestoreDb) return [];
+    try{
+      const snap=await firestoreDb.collection('bilhetes_requests').where('gameId','==',gameId).orderBy('createdAt','asc').get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); return arr;
+    }catch(e){ console.error('getBilhetes:',e); return []; }
+  },
   // ── PSE & Wellness ──────────────────────────────────────────────────────────
   async addPSE(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
@@ -2659,7 +2691,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-02c';
+const APP_BUILD='2026-09-02e';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -2931,6 +2963,8 @@ function nav(v,opts={}){
   else if(v==='public-form'){ show('v-pf') }
   else if(v==='pse-form'){ show('v-pse-form') }
   else if(v==='wellness-form'){ show('v-wellness-form') }
+  else if(v==='bilhetes-form'){ show('v-bilhetes-form') }
+  else if(v==='bilhetes'){ show('v-bilhetes'); setActive('[data-view="bilhetes"]'); renderBilhetesAdmin(); }
   else if(v==='monitoring'){
     show('v-monitoring'); setActive('[data-view="monitoring"]');
     // Init squad selector
@@ -8644,7 +8678,7 @@ function renderGame(){
   const clock=mr.matchClock||{phase:'pre'};
   const gameFinished=(clock.phase==='finished');
   // GR e Adjunto só ficam visíveis após o jogo terminar
-  if(!gameFinished && (gameTab==='gr'||gameTab==='adj'||gameTab==='analise')) gameTab='pre';
+  if(!gameFinished && (gameTab==='gr'||gameTab==='adj')) gameTab='pre';
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
@@ -8656,8 +8690,7 @@ function renderGame(){
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
       ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
-      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
-      <button class="tab-btn${gameTab==='analise'?' tab-active':''}" data-tab="analise">🤖 Análise IA</button>`:''}
+      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>`:''}
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
@@ -8687,7 +8720,6 @@ function renderGame(){
   if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
   else if(gameTab==='gr') renderGameGR(ev,sqPlayers,conv,mr);
   else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
-  else if(gameTab==='analise') renderGameAnaliseIA(ev,sqPlayers,conv,mr);
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
@@ -9057,186 +9089,7 @@ function renderGameAdjunto(ev, sqPlayers, conv, mr){
   }));
 }
 
-// ── ANÁLISE IA ────────────────────────────────────────────────────────────────
-function simpleMarkdown(md){
-  return md
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^### (.+)$/gm,'<h4 style="font-size:13px;font-weight:700;margin:14px 0 4px;color:var(--fg)">$1</h4>')
-    .replace(/^## (.+)$/gm,'<h3 style="font-size:15px;font-weight:700;margin:18px 0 6px;color:var(--fg)">$1</h3>')
-    .replace(/^# (.+)$/gm,'<h2 style="font-size:17px;font-weight:700;margin:20px 0 8px;color:var(--fg)">$1</h2>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/^- (.+)$/gm,'<li style="margin:3px 0">$1</li>')
-    .replace(/(<li[\s\S]*?<\/li>)/g,'<ul style="padding-left:18px;margin:6px 0">$1</ul>')
-    .replace(/\n\n/g,'</p><p style="margin:8px 0">')
-    .replace(/^/,'<p style="margin:0">')
-    .replace(/$/,'</p>');
-}
 
-function showApiKeyModal(cb){
-  const cur=localStorage.getItem('scv_anthropic_key')||'';
-  const curWs=localStorage.getItem('scv_anthropic_ws')||'';
-  const m=document.createElement('div');
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML=`<div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <h3 style="font-size:16px;font-weight:700;margin:0 0 8px;color:var(--fg)">🔑 Chave API Anthropic</h3>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5">Guardada localmente neste dispositivo.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">Obter chave →</a></p>
-    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Chave API</label>
-    <input id="_ak" type="password" placeholder="sk-ant-..." value="${cur}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin:4px 0 12px">
-    <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Workspace ID <span style="font-weight:400;text-transform:none">(opcional — só para chaves identity-linked)</span></label>
-    <input id="_aws" type="text" placeholder="wrkspc_..." value="${curWs}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box;margin:4px 0 16px">
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button id="_akc" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">Cancelar</button>
-      <button id="_aks" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Guardar</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  m.querySelector('#_akc').onclick=()=>m.remove();
-  m.querySelector('#_aks').onclick=()=>{
-    const k=m.querySelector('#_ak').value.trim();
-    const ws=m.querySelector('#_aws').value.trim();
-    k?localStorage.setItem('scv_anthropic_key',k):localStorage.removeItem('scv_anthropic_key');
-    ws?localStorage.setItem('scv_anthropic_ws',ws):localStorage.removeItem('scv_anthropic_ws');
-    m.remove(); if(cb)cb(); else renderGame();
-  };
-}
-
-async function generateGameAnalysisIA(ev,sqPlayers,conv,mr){
-  const apiKey=localStorage.getItem('scv_anthropic_key');
-  if(!apiKey){ toast('❌ Chave API não configurada'); return; }
-  const el=document.getElementById('gm-tab-content');
-  el.innerHTML=`<div style="padding:60px 20px;text-align:center"><div class="spinner" style="margin:0 auto"></div><p style="color:var(--muted);margin-top:18px;font-size:14px">A gerar análise IA…<br><span style="font-size:12px">Aguarda alguns segundos</span></p></div>`;
-
-  const score=mr.score||{};
-  const events=(mr.events||[]).map(e=>`${e.min||'?'}' ${e.type||''}${e.player?' ('+e.player+')':''}${e.note?' — '+e.note:''}`).join('\n')||'Sem eventos registados';
-  const ratings=Object.entries(mr.ratings||{}).map(([pid,r])=>{
-    const pl=sqPlayers.find(p=>p.id===pid||p.player===pid);
-    const nm=pl?(pl.name||pl.player):pid;
-    const rv=typeof r==='object'?r.rating:r;
-    const nt=typeof r==='object'?r.note:'';
-    return `${nm}: ${rv||'—'}/10${nt?' ('+nt+')':''}`;
-  }).join('\n')||'Sem avaliações';
-  const obs=Object.entries(mr.staffObs||{}).map(([usr,o])=>`[${o.role||usr}]: ${o.text||''}`).join('\n\n')||'Sem observações da equipa técnica';
-
-  const prompt=`És um assistente especializado em análise de futebol. Analisa este jogo do SC Vianense e gera um relatório técnico em português.
-
-## Dados do Jogo
-- Data: ${ev.date||'N/A'} | Escalão: ${ev.squad||'N/A'}
-- Formação: ${conv.formation||'N/A'}
-- Resultado: SC Vianense ${score.home??'?'} — ${score.away??'?'} ${ev.opponent||'adversário'}
-
-## Eventos
-${events}
-
-## Avaliações dos Jogadores
-${ratings}
-
-## Observações da Equipa Técnica
-${obs}
-
----
-Gera um relatório com estas secções:
-1. **Síntese do Jogo** — 2-3 frases sobre resultado e contexto
-2. **Análise Táctica** — organização, transições, pontos fortes/fracos
-3. **Destaques Individuais** — jogadores que se destacaram (positivo e negativo)
-4. **Análise dos Eventos** — golos, cartões, substituições e impacto no jogo
-5. **Sugestões para Treino** — 3-5 áreas específicas a trabalhar baseadas nas lacunas observadas
-6. **Conclusão** — 1-2 frases finais
-
-Sê técnico, objetivo e conciso. Usa markdown.`;
-
-  try{
-    const workspaceId=localStorage.getItem('scv_anthropic_ws')||'';
-    const res=await fetch('/api/analyze',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt,apiKey,...(workspaceId?{workspaceId}:{})})
-    });
-    if(!res.ok){
-      const ed=await res.json().catch(()=>({}));
-      const em=ed?.error||`HTTP ${res.status}`;
-      if(res.status===401) throw new Error('Chave API inválida (401). Verifica em 🔑 Chave API.');
-      if(res.status===429) throw new Error('Limite de requisições atingido (429). Tenta em breve.');
-      if(res.status===403) throw new Error('Acesso negado (403). Verifica as permissões da chave API.');
-      throw new Error(`Erro ${res.status}: ${em}`);
-    }
-    const data=await res.json();
-    const analysis=data.text||'Sem resposta.';
-    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
-    curMr.aiAnalysis=analysis; curMr.aiAnalysisTs=new Date().toISOString();
-    DB.updateEvent(gameEventId,{matchReport:curMr});
-    toast('✅ Análise gerada!'); renderGame();
-  }catch(e){
-    el.innerHTML=`<div style="padding:20px">
-      <div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:12px;padding:16px;color:#721c24;font-size:13px;margin-bottom:14px">
-        <strong>❌ Erro ao gerar análise</strong><br>${e.message}
-      </div>
-      <button onclick="renderGame()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">← Voltar</button>
-    </div>`;
-  }
-}
-
-function renderGameAnaliseIA(ev,sqPlayers,conv,mr){
-  const el=document.getElementById('gm-tab-content');
-  const isAdm=isAdmin();
-  const apiKey=localStorage.getItem('scv_anthropic_key')||'';
-  const saved=mr.aiAnalysis;
-  const savedTs=mr.aiAnalysisTs;
-
-  if(saved){
-    el.innerHTML=`<div style="padding:4px 0 20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <h3 style="font-size:14px;font-weight:700;color:var(--fg);margin:0">🤖 Análise IA do Jogo</h3>
-        ${isAdm?`<div style="display:flex;gap:8px">
-          <button id="ia-config-key" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer">🔑</button>
-          <button id="ia-regen" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer">↺ Regenerar</button>
-        </div>`:''}
-      </div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13.5px;line-height:1.75;color:var(--fg)">${simpleMarkdown(saved)}</div>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right">Gerada em ${savedTs?new Date(savedTs).toLocaleString('pt-PT'):'—'}</p>
-    </div>`;
-    if(isAdm){
-      el.querySelector('#ia-config-key').onclick=()=>showApiKeyModal();
-      el.querySelector('#ia-regen').onclick=()=>{
-        const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
-        delete curMr.aiAnalysis; delete curMr.aiAnalysisTs;
-        DB.updateEvent(gameEventId,{matchReport:curMr});
-        renderGame();
-      };
-    }
-    return;
-  }
-
-  // Sem análise gerada
-  if(!isAdm){
-    el.innerHTML=`<div style="padding:4px 0 20px">
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:40px 20px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">🤖</div>
-        <p style="font-size:14px;color:var(--muted)">Análise ainda não gerada.<br>Aguarda que o admin gere a análise.</p>
-      </div>
-    </div>`;
-    return;
-  }
-
-  // Admin — mostrar painel de geração
-  el.innerHTML=`<div style="padding:4px 0 20px">
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px 20px;text-align:center">
-      <div style="font-size:42px;margin-bottom:12px">🤖</div>
-      <h3 style="font-size:16px;font-weight:700;margin:0 0 8px;color:var(--fg)">Análise IA do Jogo</h3>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 20px;line-height:1.6;max-width:340px;margin-left:auto;margin-right:auto">Relatório automático com análise táctica, desempenho individual e sugestões de treino, gerado a partir de todos os dados do jogo.</p>
-      ${!apiKey?`<div style="background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.4);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:var(--fg);text-align:left">
-        <strong>⚙️ Precisas de uma chave API da Anthropic</strong><br>
-        Gratuita para começar · <a href="https://console.anthropic.com/account/keys" target="_blank" style="color:var(--accent)">Obter chave →</a>
-      </div>`:''}
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <button id="ia-set-key" style="padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:13px;cursor:pointer">🔑 ${apiKey?'Alterar Chave':'Configurar Chave'}</button>
-        <button id="ia-gen" ${!apiKey?'disabled':''} style="padding:10px 22px;border-radius:10px;border:none;background:${apiKey?'var(--green)':'var(--border)'};color:${apiKey?'#fff':'var(--muted)'};font-size:14px;font-weight:600;cursor:${apiKey?'pointer':'not-allowed'}">✨ Gerar Análise</button>
-      </div>
-    </div>
-  </div>`;
-  el.querySelector('#ia-set-key').onclick=()=>showApiKeyModal(()=>renderGame());
-  if(apiKey) el.querySelector('#ia-gen').onclick=()=>generateGameAnalysisIA(ev,sqPlayers,conv,mr);
-}
 
 function renderGamePre(ev,sqPlayers,conv){
   const convCount=Object.values(conv.players||{}).filter(v=>!!v).length;
@@ -10458,6 +10311,7 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
   });
 })();
 document.getElementById('nl-monitoring').addEventListener('click',()=>nav('monitoring'));
+document.getElementById('nl-bilhetes').addEventListener('click',()=>nav('bilhetes'));
 // Close modals on overlay click
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open') }));
 
@@ -12720,6 +12574,145 @@ function wellColor(v){ // 1=best, 7=worst
   return '#ef4444';
 }
 
+// ── BILHETES ──────────────────────────────────────────────────────────────────
+function renderBilhetesForm(params){
+  const el=document.getElementById('bilhetes-form-content');
+  if(!el) return;
+  const gameId=params.get('id')||'sem-id';
+  const gameDate=params.get('d')||'';
+  const gameAdversario=decodeURIComponent(params.get('a')||'Adversário');
+  const gameHora=decodeURIComponent(params.get('h')||'');
+  const dateLabel=gameDate?new Date(gameDate+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
+  el.innerHTML=`
+    <div id="bilhetes-success" style="display:none;background:#d4edda;color:#155724;padding:16px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center;font-size:15px">✅ Pedido registado! Obrigado.</div>
+    <div style="background:#f0f4ff;border:1px solid #c7d4f0;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Próximo Jogo em Casa</div>
+      <div style="font-size:18px;font-weight:700;color:var(--fg)">SC Vianense vs ${gameAdversario}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${dateLabel}${gameHora?' · '+gameHora:''}</div>
+    </div>
+    <form id="bilhetes-form">
+      <div class="fg" style="margin-bottom:16px">
+        <label style="font-weight:700;font-size:13px">Nome Completo *</label>
+        <input type="text" id="b-name" required placeholder="O teu nome">
+      </div>
+      <div class="fg" style="margin-bottom:16px">
+        <label style="font-weight:700;font-size:13px">Escalão *</label>
+        <select id="b-squad" required>
+          <option value="">— selecionar —</option>
+          <option value="sub23">Sub-23</option>
+          <option value="sub19">Sub-19</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:16px">
+        <label style="font-weight:700;font-size:13px">Função *</label>
+        <select id="b-role" required>
+          <option value="">— selecionar —</option>
+          <option value="Atleta">Atleta</option>
+          <option value="Staff">Staff</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetes('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'")}','${gameHora}')">Confirmar Pedido →</button>
+    </form>`;
+}
+
+async function submitBilhetes(gameId, gameDate, gameAdversario, gameHora){
+  const name=(document.getElementById('b-name')?.value||'').trim();
+  const squad=document.getElementById('b-squad')?.value||'';
+  const role=document.getElementById('b-role')?.value||'';
+  if(!name||!squad||!role){ toast('❌ Preenche todos os campos'); return; }
+  const tickets=1;
+  try{
+    await DB.addBilhete({gameId,gameDate,gameAdversario,gameHora,name,squad,role,tickets});
+    document.getElementById('bilhetes-success').style.display='block';
+    document.getElementById('bilhetes-form').style.display='none';
+  }catch(e){ toast('❌ Erro ao submeter. Tenta novamente.'); console.error(e); }
+}
+
+async function renderBilhetesAdmin(){
+  const el=document.getElementById('v-bilhetes-content');
+  if(!el) return;
+  el.innerHTML=`<div style="padding:20px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--muted);font-size:13px">A carregar...</p></div>`;
+  const today=new Date().toISOString().split('T')[0];
+  const allEvs=DB.events().filter(e=>e.squad==='eqa'&&e.type==='game'&&e.homeAway==='home'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  const nextGame=allEvs[0];
+  if(!nextGame){
+    el.innerHTML=`<div style="padding:32px;text-align:center;color:var(--muted)"><p>Não há jogos em casa da Equipa A agendados.</p></div>`;
+    return;
+  }
+  const dateLabel=new Date(nextGame.date+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'});
+  const opponent=nextGame.opponent||'Adversário';
+  const hora=nextGame.time||'';
+  const baseUrl=window.location.origin+window.location.pathname;
+  const link=`${baseUrl}?mode=bilhetes&id=${nextGame.id}&d=${nextGame.date}&a=${encodeURIComponent(opponent)}&h=${encodeURIComponent(hora)}`;
+  let requests=[];
+  try{ requests=await DB.getBilhetes(nextGame.id); }catch(e){ console.error(e); }
+  const sub23=requests.filter(r=>r.squad==='sub23');
+  const sub19=requests.filter(r=>r.squad==='sub19');
+  const total=requests.length;
+  function buildRows(rows){
+    if(!rows.length) return `<p style="color:var(--muted);font-size:13px;padding:6px 0">Sem pedidos.</p>`;
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Nome</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Função</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr style="border-bottom:1px solid var(--border)${i%2?';background:rgba(0,0,0,.02)':''}">
+        <td style="padding:7px 8px;font-weight:500">${r.name}</td>
+        <td style="padding:7px 8px;color:var(--muted)">${r.role}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  el.innerHTML=`
+    <div style="padding:0 16px 80px">
+      <p style="color:var(--muted);font-size:13px;margin:0 0 16px">${dateLabel}${hora?' · '+hora:''} · vs ${opponent}</p>
+
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;font-weight:600">🔗 Link para partilhar</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input readonly value="${link}" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:11px;min-width:0">
+          <button onclick="navigator.clipboard.writeText(document.querySelector('#v-bilhetes-content input[readonly]').value).then(()=>toast('✅ Link copiado!'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">Copiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div>
+            <div style="font-size:14px;font-weight:700">Pedidos recebidos</div>
+            <div style="font-size:12px;color:var(--muted)">${total} bilhete${total!==1?'s':''} no total</div>
+          </div>
+          <button onclick="printBilhetes()" style="padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:13px;cursor:pointer">🖨️ Imprimir</button>
+        </div>
+        ${requests.length===0?`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Ainda não há pedidos.</p>`:`
+        <div style="margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Sub-23 — ${sub23.length} bilhete${sub23.length!==1?'s':''}</div>
+          ${buildRows(sub23)}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Sub-19 — ${sub19.length} bilhete${sub19.length!==1?'s':''}</div>
+          ${buildRows(sub19)}
+        </div>`}
+      </div>
+    </div>
+    <div id="bilhetes-print-tpl" style="display:none">
+      <h2 style="font-size:16px;margin-bottom:4px">SC Vianense SAD — Pedidos de Bilhetes</h2>
+      <p style="font-size:12px;color:#666;margin-bottom:20px">${dateLabel}${hora?' · '+hora:''} · vs ${opponent} · <strong>${total} bilhete${total!==1?'s':''} no total</strong></p>
+      <h3 style="font-size:13px;color:#1a3a5c;margin:16px 0 6px">Sub-23 (${sub23.length} bilhete${sub23.length!==1?'s':''})</h3>
+      ${sub23.length?`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Nome</th><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Função</th></tr></thead><tbody>${sub23.map((r,i)=>`<tr style="${i%2?'background:#f5f5f5':''}"><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.name}</td><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.role}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:#999">Sem pedidos.</p>'}
+      <h3 style="font-size:13px;color:#1a3a5c;margin:20px 0 6px">Sub-19 (${sub19.length} bilhete${sub19.length!==1?'s':''})</h3>
+      ${sub19.length?`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Nome</th><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Função</th></tr></thead><tbody>${sub19.map((r,i)=>`<tr style="${i%2?'background:#f5f5f5':''}"><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.name}</td><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.role}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:#999">Sem pedidos.</p>'}
+    </div>`;
+}
+
+function printBilhetes(){
+  const tpl=document.getElementById('bilhetes-print-tpl');
+  if(!tpl) return;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Bilhetes — SC Vianense</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px;color:#000;max-width:700px;margin:0 auto}@media print{body{padding:0}}</style>
+    </head><body>${tpl.innerHTML}</body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
+}
+
 async function renderMonitoring(){
   const sq=document.getElementById('mon-squad').value||coachSquad()||'sub23';
   const date=document.getElementById('mon-date').value||(new Date().toISOString().slice(0,10));
@@ -13084,6 +13077,7 @@ function applyRoleUI(){
   const tmSection=[document.getElementById('nsl-tm'),document.getElementById('nl-tm')];
   const nlWeeklyPlan=document.getElementById('nl-weekly-plan');
   const monSection=[document.getElementById('nsl-monitoring'),document.getElementById('nl-monitoring'),document.getElementById('nl-pse-link'),document.getElementById('nl-wellness-link')];
+  const nlBilhetes=document.getElementById('nl-bilhetes');
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
@@ -13165,8 +13159,9 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
-    // Admin vê monitorização e os links de partilha PSE/Bem-Estar
+    // Admin vê monitorização, links PSE/Bem-Estar e bilhetes
     monSection.forEach(el=>el&&(el.style.display=''));
+    if(nlBilhetes) nlBilhetes.style.display='';
   }
 }
 
@@ -13265,11 +13260,7 @@ function initCoordApp(){
             if(!mergedObs[usr]||(obs.ts&&(!mergedObs[usr].ts||obs.ts>mergedObs[usr].ts)))
               mergedObs[usr]=obs;
           });
-          const localAiAnalysis=loc.matchReport.aiAnalysis;
-          const fsAiAnalysis=fsEv.matchReport.aiAnalysis;
-          const mergedAiAnalysis=fsAiAnalysis||(localAiAnalysis||undefined);
-          const mergedAiTs=fsEv.matchReport.aiAnalysisTs||(loc.matchReport.aiAnalysisTs||undefined);
-          return {...fsEv,matchReport:{...fsEv.matchReport,staffObs:mergedObs,...(mergedAiAnalysis?{aiAnalysis:mergedAiAnalysis,aiAnalysisTs:mergedAiTs}:{})}};
+          return {...fsEv,matchReport:{...fsEv.matchReport,staffObs:mergedObs}};
         }
         return fsEv;
       });
@@ -13580,6 +13571,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     const SQUAD_NAMES={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
     const pseBadge=document.getElementById('pse-squad-badge');
     if(pseBadge){ const lbl=SQUAD_NAMES[_pseSquad]||_pseSquad; pseBadge.textContent=lbl; pseBadge.style.display=lbl?'inline-block':'none'; }
+    return;
+  }
+  if(params.get('mode')==='bilhetes'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm');
+    nav('bilhetes-form');
+    renderBilhetesForm(params);
     return;
   }
   if(params.get('mode')==='wellness'){
