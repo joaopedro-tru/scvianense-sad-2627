@@ -2299,14 +2299,23 @@ const DB = {
   // ── Bilhetes ─────────────────────────────────────────────────────────────────
   async addBilhete(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
-    if(firestoreDb) await firestoreDb.collection('bilhetes_requests').doc(entry.id).set(entry).catch(e=>console.error('FS addBilhete:',e));
+    if(firestoreDb){
+      await firestoreDb.collection('bilhetes_requests').doc(entry.id).set(entry).catch(e=>{
+        console.error('FS addBilhete:',e);
+        throw e; // propaga para o submitBilhetes mostrar o erro
+      });
+    } else {
+      throw new Error('Firestore não disponível');
+    }
     return entry;
   },
   async getBilhetes(gameId){
     if(!firestoreDb) return [];
     try{
-      const snap=await firestoreDb.collection('bilhetes_requests').where('gameId','==',gameId).orderBy('createdAt','asc').get();
-      const arr=[]; snap.forEach(d=>arr.push(d.data())); return arr;
+      // Sem orderBy para não exigir índice composto — ordena em JS
+      const snap=await firestoreDb.collection('bilhetes_requests').where('gameId','==',gameId).get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      return arr.sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
     }catch(e){ console.error('getBilhetes:',e); return []; }
   },
   // ── PSE & Wellness ──────────────────────────────────────────────────────────
@@ -2691,7 +2700,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-02f';
+const APP_BUILD='2026-09-03a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -12599,6 +12608,7 @@ function renderBilhetesForm(params){
   const dateLabel=gameDate?new Date(gameDate+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
   el.innerHTML=`
     <div id="bilhetes-success" style="display:none;background:#d4edda;color:#155724;padding:16px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center;font-size:15px">✅ Pedido registado! Obrigado.</div>
+    <div id="bilhetes-error" style="display:none;background:#fde8e8;color:#b02020;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px"></div>
     <div style="background:#f0f4ff;border:1px solid #c7d4f0;border-radius:10px;padding:14px 16px;margin-bottom:20px">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Próximo Jogo em Casa</div>
       <div style="font-size:18px;font-weight:700;color:var(--fg)">SC Vianense vs ${gameAdversario}</div>
@@ -12635,11 +12645,16 @@ async function submitBilhetes(gameId, gameDate, gameAdversario, gameHora){
   const role=document.getElementById('b-role')?.value||'';
   if(!name||!squad||!role){ toast('❌ Preenche todos os campos'); return; }
   const tickets=1;
+  const errEl=document.getElementById('bilhetes-error');
+  if(errEl) errEl.style.display='none';
   try{
     await DB.addBilhete({gameId,gameDate,gameAdversario,gameHora,name,squad,role,tickets});
     document.getElementById('bilhetes-success').style.display='block';
     document.getElementById('bilhetes-form').style.display='none';
-  }catch(e){ toast('❌ Erro ao submeter. Tenta novamente.'); console.error(e); }
+  }catch(e){
+    console.error('submitBilhetes:',e);
+    if(errEl){ errEl.textContent='❌ Erro ao guardar: '+(e?.message||'verifica a consola'); errEl.style.display='block'; }
+  }
 }
 
 async function renderBilhetesAdmin(){
