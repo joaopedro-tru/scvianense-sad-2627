@@ -2700,7 +2700,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-03b';
+const APP_BUILD='2026-09-03c';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9743,8 +9743,16 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const obsCards=Object.entries(staffObs).map(([usr,obs])=>{
     const u=getAppUsers().find(x=>x.user===usr);
     const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):'Staff';
+    const canEdit=isAdmin()||(myUser&&myUser===usr);
+    const escapedText=(obs.text||'').replace(/'/g,"\\'").replace(/\n/g,'\\n');
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px">${label}</div>
+        ${canEdit?`<div style="display:flex;gap:6px">
+          <button onclick="editStaffObs('${escapedText}')" style="padding:2px 8px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--card);cursor:pointer;color:var(--text)">✏️ Editar</button>
+          <button onclick="deleteStaffObs('${usr}')" style="padding:2px 8px;font-size:11px;border:none;border-radius:5px;background:#fde8e8;color:#b02020;cursor:pointer">✕ Apagar</button>
+        </div>`:''}
+      </div>
       <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
     </div>`;
   }).join('');
@@ -10018,8 +10026,16 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       const newObsCards=Object.entries(curMr.staffObs).map(([usr,obs])=>{
         const u=allUsers.find(x=>x.user===usr);
         const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):'Staff';
+        const canEditCard=isAdmin()||(myUser&&myUser===usr);
+        const escapedText=(obs.text||'').replace(/'/g,"\\'").replace(/\n/g,'\\n');
         return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px">${label}</div>
+            ${canEditCard?`<div style="display:flex;gap:6px">
+              <button onclick="editStaffObs('${escapedText}')" style="padding:2px 8px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--card);cursor:pointer;color:var(--text)">✏️ Editar</button>
+              <button onclick="deleteStaffObs('${usr}')" style="padding:2px 8px;font-size:11px;border:none;border-radius:5px;background:#fde8e8;color:#b02020;cursor:pointer">✕ Apagar</button>
+            </div>`:''}
+          </div>
           <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
         </div>`;
       }).join('');
@@ -12595,6 +12611,25 @@ function wellColor(v){ // 1=best, 7=worst
   if(v<=4) return '#f59e0b';
   if(v<=5) return '#f97316';
   return '#ef4444';
+}
+
+// ── STAFF OBS EDIT / DELETE ───────────────────────────────────────────────────
+function editStaffObs(text){
+  const ta=document.getElementById('staff-obs-text');
+  if(!ta) return;
+  ta.value=text.replace(/\\n/g,'\n');
+  ta.scrollIntoView({behavior:'smooth',block:'center'});
+  ta.focus();
+}
+
+function deleteStaffObs(usr){
+  if(!confirm('Apagar esta observação?')) return;
+  const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId)?.matchReport||{}));
+  if(curMr.staffObs&&curMr.staffObs[usr]){
+    delete curMr.staffObs[usr];
+    DB.updateEvent(gameEventId,{matchReport:curMr});
+    renderGame();
+  }
 }
 
 // ── BILHETES ──────────────────────────────────────────────────────────────────
