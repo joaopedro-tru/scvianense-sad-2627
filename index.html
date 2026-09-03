@@ -2700,7 +2700,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-03a';
+const APP_BUILD='2026-09-03b';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9742,7 +9742,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const myObs=myUser?staffObs[myUser]||{}:{};
   const obsCards=Object.entries(staffObs).map(([usr,obs])=>{
     const u=getAppUsers().find(x=>x.user===usr);
-    const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+' — '+u.squad.toUpperCase():'Staff';
+    const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):'Staff';
     return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
       <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
@@ -10017,7 +10017,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       const allUsers=getAppUsers();
       const newObsCards=Object.entries(curMr.staffObs).map(([usr,obs])=>{
         const u=allUsers.find(x=>x.user===usr);
-        const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+' — '+u.squad.toUpperCase():'Staff';
+        const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):'Staff';
         return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
           <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
           <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
