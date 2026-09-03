@@ -2691,7 +2691,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-02e';
+const APP_BUILD='2026-09-02f';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -9892,7 +9892,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   ${buildClinicalSection(gameEventId, convocados)}
   <div class="card" style="margin-top:18px">
     <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📝 Observações da Equipa Técnica</h3>
-    ${obsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>'}
+    <div id="staff-obs-cards">${obsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>'}</div>
     ${canWriteObs?`
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">A minha observação${staffRoleName()?` (${staffRoleName()})`:''}</label>
@@ -9994,7 +9994,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     DB.updateEvent(gameEventId,{matchReport:curMr});
   }));
 
-  // Staff observation save
+  // Staff observation save — actualiza só a secção de observações sem re-render completo
   const btnSaveObs=document.getElementById('btn-save-staffobs');
   if(btnSaveObs&&myUser){
     btnSaveObs.addEventListener('click',()=>{
@@ -10003,7 +10003,21 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       curMr.staffObs=curMr.staffObs||{};
       curMr.staffObs[myUser]={role:staffRole()||cu?.role,text,ts:new Date().toISOString()};
       DB.updateEvent(gameEventId,{matchReport:curMr});
-      toast('✅ Observação guardada!'); renderGame();
+      // Actualizar só os cards de observações em vez de re-render completo
+      // (evita perda de scroll e o campo de escrita desaparecer)
+      const allUsers=getAppUsers();
+      const newObsCards=Object.entries(curMr.staffObs).map(([usr,obs])=>{
+        const u=allUsers.find(x=>x.user===usr);
+        const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+' — '+u.squad.toUpperCase():'Staff';
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
+          <div style="font-size:13px;white-space:pre-wrap">${obs.text||'—'}</div>
+        </div>`;
+      }).join('');
+      const obsContainer=document.getElementById('staff-obs-cards');
+      if(obsContainer) obsContainer.innerHTML=newObsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>';
+      btnSaveObs.textContent='✅ Guardado';
+      setTimeout(()=>{ if(document.getElementById('btn-save-staffobs')) document.getElementById('btn-save-staffobs').textContent='Guardar Observação'; },2000);
     });
   }
 
