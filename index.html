@@ -1807,6 +1807,19 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <label>Morada completa <span style="font-size:10px;font-weight:400;color:var(--muted)">(para link Maps)</span></label>
         <input type="text" id="e-address" placeholder="Ex: Rua do Campo, 4935-000 Viana do Castelo">
       </div>
+      <div class="fg" id="transport-grp" style="display:none">
+        <label>Transporte necessário</label>
+        <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600">
+            <input type="checkbox" id="e-transport-van" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
+            🚐 Carrinha 9 lugares
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600">
+            <input type="checkbox" id="e-transport-bus" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
+            🚌 Autocarro
+          </label>
+        </div>
+      </div>
       <div class="fr">
         <div class="fg"><label>Data *</label><input type="date" id="e-date" required></div>
         <div class="fg"><label>Hora</label><input type="time" id="e-time"></div>
@@ -2700,7 +2713,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-03e';
+const APP_BUILD='2026-09-04a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -5915,8 +5928,8 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?50:58, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP;
-  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xLoc=xOpp+C_OPP;
+  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=22, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
+  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xTransp=xOpp+C_OPP, xLoc=xTransp+C_TRANSP;
 
   // Cabeçalho da tabela
   const THY=MT+20;
@@ -5927,6 +5940,7 @@ async function _renderGameListPDF(selSquads, year, month){
   if(multiSq) doc.text('ESCALÃO',xSq+2,THY+4.8);
   doc.text('',xHa+2,THY+4.8);
   doc.text('ADVERSÁRIO',xOpp+2,THY+4.8);
+  doc.text('TRANSP.',xTransp+2,THY+4.8);
   doc.text('LOCAL / ESTÁDIO',xLoc+2,THY+4.8);
 
   // ── Linhas ──
@@ -5978,6 +5992,14 @@ async function _renderGameListPDF(selSquads, year, month){
     if(ev.competition){
       doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5);
       doc.text(ev.competition,xOpp+2,ry+11);
+    }
+
+    // Transporte
+    const transport=ev.transport||[];
+    if(transport.length){
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(40,40,40);
+      if(transport.includes('van')) doc.text('🚐 Van',xTransp+2,ry+(transport.includes('bus')?5.5:7));
+      if(transport.includes('bus')) doc.text('🚌 Bus',xTransp+2,ry+(transport.includes('van')?9.5:7));
     }
 
     // Local / Estádio
@@ -6418,6 +6440,8 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-opp').value=ev?.opponent||'';
   document.getElementById('e-city').value=ev?.city||'';
   document.getElementById('e-address').value=ev?.address||'';
+  document.getElementById('e-transport-van').checked=(ev?.transport||[]).includes('van');
+  document.getElementById('e-transport-bus').checked=(ev?.transport||[]).includes('bus');
   // Regime de contração — usa guardado, ou defaults por escalão/dia
   const _evSq=ev?.squad||defaults.squad||squad||'sub19';
   const _evDate=ev?.date||date||new Date().toISOString().split('T')[0];
@@ -6478,6 +6502,7 @@ function toggleOpp(){
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
   document.getElementById('city-grp').style.display=isGame?'block':'none';
   document.getElementById('address-grp').style.display=away?'block':'none';
+  document.getElementById('transport-grp').style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
   // Objetivos táticos apenas para treino de campo
   document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
@@ -6512,7 +6537,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[]};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
