@@ -2700,7 +2700,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-03c';
+const APP_BUILD='2026-09-03e';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -5732,11 +5732,11 @@ function exportCalPDF(){
     selOverlay.remove();
     _renderCalPDF(selSquads);
   };
-  document.getElementById('cpdf-games').onclick=()=>{
+  document.getElementById('cpdf-games').onclick=async()=>{
     const selSquads=['eqa','sub23','sub19'].filter(s=>document.getElementById('cpdf-'+s)?.checked);
     if(!selSquads.length){ toast('⚠️ Seleciona pelo menos um escalão'); return; }
     selOverlay.remove();
-    _renderGameListPDF(selSquads, calYear, calMonth);
+    await _renderGameListPDF(selSquads, calYear, calMonth);
   };
 }
 
@@ -5827,7 +5827,7 @@ async function _renderCalPDF(selSquads){
     if(!dayEvs.length) continue;
     let ey=cy+6.8;
     const maxEy=cy+cellH-0.5;
-    const chipH=Math.min((maxEy-ey)/dayEvs.length,10);
+    const chipH=Math.min((maxEy-ey)/dayEvs.length,14);
 
     dayEvs.forEach(ev=>{
       if(ey+2>maxEy) return;
@@ -5835,8 +5835,9 @@ async function _renderCalPDF(selSquads){
       const col=EV_COL[ev.type]||EV_COL.training;
       doc.setFillColor(col[0],col[1],col[2]); doc.roundedRect(cx+0.4,ey,dayW-0.8,thisH,0.6,0.6,'F');
       doc.setTextColor(col[3],col[4],col[5]);
-      // Title
-      doc.setFont('helvetica','bold'); doc.setFontSize(5.8);
+      // Linha 1 — título
+      doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+      doc.setTextColor(col[3],col[4],col[5]);
       let title='';
       if(ev.type==='game'){
         const _sqShort={eqa:'EqA',sub23:'U23',sub19:'U19',both:'All'};
@@ -5849,17 +5850,18 @@ async function _renderCalPDF(selSquads){
       }
       const tLine=doc.splitTextToSize(title.trim(),dayW-1.6)[0]||'';
       doc.text(tLine,cx+1,ey+3.2);
-      // Meta (time + location for games; time+location for all)
-      if(thisH>6.5){
-        const meta=[];
-        if(ev.time) meta.push(ev.time);
-        if(ev.type==='game'){ if(abrevComp(ev.competition)) meta.push(abrevComp(ev.competition)); if(ev.location) meta.push(ev.location); }
-        else if(ev.location){ meta.push(ev.location); }
-        if(meta.length){
-          doc.setFont('helvetica','normal'); doc.setFontSize(5);
-          const mLine=doc.splitTextToSize(meta.join(' · '),dayW-1.6)[0]||'';
-          doc.text(mLine,cx+1,ey+thisH-1.5);
-        }
+      // Linha 2 — hora + competição (sempre visível)
+      doc.setFont('helvetica','normal'); doc.setFontSize(4.6);
+      doc.setTextColor(col[3],col[4],col[5]);
+      const line2Parts=[];
+      if(ev.time) line2Parts.push(ev.time);
+      if(ev.type==='game'&&abrevComp(ev.competition)) line2Parts.push(abrevComp(ev.competition));
+      if(line2Parts.length) doc.text(doc.splitTextToSize(line2Parts.join(' · '),dayW-1.6)[0]||'',cx+1,ey+6.4);
+      // Linha 3 — estádio (sempre visível)
+      if(ev.location){
+        doc.setFont('helvetica','normal'); doc.setFontSize(4.4);
+        doc.setTextColor(col[3],col[4],col[5]);
+        doc.text(doc.splitTextToSize(ev.location,dayW-1.6)[0]||'',cx+1,ey+9.4);
       }
       ey+=chipH;
     });
@@ -5870,7 +5872,7 @@ async function _renderCalPDF(selSquads){
 }
 
 // ── GAME LIST PDF (jogos do mês em lista limpa) ────────────────────────────────
-function _renderGameListPDF(selSquads, year, month){
+async function _renderGameListPDF(selSquads, year, month){
   const mm=String(month+1).padStart(2,'0');
   const from=`${year}-${mm}-01`;
   const lastDay=new Date(year,month+1,0).getDate();
@@ -5888,90 +5890,115 @@ function _renderGameListPDF(selSquads, year, month){
   const squadLabel=selSquads.length===3?'Todos os escalões':selSquads.map(s=>({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[s])).join(' + ');
   const monthLabel=`${MONTHS[month]} ${year}`;
 
-  const WEEKDAYS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-  const MONTHS_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  toast('⏳ A gerar PDF...');
+  if(!window.jspdf) await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
+  });
+  const {jsPDF}=window.jspdf;
 
-  const rows=evs.map((ev,i)=>{
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const PW=210, ML=15, MR=15, MT=15;
+  const W=PW-ML-MR; // 180mm
+
+  // ── Cabeçalho ──
+  doc.setFillColor(14,36,68);
+  doc.rect(ML,MT,W,16,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('SC Vianense SAD',ML+5,MT+7);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(`Jogos de ${monthLabel}  ·  ${squadLabel}`,ML+5,MT+13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.setTextColor(180,200,230);
+  doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
+
+  // ── Colunas ──
+  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?50:58, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP;
+  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xLoc=xOpp+C_OPP;
+
+  // Cabeçalho da tabela
+  const THY=MT+20;
+  doc.setFillColor(26,61,110);
+  doc.rect(ML,THY,W,7,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
+  doc.text('DATA / HORA',xDate+2,THY+4.8);
+  if(multiSq) doc.text('ESCALÃO',xSq+2,THY+4.8);
+  doc.text('',xHa+2,THY+4.8);
+  doc.text('ADVERSÁRIO',xOpp+2,THY+4.8);
+  doc.text('LOCAL / ESTÁDIO',xLoc+2,THY+4.8);
+
+  // ── Linhas ──
+  const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const ROW_H=13;
+  let ry=THY+7;
+
+  evs.forEach((ev,i)=>{
     const d=new Date(ev.date+'T00:00:00');
-    const weekday=WEEKDAYS[d.getDay()];
-    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MONTHS_FULL[d.getMonth()]} ${year}`;
     const isAway=ev.homeAway==='away';
-    const haColor=isAway?'#b71c1c':'#1a3d6e';
-    const haLabel=isAway?'FORA':'CASA';
-    const haIcon=isAway?'✈':'⌂';
-    const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
-    const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'}[ev.squad]||ev.squad||'';
-    const sqColor={eqa:'#333',sub23:'#1a3d6e',sub19:'#7c6000'}[ev.squad]||'#555';
-    const rowBg=i%2===0?'#ffffff':'#f4f7fc';
-    return `<tr style="background:${rowBg}">
-      <td style="padding:12px 14px;border-right:2px solid #d0daea;white-space:nowrap;vertical-align:middle">
-        <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px">${weekday}</div>
-        <div style="font-size:15px;font-weight:800;color:#0e2444;line-height:1.15">${dateStr}</div>
-        ${ev.time
-          ?`<div style="font-size:13px;font-weight:700;color:#333;margin-top:3px">⏰ ${ev.time}</div>`
-          :`<div style="font-size:10px;color:#aaa;margin-top:3px;font-style:italic">hora a definir</div>`}
-      </td>
-      ${multiSq?`<td style="padding:12px 10px;text-align:center;border-right:1px solid #d0daea;vertical-align:middle">
-        <span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:800;color:#fff;background:${sqColor};letter-spacing:.3px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${sqLabel}</span>
-      </td>`:''}
-      <td style="padding:12px 10px;text-align:center;border-right:1px solid #d0daea;vertical-align:middle">
-        <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;color:#fff;background:${haColor};-webkit-print-color-adjust:exact;print-color-adjust:exact">${haIcon} ${haLabel}</span>
-      </td>
-      <td style="padding:12px 14px;font-size:17px;font-weight:800;color:#111;border-right:1px solid #d0daea;vertical-align:middle">${ev.opponent||'—'}</td>
-      <td style="padding:12px 14px;font-size:11px;color:#555;line-height:1.5;vertical-align:middle">${loc}</td>
-    </tr>`;
-  }).join('');
+    const even=i%2===0;
 
-  const html=`<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
-<title>Jogos de ${monthLabel} — SC Vianense SAD</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:22px 18px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.header{display:flex;align-items:center;gap:14px;padding-bottom:12px;margin-bottom:4px;border-bottom:3px solid #0e2444}
-.header img{width:48px;height:48px;object-fit:contain;flex-shrink:0}
-.club{font-size:17px;font-weight:800;color:#0e2444}
-.meta{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-top:2px}
-.subtitle{font-size:11px;color:#555;margin:8px 0 16px;font-style:italic}
-table{width:100%;border-collapse:collapse;margin-bottom:12px}
-thead tr{background:#0e2444;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-thead th{color:#fff;padding:9px 14px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
-tbody td{border-bottom:1px solid #cdd7e6;vertical-align:middle}
-.footer{text-align:center;font-size:9px;color:#bbb;margin-top:10px;padding-top:6px;border-top:1px solid #e8e8e8}
-@media print{
-  @page{size:A4 portrait;margin:12mm}
-  body{padding:0;max-width:100%}
-}
-</style></head><body>
-<div class="header">
-  <img src="https://radiogeice.com/wp-content/uploads/2022/08/SC_VIANENSE.png" alt="SC Vianense" onerror="this.style.display='none'">
-  <div>
-    <div class="club">SC Vianense SAD</div>
-    <div class="meta">⚽ Jogos de ${monthLabel}</div>
-  </div>
-</div>
-<div class="subtitle">${squadLabel} · ${evs.length} jogo${evs.length!==1?'s':''}</div>
-<table>
-  <thead>
-    <tr>
-      <th>Data / Hora</th>
-      ${multiSq?'<th>Escalão</th>':''}
-      <th>Casa / Fora</th>
-      <th>Adversário</th>
-      <th>Local</th>
-    </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')}</div>
-</body></html>`;
+    // Fundo alternado
+    doc.setFillColor(even?255:243,even?255:247,even?255:252);
+    doc.rect(ML,ry,W,ROW_H,'F');
+    doc.setDrawColor(208,218,234); doc.setLineWidth(0.1);
+    doc.line(ML,ry+ROW_H,ML+W,ry+ROW_H);
 
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const fname=`Jogos_${monthLabel.replace(/\s/g,'_')}_${squadLabel.replace(/[\s/+]/g,'_')}.html`;
-  const a=document.createElement('a');
-  a.href=url; a.download=fname; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
-  toast('📄 Lista de jogos exportada!');
+    // Data + hora
+    doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
+    doc.text(WD[d.getDay()],xDate+2,ry+4);
+    doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}`,xDate+2,ry+8.5);
+    if(ev.time){
+      doc.setTextColor(60,60,60); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+      doc.text(ev.time,xDate+C_DATE-3,ry+5,{align:'right'});
+    }
+
+    // Escalão
+    if(multiSq){
+      const sqLbl={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'}[ev.squad]||ev.squad||'';
+      const sqC={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]}[ev.squad]||[80,80,80];
+      doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+4,C_SQ-3,5,1,1,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+      doc.text(sqLbl,xSq+1+(C_SQ-3)/2,ry+7.5,{align:'center'});
+    }
+
+    // Casa/Fora
+    const haC=isAway?[183,28,28]:[22,101,52];
+    doc.setFillColor(...haC); doc.roundedRect(xHa+1,ry+4,C_HA-3,5,1,1,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+    doc.text(isAway?'FORA':'CASA',xHa+1+(C_HA-3)/2,ry+7.5,{align:'center'});
+
+    // Adversário + competição
+    doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    const oppLine=doc.splitTextToSize(ev.opponent||'—',C_OPP-3)[0]||'';
+    doc.text(oppLine,xOpp+2,ry+7);
+    if(ev.competition){
+      doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5);
+      doc.text(ev.competition,xOpp+2,ry+11);
+    }
+
+    // Local / Estádio
+    const loc=[ev.location,ev.city].filter(Boolean).join(', ')||'—';
+    doc.setTextColor(60,60,60); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    const locLines=doc.splitTextToSize(loc,C_LOC-3);
+    doc.text(locLines[0]||'',xLoc+2,ry+5.5);
+    if(locLines[1]) doc.text(locLines[1],xLoc+2,ry+9.5);
+
+    ry+=ROW_H;
+  });
+
+  // ── Rodapé ──
+  doc.setDrawColor(14,36,68); doc.setLineWidth(0.3);
+  doc.line(ML,ry+3,ML+W,ry+3);
+  doc.setTextColor(160,160,160); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('SC Vianense SAD · Gestão Desportiva',ML,ry+7);
+  doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
+
+  doc.save(`Jogos_${monthLabel.replace(/\s/g,'_')}.pdf`);
+  toast('✅ PDF de jogos descarregado!');
 }
 
 // Show back button in standalone (PWA) mode
