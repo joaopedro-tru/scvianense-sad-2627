@@ -2901,6 +2901,9 @@ function nav(v,opts={}){
   else if(v==='sq-games'){ squad=opts.squad||squad; show('v-sq-games'); setActive(`[data-view="sq-games"][data-squad="${squad}"]`); renderSqGames() }
   else if(v==='game'){
     if(opts.id) gameEventId=opts.id;
+    // Sync squad to the game's own squad so back-navigation lands on the correct list
+    const _gev=DB.getEvent(gameEventId);
+    if(_gev?.squad && _gev.squad!=='both') squad=_gev.squad;
     show('v-game'); renderGame();
     // Fresh read do Firestore para garantir matchReport e convocatória actualizados
     if(firestoreDb && gameEventId){
@@ -10331,7 +10334,8 @@ document.getElementById('btn-edit-game').addEventListener('click',()=>openEventM
 document.getElementById('btn-del-game').addEventListener('click',()=>{
   const ev=DB.getEvent(gameEventId); if(!ev)return;
   if(!confirm(`Eliminar jogo vs ${ev.opponent||'—'}?`))return;
-  DB.deleteEvent(gameEventId); toast('Jogo eliminado.'); nav('sq-games',{squad});
+  const delSquad=ev.squad&&ev.squad!=='both'?ev.squad:squad;
+  DB.deleteEvent(gameEventId); toast('Jogo eliminado.'); nav('sq-games',{squad:delSquad});
 });
 document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
 document.getElementById('btn-back-game').addEventListener('click',()=>navBack());
