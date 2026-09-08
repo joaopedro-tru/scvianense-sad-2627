@@ -10367,6 +10367,25 @@ function generateConvocatoriaPDF(evId){
     return po!==0?po:(a.number||99)-(b.number||99);
   });
   if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
+
+  // ── Staff para o PDF ──────────────────────────────────────────────────────
+  const PDF_ROLE_GROUP={headcoach:0,adjunto:1,estagiario:1,grcoach:1,analista:1,condicionamento:1,delegado:2,teammanager:2,fisio:3,enfermeiro:3,massagista:3,medical:3};
+  const gmSqPdf=ev.squad==='both'?null:ev.squad;
+  const convStaffPdf=conv.staff||{};
+  const convExtraPdf=conv.staffExtra||[];
+  const goingStaffPdf=getAppUsers()
+    .filter(u=>u.role!=='admin')
+    .filter(u=>!gmSqPdf||u.squad===gmSqPdf)
+    .filter(u=>!!convStaffPdf[u.user]?.going)
+    .map(u=>{
+      const p=DB.getStaffProfile(u.user)||{};
+      const roleKey=userStaffRole(u);
+      const defaultLabel=STAFF_ROLES_LABEL[roleKey]||roleKey||u.role||'—';
+      return {name:p.name||u.user,roleLabel:convStaffPdf[u.user]?.role||defaultLabel,roleKey,isExtra:false};
+    })
+    .sort((a,b)=>(PDF_ROLE_GROUP[a.roleKey]??9)-(PDF_ROLE_GROUP[b.roleKey]??9));
+  const allStaffPdf=[...goingStaffPdf,...convExtraPdf.map(es=>({name:es.name,roleLabel:es.role||'—',roleKey:null,isExtra:true}))];
+
   const isHome=ev.homeAway!=='away';
   const traveling=conv.traveling||{};
   const hasTraveling=!isHome&&Object.keys(traveling).length>0;
@@ -10417,6 +10436,9 @@ function generateConvocatoriaPDF(evId){
 .cvpdf .obs-box{background:#f5f8ff;border-radius:7px;padding:8px 12px;margin-bottom:10px;border:1px solid #dce8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .cvpdf .obs-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:700;margin-bottom:4px}
 .cvpdf .footer{text-align:center;font-size:9px;color:#bbb;margin-top:8px;padding-top:6px;border-top:1px solid #eee}
+.cvpdf .staff-th{background:#2c4a2c;color:#fff;padding:5px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cvpdf .staff-role{color:#555;font-size:11px}
+.cvpdf .subst-badge{font-size:9px;background:#fef3cd;color:#856404;padding:1px 4px;border-radius:3px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style>`;
   const inner=`<div class="cvpdf">
 <div class="header">
@@ -10488,8 +10510,12 @@ ${convocados.map(p=>{
   return `<tr><td>${p.number||'—'}</td><td>${nameHtml}</td>${travCell}<td class="sig-col"><div></div></td></tr>`;
 }).join('')}
 </tbody></table>
+${allStaffPdf.length?`
+<table class="pt" style="margin-top:6px"><thead><tr><th class="staff-th" colspan="2">🧑‍💼 Equipa Técnica</th></tr></thead><tbody>
+${allStaffPdf.map(s=>`<tr><td style="font-weight:700;font-size:12px;width:55%">${s.name}</td><td class="staff-role">${s.roleLabel}${s.isExtra?` <span class="subst-badge">SUBST.</span>`:''}</td></tr>`).join('')}
+</tbody></table>`:''}
 ${hasNotes?`<div class="obs-box"><div class="obs-label">Observações</div><div style="font-size:11px">${conv.notes}</div></div>`:''}
-<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados</div>
+<div class="footer">SC Vianense SAD · Gerado em ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'})} · ${convocados.length} atletas convocados${allStaffPdf.length?' · '+allStaffPdf.length+' staff':''}</div>
 </div>`;
   const contentDiv=document.getElementById('pdf-conv-content');
   contentDiv.innerHTML=css+inner;
