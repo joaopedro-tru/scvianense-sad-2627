@@ -4490,6 +4490,7 @@ function renderPlayer(){
 
   // GR stats (only for GR position players)
   let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
+  const grActionCounts={}; // per-action counts for selected squad
   if(p.position==='GR'){
     allEvs.forEach(ev=>{
       if(ev.type!=='game') return;
@@ -4505,6 +4506,9 @@ function renderPlayer(){
         const cat=Object.entries(GR_ACTIONS).find(([,acts])=>acts.find(a=>a.key===e.key))?.[0];
         if(cat==='def') grDefTotal++;
         if(cat==='off') grOffTotal++;
+        if(ev.squad===selSq){
+          grActionCounts[e.key]=(grActionCounts[e.key]||0)+1;
+        }
       });
     });
   }
@@ -4607,7 +4611,42 @@ function renderPlayer(){
         ${gameStatsBlock(statsFri,'⚽ Preparação','var(--muted,#888)')}
       </div>`;
 
-    if(!selRecs.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados para ${SQUADS[selSq]||selSq}.</div>`;
+    // GR-specific per-action stats card (only for GR players, only actions with count > 0)
+    const grStatsHTML=(()=>{
+      if(p.position!=='GR') return '';
+      const hasAny=Object.keys(grActionCounts).some(k=>grActionCounts[k]>0);
+      if(!hasAny) return '';
+      const GR_CAT_META_LOCAL={
+        def:{label:'Defensivo',color:'#1565c0'},
+        off:{label:'Ofensivo',color:'#2e7d32'},
+        rem:{label:'Remates sofridos',color:'#6a1b9a'},
+        fin:{label:'Finalização',color:'#b71c1c'},
+        atq:{label:'Ataque',color:'#e65100'},
+      };
+      const catBlocks=Object.entries(GR_ACTIONS).map(([catKey,actions])=>{
+        const rows=actions.filter(a=>(grActionCounts[a.key]||0)>0).map(a=>{
+          const cnt=grActionCounts[a.key];
+          const isWarn=a.warn;
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:12px;color:${isWarn?'#b71c1c':'var(--text)'}">${a.label}</span>
+            <span style="font-size:13px;font-weight:700;color:${isWarn?'#b71c1c':'var(--text)'};background:${isWarn?'#ffeef0':'var(--bg)'};border-radius:5px;padding:1px 8px;min-width:24px;text-align:center">${cnt}</span>
+          </div>`;
+        }).join('');
+        if(!rows) return '';
+        const meta=GR_CAT_META_LOCAL[catKey]||{label:catKey,color:'#888'};
+        return `<div style="margin-bottom:10px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${meta.color};margin-bottom:4px">${meta.label}</div>
+          ${rows}
+        </div>`;
+      }).filter(Boolean).join('');
+      if(!catBlocks) return '';
+      return `<div class="card" style="margin-top:14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)">🧤 Ações GR — ${SQUADS[selSq]||selSq}</div>
+        ${catBlocks}
+      </div>`;
+    })();
+
+    if(!selRecs.length) return aggregateSummary+grStatsHTML+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados para ${SQUADS[selSq]||selSq}.</div>`;
 
     const th=(t,align='center')=>`<th style="padding:6px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:${align};white-space:nowrap">${t}</th>`;
     const td=(content,extra='')=>`<td style="padding:6px 5px;vertical-align:top;${extra}">${content}</td>`;
@@ -4651,7 +4690,7 @@ function renderPlayer(){
       ...(friendlyRecs.length?[sectionHeader('⚽ Preparação'),...friendlyRecs.map(buildRow)]:[]),
     ].join('');
 
-    return aggregateSummary+`
+    return aggregateSummary+grStatsHTML+`
       <div class="card" style="padding:0;overflow:hidden">
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;min-width:580px">
@@ -4739,7 +4778,7 @@ function renderPlayer(){
   const tabBar=`<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;gap:0">
     <button class="tab-btn${playerTab==='dados'?' tab-active':''}" data-ptab="dados" style="padding:10px 18px">Dados</button>
     <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
-    ${playerWellnessHasData!==false?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
+    ${playerWellnessHasData===true?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
     ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
   </div>`;
 
@@ -4851,11 +4890,27 @@ function renderPlayer(){
     toast('✅ Registo actualizado!'); renderPlayer();
   }));
 
-  // Wellness tab async load
+  // Wellness: verificar dados sempre (para mostrar/esconder o tab), renderizar só se activo
+  if(playerWellnessHasData===null) _checkPlayerWellnessData(p);
   if(playerTab==='wellness') _renderPlayerWellness(p);
 }
 
 // ── PLAYER WELLNESS TAB ───────────────────────────────────────────────────────
+async function _checkPlayerWellnessData(p){
+  const jnum=p.jerseyNumber??p.number;
+  if(jnum==null){ playerWellnessHasData=false; return; }
+  const pSquads=playerSquads(p).filter(s=>s&&s!=='both');
+  const sq=pSquads[0]||squad;
+  const since=new Date(); since.setDate(since.getDate()-28);
+  const sinceStr=since.toISOString().slice(0,10);
+  try{
+    const [pseData,wellData]=await Promise.all([DB.getPSEEntries(sq,sinceStr),DB.getWellnessEntries(sq,sinceStr)]);
+    const hasData=pseData.some(e=>e.jerseyNumber==jnum)||wellData.some(e=>e.jerseyNumber==jnum);
+    if(hasData&&playerWellnessHasData!==true){ playerWellnessHasData=true; renderPlayer(); }
+    else if(!hasData&&playerWellnessHasData!==false){ playerWellnessHasData=false; }
+  }catch(_){ playerWellnessHasData=false; }
+}
+
 async function _renderPlayerWellness(p){
   const container=document.getElementById('player-wellness-tab');
   if(!container) return;
