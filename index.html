@@ -9227,23 +9227,53 @@ function renderGamePre(ev,sqPlayers,conv){
       ${otherSqHTML}
     </details>`:'';
   const haLabel=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
-  // Staff section for game
+  // Staff section for game — editable (quem vai ao jogo)
   const gmSq=ev.squad==='both'?null:ev.squad;
   const gmStaffProfiles=getAllProfileUsers().filter(u=>!gmSq||u.squad===gmSq).map(u=>({u,p:DB.getStaffProfile(u.user)})).filter(x=>!!x.p);
+  const convStaff=conv.staff||{};
   const gmStaffRows=gmStaffProfiles.map(({u,p})=>{
     const role=userStaffRole(u);
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+    const defaultRoleLabel=STAFF_ROLES_LABEL[role]||role||'—';
+    const isGoing=!!convStaff[u.user]?.going;
+    const roleOverride=convStaff[u.user]?.role||'';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="width:32px;height:32px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden">${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:cover">`:spIni(p.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600">${p.name}</div>
-        <div style="font-size:11px;color:var(--muted)">${STAFF_ROLES_LABEL[role]||role||'—'}${p.license?' · '+p.license:''}</div>
+        <div style="font-size:11px;color:var(--muted)">${defaultRoleLabel}</div>
+        <input type="text" data-staff-role="${u.user}" placeholder="Função (opcional)" value="${roleOverride.replace(/"/g,'&quot;')}"
+          style="margin-top:4px;padding:3px 7px;font-size:11px;border:1px solid var(--border);border-radius:4px;width:100%;display:${isGoing?'block':'none'}">
       </div>
+      <button class="att-btn${isGoing?' present':''}" data-gstaff="${u.user}" style="min-width:80px">${isGoing?'✓ Vai':'+ Vai'}</button>
     </div>`;
   }).join('');
   const gmStaffCard=gmStaffRows?`<div class="card" style="margin-top:14px">
-    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🧑‍💼 Equipa Técnica</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">🧑‍💼 Equipa Técnica</h3>
+      <span style="font-size:12px;color:var(--muted)">${Object.values(convStaff).filter(s=>s.going).length} vai${Object.values(convStaff).filter(s=>s.going).length!==1?'o':''} ao jogo</span>
+    </div>
     ${gmStaffRows}
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">Guarda com o botão ↓ depois de selecionar.</p>
   </div>`:'';
+  // Staff que vai ao jogo — para mostrar na convocatória (coluna direita)
+  const staffGoingList=gmStaffProfiles.filter(({u})=>!!convStaff[u.user]?.going);
+  const staffGoingHTML=staffGoingList.length?`
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🧑‍💼 Equipa Técnica</div>
+      ${staffGoingList.map(({u,p})=>{
+        const role=userStaffRole(u);
+        const defaultRoleLabel=STAFF_ROLES_LABEL[role]||role||'—';
+        const displayRole=convStaff[u.user]?.role||defaultRoleLabel;
+        return `<div class="att-row" style="padding:6px 0">
+          <div class="av" style="width:34px;height:34px;font-size:11px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:spIni(p.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${p.name}</div>
+            <div style="font-size:11px;color:var(--muted)">${displayRole}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`:'';
+
   // ── helpers ──────────────────────────────────────────────────────────────
   const isEqa = ev.squad==='eqa';
 
@@ -9320,6 +9350,7 @@ function renderGamePre(ev,sqPlayers,conv){
       ${isAway?`<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--muted)"><span>✈️ Desloca-se</span></div>`:''}
       ${pRows||'<p style="color:var(--muted);font-size:13px">Sem atletas neste escalão.</p>'}
       ${otherSqSection}
+      ${staffGoingHTML}
     </div>
   </div>`;
 
@@ -9369,8 +9400,26 @@ function renderGamePre(ev,sqPlayers,conv){
     c.scheduleWarmup=document.getElementById('gm-sch-warmup').value;
     c.scheduleDressing=document.getElementById('gm-sch-dressing').value;
     c.notes=document.getElementById('gm-notes').value;
+    // Save staff selections
+    const staffSel={};
+    document.querySelectorAll('[data-gstaff]').forEach(btn=>{
+      const uid=btn.dataset.gstaff;
+      const going=btn.classList.contains('present');
+      const roleInput=document.querySelector(`[data-staff-role="${uid}"]`);
+      if(going) staffSel[uid]={going:true,role:(roleInput?.value||'').trim()};
+    });
+    c.staff=staffSel;
     DB.updateEvent(gameEventId,{convocatoria:c}); toast('✅ Guardado!'); renderGame();
   });
+  // Staff toggle — sem re-render para não perder alterações não guardadas
+  document.querySelectorAll('[data-gstaff]').forEach(btn=>btn.addEventListener('click',()=>{
+    const uid=btn.dataset.gstaff;
+    const nowGoing=!btn.classList.contains('present');
+    btn.classList.toggle('present',nowGoing);
+    btn.textContent=nowGoing?'✓ Vai':'+ Vai';
+    const roleInput=document.querySelector(`[data-staff-role="${uid}"]`);
+    if(roleInput) roleInput.style.display=nowGoing?'block':'none';
+  }));
   document.getElementById('btn-gen-pdf').addEventListener('click',()=>generateConvocatoriaPDF(gameEventId));
 
   // Apply default schedule template
