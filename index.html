@@ -2825,7 +2825,7 @@ function setPhotoZoneExisting(circleId, initialsId, hintId, photoUrl, name) {
 }
 
 // ── ROUTING ───────────────────────────────────────────────────────────────────
-let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter=['eqa','sub23','sub19'], sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados';
+let view='dashboard', squad='sub19', player=null, calEvent=null, calYear=new Date().getFullYear(), calMonth=new Date().getMonth(), calFilter=['eqa','sub23','sub19'], sqViewMode='grid', trainingEventId=null, gameEventId=null, gameTab='pre', sqtrYear=new Date().getFullYear(), sqtrMonth=new Date().getMonth(), sqgymYear=new Date().getFullYear(), sqgymMonth=new Date().getMonth(), liveGameId=null, liveMinute=1, livePending=null, liveStep='lineup', liveTempLineup=new Set(), liveTempPositions={}, clockInterval=null, liveTab='geral', liveGRCat='def', weekPlanSquad='sub19', weekPlanStart=null, playerTab='dados', playerStatsSq=null, playerWellnessSq=null, playerWellnessHasData=null;
 // Navigation stack — replaces flat _backView/_backSquad
 const _navStack=[];
 let _navBack=false; // prevents stack push during back navigation
@@ -2900,7 +2900,7 @@ function nav(v,opts={}){
   view=v;
   if(v==='dashboard'){ show('v-dash'); setActive('[data-view="dashboard"]'); renderDash() }
   else if(v==='squad'){ squad=opts.squad||squad; show('v-squad'); setActive(`[data-view="squad"][data-squad="${squad}"]`); renderSquad() }
-  else if(v==='player'){ if(opts.id)player=DB.getPlayer(opts.id)||player; show('v-player'); renderPlayer() }
+  else if(v==='player'){ if(opts.id){player=DB.getPlayer(opts.id)||player; playerStatsSq=null; playerWellnessSq=null; playerWellnessHasData=null;} show('v-player'); renderPlayer() }
   else if(v==='calendar'){ show('v-cal'); setActive('[data-view="calendar"]'); renderCal() }
   else if(v==='training'){ if(opts.id)trainingEventId=opts.id; show('v-training'); renderTraining() }
   else if(v==='sq-trainings'){ squad=opts.squad||squad; show('v-sq-trainings'); setActive(`[data-view="sq-trainings"][data-squad="${squad}"]`); renderSqTrainings() }
@@ -4474,15 +4474,13 @@ function renderPlayer(){
     const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
     return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
   }
-  const statsAll=computeSquadStats(primarySq);
+  // Escalão seleccionado para as stats (inicializa com o principal)
+  if(!playerStatsSq) playerStatsSq=primarySq;
+  const selSq=playerStatsSq;
+  const statsAll=computeSquadStats(selSq);
   const {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating}=statsAll;
-  const statsOff=computeSquadStats(primarySq,'official');
-  const statsFri=computeSquadStats(primarySq,'friendly');
-  // Outras participações (outros escalões)
-  const otherSqStats=computeSquadStats(null);
-  const otherTrainAttended=otherSqStats.trainAttended-trainAttended;
-  const otherGamesConv=otherSqStats.gamesConv-statsAll.gamesConv;
-  const otherGamesPlayed=otherSqStats.gamesPlayed-statsAll.gamesPlayed;
+  const statsOff=computeSquadStats(selSq,'official');
+  const statsFri=computeSquadStats(selSq,'friendly');
 
   // GR stats (only for GR position players)
   let grGames=0, grGoalsConceded=0, grDefTotal=0, grOffTotal=0;
@@ -4557,12 +4555,27 @@ function renderPlayer(){
   }
 
   const statsTabHTML=(()=>{
-    // Totais para o resumo agregado — inclui remates e faltas
-    const totalShotOn=gameRecords.reduce((s,r)=>s+r.sOn,0);
-    const totalShotOff=gameRecords.reduce((s,r)=>s+r.sOff,0);
-    const totalFouls=gameRecords.reduce((s,r)=>s+r.fouls,0);
+    // Seletor de escalão — todos os escalões em que o jogador tem registos
+    const sqsWithData=([...new Set(gameRecords.map(r=>r.ev.squad))]);
+    // Garantir que os escalões formais do jogador aparecem mesmo sem jogos
+    const sqsToShow=[...new Set([...pSquads,...sqsWithData])].filter(s=>s&&s!=='both');
+    const multiSq=sqsToShow.length>1;
 
-    // Bloco visual de stats de jogo (oficial ou preparação), reutilizável
+    const sqSelectorHTML=multiSq?`
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        ${sqsToShow.map(s=>{
+          const active=s===selSq;
+          const sqColor=s==='eqa'?'#1e293b':s==='sub23'?'var(--primary,#1a56db)':'#b8860b';
+          return `<button data-stats-sq="${s}" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;border:2px solid ${sqColor};background:${active?sqColor:'transparent'};color:${active?'#fff':sqColor};cursor:pointer;font-family:inherit;transition:all .15s">${SQUADS[s]||s}</button>`;
+        }).join('')}
+      </div>`:''  ;
+
+    // Registos filtrados para o escalão seleccionado
+    const selRecs=gameRecords.filter(r=>r.ev.squad===selSq);
+    const totalShotOn=selRecs.reduce((s,r)=>s+r.sOn,0);
+    const totalShotOff=selRecs.reduce((s,r)=>s+r.sOff,0);
+    const totalFouls=selRecs.reduce((s,r)=>s+r.fouls,0);
+
     function gameStatsBlock(st, label, accent){
       return `<div style="border:1.5px solid ${accent}22;border-radius:10px;padding:10px 4px 4px;position:relative;margin-bottom:10px">
         <div style="position:absolute;top:-9px;left:12px;background:var(--card,#fff);padding:0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accent}">${label}</div>
@@ -4577,21 +4590,15 @@ function renderPlayer(){
 
     const aggregateSummary=`
       <div class="card" style="margin-bottom:0">
+        ${sqSelectorHTML}
         <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);margin-bottom:14px">
           ${statBox('Treinos',trainAttended,'presenças')}${statBox('Rem. Baliza',totalShotOn,'')}${statBox('Rem. Fora',totalShotOff,'')}
         </div>
         ${gameStatsBlock(statsOff,'🏆 Oficiais','var(--primary,#1a56db)')}
         ${gameStatsBlock(statsFri,'⚽ Preparação','var(--muted,#888)')}
-        ${(otherTrainAttended>0||otherGamesConv>0||otherGamesPlayed>0)?`
-        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🔄 Outras Participações</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr)">
-            ${statBox('Treinos',otherTrainAttended,'presenças')}${statBox('Convocado',otherGamesConv,'jogos')}${statBox('Jogou',otherGamesPlayed,'jogos')}
-          </div>
-        </div>`:''}
       </div>`;
 
-    if(!gameRecords.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados.</div>`;
+    if(!selRecs.length) return aggregateSummary+`<div class="card" style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem jogos registados para ${SQUADS[selSq]||selSq}.</div>`;
 
     const th=(t,align='center')=>`<th style="padding:6px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:${align};white-space:nowrap">${t}</th>`;
     const td=(content,extra='')=>`<td style="padding:6px 5px;vertical-align:top;${extra}">${content}</td>`;
@@ -4601,8 +4608,6 @@ function renderPlayer(){
       const tipoBadge=gt==='cup'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#7c3aed22;color:#7c3aed">Taça</span>`
         :gt==='friendly'?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#88888822;color:#666">Prep.</span>`
         :`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#1a56db22;color:#1a56db">Liga</span>`;
-      const sqColor=ev.squad==='eqa'?'#333':ev.squad==='sub19'?'#b8860b':'var(--blue)';
-      const squadBadge=ev.squad!==primarySq?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:${sqColor}18;color:${sqColor}">${SQUADS[ev.squad]||ev.squad}</span>`:'';
       const roleStr=played
         ?(isStarter
           ?`<span style="color:var(--ok);font-size:11px;font-weight:700">Tit.${subOutMin?`<br><span style="font-size:9px;color:var(--muted)">↓${subOutMin}'</span>`:''}</span>`
@@ -4610,7 +4615,7 @@ function renderPlayer(){
         :`<span style="color:var(--muted);font-size:10px">Conv.</span>`;
       const minsStr=minsPlayed!==null?`<span style="font-size:11px;font-weight:600">${minsPlayed}'</span>`:'—';
       return `<tr style="border-bottom:1px solid var(--border)">
-        ${td(`<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>${tipoBadge}${squadBadge}</div>`)}
+        ${td(`<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtDate(ev.date)}</span>${tipoBadge}</div>`)}
         ${td(`<span style="font-size:12px;font-weight:600">${ev.homeAway==='away'?'✈️':'🏠'} ${ev.opponent||'—'}</span>`,'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
         ${td(`<span style="font-size:12px;font-weight:700;color:${resultColor}">${result||''}${result?' ':''}</span><span style="font-size:12px;font-weight:600">${scoreStr}</span>`,'text-align:center')}
         ${td(roleStr,'text-align:center')}
@@ -4630,15 +4635,11 @@ function renderPlayer(){
       return `<tr><td colspan="13" style="padding:10px 8px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);background:var(--bg)">${label}</td></tr>`;
     }
 
-    // Separar registos: escalão principal vs outros escalões
-    const primaryRecs=gameRecords.filter(r=>r.ev.squad===primarySq);
-    const otherRecs=gameRecords.filter(r=>r.ev.squad!==primarySq);
-    const officialRecs=primaryRecs.filter(r=>{ const gt=getGameType(r.ev); return gt==='league'||gt==='cup'; });
-    const friendlyRecs=primaryRecs.filter(r=>getGameType(r.ev)==='friendly');
+    const officialRecs=selRecs.filter(r=>{ const gt=getGameType(r.ev); return gt==='league'||gt==='cup'; });
+    const friendlyRecs=selRecs.filter(r=>getGameType(r.ev)==='friendly');
     const allRows=[
       ...(officialRecs.length?[sectionHeader('🏆 Jogos Oficiais'),...officialRecs.map(buildRow)]:[]),
       ...(friendlyRecs.length?[sectionHeader('⚽ Preparação'),...friendlyRecs.map(buildRow)]:[]),
-      ...(otherRecs.length?[sectionHeader('🔄 Outras Participações'),...otherRecs.map(buildRow)]:[]),
     ].join('');
 
     return aggregateSummary+`
@@ -4729,7 +4730,7 @@ function renderPlayer(){
   const tabBar=`<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;gap:0">
     <button class="tab-btn${playerTab==='dados'?' tab-active':''}" data-ptab="dados" style="padding:10px 18px">Dados</button>
     <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
-    <button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>
+    ${playerWellnessHasData!==false?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
     ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
   </div>`;
 
@@ -4811,6 +4812,10 @@ function renderPlayer(){
   document.querySelectorAll('[data-ptab]').forEach(btn=>btn.addEventListener('click',()=>{
     playerTab=btn.dataset.ptab; renderPlayer();
   }));
+  // Squad selector (stats tab)
+  document.querySelectorAll('[data-stats-sq]').forEach(btn=>btn.addEventListener('click',()=>{
+    playerStatsSq=btn.dataset.statsSq; renderPlayer();
+  }));
   if(canManageUnavail()) bindUnavailHandlers();
 
   // ── Player clinical card — edit handlers ────────────────────────────────────
@@ -4848,12 +4853,15 @@ async function _renderPlayerWellness(p){
 
   const jnum=p.jerseyNumber??p.number;
   if(jnum==null){
-    container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">Sem número de camisola associado a este atleta.<br>Define-o no perfil para ver os dados de Wellness.</div>';
+    playerWellnessHasData=false;
+    if(playerTab==='wellness'){playerTab='dados'; renderPlayer(); return;}
+    container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">Sem número de camisola associado a este atleta.</div>';
     return;
   }
 
-  const pSquads=playerSquads(p);
-  const sq=pSquads[0]||squad;
+  const pSquads=playerSquads(p).filter(s=>s&&s!=='both');
+  if(!playerWellnessSq||!pSquads.includes(playerWellnessSq)) playerWellnessSq=pSquads[0]||squad;
+  const sq=playerWellnessSq;
   const since=new Date(); since.setDate(since.getDate()-28);
   const sinceStr=since.toISOString().slice(0,10);
 
@@ -4862,15 +4870,38 @@ async function _renderPlayerWellness(p){
     DB.getWellnessEntries(sq, sinceStr)
   ]);
 
-  if(!document.getElementById('player-wellness-tab')) return; // modal fechou entretanto
+  if(!document.getElementById('player-wellness-tab')) return;
 
   const myPse=pseData.filter(e=>e.jerseyNumber==jnum).sort((a,b)=>a.date.localeCompare(b.date));
   const myWell=wellData.filter(e=>e.jerseyNumber==jnum).sort((a,b)=>a.date.localeCompare(b.date));
 
   if(!myPse.length && !myWell.length){
-    container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">Sem dados de PSE ou Bem-Estar nos últimos 28 dias.</div>';
+    // Sem dados neste escalão — verificar outros escalões antes de concluir
+    if(playerWellnessHasData===null){
+      // Primeira verificação: marcar como sem dados e atualizar tab bar
+      playerWellnessHasData=false;
+      if(playerTab==='wellness'){playerTab='dados'; renderPlayer(); return;}
+      // Se outro escalão já foi verificado com dados não chegamos aqui
+    }
+    container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">Sem dados de PSE ou Bem-Estar nos últimos 28 dias para ${SQUADS[sq]||sq}.</div>';
     return;
   }
+
+  // Tem dados — garantir que o tab fica visível
+  if(playerWellnessHasData===false||playerWellnessHasData===null){
+    playerWellnessHasData=true;
+    renderPlayer(); return; // re-render para mostrar o tab
+  }
+
+  // Seletor de escalão
+  const multiSq=pSquads.length>1;
+  const sqSelectorHTML=multiSq?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    ${pSquads.map(s=>{
+      const active=s===sq;
+      const sqColor=s==='eqa'?'#1e293b':s==='sub23'?'var(--primary,#1a56db)':'#b8860b';
+      return `<button data-well-sq="${s}" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;border:2px solid ${sqColor};background:${active?sqColor:'transparent'};color:${active?'#fff':sqColor};cursor:pointer;font-family:inherit">${SQUADS[s]||s}</button>`;
+    }).join('')}
+  </div>`:'';
 
   // Color helpers
   const pseColor=v=>v<=3?'#22c55e':v<=5?'#84cc16':v<=7?'#f59e0b':v<=8?'#f97316':'#ef4444';
@@ -4964,7 +4995,13 @@ async function _renderPlayerWellness(p){
     </div>`;
   }
 
-  container.innerHTML=`<div class="ds">${pseHTML}${wellHTML}</div>`;
+  container.innerHTML=`<div class="ds">${sqSelectorHTML}${pseHTML}${wellHTML}</div>`;
+
+  // Squad selector handlers
+  container.querySelectorAll('[data-well-sq]').forEach(btn=>btn.addEventListener('click',()=>{
+    playerWellnessSq=btn.dataset.wellSq;
+    _renderPlayerWellness(p);
+  }));
 }
 
 // ── PLAYER MODAL ──────────────────────────────────────────────────────────────
