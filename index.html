@@ -10370,7 +10370,16 @@ function generateConvocatoriaPDF(evId){
   if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
 
   // ── Staff para o PDF ──────────────────────────────────────────────────────
-  const PDF_ROLE_GROUP={headcoach:0,adjunto:1,estagiario:1,grcoach:1,analista:1,condicionamento:1,delegado:2,delegado2:3,teammanager:4,fisio:5,enfermeiro:5,massagista:5,medical:5};
+  // Derivar grupo de ordenação a partir do label (mais fiável que roleKey que pode não estar nos perfis)
+  function pdfLabelGroup(label){
+    const l=(label||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if(l.includes('principal')) return 0;
+    if(l.includes('treinador')||l.includes('adjunto')||l.includes('estagiari')||l.includes('analista')||l.includes('condicionamento')||l.includes('preparador')||l.includes(' gr')||l.startsWith('gr ')) return 1;
+    if(l.includes('delegado')||l.includes('team manager')||l.includes('teammanager')) return 2;
+    if(l.includes('fisio')||l.includes('enfermeiro')||l.includes('massagista')||l.includes('clinic')) return 3;
+    return 9;
+  }
+  const PDF_ROLE_GROUP={headcoach:0,adjunto:1,estagiario:1,grcoach:1,analista:1,condicionamento:1,delegado:2,teammanager:2,fisio:3,enfermeiro:3,massagista:3,medical:3};
   const gmSqPdf=ev.squad==='both'?null:ev.squad;
   const convStaffPdf=conv.staff||{};
   const convExtraPdf=conv.staffExtra||[];
@@ -10380,18 +10389,17 @@ function generateConvocatoriaPDF(evId){
     .filter(u=>!!convStaffPdf[u.user]?.going)
     .map(u=>{
       const p=DB.getStaffProfile(u.user)||{};
-      // Preferir staffRole do perfil (fonte canónica) — app_users pode não ter este campo
       const roleKey=p.staffRole||userStaffRole(u)||null;
       const defaultLabel=STAFF_ROLES_LABEL[roleKey]||roleKey||u.role||'—';
-      return {name:p.name||u.user,roleLabel:convStaffPdf[u.user]?.role||defaultLabel,roleKey,isExtra:false};
+      const roleLabel=convStaffPdf[u.user]?.role||defaultLabel;
+      return {name:p.name||u.user,roleLabel,isExtra:false};
     })
     .sort((a,b)=>{
-      const ga=PDF_ROLE_GROUP[a.roleKey]??9, gb=PDF_ROLE_GROUP[b.roleKey]??9;
+      const ga=pdfLabelGroup(a.roleLabel), gb=pdfLabelGroup(b.roleLabel);
       if(ga!==gb) return ga-gb;
-      // Dentro do mesmo grupo: ordenar pelo label para "1º ..." antes de "2º ..."
       return (a.roleLabel||'').localeCompare(b.roleLabel||'','pt',{numeric:true});
     });
-  const allStaffPdf=[...goingStaffPdf,...convExtraPdf.map(es=>({name:es.name,roleLabel:es.role||'—',roleKey:null,isExtra:true}))];
+  const allStaffPdf=[...goingStaffPdf,...convExtraPdf.map(es=>({name:es.name,roleLabel:es.role||'—',isExtra:true}))];
 
   const isHome=ev.homeAway!=='away';
   const traveling=conv.traveling||{};
