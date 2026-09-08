@@ -4653,10 +4653,83 @@ function renderPlayer(){
       </div>`;
   })();
 
+  // ── Coord tab data (admin only) ───────────────────────────────────────────
+  const coordTabHTML=(()=>{
+    if(!isAdmin()) return '';
+    const allGames=DB.events().filter(e=>e.type==='game');
+    const rows=allGames
+      .filter(e=>{
+        const cp=e.convocatoria?.players||{};
+        return cp[pid]&&e.matchReport?.adminReport?.playerEvals?.[pid];
+      })
+      .map(e=>{
+        const mr2=e.matchReport||{};
+        const ce=mr2.adminReport.playerEvals[pid];
+        const cr=mr2.ratings?.[pid];
+        const coachR=cr?.rating!==undefined&&cr?.rating!==null&&cr?.rating!==''?parseFloat(cr.rating):null;
+        const coordR=ce.rating!==null&&ce.rating!==undefined?parseFloat(ce.rating):null;
+        const diff=coordR!==null&&coachR!==null?coordR-coachR:null;
+        const diffStr=diff!==null?(diff>0?`<span style="color:var(--green);font-weight:700">+${diff.toFixed(1)}</span>`:(diff<0?`<span style="color:var(--red,#c0392b);font-weight:700">${diff.toFixed(1)}</span>`:`<span style="color:var(--muted)">0</span>`)):'<span style="color:var(--muted)">—</span>';
+        return {date:e.date,opponent:e.opponent||'—',coordR,coachR,diff,diffStr,comment:ce.comment||'',id:e.id};
+      })
+      .sort((a,b)=>b.date.localeCompare(a.date));
+
+    if(!rows.length) return `<div class="card"><p style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">Sem avaliações de coordenação para este jogador.</p></div>`;
+
+    const coordVals=rows.filter(r=>r.coordR!==null).map(r=>r.coordR);
+    const coachVals=rows.filter(r=>r.coachR!==null).map(r=>r.coachR);
+    const avgCoord=coordVals.length?(coordVals.reduce((s,v)=>s+v,0)/coordVals.length):null;
+    const avgCoach=coachVals.length?(coachVals.reduce((s,v)=>s+v,0)/coachVals.length):null;
+    const avgDiff=avgCoord!==null&&avgCoach!==null?avgCoord-avgCoach:null;
+
+    const summaryCards=`<div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:var(--green)">${avgCoord!==null?avgCoord.toFixed(1):'—'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Média Coord.</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:var(--primary)">${avgCoach!==null?avgCoach.toFixed(1):'—'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Média Treinadores</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:${avgDiff===null?'var(--muted)':avgDiff>0?'var(--green)':avgDiff<0?'var(--red,#c0392b)':'var(--muted)'}">${avgDiff!==null?(avgDiff>0?'+':'')+avgDiff.toFixed(1):'—'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Diferença Média</div>
+      </div>
+    </div>`;
+
+    const tableRows=rows.map(r=>`<tr>
+      <td style="padding:8px 6px;font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.date)}</td>
+      <td style="padding:8px 6px;font-size:13px;font-weight:600">${r.opponent}</td>
+      <td style="padding:8px 6px;text-align:center;font-size:14px;font-weight:700;color:var(--green)">${r.coordR!==null?r.coordR.toFixed(1):'—'}</td>
+      <td style="padding:8px 6px;text-align:center;font-size:13px;color:var(--primary)">${r.coachR!==null?r.coachR.toFixed(1):'—'}</td>
+      <td style="padding:8px 6px;text-align:center">${r.diffStr}</td>
+      <td style="padding:8px 6px;font-size:12px;color:var(--muted)">${r.comment||''}</td>
+    </tr>`).join('');
+
+    return `<div class="card">
+      <h3 style="font-size:13px;font-weight:700;margin-bottom:14px">🔍 Avaliações de Coordenação</h3>
+      ${summaryCards}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:6px;font-size:11px;text-align:left;color:var(--muted);font-weight:600">Data</th>
+            <th style="padding:6px;font-size:11px;text-align:left;color:var(--muted);font-weight:600">Adversário</th>
+            <th style="padding:6px;font-size:11px;text-align:center;color:var(--muted);font-weight:600">Coord.</th>
+            <th style="padding:6px;font-size:11px;text-align:center;color:var(--muted);font-weight:600">Trein.</th>
+            <th style="padding:6px;font-size:11px;text-align:center;color:var(--muted);font-weight:600">Δ</th>
+            <th style="padding:6px;font-size:11px;text-align:left;color:var(--muted);font-weight:600">Obs.</th>
+          </tr></thead>
+          <tbody style="border-collapse:collapse">${tableRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  })();
+
   const tabBar=`<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;gap:0">
     <button class="tab-btn${playerTab==='dados'?' tab-active':''}" data-ptab="dados" style="padding:10px 18px">Dados</button>
     <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
     <button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>
+    ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
   </div>`;
 
   const isInactive=p.status==='inactive';
@@ -4729,7 +4802,9 @@ function renderPlayer(){
       ?`<div style="display:flex;flex-direction:column;gap:16px">${statsTabHTML}</div>`
       :playerTab==='wellness'
         ?`<div id="player-wellness-tab"><div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">A carregar...</div></div>`
-        :dadosHTML}`;
+        :playerTab==='coord'
+          ?`<div>${coordTabHTML}</div>`
+          :dadosHTML}`;
 
   // Tab click handlers
   document.querySelectorAll('[data-ptab]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -8811,7 +8886,7 @@ function renderGame(){
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else if(gameTab==='tm') renderGameTM(ev,mr);
-  else if(gameTab==='coord') renderGameCoord(ev,mr);
+  else if(gameTab==='coord') renderGameCoord(ev,sqPlayers,conv,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
 
   // Prefetch cross-squad convocados missing from local cache.
@@ -9953,32 +10028,61 @@ async function uploadTMReport(gameId){
 }
 
 // ── RELATÓRIO DE COORDENAÇÃO (admin) ─────────────────────────────────────────
-function renderGameCoord(ev, mr){
+function renderGameCoord(ev, sqPlayers, conv, mr){
   const report=mr.adminReport||{};
+  const playerEvals=report.playerEvals||{};
   const tc=document.getElementById('gm-tab-content');
   const savedAt=report.savedAt?new Date(report.savedAt).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   const ratingOpts=[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${report.coachEval?.rating==n?' selected':''}>${n}</option>`).join('');
+
+  // Convocados para avaliação individual
+  const convPlayers=(conv?.players)||{};
+  const convocados=(sqPlayers||[]).filter(p=>convPlayers[p.id]);
+  const coachRatings=mr.ratings||{};
+  const iStyle2='width:62px;padding:5px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;text-align:center;outline:none;font-family:inherit;background:var(--bg);color:var(--text)';
+  const playerRows=convocados.map(p=>{
+    const ce=playerEvals[p.id]||{};
+    const cr=coachRatings[p.id];
+    const coachR=cr?.rating!==undefined&&cr?.rating!==null&&cr?.rating!==''?parseFloat(cr.rating):null;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      ${p.number?`<span style="font-weight:700;color:var(--green);min-width:22px;text-align:right;font-size:13px;flex-shrink:0">${p.number}</span>`:'<span style="min-width:22px"></span>'}
+      <span style="flex:0 0 140px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dn(p)}</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:11px;color:var(--muted)">Coord.</span>
+        <input type="number" min="0" max="10" step="0.5" value="${ce.rating!==undefined?ce.rating:''}" placeholder="—" data-coord-pid="${p.id}" style="${iStyle2}">
+      </div>
+      ${coachR!==null?`<span style="font-size:11px;color:var(--muted);flex-shrink:0">Trein. <strong>${coachR.toFixed(1)}</strong></span>`:''}
+      <input type="text" value="${(ce.comment||'').replace(/"/g,'&quot;')}" placeholder="Observação..." data-coord-comment-pid="${p.id}" style="flex:1;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+    </div>`;
+  }).join('');
+
   tc.innerHTML=`
-    <div style="max-width:700px">
+    <div style="max-width:740px">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:6px">🔍 Relatório de Coordenação</h3>
       <p style="font-size:13px;color:var(--muted);margin-bottom:${savedAt?'6':'20'}px">Análise interna ao jogo e avaliação do treinador. Visível apenas a administradores.</p>
       ${savedAt?`<p style="font-size:11px;color:var(--muted);margin-bottom:18px">Última actualização: ${savedAt} por <strong>${report.savedBy||'—'}</strong></p>`:''}
       <div style="margin-bottom:20px">
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Análise ao Jogo</label>
-        <textarea id="coord-analysis" rows="9" placeholder="Observações gerais, contexto, resultado, momentos-chave..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.6">${(report.analysis||'').replace(/</g,'&lt;')}</textarea>
+        <textarea id="coord-analysis" rows="7" placeholder="Observações gerais, contexto, resultado, momentos-chave..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.6;background:var(--bg);color:var(--text)">${(report.analysis||'').replace(/</g,'&lt;')}</textarea>
       </div>
-      <div style="padding:18px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:22px">
+      <div style="padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:20px">
         <label style="font-size:13px;font-weight:700;display:block;margin-bottom:14px">Avaliação ao Trabalho do Treinador</label>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
           <label style="font-size:13px;font-weight:600;min-width:80px">Nota (1–10)</label>
-          <select id="coord-coach-rating" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;width:90px">
+          <select id="coord-coach-rating" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;width:90px;background:var(--bg);color:var(--text)">
             <option value="">—</option>
             ${ratingOpts}
           </select>
         </div>
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Comentário</label>
-        <textarea id="coord-coach-comment" rows="4" placeholder="Pontos positivos, áreas a melhorar, notas adicionais..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5">${(report.coachEval?.text||'').replace(/</g,'&lt;')}</textarea>
+        <textarea id="coord-coach-comment" rows="3" placeholder="Pontos positivos, áreas a melhorar, notas adicionais..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5;background:var(--bg);color:var(--text)">${(report.coachEval?.text||'').replace(/</g,'&lt;')}</textarea>
       </div>
+      ${convocados.length?`
+      <div style="padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:22px">
+        <label style="font-size:13px;font-weight:700;display:block;margin-bottom:4px">⭐ Avaliação Individual — Jogadores</label>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Nota da coordenação por jogador (independente da dos treinadores).</p>
+        ${playerRows}
+      </div>`:''}
       <button class="btn btn-p" id="btn-save-coord" onclick="saveCoordReport('${ev.id}')">💾 Guardar Relatório</button>
     </div>`;
 }
@@ -9987,9 +10091,24 @@ function saveCoordReport(gameId){
   const analysis=(document.getElementById('coord-analysis')?.value||'').trim();
   const ratingVal=document.getElementById('coord-coach-rating')?.value||'';
   const coachComment=(document.getElementById('coord-coach-comment')?.value||'').trim();
+  // Recolher avaliações individuais dos jogadores
+  const playerEvals={};
+  document.querySelectorAll('[data-coord-pid]').forEach(input=>{
+    const pid=input.dataset.coordPid;
+    const val=input.value.trim();
+    const commentEl=document.querySelector(`[data-coord-comment-pid="${pid}"]`);
+    const comment=(commentEl?.value||'').trim();
+    if(val!==''||comment){
+      playerEvals[pid]={
+        rating:val!==''?Math.min(10,Math.max(0,parseFloat(val))):null,
+        comment
+      };
+    }
+  });
   const adminReport={
     analysis,
     coachEval:{rating:ratingVal?parseInt(ratingVal,10):null,text:coachComment},
+    playerEvals,
     savedBy:currentUser()?.user||'—',
     savedAt:new Date().toISOString()
   };
@@ -10148,25 +10267,30 @@ function renderGamePos(ev,sqPlayers,conv,mr){
         })()}
       </div>
       <div class="card" style="margin-bottom:18px">
-        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Eventos da Partida</h3>
-        <div style="background:#f5f8ff;border-radius:8px;padding:13px;margin-bottom:16px">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="200" placeholder="45" style="${iStyle}"></div>
-            <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
-              <select id="me-type" style="${iStyle};cursor:pointer">
-                <option value="goal">⚽ Golo</option>
-                <option value="own_goal">🔄 Autogolo (adv.)</option>
-                <option value="goal_conceded">🥅 Golo Sofrido</option>
-                <option value="yellow">🟡 Cartão Amarelo</option>
-                <option value="red">🔴 Cartão Vermelho</option>
-                <option value="sub">🔄 Substituição</option>
-              </select>
-            </div>
-            <div id="me-extra" style="display:flex;gap:8px;flex:2;min-width:200px;flex-wrap:wrap;align-items:flex-end"></div>
-            <button class="btn btn-p btn-sm" id="btn-add-me" style="height:34px">+ Adicionar</button>
-          </div>
+        <div id="me-events-toggle" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding-bottom:0" onclick="(function(){var b=document.getElementById('me-events-body');var a=document.getElementById('me-events-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()">
+          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">Eventos da Partida</h3>
+          <span id="me-events-arrow" style="font-size:11px;color:var(--muted);font-weight:700;transition:transform .2s">▶</span>
         </div>
-        <div id="me-list">${evTimeline||'<p style="color:var(--muted);font-size:13px;text-align:center;padding:18px 0">Sem eventos registados.</p>'}</div>
+        <div id="me-events-body" style="display:none;margin-top:14px;padding-top:8px;border-top:1px solid var(--border)">
+          <div style="background:#f5f8ff;border-radius:8px;padding:13px;margin-bottom:16px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+              <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="200" placeholder="45" style="${iStyle}"></div>
+              <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
+                <select id="me-type" style="${iStyle};cursor:pointer">
+                  <option value="goal">⚽ Golo</option>
+                  <option value="own_goal">🔄 Autogolo (adv.)</option>
+                  <option value="goal_conceded">🥅 Golo Sofrido</option>
+                  <option value="yellow">🟡 Cartão Amarelo</option>
+                  <option value="red">🔴 Cartão Vermelho</option>
+                  <option value="sub">🔄 Substituição</option>
+                </select>
+              </div>
+              <div id="me-extra" style="display:flex;gap:8px;flex:2;min-width:200px;flex-wrap:wrap;align-items:flex-end"></div>
+              <button class="btn btn-p btn-sm" id="btn-add-me" style="height:34px">+ Adicionar</button>
+            </div>
+          </div>
+          <div id="me-list">${evTimeline||'<p style="color:var(--muted);font-size:13px;text-align:center;padding:18px 0">Sem eventos registados.</p>'}</div>
+        </div>
       </div>
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">⭐ Avaliação${playedIds.size===0&&convocados.length>0?' <span style="font-weight:400;font-size:10px;text-transform:none">(define titulares para filtrar)</span>':''}</h3>
