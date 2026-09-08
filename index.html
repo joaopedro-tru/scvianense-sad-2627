@@ -698,6 +698,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
     <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
     <hr class="nd">
+    <div class="nl" id="nl-scouting" data-view="scouting"><span class="ic">🔭</span> Prospeção</div>
+    <hr class="nd">
     <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
     <div class="nl" id="nl-myprofile" data-view="myprofile"><span class="ic">👤</span> O Meu Perfil</div>
     <div class="nsl" id="nsl-tm">Gestão Clube</div>
@@ -1772,6 +1774,121 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   </div>
 </div>
 
+  <!-- SCOUTING VIEW -->
+  <div class="view" id="v-scouting">
+    <div class="tb">
+      <div><h1>🔭 Prospeção</h1><div class="sub">Base de dados de atletas adversários de interesse</div></div>
+      <button class="btn btn-p" id="btn-add-scout">+ Adicionar Atleta</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+      <select id="scout-filter-status" class="si btn-sm" style="max-width:160px">
+        <option value="">Todos os estados</option>
+        <option value="interesse">⭐ Interesse</option>
+        <option value="em_analise">🔍 Em análise</option>
+        <option value="contactado">📞 Contactado</option>
+        <option value="descartado">✕ Descartado</option>
+      </select>
+      <select id="scout-filter-sq" class="si btn-sm" style="max-width:160px">
+        <option value="">Todos os escalões</option>
+        <option value="eqa">Equipa A</option>
+        <option value="sub23">Sub-23</option>
+        <option value="sub19">Sub-19</option>
+      </select>
+      <select id="scout-filter-pos" class="si btn-sm" style="max-width:140px">
+        <option value="">Todas as posições</option>
+        <option value="GR">GR</option>
+        <option value="DC">DC</option>
+        <option value="LD">LD</option>
+        <option value="LE">LE</option>
+        <option value="MC">MC</option>
+        <option value="MD">MD</option>
+        <option value="MO">MO</option>
+        <option value="AV">AV</option>
+        <option value="PL">PL</option>
+      </select>
+      <input type="text" id="scout-search" class="si btn-sm" placeholder="🔍 Nome ou clube..." style="max-width:200px">
+    </div>
+    <div id="scout-list"></div>
+  </div>
+
+<!-- MODAL: SCOUT PLAYER -->
+<div class="mo" id="mo-scout">
+  <div class="md" style="max-width:500px">
+    <div class="mh"><h2 id="mo-scout-title">Adicionar Atleta</h2><button class="mc" onclick="document.getElementById('mo-scout').classList.remove('open')">✕</button></div>
+    <form id="mo-scout-form" onsubmit="return false">
+      <input type="hidden" id="scout-id">
+      <div class="fr">
+        <div class="fg" style="flex:2">
+          <label>Nome *</label>
+          <input type="text" id="scout-name" required placeholder="Nome do atleta">
+        </div>
+        <div class="fg" style="flex:1">
+          <label>Posição</label>
+          <select id="scout-pos">
+            <option value="">—</option>
+            <option value="GR">GR</option><option value="DC">DC</option><option value="LD">LD</option>
+            <option value="LE">LE</option><option value="ALD">ALD</option><option value="ALE">ALE</option>
+            <option value="MD">MD</option><option value="MC">MC</option><option value="MO">MO</option>
+            <option value="ED">ED</option><option value="EE">EE</option><option value="PL">PL</option><option value="AV">AV</option>
+          </select>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg" style="flex:2">
+          <label>Clube Atual</label>
+          <input type="text" id="scout-team" placeholder="Ex: Varzim SC">
+        </div>
+        <div class="fg" style="flex:1">
+          <label>Ano Nasc.</label>
+          <input type="number" id="scout-birth" placeholder="Ex: 2002" min="1970" max="2015">
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <label>Escalão Alvo</label>
+          <select id="scout-sq">
+            <option value="">—</option>
+            <option value="eqa">Equipa A</option>
+            <option value="sub23">Sub-23</option>
+            <option value="sub19">Sub-19</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Estado</label>
+          <select id="scout-status">
+            <option value="interesse">⭐ Interesse</option>
+            <option value="em_analise">🔍 Em análise</option>
+            <option value="contactado">📞 Contactado</option>
+            <option value="descartado">✕ Descartado</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Interesse (1–5)</label>
+          <div id="scout-interest-stars" style="display:flex;gap:4px;margin-top:6px">
+            ${[1,2,3,4,5].map(n=>`<span data-si="${n}" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>`).join('')}
+          </div>
+          <input type="hidden" id="scout-interest" value="3">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Observado em (jogo)</label>
+        <input type="text" id="scout-game-ref" placeholder="Ex: Sub-23 vs Varzim SC, 15/09" readonly style="background:var(--bg)">
+        <input type="hidden" id="scout-game-id">
+        <input type="hidden" id="scout-game-date">
+        <input type="hidden" id="scout-opponent">
+      </div>
+      <div class="fg">
+        <label>Notas de Observação</label>
+        <textarea id="scout-notes" rows="4" placeholder="Características técnicas, físicas, mentais, pontos fortes/fracos..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button type="submit" class="btn btn-p" style="flex:1" id="btn-scout-save">Guardar</button>
+        <button type="button" class="btn btn-o" id="btn-scout-delete" style="display:none;color:#b02020;border-color:#b02020">Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- MODAL: EVENT -->
 <div class="mo" id="mo-event">
   <div class="md" style="max-width:460px">
@@ -2482,6 +2599,34 @@ const DB = {
     }catch(e){ console.warn('syncStaffProfiles:',e); }
   },
 
+  // ── Scouting (prospeção de atletas adversários) ───────────────────────────────
+  _fssc(){ return firestoreDb?.collection('scouted_players') },
+  _sc(){ try{ return JSON.parse(localStorage.getItem('scv_scout')||'[]'); }catch{ return []; } },
+  _ssc(arr){ localStorage.setItem('scv_scout',JSON.stringify(arr)); },
+  getScoutedPlayers(){ return this._sc(); },
+  addScoutedPlayer(p){
+    p.id='scout_'+uid(); p.addedAt=new Date().toISOString();
+    const arr=this._sc(); arr.push(p); this._ssc(arr);
+    this._fssc()?.doc(p.id).set(p).catch(e=>console.error('FS addScouted:',e));
+    return p;
+  },
+  updateScoutedPlayer(id,u){
+    const arr=this._sc(); const i=arr.findIndex(x=>x.id===id);
+    if(i>-1){ arr[i]={...arr[i],...u,id,updatedAt:new Date().toISOString()}; this._ssc(arr);
+      this._fssc()?.doc(id).set(arr[i]).catch(e=>console.error('FS updateScouted:',e)); }
+  },
+  deleteScoutedPlayer(id){
+    const arr=this._sc().filter(x=>x.id!==id); this._ssc(arr);
+    this._fssc()?.doc(id).delete().catch(e=>console.error('FS delScouted:',e));
+  },
+  async syncScoutedFromFirestore(){
+    if(!this._fssc()) return;
+    try{
+      const snap=await this._fssc().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data())); this._ssc(arr);
+    }catch(e){ console.warn('syncScouted:',e); }
+  },
+
   // ── Trial Players (atletas à experiência — globais por escalão) ───────────────
   _ftp(){ return firestoreDb?.collection('trial_players') },
   _tp(){ try{ return JSON.parse(localStorage.getItem('scv_tp')||'[]'); }catch{ return []; } },
@@ -2993,6 +3138,7 @@ function nav(v,opts={}){
       }).catch(err=>console.warn('Fresh game read:',err));
     }
   }
+  else if(v==='scouting'){ show('v-scouting'); setActive('[data-view="scouting"]'); renderScouting() }
   else if(v==='help'){ show('v-help'); setActive('[data-view="help"]'); renderHelp() }
   else if(v==='public-form'){ show('v-pf') }
   else if(v==='pse-form'){ show('v-pse-form') }
@@ -10537,7 +10683,10 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   </div>
   ${buildClinicalSection(gameEventId, convocados)}
   <div class="card" style="margin-top:18px">
-    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📝 Observações da Equipa Técnica</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">📝 Observações da Equipa Técnica</h3>
+      <button id="btn-scout-from-game" style="padding:4px 10px;font-size:11px;font-weight:700;border:1.5px solid #7c3aed;border-radius:6px;background:transparent;color:#7c3aed;cursor:pointer;font-family:inherit">🔭 Sinalizar Atleta Adversário</button>
+    </div>
     <div id="staff-obs-cards">${obsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>'}</div>
     ${canWriteObs?`
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
@@ -10674,6 +10823,23 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       setTimeout(()=>{ if(document.getElementById('btn-save-staffobs')) document.getElementById('btn-save-staffobs').textContent='Guardar Observação'; },2000);
     });
   }
+
+  // ── Scout from game: pre-fill opponent + game ref ────────────────────────
+  document.getElementById('btn-scout-from-game')?.addEventListener('click',()=>{
+    const gev=DB.getEvent(gameEventId)||{};
+    const d=gev.date?new Date(gev.date+'T00:00:00'):null;
+    const dateStr=d?`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`:'';
+    const opp=gev.opponent||'';
+    const sqLabel=SQUADS[gev.squad]||gev.squad||'';
+    openScoutModal(null,{
+      team:opp,
+      targetSquad:gev.squad||'',
+      gameId:gameEventId,
+      gameDate:gev.date||'',
+      opponent:opp,
+      gameRef:opp&&dateStr?`${sqLabel} vs ${opp}, ${dateStr}`:'',
+    });
+  });
 
   // ── Team moments star ratings ─────────────────────────────────────────────
   document.querySelectorAll('.star-row').forEach(row=>{
@@ -13704,6 +13870,180 @@ function monEditJersey(id, type, btn){
   inp.focus();
 }
 
+// ── SCOUTING ──────────────────────────────────────────────────────────────────
+const SCOUT_STATUS={
+  interesse: {label:'Interesse',    color:'#d97706', bg:'#fef3c7'},
+  em_analise:{label:'Em análise',   color:'#1d4ed8', bg:'#dbeafe'},
+  contactado:{label:'Contactado',   color:'#15803d', bg:'#dcfce7'},
+  descartado:{label:'Descartado',   color:'#9ca3af', bg:'#f3f4f6'},
+};
+
+function openScoutModal(id=null, prefill={}){
+  const mo=document.getElementById('mo-scout');
+  const rec=id?DB.getScoutedPlayers().find(x=>x.id===id):null;
+  document.getElementById('mo-scout-title').textContent=rec?'Editar Atleta':'Adicionar Atleta';
+  document.getElementById('scout-id').value=id||'';
+  document.getElementById('scout-name').value=rec?.name||prefill.name||'';
+  document.getElementById('scout-pos').value=rec?.position||prefill.position||'';
+  document.getElementById('scout-team').value=rec?.team||prefill.team||'';
+  document.getElementById('scout-birth').value=rec?.birthYear||'';
+  document.getElementById('scout-sq').value=rec?.targetSquad||prefill.targetSquad||'';
+  document.getElementById('scout-status').value=rec?.status||'interesse';
+  document.getElementById('scout-notes').value=rec?.notes||'';
+  const interest=rec?.interest||prefill.interest||3;
+  document.getElementById('scout-interest').value=interest;
+  document.getElementById('scout-game-ref').value=rec?.gameRef||prefill.gameRef||'';
+  document.getElementById('scout-game-id').value=rec?.gameId||prefill.gameId||'';
+  document.getElementById('scout-game-date').value=rec?.gameDate||prefill.gameDate||'';
+  document.getElementById('scout-opponent').value=rec?.opponent||prefill.opponent||'';
+  // Stars
+  document.querySelectorAll('#scout-interest-stars [data-si]').forEach(s=>{
+    s.style.color=parseInt(s.dataset.si)<=interest?'#f59e0b':'#d1d5db';
+  });
+  document.getElementById('btn-scout-delete').style.display=rec?'':'none';
+  mo.classList.add('open');
+  document.getElementById('scout-name').focus();
+}
+
+function renderScouting(){
+  const allScouts=DB.getScoutedPlayers();
+  const filterStatus=document.getElementById('scout-filter-status').value;
+  const filterSq=document.getElementById('scout-filter-sq').value;
+  const filterPos=document.getElementById('scout-filter-pos').value;
+  const searchQ=(document.getElementById('scout-search').value||'').toLowerCase().trim();
+
+  const filtered=allScouts.filter(p=>{
+    if(filterStatus&&p.status!==filterStatus) return false;
+    if(filterSq&&p.targetSquad!==filterSq) return false;
+    if(filterPos&&p.position!==filterPos) return false;
+    if(searchQ&&!(p.name?.toLowerCase().includes(searchQ)||p.team?.toLowerCase().includes(searchQ))) return false;
+    return true;
+  }).sort((a,b)=>{
+    // Sort: not-discarded first, then by interest desc, then by name
+    const aDisc=a.status==='descartado'?1:0, bDisc=b.status==='descartado'?1:0;
+    if(aDisc!==bDisc) return aDisc-bDisc;
+    return (b.interest||0)-(a.interest||0)||(a.name||'').localeCompare(b.name||'');
+  });
+
+  const listEl=document.getElementById('scout-list');
+  if(!filtered.length){
+    listEl.innerHTML=`<div class="card" style="text-align:center;color:var(--muted);padding:40px;font-size:14px">${allScouts.length?'Nenhum atleta corresponde aos filtros.':'Ainda não há atletas sinalizados. Clica em <strong>+ Adicionar Atleta</strong> ou usa o botão <strong>🔭 Sinalizar</strong> dentro de um jogo.'}</div>`;
+    return;
+  }
+
+  // Group by targetSquad
+  const groups={eqa:[],sub23:[],sub19:[],'':[]} ;
+  filtered.forEach(p=>{ (groups[p.targetSquad||'']||groups['']).push(p); });
+  const sqMeta={eqa:{label:'⚫ Equipa A',color:'#444'},sub23:{label:'🔵 Sub-23',color:'var(--blue)'},sub19:{label:'🟡 Sub-19',color:'#b8860b'},'':{label:'Escalão não definido',color:'var(--muted)'}};
+
+  function starStr(n){ return [1,2,3,4,5].map(i=>i<=(n||0)?'★':'☆').join(''); }
+
+  function card(p){
+    const st=SCOUT_STATUS[p.status||'interesse']||SCOUT_STATUS.interesse;
+    const agePart=p.birthYear?`<span style="color:var(--muted);font-size:11px">${new Date().getFullYear()-p.birthYear} anos (${p.birthYear})</span>`:'';
+    const stars=`<span style="color:#f59e0b;font-size:13px;letter-spacing:1px">${starStr(p.interest)}</span>`;
+    const gameRef=p.gameRef?`<div style="font-size:10px;color:var(--muted);margin-top:2px">👁 ${p.gameRef}</div>`:'';
+    const notesEl=p.notes?`<div style="font-size:12px;color:var(--text);margin-top:6px;white-space:pre-wrap;border-top:1px solid var(--border);padding-top:6px">${p.notes.replace(/</g,'&lt;')}</div>`:'';
+    return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="flex-shrink:0;width:42px;height:42px;border-radius:50%;background:var(--bg);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--muted)">${p.position||'?'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:700;color:var(--text)">${p.name||'—'}</span>
+          ${p.team?`<span style="font-size:11px;color:var(--muted)">${p.team}</span>`:''}
+          <span style="margin-left:auto;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${st.bg};color:${st.color}">${st.label}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:3px;flex-wrap:wrap">
+          ${stars}
+          ${agePart}
+        </div>
+        ${gameRef}
+        ${notesEl}
+      </div>
+      <button onclick="openScoutModal('${p.id}')" style="flex-shrink:0;padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text)">✏️</button>
+    </div>`;
+  }
+
+  const sections=Object.entries(sqMeta).map(([sq,meta])=>{
+    const ps=groups[sq];
+    if(!ps?.length) return '';
+    return `<div class="card" style="margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:${meta.color};margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border)">${meta.label} <span style="font-weight:400;color:var(--muted);font-size:12px">(${ps.length})</span></div>
+      ${ps.map(card).join('')}
+    </div>`;
+  }).join('');
+
+  listEl.innerHTML=sections||'<div class="card" style="text-align:center;color:var(--muted);padding:32px">Sem resultados.</div>';
+
+  // Wire filters
+  ['scout-filter-status','scout-filter-sq','scout-filter-pos','scout-search'].forEach(id=>{
+    document.getElementById(id)?.addEventListener('input',renderScouting);
+    document.getElementById(id)?.addEventListener('change',renderScouting);
+  });
+}
+
+function _initScoutModal(){
+  const mo=document.getElementById('mo-scout');
+  if(!mo||mo._scoutBound) return;
+  mo._scoutBound=true;
+
+  // Star hover/click in modal
+  document.querySelectorAll('#scout-interest-stars [data-si]').forEach(star=>{
+    star.addEventListener('click',()=>{
+      const v=parseInt(star.dataset.si);
+      document.getElementById('scout-interest').value=v;
+      document.querySelectorAll('#scout-interest-stars [data-si]').forEach(s=>{ s.style.color=parseInt(s.dataset.si)<=v?'#f59e0b':'#d1d5db'; });
+    });
+    star.addEventListener('mouseenter',()=>{
+      const n=parseInt(star.dataset.si);
+      document.querySelectorAll('#scout-interest-stars [data-si]').forEach(s=>{ s.style.color=parseInt(s.dataset.si)<=n?'#fbbf24':'#d1d5db'; });
+    });
+    star.addEventListener('mouseleave',()=>{
+      const cur=parseInt(document.getElementById('scout-interest').value||0);
+      document.querySelectorAll('#scout-interest-stars [data-si]').forEach(s=>{ s.style.color=parseInt(s.dataset.si)<=cur?'#f59e0b':'#d1d5db'; });
+    });
+  });
+
+  document.getElementById('btn-scout-save').addEventListener('click',()=>{
+    const name=document.getElementById('scout-name').value.trim();
+    if(!name){ toast('❌ Nome obrigatório'); return; }
+    const data={
+      name,
+      position:document.getElementById('scout-pos').value,
+      team:document.getElementById('scout-team').value.trim(),
+      birthYear:parseInt(document.getElementById('scout-birth').value)||null,
+      targetSquad:document.getElementById('scout-sq').value,
+      status:document.getElementById('scout-status').value,
+      interest:parseInt(document.getElementById('scout-interest').value)||3,
+      notes:document.getElementById('scout-notes').value.trim(),
+      gameRef:document.getElementById('scout-game-ref').value,
+      gameId:document.getElementById('scout-game-id').value,
+      gameDate:document.getElementById('scout-game-date').value,
+      opponent:document.getElementById('scout-opponent').value,
+      addedBy:currentUser()?.user||'',
+    };
+    const id=document.getElementById('scout-id').value;
+    if(id){ DB.updateScoutedPlayer(id,data); toast('✅ Atleta atualizado.'); }
+    else{ DB.addScoutedPlayer(data); toast('✅ Atleta adicionado à prospeção.'); }
+    mo.classList.remove('open');
+    if(view==='scouting') renderScouting();
+  });
+
+  document.getElementById('btn-scout-delete').addEventListener('click',()=>{
+    const id=document.getElementById('scout-id').value; if(!id) return;
+    const name=document.getElementById('scout-name').value;
+    if(!confirm(`Eliminar "${name}" da base de prospeção?`)) return;
+    DB.deleteScoutedPlayer(id); toast('✅ Atleta removido.');
+    mo.classList.remove('open');
+    if(view==='scouting') renderScouting();
+  });
+
+}
+// Wire 'add scout' button once (it lives in the static view HTML)
+(function(){
+  const btn=document.getElementById('btn-add-scout');
+  if(btn) btn.addEventListener('click',()=>openScoutModal());
+})();
+
 function renderHelp(){
   const u=currentUser();
   const role=u?.role||'';
@@ -13882,12 +14222,14 @@ function applyRoleUI(){
   const nlWeeklyPlan=document.getElementById('nl-weekly-plan');
   const monSection=[document.getElementById('nsl-monitoring'),document.getElementById('nl-monitoring'),document.getElementById('nl-pse-link'),document.getElementById('nl-wellness-link')];
   const nlBilhetes=document.getElementById('nl-bilhetes');
+  const nlScouting=document.getElementById('nl-scouting');
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
+    if(nlScouting) nlScouting.style.display='';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     monSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
@@ -13903,6 +14245,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
+    if(nlScouting) nlScouting.style.display='none';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     // Staff vê monitoring mas não os links de partilha
     document.getElementById('nsl-monitoring').style.display='';
@@ -13923,6 +14266,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='none';
+    if(nlScouting) nlScouting.style.display='none';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     // Médicos veem monitoring (importante para saúde) mas não os links
     document.getElementById('nsl-monitoring').style.display='';
@@ -13939,6 +14283,7 @@ function applyRoleUI(){
   } else if(u.role==='teammanager'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
+    if(nlScouting) nlScouting.style.display='none';
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
@@ -13960,6 +14305,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
+    if(nlScouting) nlScouting.style.display='';
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
@@ -13978,6 +14324,7 @@ function initCoordApp(){
   setupPhotoZone('pf-photo-circle','pf-photo-input','pf-photo-initials',null);
   setupPhotoZone('sp-photo-circle','sp-photo-input','sp-photo-initials',null);
   applyRoleUI();
+  _initScoutModal();
   // Arrancar imediatamente com o que estiver em localStorage.
   // Os listeners Firestore correm em background e re-renderizam a UI quando chegam dados.
   // Assim não há espera de rede no login — independentemente da velocidade do device.
@@ -14114,6 +14461,7 @@ function initCoordApp(){
     const bgSyncs=[DB.syncStaffProfilesFromFirestore(), DB.syncAthleteDocsFromFirestore()];
     if(canSeeClinical()) bgSyncs.push(DB.syncClinicalFromFirestore());
     if(isAdmin()||isStaff()||currentUser()?.role==='coach') bgSyncs.push(DB.syncTrialFromFirestore());
+    if(isAdmin()||currentUser()?.role==='coach') bgSyncs.push(DB.syncScoutedFromFirestore());
     Promise.race([Promise.all(bgSyncs),new Promise(r=>setTimeout(r,8000))]).catch(()=>{});
 
     if(isAdmin()){
