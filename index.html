@@ -2042,7 +2042,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <option value="fisio">Fisioterapeuta</option>
           <option value="enfermeiro">Enfermeiro</option>
           <option value="massagista">Massagista</option>
-          <option value="delegado">Delegado</option>
+          <option value="delegado">1º Delegado</option>
+          <option value="delegado2">2º Delegado</option>
           <option value="teammanager">Team Manager</option>
           <option value="outro">Outro</option>
         </select>
@@ -5309,7 +5310,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 })();
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
-const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',analista:'Treinador Analista',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',outro:'Outro'};
+const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',analista:'Treinador Analista',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'1º Delegado',delegado2:'2º Delegado',teammanager:'Team Manager',outro:'Outro'};
 const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario'];
 // Funções dinâmicas — usam getAppUsers() (Firestore) em vez do USERS estático vazio
 function getStaffAccounts(){ return getAppUsers().filter(u=>u.role==='staff'||u.role==='medical'); }
@@ -10369,7 +10370,7 @@ function generateConvocatoriaPDF(evId){
   if(!convocados.length){ toast('⚠️ Sem atletas na convocatória.'); return; }
 
   // ── Staff para o PDF ──────────────────────────────────────────────────────
-  const PDF_ROLE_GROUP={headcoach:0,adjunto:1,estagiario:1,grcoach:1,analista:1,condicionamento:1,delegado:2,teammanager:2,fisio:3,enfermeiro:3,massagista:3,medical:3};
+  const PDF_ROLE_GROUP={headcoach:0,adjunto:1,estagiario:1,grcoach:1,analista:1,condicionamento:1,delegado:2,delegado2:3,teammanager:4,fisio:5,enfermeiro:5,massagista:5,medical:5};
   const gmSqPdf=ev.squad==='both'?null:ev.squad;
   const convStaffPdf=conv.staff||{};
   const convExtraPdf=conv.staffExtra||[];
@@ -10383,7 +10384,12 @@ function generateConvocatoriaPDF(evId){
       const defaultLabel=STAFF_ROLES_LABEL[roleKey]||roleKey||u.role||'—';
       return {name:p.name||u.user,roleLabel:convStaffPdf[u.user]?.role||defaultLabel,roleKey,isExtra:false};
     })
-    .sort((a,b)=>(PDF_ROLE_GROUP[a.roleKey]??9)-(PDF_ROLE_GROUP[b.roleKey]??9));
+    .sort((a,b)=>{
+      const ga=PDF_ROLE_GROUP[a.roleKey]??9, gb=PDF_ROLE_GROUP[b.roleKey]??9;
+      if(ga!==gb) return ga-gb;
+      // Dentro do mesmo grupo: ordenar pelo label para "1º ..." antes de "2º ..."
+      return (a.roleLabel||'').localeCompare(b.roleLabel||'','pt',{numeric:true});
+    });
   const allStaffPdf=[...goingStaffPdf,...convExtraPdf.map(es=>({name:es.name,roleLabel:es.role||'—',roleKey:null,isExtra:true}))];
 
   const isHome=ev.homeAway!=='away';
@@ -13824,7 +13830,8 @@ async function openAccountsModal(){
           <option value="fisio">Fisioterapeuta</option>
           <option value="enfermeiro">Enfermeiro</option>
           <option value="massagista">Massagista</option>
-          <option value="delegado">Delegado</option>
+          <option value="delegado">1º Delegado</option>
+          <option value="delegado2">2º Delegado</option>
           <option value="teammanager">Team Manager</option>
           <option value="outro">Outro</option>
         </select>
