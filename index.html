@@ -735,6 +735,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div id="d-admin-content">
       <div id="d-admin-cols"></div>
       <div id="d-perf-admin" style="margin-bottom:16px"></div>
+      <div id="d-moments-admin" style="margin-bottom:16px"></div>
       <!-- Staff dashboard viewer -->
       <div id="d-admin-staff-picker" style="margin-bottom:16px"></div>
       <div id="d-admin-staff-view" style="display:none;margin-bottom:16px"></div>
@@ -757,6 +758,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div id="d-coach-content" style="display:none">
       <div class="sg" id="d-coach-stats"></div>
       <div id="d-perf-coach" style="margin-bottom:14px"></div>
+      <div id="d-moments-coach" style="margin-bottom:14px"></div>
       <div id="d-staff-load"></div>
       <div class="g2col">
         <div class="card">
@@ -3778,6 +3780,99 @@ function abbrevCompName(name){
 }
 
 // squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
+function buildTeamMomentsHTML(squads, events, today){
+  // Five weeks ago
+  const fiveWeeksAgo=new Date(today);
+  fiveWeeksAgo.setDate(fiveWeeksAgo.getDate()-35);
+  const fiveWeeksStr=fiveWeeksAgo.toISOString().slice(0,10);
+
+  function starBar(val){
+    if(!val) return '<span style="color:var(--muted);font-size:12px">—</span>';
+    const filled='<span style="color:#f59e0b;font-size:13px">★</span>';
+    const empty='<span style="color:#d1d5db;font-size:13px">★</span>';
+    return [1,2,3,4,5].map(n=>val>=n?filled:empty).join('');
+  }
+
+  const blocks=squads.map(({cs,label,color,icon})=>{
+    const sqGames=events.filter(e=>e.type==='game'&&e.squad===cs&&e.date<today)
+      .sort((a,b)=>b.date.localeCompare(a.date));
+    const withEval=sqGames.filter(g=>{
+      const te=g.matchReport?.teamEval;
+      return te&&TEAM_MOMENTS.some(m=>te[m.key]>0);
+    });
+    if(!withEval.length) return '';
+
+    // Season averages
+    const avgRow=TEAM_MOMENTS.map(m=>{
+      const vals=withEval.map(g=>g.matchReport.teamEval[m.key]).filter(v=>v>0);
+      const avg=vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
+      return {m,avg};
+    });
+
+    // Last 5 weeks games
+    const recentGames=sqGames.filter(g=>{
+      const te=g.matchReport?.teamEval;
+      return te&&TEAM_MOMENTS.some(m=>te[m.key]>0)&&g.date>=fiveWeeksStr;
+    }).slice(0,8);
+
+    const avgSection=`
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Média da Época</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+          ${avgRow.map(({m,avg})=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:11px;color:var(--text)">${m.label}</span>
+              <span style="display:flex;align-items:center;gap:4px">
+                ${avg?starBar(Math.round(avg)):'<span style="color:var(--muted);font-size:11px">—</span>'}
+                ${avg?`<span style="font-size:10px;color:var(--muted);min-width:22px;text-align:right">${avg.toFixed(1)}</span>`:''}
+              </span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+    const recentSection=recentGames.length===0?'':`
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">Últimas 5 Semanas</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:380px">
+            <thead>
+              <tr style="border-bottom:1.5px solid var(--border)">
+                <th style="text-align:left;padding:4px 6px 4px 0;color:var(--muted);font-weight:700;white-space:nowrap">Jogo</th>
+                ${TEAM_MOMENTS.map(m=>`<th style="text-align:center;padding:4px 3px;color:var(--muted);font-weight:700;white-space:nowrap;font-size:9px;max-width:52px">${m.label.replace(' ',' ')}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${recentGames.map(g=>{
+                const te=g.matchReport?.teamEval||{};
+                const d=new Date(g.date+'T00:00:00');
+                const opp=g.opponent||'—';
+                return `<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:5px 8px 5px 0;white-space:nowrap">
+                    <div style="font-size:11px;font-weight:600;color:var(--text)">${d.getDate()}/${d.getMonth()+1}</div>
+                    <div style="font-size:10px;color:var(--muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${opp}</div>
+                  </td>
+                  ${TEAM_MOMENTS.map(m=>`<td style="text-align:center;padding:5px 3px">
+                    ${te[m.key]?`<span style="font-size:10px;font-weight:700;color:#f59e0b">${te[m.key]}★</span>`:'<span style="color:#d1d5db;font-size:10px">—</span>'}
+                  </td>`).join('')}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    return `<div class="card">
+      <div style="font-size:13px;font-weight:700;color:${color};margin-bottom:12px">${icon} ${label} — Momentos de Jogo</div>
+      ${avgSection}
+      ${recentSection}
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if(!blocks) return '';
+  return `<div style="display:flex;flex-direction:column;gap:14px">${blocks}</div>`;
+}
+
+// squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
 function buildSquadPerfHTML(squads, events, today){
   const SQ_COLOR={eqa:'#444',sub23:'var(--blue)',sub19:'#b8860b'};
   const SQ_ICON={eqa:'⚫',sub23:'🔵',sub19:'🟡'};
@@ -3880,6 +3975,8 @@ function renderDash(){
     const sqColor=cs==='eqa'?'#444':cs==='sub23'?'var(--blue)':'#b8860b';
     const perfCoachEl=document.getElementById('d-perf-coach');
     if(perfCoachEl) perfCoachEl.innerHTML=buildSquadPerfHTML([{cs,label:SQUADS[cs],color:sqColor,icon:sqIcon}],es,today);
+    const momCoachEl=document.getElementById('d-moments-coach');
+    if(momCoachEl) momCoachEl.innerHTML=buildTeamMomentsHTML([{cs,label:SQUADS[cs],color:sqColor,icon:sqIcon}],es,today);
     return;
   }
 
@@ -3997,6 +4094,11 @@ function renderDash(){
   if(perfAdminEl){
     const allSquads=ADMIN_SQUADS.map(({cs,icon,color})=>({cs,label:SQUADS[cs],color,icon}));
     perfAdminEl.innerHTML=buildSquadPerfHTML(allSquads,es,today);
+  }
+  const momAdminEl=document.getElementById('d-moments-admin');
+  if(momAdminEl){
+    const allSquads=ADMIN_SQUADS.map(({cs,icon,color})=>({cs,label:SQUADS[cs],color,icon}));
+    momAdminEl.innerHTML=buildTeamMomentsHTML(allSquads,es,today);
   }
 
   // ── Staff dashboard picker ────────────────────────────────────────────────
@@ -9016,6 +9118,16 @@ function renderGame(){
   }
 }
 
+// ── TEAM MOMENTS EVALUATION ──────────────────────────────────────────────────
+const TEAM_MOMENTS=[
+  {key:'offOrg',     label:'Organização Ofensiva'},
+  {key:'defOrg',     label:'Organização Defensiva'},
+  {key:'defTrans',   label:'Transição Defensiva'},
+  {key:'offTrans',   label:'Transição Ofensiva'},
+  {key:'setPieceOff',label:'Bolas Paradas Ofensivas'},
+  {key:'setPieceDef',label:'Bolas Paradas Defensivas'},
+];
+
 // ── GR ANALYSIS TAB ───────────────────────────────────────────────────────────
 const GR_ACTIONS={
   def:[
@@ -10402,6 +10514,21 @@ function renderGamePos(ev,sqPlayers,conv,mr){
           <div id="me-list">${evTimeline||'<p style="color:var(--muted);font-size:13px;text-align:center;padding:18px 0">Sem eventos registados.</p>'}</div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🎯 Momentos de Jogo</h3>
+        ${TEAM_MOMENTS.map(m=>{
+          const val=(mr.teamEval||{})[m.key]||0;
+          const stars=[1,2,3,4,5].map(n=>`<span data-star="${n}" style="font-size:22px;cursor:pointer;color:${val>=n?'#f59e0b':'#d1d5db'};user-select:none;line-height:1;transition:color .1s">★</span>`).join('');
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="flex:1;font-size:13px;font-weight:600">${m.label}</span>
+            <div class="star-row" data-moment="${m.key}" style="display:flex;gap:2px">${stars}</div>
+          </div>`;
+        }).join('')}
+        <div style="margin-top:12px">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Comentário</label>
+          <textarea id="team-eval-comment" rows="2" placeholder="Observações gerais sobre o jogo..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;background:var(--bg);color:var(--text)">${(mr.teamEval?.comment||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+      </div>
       <div class="card">
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">⭐ Avaliação${playedIds.size===0&&convocados.length>0?' <span style="font-weight:400;font-size:10px;text-transform:none">(define titulares para filtrar)</span>':''}</h3>
         ${toRate.length===0?'<p style="color:var(--muted);font-size:13px">Sem atletas convocados.</p>':ratingRows}
@@ -10545,6 +10672,45 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       if(obsContainer) obsContainer.innerHTML=newObsCards||'<p style="color:var(--muted);font-size:13px">Sem observações registadas.</p>';
       btnSaveObs.textContent='✅ Guardado';
       setTimeout(()=>{ if(document.getElementById('btn-save-staffobs')) document.getElementById('btn-save-staffobs').textContent='Guardar Observação'; },2000);
+    });
+  }
+
+  // ── Team moments star ratings ─────────────────────────────────────────────
+  document.querySelectorAll('.star-row').forEach(row=>{
+    const momentKey=row.dataset.moment;
+    row.querySelectorAll('[data-star]').forEach(star=>{
+      star.addEventListener('click',()=>{
+        const newVal=parseInt(star.dataset.star);
+        const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+        curMr.teamEval=curMr.teamEval||{};
+        // Click same value again → clear
+        curMr.teamEval[momentKey]=curMr.teamEval[momentKey]===newVal?0:newVal;
+        DB.updateEvent(gameEventId,{matchReport:curMr});
+        const cur=curMr.teamEval[momentKey];
+        row.querySelectorAll('[data-star]').forEach(s=>{
+          s.style.color=cur>=parseInt(s.dataset.star)?'#f59e0b':'#d1d5db';
+        });
+      });
+      star.addEventListener('mouseenter',()=>{
+        const n=parseInt(star.dataset.star);
+        row.querySelectorAll('[data-star]').forEach(s=>{ s.style.color=parseInt(s.dataset.star)<=n?'#fbbf24':'#d1d5db'; });
+      });
+      star.addEventListener('mouseleave',()=>{
+        const cur=parseInt(row.dataset.val||0);
+        row.querySelectorAll('[data-star]').forEach(s=>{ s.style.color=parseInt(s.dataset.star)<=cur?'#f59e0b':'#d1d5db'; });
+      });
+    });
+    // Store current value for mouseleave
+    const curVal=(mr.teamEval||{})[momentKey]||0;
+    row.dataset.val=curVal;
+  });
+  const teamEvalCommentEl=document.getElementById('team-eval-comment');
+  if(teamEvalCommentEl){
+    teamEvalCommentEl.addEventListener('change',()=>{
+      const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
+      curMr.teamEval=curMr.teamEval||{};
+      curMr.teamEval.comment=teamEvalCommentEl.value;
+      DB.updateEvent(gameEventId,{matchReport:curMr});
     });
   }
 
