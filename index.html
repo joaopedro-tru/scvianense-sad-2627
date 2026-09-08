@@ -4439,15 +4439,17 @@ function renderPlayer(){
   const pSquads=playerSquads(p);
   const primarySq=pSquads[0]||squad;
   // typeFilter: null=todos, 'official'=liga+taça, 'friendly'=preparação
+  const todayStr=new Date().toISOString().slice(0,10);
   function computeSquadStats(sq, typeFilter=null){
     let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0;
     const ratings=[];
     allEvs.filter(ev=>!sq||ev.squad===sq).forEach(ev=>{
       if(ev.type==='training'){
-        if(typeFilter) return; // treinos não têm tipo de jogo
+        if(typeFilter) return;
         if(sq&&ev.squad!==sq) return;
         const s=effectiveAtt(ev.attendance||{},pid,ev.date); if(s===true||s==='condicionado') trainAttended++;
       } else if(ev.type==='game'){
+        if(ev.date>todayStr) return; // ignorar jogos futuros
         if(sq&&ev.squad!==sq) return;
         if(typeFilter){
           const gt=getGameType(ev);
@@ -4459,19 +4461,23 @@ function renderPlayer(){
         if(conv) gamesConv++;
         const mr=ev.matchReport||{};
         const evList=mr.events||[];
-        const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
+        const isStarter=(mr.lineup||[]).includes(pid);
         const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
-        if(hasRating||subbedIn) gamesPlayed++;
+        if(isStarter||subbedIn) gamesPlayed++;
         evList.forEach(e=>{
           if(e.type==='goal'&&e.playerId===pid) goals++;
           if(e.type==='goal'&&e.assistId===pid) assists++;
           if((e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid) yellows++;
           if((e.type==='red'||e.type==='yellow2')&&e.playerId===pid) reds++;
         });
-        if(hasRating) ratings.push(parseFloat(mr.ratings[pid]));
+        // mr.ratings[pid] pode ser objeto {rating,comment} ou número (formato legado)
+        const rObj=mr.ratings?.[pid];
+        const rVal=rObj!=null?(typeof rObj==='object'?rObj.rating:rObj):undefined;
+        if(rVal!=null&&rVal!=='') ratings.push(parseFloat(rVal));
       }
     });
-    const avgRating=ratings.length?(ratings.reduce((s,v)=>s+v,0)/ratings.length).toFixed(1):null;
+    const validRatings=ratings.filter(v=>!isNaN(v));
+    const avgRating=validRatings.length?(validRatings.reduce((s,v)=>s+v,0)/validRatings.length).toFixed(1):null;
     return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
   }
   // Escalão seleccionado para as stats (inicializa com o principal)
@@ -4513,7 +4519,7 @@ function renderPlayer(){
 
   // ── Build Stats tab content ───────────────────────────────────────────────
   const gameRecords = [];
-  allEvs.filter(ev=>ev.type==='game').sort((a,b)=>b.date.localeCompare(a.date)).forEach(ev=>{
+  allEvs.filter(ev=>ev.type==='game'&&ev.date<=todayStr).sort((a,b)=>b.date.localeCompare(a.date)).forEach(ev=>{
     const conv=!!(ev.convocatoria?.players?.[pid]);
     const mr=ev.matchReport||{};
     const evList=mr.events||[];
@@ -4522,8 +4528,11 @@ function renderPlayer(){
     const subOutEv=evList.find(e=>e.type==='sub'&&e.playerOutId===pid);
     const subbedIn=!!subInEv;
     const played=isStarter||subbedIn;
-    const hasRating=mr.ratings&&mr.ratings[pid]!==undefined;
-    const rating=hasRating?parseFloat(mr.ratings[pid]):null;
+    // mr.ratings[pid] pode ser objeto {rating,comment} ou número (formato legado)
+    const rObj=mr.ratings?.[pid];
+    const rVal=rObj!=null?(typeof rObj==='object'?rObj.rating:rObj):undefined;
+    const hasRating=rVal!=null&&rVal!=='';
+    const rating=hasRating?parseFloat(rVal):null;
     const goalEvs=evList.filter(e=>e.type==='goal'&&e.playerId===pid);
     const assistEvs=evList.filter(e=>e.type==='goal'&&e.assistId===pid);
     const yellowEvs=evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId===pid);
