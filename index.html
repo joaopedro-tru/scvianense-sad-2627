@@ -1535,6 +1535,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-d btn-sm" id="btn-del-game">🗑️</button>
+        <button class="btn btn-o btn-sm" id="btn-clear-game-data" style="display:none" title="Limpar todos os dados do jogo (matchReport)">🧹</button>
         <button class="btn btn-o btn-sm" id="btn-edit-game">✏️ Editar</button>
       </div>
     </div>
@@ -10035,12 +10036,13 @@ function renderGameCoord(ev, sqPlayers, conv, mr){
   const savedAt=report.savedAt?new Date(report.savedAt).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   const ratingOpts=[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${report.coachEval?.rating==n?' selected':''}>${n}</option>`).join('');
 
-  // Convocados para avaliação individual — mesma ordem da vista do treinador
+  // Convocados para avaliação individual — mesma lógica de renderGamePos
   const convPlayers=(conv?.players)||{};
-  const convocados=sortByPos((sqPlayers||[]).filter(p=>convPlayers[p.id]));
+  const convocados=sortByPos(DB.players().filter(p=>!!convPlayers[p.id]));
   const lineup=mr.lineup||[];
   const subsIn=(mr.events||[]).filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId);
   const playedIds=new Set([...lineup,...subsIn]);
+  // Titulares por posição, depois suplentes utilizados por posição
   const titulares=convocados.filter(p=>lineup.includes(p.id));
   const subsUsed=convocados.filter(p=>!lineup.includes(p.id)&&subsIn.includes(p.id));
   const toEval=playedIds.size>0?[...titulares,...subsUsed]:convocados;
@@ -10180,10 +10182,11 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     if(!icon) return '';
     return `<div class="mev"><span class="mev-min">${fmtEvMin(e.minute)}</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
   }).join('');
-  // Ratings: players who were on the field (lineup + subs in); fallback to all convocados
+  // Ratings: titulares por posição → suplentes utilizados por posição; fallback a todos os convocados
   const subsIn=(mr.events||[]).filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId);
   const playedIds=new Set([...lineup,...subsIn]);
-  const toRate=convocados.filter(p=>playedIds.size>0?playedIds.has(p.id):true);
+  const subsUsedPos=convocados.filter(p=>!lineup.includes(p.id)&&subsIn.includes(p.id));
+  const toRate=playedIds.size>0?[...titulares,...subsUsedPos]:convocados;
   const ratings=mr.ratings||{};
   const ratingRows=toRate.map(p=>{
     const r=ratings[p.id]||{};
@@ -10719,6 +10722,16 @@ document.getElementById('btn-del-game').addEventListener('click',()=>{
   if(!confirm(`Eliminar jogo vs ${ev.opponent||'—'}?`))return;
   const delSquad=ev.squad&&ev.squad!=='both'?ev.squad:squad;
   DB.deleteEvent(gameEventId); toast('Jogo eliminado.'); nav('sq-games',{squad:delSquad});
+});
+// Mostrar botão limpar dados apenas para admins
+if(isAdmin()) document.getElementById('btn-clear-game-data').style.display='';
+document.getElementById('btn-clear-game-data').addEventListener('click',()=>{
+  const ev=DB.getEvent(gameEventId); if(!ev)return;
+  if(!confirm(`⚠️ Limpar TODOS os dados do jogo vs ${ev.opponent||'—'} (${fmtDate(ev.date)})?\n\nIsto apaga: resultado, eventos, convocatória, avaliações, relatórios e clock.\nO jogo em si (data, adversário, equipa) mantém-se.\n\nEsta ação não pode ser desfeita.`))return;
+  DB.updateEvent(gameEventId,{matchReport:{events:[]},convocatoria:{players:{}}});
+  gameTab='pre';
+  toast('✅ Dados do jogo limpos.');
+  renderGame();
 });
 document.getElementById('btn-edit-training').addEventListener('click',()=>openEventModal(DB.getEvent(trainingEventId)));
 document.getElementById('btn-back-game').addEventListener('click',()=>navBack());
