@@ -698,6 +698,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
     <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
     <hr class="nd">
+    <div class="nsl" id="nsl-scouting">Prospeção</div>
     <div class="nl" id="nl-scouting" data-view="scouting"><span class="ic">🔭</span> Prospeção</div>
     <hr class="nd">
     <div class="nsl" id="nsl-myprofile">O Meu Perfil</div>
@@ -1865,7 +1866,11 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <div class="fg">
           <label>Interesse (1–5)</label>
           <div id="scout-interest-stars" style="display:flex;gap:4px;margin-top:6px">
-            ${[1,2,3,4,5].map(n=>`<span data-si="${n}" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>`).join('')}
+            <span data-si="1" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>
+            <span data-si="2" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>
+            <span data-si="3" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>
+            <span data-si="4" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>
+            <span data-si="5" style="font-size:24px;cursor:pointer;color:#d1d5db;user-select:none">★</span>
           </div>
           <input type="hidden" id="scout-interest" value="3">
         </div>
@@ -14223,13 +14228,15 @@ function applyRoleUI(){
   const monSection=[document.getElementById('nsl-monitoring'),document.getElementById('nl-monitoring'),document.getElementById('nl-pse-link'),document.getElementById('nl-wellness-link')];
   const nlBilhetes=document.getElementById('nl-bilhetes');
   const nlScouting=document.getElementById('nl-scouting');
+  const nslScouting=document.getElementById('nsl-scouting');
+  function showScouting(show){ [nlScouting,nslScouting].forEach(el=>el&&(el.style.display=show?'':'none')); }
 
   if(u.role==='coach'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
-    if(nlScouting) nlScouting.style.display='';
+    showScouting(true);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     monSection.forEach(el=>el&&(el.style.display=''));
     const allSquads=['eqa','sub19','sub23'];
@@ -14245,7 +14252,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
-    if(nlScouting) nlScouting.style.display='none';
+    showScouting(false);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     // Staff vê monitoring mas não os links de partilha
     document.getElementById('nsl-monitoring').style.display='';
@@ -14266,7 +14273,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='none';
-    if(nlScouting) nlScouting.style.display='none';
+    showScouting(false);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     // Médicos veem monitoring (importante para saúde) mas não os links
     document.getElementById('nsl-monitoring').style.display='';
@@ -14283,7 +14290,7 @@ function applyRoleUI(){
   } else if(u.role==='teammanager'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
-    if(nlScouting) nlScouting.style.display='none';
+    showScouting(false);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
@@ -14305,7 +14312,7 @@ function applyRoleUI(){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
-    if(nlScouting) nlScouting.style.display='';
+    showScouting(true);
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
