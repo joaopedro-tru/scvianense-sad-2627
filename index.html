@@ -10380,7 +10380,8 @@ function generateConvocatoriaPDF(evId){
     .filter(u=>!!convStaffPdf[u.user]?.going)
     .map(u=>{
       const p=DB.getStaffProfile(u.user)||{};
-      const roleKey=userStaffRole(u);
+      // Preferir staffRole do perfil (fonte canónica) — app_users pode não ter este campo
+      const roleKey=p.staffRole||userStaffRole(u)||null;
       const defaultLabel=STAFF_ROLES_LABEL[roleKey]||roleKey||u.role||'—';
       return {name:p.name||u.user,roleLabel:convStaffPdf[u.user]?.role||defaultLabel,roleKey,isExtra:false};
     })
