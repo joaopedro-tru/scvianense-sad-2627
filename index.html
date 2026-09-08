@@ -8742,7 +8742,7 @@ function renderGame(){
   const clock=mr.matchClock||{phase:'pre'};
   const gameFinished=(clock.phase==='finished');
   // GR e Adjunto só ficam visíveis após o jogo terminar
-  if(!gameFinished && (gameTab==='gr'||gameTab==='adj')) gameTab='pre';
+  if(!gameFinished && (gameTab==='gr'||gameTab==='adj'||gameTab==='tm'||gameTab==='coord')) gameTab='pre';
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
@@ -8754,7 +8754,9 @@ function renderGame(){
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
       ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
-      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>`:''}
+      <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
+      ${(currentUser()?.role==='teammanager'||isAdmin())?`<button class="tab-btn${gameTab==='tm'?' tab-active':''}" data-tab="tm">📄 TM</button>`:''}
+      ${isAdmin()?`<button class="tab-btn${gameTab==='coord'?' tab-active':''}" data-tab="coord">🔍 Coord.</button>`:''}`:''}
     </div>
     <div id="gm-tab-content"></div>`;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
@@ -8786,6 +8788,8 @@ function renderGame(){
   else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
   else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
+  else if(gameTab==='tm') renderGameTM(ev,mr);
+  else if(gameTab==='coord') renderGameCoord(ev,mr);
   else renderGamePos(ev,sqPlayers,conv,mr);
 
   // Prefetch cross-squad convocados missing from local cache.
@@ -9786,6 +9790,112 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     });
     doc.save(`Relatorio_${opp.replace(/\s+/g,'_')}_${ev.date||'jogo'}.pdf`);
   });
+}
+
+// ── RELATÓRIO TM (upload PDF) ─────────────────────────────────────────────────
+function renderGameTM(ev, mr){
+  const cu=currentUser();
+  const canUpload=(cu?.role==='teammanager'||isAdmin());
+  const report=mr.tmReport||null;
+  const tc=document.getElementById('gm-tab-content');
+  tc.innerHTML=`
+    <div style="max-width:600px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:6px">📄 Relatório do Team Manager</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Relatório de logística e notas adicionais do jogo.</p>
+      ${report?`
+        <div style="padding:16px;background:#f0f7f4;border:1px solid #c3dfd2;border-radius:8px;margin-bottom:24px;display:flex;align-items:center;gap:14px">
+          <span style="font-size:28px;flex-shrink:0">📑</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${report.filename||'Relatório TM'}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">Enviado por <strong>${report.uploadedBy||'—'}</strong>${report.uploadedAt?' · '+new Date(report.uploadedAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'}):''}</div>
+          </div>
+          <a href="${report.url}" target="_blank" rel="noopener" class="btn btn-p btn-sm">Abrir</a>
+        </div>
+      `:`<div style="padding:14px 16px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;margin-bottom:24px;color:var(--muted);font-size:13px;text-align:center">Nenhum relatório submetido ainda.</div>`}
+      ${canUpload?`
+        <div>
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">${report?'Substituir PDF':'Submeter Relatório (PDF)'}</label>
+          <input type="file" id="tm-report-file" accept="application/pdf" style="display:block;margin-bottom:14px;font-size:13px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-p" id="btn-tm-upload" onclick="uploadTMReport('${ev.id}')">📤 Enviar PDF</button>
+            <span id="tm-upload-status" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+        </div>
+      `:''}
+    </div>`;
+}
+
+async function uploadTMReport(gameId){
+  const fileInput=document.getElementById('tm-report-file');
+  const file=fileInput?.files[0];
+  if(!file){ toast('Selecciona um ficheiro PDF primeiro.'); return; }
+  if(file.type!=='application/pdf'){ toast('Só são aceites ficheiros PDF.'); return; }
+  if(!storage){ toast('❌ Storage não disponível.'); return; }
+  const btn=document.getElementById('btn-tm-upload');
+  const status=document.getElementById('tm-upload-status');
+  if(btn) btn.disabled=true;
+  if(status) status.textContent='A enviar...';
+  try{
+    const url=await uploadFile(file,`tm_${gameId}`,'game_tm_reports');
+    const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.matchReport||{}));
+    curMr.tmReport={url,filename:file.name,uploadedBy:currentUser()?.user||'—',uploadedAt:new Date().toISOString()};
+    DB.updateEvent(gameId,{matchReport:curMr});
+    toast('✅ Relatório TM enviado com sucesso!');
+    renderGame();
+  }catch(e){
+    console.error('TM upload:',e);
+    if(status) status.textContent='❌ Erro ao enviar. Verifica as permissões do Storage.';
+    if(btn) btn.disabled=false;
+  }
+}
+
+// ── RELATÓRIO DE COORDENAÇÃO (admin) ─────────────────────────────────────────
+function renderGameCoord(ev, mr){
+  const report=mr.adminReport||{};
+  const tc=document.getElementById('gm-tab-content');
+  const savedAt=report.savedAt?new Date(report.savedAt).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  const ratingOpts=[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${report.coachEval?.rating==n?' selected':''}>${n}</option>`).join('');
+  tc.innerHTML=`
+    <div style="max-width:700px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:6px">🔍 Relatório de Coordenação</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:${savedAt?'6':'20'}px">Análise interna ao jogo e avaliação do treinador. Visível apenas a administradores.</p>
+      ${savedAt?`<p style="font-size:11px;color:var(--muted);margin-bottom:18px">Última actualização: ${savedAt} por <strong>${report.savedBy||'—'}</strong></p>`:''}
+      <div style="margin-bottom:20px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Análise ao Jogo</label>
+        <textarea id="coord-analysis" rows="9" placeholder="Observações gerais, contexto, resultado, momentos-chave..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.6">${(report.analysis||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div style="padding:18px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:22px">
+        <label style="font-size:13px;font-weight:700;display:block;margin-bottom:14px">Avaliação ao Trabalho do Treinador</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600;min-width:80px">Nota (1–10)</label>
+          <select id="coord-coach-rating" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;width:90px">
+            <option value="">—</option>
+            ${ratingOpts}
+          </select>
+        </div>
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Comentário</label>
+        <textarea id="coord-coach-comment" rows="4" placeholder="Pontos positivos, áreas a melhorar, notas adicionais..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5">${(report.coachEval?.text||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <button class="btn btn-p" id="btn-save-coord" onclick="saveCoordReport('${ev.id}')">💾 Guardar Relatório</button>
+    </div>`;
+}
+
+function saveCoordReport(gameId){
+  const analysis=(document.getElementById('coord-analysis')?.value||'').trim();
+  const ratingVal=document.getElementById('coord-coach-rating')?.value||'';
+  const coachComment=(document.getElementById('coord-coach-comment')?.value||'').trim();
+  const adminReport={
+    analysis,
+    coachEval:{rating:ratingVal?parseInt(ratingVal,10):null,text:coachComment},
+    savedBy:currentUser()?.user||'—',
+    savedAt:new Date().toISOString()
+  };
+  const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.matchReport||{}));
+  curMr.adminReport=adminReport;
+  DB.updateEvent(gameId,{matchReport:curMr});
+  const btn=document.getElementById('btn-save-coord');
+  if(btn){btn.textContent='✅ Guardado';setTimeout(()=>{const b=document.getElementById('btn-save-coord');if(b)b.textContent='💾 Guardar Relatório';},2000);}
+  toast('Relatório de coordenação guardado.');
 }
 
 function renderGamePos(ev,sqPlayers,conv,mr){
