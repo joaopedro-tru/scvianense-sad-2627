@@ -10035,12 +10035,18 @@ function renderGameCoord(ev, sqPlayers, conv, mr){
   const savedAt=report.savedAt?new Date(report.savedAt).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   const ratingOpts=[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${report.coachEval?.rating==n?' selected':''}>${n}</option>`).join('');
 
-  // Convocados para avaliação individual
+  // Convocados para avaliação individual — mesma ordem da vista do treinador
   const convPlayers=(conv?.players)||{};
-  const convocados=(sqPlayers||[]).filter(p=>convPlayers[p.id]);
+  const convocados=sortByPos((sqPlayers||[]).filter(p=>convPlayers[p.id]));
+  const lineup=mr.lineup||[];
+  const subsIn=(mr.events||[]).filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId);
+  const playedIds=new Set([...lineup,...subsIn]);
+  const titulares=convocados.filter(p=>lineup.includes(p.id));
+  const subsUsed=convocados.filter(p=>!lineup.includes(p.id)&&subsIn.includes(p.id));
+  const toEval=playedIds.size>0?[...titulares,...subsUsed]:convocados;
   const coachRatings=mr.ratings||{};
   const iStyle2='width:62px;padding:5px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;text-align:center;outline:none;font-family:inherit;background:var(--bg);color:var(--text)';
-  const playerRows=convocados.map(p=>{
+  const playerRows=toEval.map(p=>{
     const ce=playerEvals[p.id]||{};
     const cr=coachRatings[p.id];
     const coachR=cr?.rating!==undefined&&cr?.rating!==null&&cr?.rating!==''?parseFloat(cr.rating):null;
@@ -10077,7 +10083,7 @@ function renderGameCoord(ev, sqPlayers, conv, mr){
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Comentário</label>
         <textarea id="coord-coach-comment" rows="3" placeholder="Pontos positivos, áreas a melhorar, notas adicionais..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5;background:var(--bg);color:var(--text)">${(report.coachEval?.text||'').replace(/</g,'&lt;')}</textarea>
       </div>
-      ${convocados.length?`
+      ${toEval.length?`
       <div style="padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:22px">
         <label style="font-size:13px;font-weight:700;display:block;margin-bottom:4px">⭐ Avaliação Individual — Jogadores</label>
         <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Nota da coordenação por jogador (independente da dos treinadores).</p>
