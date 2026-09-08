@@ -14913,6 +14913,13 @@ document.addEventListener('DOMContentLoaded',()=>{
         if(data.error){
           errEl.textContent='Erro: '+data.error.message;
         } else {
+          // Criar userProfiles document com o UID retornado pela API
+          // para que resolveProfile encontre o utilizador imediatamente no login
+          const newUid=data.localId;
+          if(newUid && firestoreDb){
+            const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
+            await firestoreDb.collection('userProfiles').doc(newUid).set(profile).catch(()=>{});
+          }
           setupWrap.style.display='none';
           errEl.style.color='var(--ok)';
           errEl.textContent='✅ Conta criada! A entrar…';
