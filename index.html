@@ -1019,10 +1019,15 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         </div>
         <div id="sf-account-info" style="display:none;background:#f0f4ff;border:1px solid #c7d4f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
           <span id="sf-account-role" style="font-weight:600"></span> · <span id="sf-account-squad" style="color:var(--muted)"></span>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">Email de acesso: <strong id="sf-account-email"></strong></div>
         </div>
 
         <div id="sf-fields" style="display:none">
+          <div class="fst">Acesso à App</div>
+          <div class="fg">
+            <label>Email *</label>
+            <input type="email" id="sf-email" required placeholder="o.teu@email.com" autocomplete="email">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Será o email com que fazes login na app. Usa um email pessoal ao qual tens acesso.</div>
+          </div>
           <div class="fst">Dados Pessoais</div>
           <!-- Photo -->
           <div class="fg" style="margin-bottom:16px">
@@ -5182,15 +5187,18 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     const info=document.getElementById('sf-account-info');
     const fields=document.getElementById('sf-fields');
     const alreadyBanner=document.getElementById('sf-already');
-    if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; return; }
+    const errEl=document.getElementById('sf-err');
+    if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; if(errEl) errEl.textContent=''; return; }
     const role=userRole(u);
     document.getElementById('sf-account-role').textContent=ROLE_LABEL[role]||role||u.role;
     document.getElementById('sf-account-squad').textContent=SQUAD_LABEL[u.squad]||'—';
-    document.getElementById('sf-account-email').textContent=u.email||'—';
     info.style.display='';
-    // Profile was already filtered out of dropdown, so if selected it's pending
     alreadyBanner.style.display='none';
+    if(errEl) errEl.textContent='';
     fields.style.display='';
+    // Pre-fill email if already defined by admin; staff can change it
+    const emailField=document.getElementById('sf-email');
+    if(emailField && u.email) emailField.value=u.email;
     const licWrap=document.getElementById('sf-license-wrap');
     licWrap.style.display=['headcoach','adjunto','estagiario'].includes(role)?'':'none';
     document.getElementById('sf-photo-initials').textContent=u.user.slice(0,2).toUpperCase();
@@ -5211,16 +5219,19 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     if(pw.length<6){ errEl.textContent='A password deve ter pelo menos 6 caracteres.'; return; }
     if(pw!==pw2){ errEl.textContent='As passwords não coincidem.'; return; }
 
+    // Validar email introduzido pelo utilizador
+    const emailRaw=(document.getElementById('sf-email')?.value||'').trim().toLowerCase();
+    if(!emailRaw||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)){
+      errEl.textContent='Preenche um email válido.';
+      return;
+    }
     btn.disabled=true; btn.innerHTML='<span class="spin"></span> A criar…';
     try{
       if(!FB_READY||!FB_CONFIG.apiKey) throw new Error('Firebase não configurado.');
 
-      // Validar email antes de chamar a API
-      const emailToUse=(u.email||'').trim().toLowerCase();
-      if(!emailToUse||!emailToUse.includes('@'))
-        throw new Error(`Email não configurado para esta conta (${u.user}). Pede ao admin para definir o email em Gerir Contas.`);
+      const emailToUse=emailRaw;
 
-      // 1. Criar conta Firebase Auth com o email configurado pelo admin
+      // 1. Criar conta Firebase Auth com o email introduzido pelo utilizador
       const authRes=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email:emailToUse, password:pw, returnSecureToken:true})
@@ -5229,6 +5240,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
       console.log('accounts:signUp response:', JSON.stringify(authData?.error||'OK'));
       if(authData.error){
         if(authData.error.message==='EMAIL_EXISTS'){
+          errEl.textContent='Este email já tem conta criada. Se esqueceste a password, usa a opção "Esqueci a password" no login. Se o email estiver errado, corrige-o acima.';
           document.getElementById('sf-already').style.display='block';
           return;
         }
@@ -5240,6 +5252,15 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 
       // 2. Sign in para Firestore aceitar escritas autenticadas
       await firebaseAuth.signInWithEmailAndPassword(emailToUse, pw);
+
+      // 2b. Guardar email na app_users para o admin ver e para logins futuros
+      if(firestoreDb){
+        try{
+          await firestoreDb.collection('app_users').doc(u.user).update({email:emailToUse});
+          const arr=getAppUsers().map(x=>x.user===u.user?{...x,email:emailToUse}:x);
+          _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
+        }catch(saveErr){ console.warn('Email save to app_users failed:',saveErr); }
+      }
 
       // 3. Guardar foto se existir
       let photoUrl=null;
@@ -5262,7 +5283,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
         license:document.getElementById('sf-license').value||null,
         notes:document.getElementById('sf-notes').value.trim()||null,
         squad:u.squad||null, staffRole:role,
-        photoUrl, email:u.email,
+        photoUrl, email:emailToUse,
         createdAt:new Date().toISOString()
       };
       if(firestoreDb){
@@ -9254,10 +9275,35 @@ function renderGamePre(ev,sqPlayers,conv){
     </div>
     ${gmStaffRows}
     <p style="font-size:11px;color:var(--muted);margin-top:8px">Guarda com o botão ↓ depois de selecionar.</p>
+    <!-- Extra staff (substitutos) -->
+    ${(conv.staffExtra||[]).map((es,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:32px;height:32px;border-radius:50%;background:#607d8b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${spIni(es.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${es.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${es.role||'—'} <span style="background:#fef3cd;color:#856404;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;margin-left:3px">SUBST.</span></div>
+        </div>
+        <button onclick="removeExtraStaff(${i},'${gameEventId}')" title="Remover" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:4px;line-height:1">✕</button>
+      </div>`).join('')}
+    <div style="margin-top:10px">
+      <div id="extra-staff-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <input id="extra-staff-name" type="text" placeholder="Nome *" style="padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;font-family:inherit">
+          <input id="extra-staff-role" type="text" placeholder="Função (ex: Fisioterapeuta)" style="padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;font-family:inherit">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-p btn-sm" onclick="addExtraStaff('${gameEventId}')">✓ Adicionar</button>
+          <button class="btn btn-g btn-sm" onclick="document.getElementById('extra-staff-form').style.display='none'">Cancelar</button>
+        </div>
+      </div>
+      <button class="btn btn-o btn-sm" onclick="const f=document.getElementById('extra-staff-form');f.style.display=f.style.display==='none'?'block':'none'">+ Adicionar substituto</button>
+    </div>
   </div>`:'';
   // Staff que vai ao jogo — para mostrar na convocatória (coluna direita)
   const staffGoingList=gmStaffProfiles.filter(({u})=>!!convStaff[u.user]?.going);
-  const staffGoingHTML=staffGoingList.length?`
+  const staffExtraList=conv.staffExtra||[];
+  const hasAnyStaff=staffGoingList.length||staffExtraList.length;
+  const staffGoingHTML=hasAnyStaff?`
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">🧑‍💼 Equipa Técnica</div>
       ${staffGoingList.map(({u,p})=>{
@@ -9272,6 +9318,13 @@ function renderGamePre(ev,sqPlayers,conv){
           </div>
         </div>`;
       }).join('')}
+      ${staffExtraList.map(es=>`<div class="att-row" style="padding:6px 0">
+        <div class="av" style="width:34px;height:34px;font-size:11px;flex-shrink:0;background:#607d8b">${spIni(es.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${es.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${es.role||'—'} <span style="background:#fef3cd;color:#856404;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700">SUBST.</span></div>
+        </div>
+      </div>`).join('')}
     </div>`:'';
 
   // ── helpers ──────────────────────────────────────────────────────────────
@@ -12845,6 +12898,27 @@ function deleteStaffObs(usr){
     DB.updateEvent(gameEventId,{matchReport:curMr});
     renderGame();
   }
+}
+
+// ── EXTRA STAFF (substitutos) ─────────────────────────────────────────────────
+function addExtraStaff(gameId){
+  const name=(document.getElementById('extra-staff-name')?.value||'').trim();
+  const role=(document.getElementById('extra-staff-role')?.value||'').trim();
+  if(!name){ toast('Indica o nome do staff.'); return; }
+  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{players:{}}));
+  c.staffExtra=c.staffExtra||[];
+  c.staffExtra.push({name,role,id:uid()});
+  DB.updateEvent(gameId,{convocatoria:c});
+  renderGame();
+}
+
+function removeExtraStaff(idx,gameId){
+  if(!confirm('Remover este membro do staff?')) return;
+  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{players:{}}));
+  c.staffExtra=c.staffExtra||[];
+  c.staffExtra.splice(idx,1);
+  DB.updateEvent(gameId,{convocatoria:c});
+  renderGame();
 }
 
 // ── BILHETES ──────────────────────────────────────────────────────────────────
