@@ -6383,7 +6383,7 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=34, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
+  const C_DATE=40, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=30, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
   const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xTransp=xOpp+C_OPP, xLoc=xTransp+C_TRANSP;
 
   // Cabeçalho da tabela
