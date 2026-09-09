@@ -1151,16 +1151,24 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     </div>
     <!-- transport panel -->
     <div id="tm-panel-transp" style="display:none">
-      <div class="sf" style="align-items:center">
+      <div class="sf" style="align-items:center;flex-wrap:wrap;gap:10px">
         <select class="si" id="tm-transp-squad">
           <option value="">Todos os escalões</option>
           <option value="eqa">Equipa A</option>
           <option value="sub19">Sub-19</option>
           <option value="sub23">Sub-23</option>
         </select>
+        <div style="display:flex;gap:4px;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+          <button id="tm-transp-filter-away" onclick="setTranspFilter('away')"
+            style="padding:6px 14px;font-size:12px;font-weight:600;border:none;background:#b71c1c;color:#fff;cursor:pointer">✈️ Fora</button>
+          <button id="tm-transp-filter-home" onclick="setTranspFilter('home')"
+            style="padding:6px 14px;font-size:12px;font-weight:600;border:none;background:var(--bg);color:var(--muted);cursor:pointer">🏠 Casa</button>
+          <button id="tm-transp-filter-all" onclick="setTranspFilter('all')"
+            style="padding:6px 14px;font-size:12px;font-weight:600;border:none;background:var(--bg);color:var(--muted);cursor:pointer">Todos</button>
+        </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
           <input type="checkbox" id="tm-transp-show-past" style="width:15px;height:15px;cursor:pointer">
-          Mostrar jogos realizados
+          Mostrar realizados
         </label>
         <button class="btn btn-sm" style="background:#111;color:#fff;margin-left:auto" onclick="exportTransportPDF()">📄 Exportar PDF</button>
       </div>
@@ -1168,6 +1176,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <table id="tm-transp-table" style="width:100%;border-collapse:collapse;font-size:13px">
           <thead>
             <tr style="background:var(--bg)">
+              <th style="width:36px;border-bottom:1px solid var(--border)"></th>
               <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Data</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Adversário</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Escalão</th>
@@ -12940,7 +12949,7 @@ function renderTM(){
         // (athletes may have filled the public form after the last login sync)
         DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
       }
-      if(tab==='transp') renderTransportTab();
+      if(tab==='transp'){ setTranspFilter(_transpFilter); }
       if(tab==='fines') renderTMFines();
     };
   });
@@ -12969,6 +12978,25 @@ function renderTM(){
 
 // ── TRANSPORT TAB ──────────────────────────────────────────────────────────────
 const TRANSP_KEY='scv_transport_meta'; // localStorage: {[eventId]: {requested, approved, driver}}
+let _transpFilter='away'; // 'away' | 'home' | 'all'
+
+function setTranspFilter(val){
+  _transpFilter=val;
+  // update button styles
+  const styles={
+    away:{bg:'#b71c1c',color:'#fff'},
+    home:{bg:'#1b5e20',color:'#fff'},
+    all:{bg:'var(--primary)',color:'#fff'},
+  };
+  ['away','home','all'].forEach(k=>{
+    const btn=document.getElementById(`tm-transp-filter-${k}`);
+    if(!btn) return;
+    const active=k===val;
+    btn.style.background=active?styles[k].bg:'var(--bg)';
+    btn.style.color=active?styles[k].color:'var(--muted)';
+  });
+  renderTransportTab();
+}
 
 function getTransportMeta(){ return JSON.parse(localStorage.getItem(TRANSP_KEY)||'{}'); }
 function setTransportMeta(id, patch){
@@ -12986,10 +13014,15 @@ function renderTransportTab(){
   const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
   const today=new Date().toISOString().slice(0,10);
 
-  // Collect all games (home + away) for selected squads
+  // Collect games for selected squads, filtered by home/away
   const squads=sq?[sq]:['eqa','sub23','sub19'];
   let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
+    .filter(e=>{
+      if(_transpFilter==='away') return e.homeAway==='away';
+      if(_transpFilter==='home') return e.homeAway!=='away';
+      return true;
+    })
     .filter(e=>showPast||e.date>=today)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
 
@@ -13018,6 +13051,11 @@ function renderTransportTab(){
     const rowBg=i%2===0?'':'background:#f8faff';
     const haStyle=isAway?'background:#b71c1c;color:#fff':'background:#1b5e20;color:#fff';
     return `<tr style="border-bottom:1px solid var(--border);${rowBg}">
+      <td style="padding:6px 8px;text-align:center;width:36px">
+        <button class="transp-edit-btn" data-id="${ev.id}"
+          style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:13px;color:var(--muted)"
+          title="Editar jogo">✏️</button>
+      </td>
       <td style="padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap">${dateStr}</td>
       <td style="padding:10px;font-size:13px;font-weight:600">${ev.opponent||'—'}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${ev.location?ev.location+(ev.city?', '+ev.city:''):''}</span></td>
       <td style="padding:10px;text-align:center">
@@ -13046,6 +13084,14 @@ function renderTransportTab(){
       </td>
     </tr>`;
   }).join('');
+
+  // Edit handlers
+  body.querySelectorAll('.transp-edit-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      const ev=DB.getEvent(btn.dataset.id);
+      if(ev) openEventModal(ev);
+    };
+  });
 
   // Toggle handlers
   body.querySelectorAll('.transp-toggle').forEach(btn=>{
