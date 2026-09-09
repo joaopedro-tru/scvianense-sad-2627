@@ -1158,7 +1158,10 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <option value="sub19">Sub-19</option>
           <option value="sub23">Sub-23</option>
         </select>
-        <select class="si" id="tm-transp-month" style="max-width:160px"></select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="tm-transp-show-past" style="width:15px;height:15px;cursor:pointer">
+          Mostrar jogos realizados
+        </label>
         <button class="btn btn-sm" style="background:#111;color:#fff;margin-left:auto" onclick="exportTransportPDF()">📄 Exportar PDF</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
@@ -1177,7 +1180,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <tbody id="tm-transp-body"></tbody>
         </table>
       </div>
-      <p id="tm-transp-empty" style="display:none;text-align:center;color:var(--muted);padding:40px;font-size:14px">Sem jogos fora neste período.</p>
+      <p id="tm-transp-empty" style="display:none;text-align:center;color:var(--muted);padding:40px;font-size:14px">Sem jogos fora.</p>
     </div>
     <!-- fines panel -->
     <div id="tm-panel-fines" style="display:none">
@@ -12955,27 +12958,12 @@ function renderTM(){
 
   // Transport tab selectors
   const transpSquadSel=document.getElementById('tm-transp-squad');
-  const transpMonthSel=document.getElementById('tm-transp-month');
   if(u?.squad && u.role!=='admin'){
     transpSquadSel.value=u.squad;
     transpSquadSel.style.display='none';
   }
-  // Populate month selector: past 3 months + next 6
-  (()=>{
-    const now=new Date();
-    const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    transpMonthSel.innerHTML='';
-    for(let i=-3;i<=6;i++){
-      const d=new Date(now.getFullYear(),now.getMonth()+i,1);
-      const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const opt=document.createElement('option');
-      opt.value=val; opt.textContent=`${MN[d.getMonth()]} ${d.getFullYear()}`;
-      if(i===0) opt.selected=true;
-      transpMonthSel.appendChild(opt);
-    }
-  })();
   transpSquadSel.onchange=renderTransportTab;
-  transpMonthSel.onchange=renderTransportTab;
+  document.getElementById('tm-transp-show-past').onchange=renderTransportTab;
 }
 
 // ── TRANSPORT TAB ──────────────────────────────────────────────────────────────
@@ -12994,18 +12982,14 @@ function renderTransportTab(){
   if(!body) return;
 
   const sq=document.getElementById('tm-transp-squad')?.value||'';
-  const monthVal=document.getElementById('tm-transp-month')?.value||'';
-  const [year,month]=monthVal?monthVal.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
-  const mm=String(month).padStart(2,'0');
-  const from=`${year}-${mm}-01`;
-  const lastDay=new Date(year,month,0).getDate();
-  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+  const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
+  const today=new Date().toISOString().slice(0,10);
 
-  // Collect away games for selected squads in selected month
+  // Collect all away games for selected squads
   const squads=sq?[sq]:Object.keys(SQUADS);
   let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
-    .filter(e=>e.date>=from&&e.date<=to)
+    .filter(e=>showPast||e.date>=today)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
 
   if(!evs.length){
@@ -13075,17 +13059,13 @@ function renderTransportTab(){
 
 async function exportTransportPDF(){
   const sq=document.getElementById('tm-transp-squad')?.value||'';
-  const monthVal=document.getElementById('tm-transp-month')?.value||'';
-  const [year,month]=monthVal?monthVal.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
-  const mm=String(month).padStart(2,'0');
-  const from=`${year}-${mm}-01`;
-  const lastDay=new Date(year,month,0).getDate();
-  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+  const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
+  const today=new Date().toISOString().slice(0,10);
 
   const squads=sq?[sq]:Object.keys(SQUADS);
   let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
-    .filter(e=>e.date>=from&&e.date<=to)
+    .filter(e=>showPast||e.date>=today)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
 
   if(!evs.length){ toast('⚠️ Sem jogos fora neste período.'); return; }
@@ -13098,11 +13078,10 @@ async function exportTransportPDF(){
   });
   const {jsPDF}=window.jspdf;
 
-  const MONTHS_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const TRANSP_LABEL={van:'Carrinha 9 lugares',bus:'Mini-bus SCV / Autocarro'};
   const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'};
-  const monthLabel=`${MONTHS_PT[month-1]} ${year}`;
+  const seasonLabel=`Época ${new Date().getFullYear()}/${new Date().getFullYear()+1}`;
 
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const PW=297, PH=210, ML=15, MR=15, MT=15, MB=15;
@@ -13115,7 +13094,7 @@ async function exportTransportPDF(){
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text('SC Vianense SAD',ML+5,MT+7);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text(`Transporte – Jogos Fora · ${monthLabel}${sq?' · '+(sqLabel[sq]||sq):''}`,ML+5,MT+13);
+  doc.text(`Transporte – Jogos Fora · ${seasonLabel}${sq?' · '+(sqLabel[sq]||sq):''}`,ML+5,MT+13);
   doc.setFont('helvetica','normal'); doc.setFontSize(7);
   doc.setTextColor(180,200,230);
   doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
@@ -13212,7 +13191,7 @@ async function exportTransportPDF(){
   doc.text('SC Vianense SAD · Gestão Desportiva',ML,ry+7);
   doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
 
-  doc.save(`Transporte_${monthLabel.replace(/\s/g,'_')}.pdf`);
+  doc.save(`Transporte_Jogos_Fora.pdf`);
   toast('✅ PDF de transporte descarregado!');
 }
 
