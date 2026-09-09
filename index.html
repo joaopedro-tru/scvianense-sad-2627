@@ -1170,7 +1170,6 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <input type="checkbox" id="tm-transp-show-past" style="width:15px;height:15px;cursor:pointer">
           Mostrar realizados
         </label>
-        <button class="btn btn-sm" style="background:#111;color:#fff;margin-left:auto" onclick="exportTransportPDF()">📄 Exportar PDF</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <table id="tm-transp-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -1185,6 +1184,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Pedido</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Aprovado</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Condutor</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Observações</th>
             </tr>
           </thead>
           <tbody id="tm-transp-body"></tbody>
@@ -4647,15 +4647,15 @@ function buildPlayerClinicalCard(athleteId){
   const rows=recs.map(r=>{
     const ev=r.eventId?DB.getEvent(r.eventId):null;
     const evLabel=ev?`${ev.type==='game'?'Jogo vs '+ev.opponent:'Treino'} · `:'';
-    const isInjury=r.type==='injury';
+    const isInjury=CR_HAS_INJURY_FIELDS(r.type);
     const injExtra=isInjury?`
-      <div style="padding:8px 10px;background:${r.actualRecoveryDate?'#f1f8e9':'#fff3f3'};border-radius:6px;margin-top:6px;font-size:12px">
+      <div style="padding:8px 10px;background:${r.type==='minor_injury'?'#fff8e1':r.actualRecoveryDate?'#f1f8e9':'#fff3f3'};border-radius:6px;margin-top:6px;font-size:12px">
         ${r.diagnostico?`<div><span style="color:var(--muted)">Diagnóstico:</span> <strong>${r.diagnostico}</strong></div>`:''}
         ${r.treatment?`<div style="margin-top:2px"><span style="color:var(--muted)">Tratamento:</span> ${r.treatment}</div>`:''}
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+        ${r.type==='minor_injury'?`<div style="font-size:11px;color:#e65100;font-weight:600;margin-top:4px">⚠️ Em vigilância — apto para treinar</div>`:`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
           ${r.estimatedRecoveryDate?`<span><span style="color:var(--muted)">Prev.:</span> ${fmtDate(r.estimatedRecoveryDate)}</span>`:''}
           ${r.actualRecoveryDate?`<span style="color:#2e7d32;font-weight:600">✅ Recuperado em ${fmtDate(r.actualRecoveryDate)}</span>`:`<span style="color:#b71c1c;font-weight:600">🚨 A recuperar</span>`}
-        </div>
+        </div>`}
       </div>`:'';
     const editForm=canEdit&&isInjury?`
       <div id="pcr-edit-${r.id}" style="display:none;margin-top:8px;padding:10px;background:var(--bg);border:1.5px solid #1a56db;border-radius:8px">
@@ -7047,7 +7047,8 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
 
 // ── TRAINING VIEW ─────────────────────────────────────────────────────────────
 // ── CLINICAL RECORDS HELPERS ──────────────────────────────────────────────────
-const CR_TYPES={injury:'🩹 Lesão',treatment:'💊 Tratamento',assessment:'📋 Avaliação',illness:'🤒 Doença',prevention:'🛡️ Prevenção',other:'📝 Outro'};
+const CR_TYPES={injury:'🩹 Lesão',minor_injury:'⚠️ Lesão Ligeira',treatment:'💊 Tratamento',assessment:'📋 Avaliação',illness:'🤒 Doença',prevention:'🛡️ Prevenção',other:'📝 Outro'};
+const CR_HAS_INJURY_FIELDS=t=>t==='injury'||t==='minor_injury';
 
 function buildClinicalSection(eventId, sqPlayers, onSave){
   if(!canSeeClinical()) return '';
@@ -7067,12 +7068,11 @@ function buildClinicalSection(eventId, sqPlayers, onSave){
     const p=DB.getPlayer(r.athleteId);
     const tp=r.athleteId?.startsWith('trial_')?DB.getTrialPlayer(r.athleteId):null;
     const athleteName=p?dn(p):(tp?tp.name+'  🧪':'—');
-    const isInjury=r.type==='injury';
+    const isInjury=CR_HAS_INJURY_FIELDS(r.type);
     const injExtra=isInjury?`
       ${r.diagnostico?`<div style="font-size:12px;margin-top:2px"><span style="color:var(--muted)">Diagnóstico:</span> ${r.diagnostico}</div>`:''}
       ${r.treatment?`<div style="font-size:12px"><span style="color:var(--muted)">Tratamento:</span> ${r.treatment}</div>`:''}
-      ${r.estimatedRecoveryDate?`<div style="font-size:12px"><span style="color:var(--muted)">Prev. recuperação:</span> ${fmtDate(r.estimatedRecoveryDate)}</div>`:''}
-      ${r.actualRecoveryDate?`<div style="font-size:12px;color:#2e7d32"><span style="color:var(--muted)">Recuperação efectiva:</span> ${fmtDate(r.actualRecoveryDate)}</div>`:'<div style="font-size:11px;color:#b71c1c;font-weight:600;margin-top:2px">🚨 Em lesão</div>'}
+      ${r.type==='minor_injury'?`<div style="font-size:11px;color:#e65100;font-weight:600;margin-top:2px">⚠️ Em vigilância</div>`:(r.estimatedRecoveryDate?`<div style="font-size:12px"><span style="color:var(--muted)">Prev. recuperação:</span> ${fmtDate(r.estimatedRecoveryDate)}</div>`:'')+(r.actualRecoveryDate?`<div style="font-size:12px;color:#2e7d32"><span style="color:var(--muted)">Recuperação efectiva:</span> ${fmtDate(r.actualRecoveryDate)}</div>`:'<div style="font-size:11px;color:#b71c1c;font-weight:600;margin-top:2px">🚨 Em lesão</div>')}
     `:'';
     return `<div data-cr-row="${r.id}" style="padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:flex-start;gap:10px">
@@ -7096,7 +7096,7 @@ function buildClinicalSection(eventId, sqPlayers, onSave){
           </select>
         </div>
         <textarea id="cr-edit-notes-${r.id}" rows="2" placeholder="Notas..." style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit;resize:vertical;background:var(--bg);color:var(--text);box-sizing:border-box">${r.notes||''}</textarea>
-        <div id="cr-edit-inj-${r.id}" style="display:${r.type==='injury'?'block':'none'};margin-top:8px">
+        <div id="cr-edit-inj-${r.id}" style="display:${CR_HAS_INJURY_FIELDS(r.type)?'block':'none'};margin-top:8px">
           <input id="cr-edit-diag-${r.id}" type="text" placeholder="Diagnóstico" value="${r.diagnostico||''}" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
           <input id="cr-edit-treat-${r.id}" type="text" placeholder="Tratamento" value="${r.treatment||''}" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -7173,7 +7173,7 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
   document.querySelectorAll('[id^="cr-edit-type-"]').forEach(sel=>sel.addEventListener('change',()=>{
     const id=sel.id.replace('cr-edit-type-','');
     const injDiv=document.getElementById('cr-edit-inj-'+id);
-    if(injDiv) injDiv.style.display=sel.value==='injury'?'block':'none';
+    if(injDiv) injDiv.style.display=CR_HAS_INJURY_FIELDS(sel.value)?'block':'none';
   }));
   // Cancel edit
   document.querySelectorAll('[data-cancel-cr]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -7187,11 +7187,15 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
     const type=document.getElementById('cr-edit-type-'+id)?.value;
     const notes=document.getElementById('cr-edit-notes-'+id)?.value.trim()||'';
     const changes={type,notes};
-    if(type==='injury'){
+    if(CR_HAS_INJURY_FIELDS(type)){
       changes.diagnostico=document.getElementById('cr-edit-diag-'+id)?.value.trim()||'';
       changes.treatment=document.getElementById('cr-edit-treat-'+id)?.value.trim()||'';
-      changes.estimatedRecoveryDate=document.getElementById('cr-edit-edate-'+id)?.value||'';
-      changes.actualRecoveryDate=document.getElementById('cr-edit-adate-'+id)?.value||'';
+      if(type==='injury'){
+        changes.estimatedRecoveryDate=document.getElementById('cr-edit-edate-'+id)?.value||'';
+        changes.actualRecoveryDate=document.getElementById('cr-edit-adate-'+id)?.value||'';
+      } else {
+        changes.estimatedRecoveryDate=''; changes.actualRecoveryDate='';
+      }
     } else {
       // clear injury fields if type changed away from injury
       changes.diagnostico=''; changes.treatment='';
@@ -7206,7 +7210,7 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
   const crInjFields=document.getElementById('cr-inj-fields');
   if(crType&&crInjFields){
     crType.addEventListener('change',()=>{
-      crInjFields.style.display=crType.value==='injury'?'block':'none';
+      crInjFields.style.display=CR_HAS_INJURY_FIELDS(crType.value)?'block':'none';
     });
   }
 
@@ -7224,11 +7228,13 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
       squad:ev?.squad||currentUser()?.squad||'',
       type, notes, addedBy:currentUser()?.user||''
     };
-    if(type==='injury'){
+    if(CR_HAS_INJURY_FIELDS(type)){
       rec.diagnostico=document.getElementById('cr-diagnostico')?.value.trim()||'';
       rec.treatment=document.getElementById('cr-treatment')?.value.trim()||'';
-      rec.estimatedRecoveryDate=document.getElementById('cr-edate')?.value||'';
-      rec.actualRecoveryDate=document.getElementById('cr-adate')?.value||'';
+      if(type==='injury'){
+        rec.estimatedRecoveryDate=document.getElementById('cr-edate')?.value||'';
+        rec.actualRecoveryDate=document.getElementById('cr-adate')?.value||'';
+      }
     }
     await DB.addClinicalRecord(rec);
     toast('✅ Registo clínico guardado!'); rerenderFn();
@@ -13048,6 +13054,7 @@ function renderTransportTab(){
     const isRequested=!!m.requested;
     const isApproved=!!m.approved;
     const driver=m.driver||'';
+    const notes=m.notes||'';
     const rowBg=i%2===0?'':'background:#f8faff';
     const haStyle=isAway?'background:#b71c1c;color:#fff':'background:#1b5e20;color:#fff';
     return `<tr style="border-bottom:1px solid var(--border);${rowBg}">
@@ -13080,6 +13087,11 @@ function renderTransportTab(){
       <td style="padding:8px 10px">
         <input type="text" class="si transp-driver" data-id="${ev.id}" value="${driver.replace(/"/g,'&quot;')}"
           placeholder="Nome do condutor…"
+          style="width:100%;min-width:130px;padding:6px 8px;font-size:12px">
+      </td>
+      <td style="padding:8px 10px">
+        <input type="text" class="si transp-notes" data-id="${ev.id}" value="${notes.replace(/"/g,'&quot;')}"
+          placeholder="Observações…"
           style="width:100%;min-width:140px;padding:6px 8px;font-size:12px">
       </td>
     </tr>`;
@@ -13102,159 +13114,19 @@ function renderTransportTab(){
     };
   });
 
-  // Driver input handlers (save on blur / Enter)
+  // Driver + Notes input handlers (save on blur / Enter)
   body.querySelectorAll('.transp-driver').forEach(inp=>{
     const save=()=>setTransportMeta(inp.dataset.id,{driver:inp.value.trim()});
     inp.onblur=save;
     inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); inp.blur(); } };
   });
+  body.querySelectorAll('.transp-notes').forEach(inp=>{
+    const save=()=>setTransportMeta(inp.dataset.id,{notes:inp.value.trim()});
+    inp.onblur=save;
+    inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); inp.blur(); } };
+  });
 }
 
-async function exportTransportPDF(){
-  const sq=document.getElementById('tm-transp-squad')?.value||'';
-  const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
-  const today=new Date().toISOString().slice(0,10);
-
-  const squads=sq?[sq]:['eqa','sub23','sub19'];
-  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
-    .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
-    .filter(e=>showPast||e.date>=today)
-    .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
-
-  if(!evs.length){ toast('⚠️ Sem jogos neste período.'); return; }
-
-  toast('⏳ A gerar PDF...');
-  if(!window.jspdf) await new Promise((res,rej)=>{
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
-  });
-  const {jsPDF}=window.jspdf;
-
-  const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const TRANSP_LABEL={van:'Carrinha 9 lugares',bus:'Mini-bus SCV / Autocarro'};
-  const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'};
-  const seasonLabel=`Época ${new Date().getFullYear()}/${new Date().getFullYear()+1}`;
-
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const PW=297, PH=210, ML=15, MR=15, MT=15, MB=15;
-  const W=PW-ML-MR;
-
-  // Header
-  doc.setFillColor(14,36,68);
-  doc.rect(ML,MT,W,16,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('SC Vianense SAD',ML+5,MT+7);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text(`Transporte – Jogos Fora · ${seasonLabel}${sq?' · '+(sqLabel[sq]||sq):''}`,ML+5,MT+13);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7);
-  doc.setTextColor(180,200,230);
-  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
-
-  // Column widths (added C_HA for Casa/Fora)
-  const C_DATE=40, C_OPP=55, C_SQ=20, C_HA=16, C_LOC=52, C_TRANSP=38, C_REQ=18, C_APR=18, C_DRV=W-C_DATE-C_OPP-C_SQ-C_HA-C_LOC-C_TRANSP-C_REQ-C_APR;
-  const xDate=ML, xOpp=xDate+C_DATE, xSq=xOpp+C_OPP, xHa=xSq+C_SQ, xLoc=xHa+C_HA, xTransp=xLoc+C_LOC, xReq=xTransp+C_TRANSP, xApr=xReq+C_REQ, xDrv=xApr+C_APR;
-  const ROW_H=14;
-  const meta=getTransportMeta();
-
-  function drawHeader(y){
-    doc.setFillColor(26,61,110);
-    doc.rect(ML,y,W,7,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
-    doc.text('DATA / HORA',xDate+2,y+4.8);
-    doc.text('ADVERSÁRIO',xOpp+2,y+4.8);
-    doc.text('ESC.',xSq+2,y+4.8);
-    doc.text('C/F',xHa+C_HA/2,y+4.8,{align:'center'});
-    doc.text('LOCAL',xLoc+2,y+4.8);
-    doc.text('TRANSPORTE',xTransp+2,y+4.8);
-    doc.text('PEDIDO',xReq+C_REQ/2,y+4.8,{align:'center'});
-    doc.text('APROV.',xApr+C_APR/2,y+4.8,{align:'center'});
-    doc.text('CONDUTOR',xDrv+2,y+4.8);
-    return y+7;
-  }
-
-  let ry=drawHeader(MT+20);
-
-  evs.forEach((ev,i)=>{
-    if(ry+ROW_H>PH-MB){
-      doc.addPage('a4','landscape');
-      ry=MT;
-      ry=drawHeader(ry);
-    }
-    const d=new Date(ev.date+'T00:00:00');
-    const yr=d.getFullYear();
-    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${yr}`;
-    const m=meta[ev.id]||{};
-    const even=i%2===0;
-
-    doc.setFillColor(even?255:243,even?255:247,even?255:252);
-    doc.rect(ML,ry,W,ROW_H,'F');
-    doc.setDrawColor(208,218,234); doc.setLineWidth(0.1);
-    doc.line(ML,ry+ROW_H,ML+W,ry+ROW_H);
-
-    doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-    doc.text(dateStr,xDate+2,ry+6);
-    if(ev.time){ doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80); doc.text(ev.time,xDate+2,ry+10.5); }
-
-    doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-    const oppLines=doc.splitTextToSize(ev.opponent||'—',C_OPP-3);
-    doc.text(oppLines[0],xOpp+2,ry+6);
-    if(oppLines[1]){ doc.setFontSize(7); doc.text(oppLines[1],xOpp+2,ry+10); }
-
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
-    const sqC={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]}[ev.squad]||[80,80,80];
-    doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+4,C_SQ-3,6,1,1,'F');
-    doc.text(sqLabel[ev.squad]||ev.squad,xSq+1+(C_SQ-3)/2,ry+8.5,{align:'center'});
-
-    const isAway=ev.homeAway==='away';
-    doc.setFillColor(...(isAway?[183,28,28]:[27,94,32]));
-    doc.roundedRect(xHa+1,ry+4,C_HA-3,6,1,1,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
-    doc.text(isAway?'Fora':'Casa',xHa+1+(C_HA-3)/2,ry+8.5,{align:'center'});
-
-    const loc=[ev.location,ev.city].filter(Boolean).join(', ')||'—';
-    doc.setTextColor(60,60,60); doc.setFont('helvetica','normal'); doc.setFontSize(7);
-    const locLines=doc.splitTextToSize(loc,C_LOC-3);
-    doc.text(locLines[0]||'',xLoc+2,ry+5.5);
-    if(locLines[1]) doc.text(locLines[1],xLoc+2,ry+9.5);
-
-    const tLabels=(ev.transport||[]).map(t=>TRANSP_LABEL[t]||t);
-    doc.setFontSize(6.5); doc.setTextColor(40,40,40);
-    tLabels.forEach((lbl,ti)=>{
-      const lines=doc.splitTextToSize(lbl,C_TRANSP-3);
-      lines.slice(0,2).forEach((ln,li)=>doc.text(ln,xTransp+2,ry+5+(ti*6)+(li*3.5)));
-    });
-
-    // Requested / Approved checkboxes
-    const drawStatus=(x,val)=>{
-      doc.setFillColor(val?232:250,val?245:250,val?233:250);
-      doc.roundedRect(x+2,ry+3.5,C_REQ-4,7,1.5,1.5,'F');
-      doc.setTextColor(val?27:160,val?94:160,val?32:160);
-      doc.setFont('helvetica','bold'); doc.setFontSize(8);
-      doc.text(val?'Sim':'Nao',x+C_REQ/2,ry+9,{align:'center'});
-    };
-    drawStatus(xReq,!!m.requested);
-    drawStatus(xApr,!!m.approved);
-
-    doc.setTextColor(17,17,17); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-    const drv=m.driver||'';
-    if(drv){ const dl=doc.splitTextToSize(drv,C_DRV-3); doc.text(dl[0],xDrv+2,ry+7); }
-    else { doc.setTextColor(180,180,180); doc.text('—',xDrv+2,ry+7); }
-
-    ry+=ROW_H;
-  });
-
-  // Footer
-  doc.setDrawColor(14,36,68); doc.setLineWidth(0.3);
-  doc.line(ML,ry+3,ML+W,ry+3);
-  doc.setTextColor(160,160,160); doc.setFont('helvetica','normal'); doc.setFontSize(7);
-  doc.text('SC Vianense SAD · Gestão Desportiva',ML,ry+7);
-  doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
-
-  doc.save(`Transporte_Jogos_Fora.pdf`);
-  toast('✅ PDF de transporte descarregado!');
-}
 
 function renderTMFines(){
   const container=document.getElementById('tm-fines-content');
