@@ -1111,46 +1111,16 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   <!-- TEAM MANAGER MODULE -->
   <div class="view" id="v-tm">
     <div class="tb">
-      <div><h1>Team Manager</h1><div class="sub" id="tm-sub">Gestão de documentos</div></div>
+      <div><h1>Team Manager</h1><div class="sub" id="tm-sub">Gestão de equipamento e transporte</div></div>
     </div>
     <!-- tabs -->
     <div style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card);margin-bottom:0">
-      <button class="tm-tab active" data-tab="docs" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-1px">📋 Documentos</button>
-      <button class="tm-tab" data-tab="kit" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">👕 Equipamento</button>
+      <button class="tm-tab active" data-tab="kit" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-1px">👕 Equipamento</button>
+      <button class="tm-tab" data-tab="transp" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">🚌 Transporte</button>
       <button class="tm-tab" data-tab="fines" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⏱ Atrasos / Multas</button>
     </div>
-    <!-- docs panel -->
-    <div id="tm-panel-docs">
-      <div class="sf">
-        <select class="si" id="tm-docs-squad">
-          <option value="">Todos os escalões</option>
-          <option value="eqa">Equipa A</option>
-          <option value="sub19">Sub-19</option>
-          <option value="sub23">Sub-23</option>
-        </select>
-        <input class="si" id="tm-docs-search" placeholder="Pesquisar atleta..." style="max-width:220px">
-        <span id="tm-docs-stats" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <table id="tm-docs-table" style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:var(--bg)">
-              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Atleta</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">CC</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Modelo 2 FPF</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Exame Médico</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Foto</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center" title="Só para atletas menores de idade">CC de EE</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center" title="Só para atletas nascidos em 2007 ou depois">Comp. Desp.</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center" title="Internacional — processamento manual necessário">🌍 Intern.</th>
-            </tr>
-          </thead>
-          <tbody id="tm-docs-body"></tbody>
-        </table>
-      </div>
-    </div>
     <!-- kit panel -->
-    <div id="tm-panel-kit" style="display:none">
+    <div id="tm-panel-kit">
       <div class="sf" style="align-items:center">
         <select class="si" id="tm-kit-squad">
           <option value="">Todos os escalões</option>
@@ -1178,6 +1148,36 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <tbody id="tm-kit-body"></tbody>
         </table>
       </div>
+    </div>
+    <!-- transport panel -->
+    <div id="tm-panel-transp" style="display:none">
+      <div class="sf" style="align-items:center">
+        <select class="si" id="tm-transp-squad">
+          <option value="">Todos os escalões</option>
+          <option value="eqa">Equipa A</option>
+          <option value="sub19">Sub-19</option>
+          <option value="sub23">Sub-23</option>
+        </select>
+        <select class="si" id="tm-transp-month" style="max-width:160px"></select>
+        <button class="btn btn-sm" style="background:#111;color:#fff;margin-left:auto" onclick="exportTransportPDF()">📄 Exportar PDF</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table id="tm-transp-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Data</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Adversário</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Escalão</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Transporte</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Pedido</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Aprovado</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Condutor</th>
+            </tr>
+          </thead>
+          <tbody id="tm-transp-body"></tbody>
+        </table>
+      </div>
+      <p id="tm-transp-empty" style="display:none;text-align:center;color:var(--muted);padding:40px;font-size:14px">Sem jogos fora neste período.</p>
     </div>
     <!-- fines panel -->
     <div id="tm-panel-fines" style="display:none">
@@ -12928,104 +12928,20 @@ function renderTM(){
       btn.style.color='var(--primary)';
       btn.classList.add('active');
       const tab=btn.dataset.tab;
-      document.getElementById('tm-panel-docs').style.display=tab==='docs'?'':'none';
       document.getElementById('tm-panel-kit').style.display=tab==='kit'?'':'none';
+      document.getElementById('tm-panel-transp').style.display=tab==='transp'?'':'none';
       document.getElementById('tm-panel-fines').style.display=tab==='fines'?'':'none';
       if(tab==='kit'){
         // Always re-sync athlete_docs before rendering kit tab
         // (athletes may have filled the public form after the last login sync)
         DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
       }
+      if(tab==='transp') renderTransportTab();
       if(tab==='fines') renderTMFines();
     };
   });
 
-  // Pre-filter squad selector to TM's own squad (non-admin)
-  const docsSquadSel=document.getElementById('tm-docs-squad');
-  if(u?.squad && u.role!=='admin'){
-    docsSquadSel.value=u.squad;
-    docsSquadSel.style.display='none'; // TM only sees their squad
-  } else {
-    docsSquadSel.style.display='';
-  }
-
-  const docsSearch=document.getElementById('tm-docs-search');
-  const renderDocs=()=>{
-    const sq=docsSquadSel.value;
-    const q=(docsSearch.value||'').toLowerCase();
-    let players=DB.players().filter(p=>!sq||p.squad===sq);
-    if(q) players=players.filter(p=>dn(p).toLowerCase().includes(q));
-    players.sort((a,b)=>dn(a).localeCompare(dn(b)));
-    const total=players.length;
-    const complete=players.filter(p=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      return !d.isInternational && TM_DOC_FIELDS.filter(f=>(!f.minorOnly||isMinor(p))&&(!f.born2007||isBorn2007Plus(p))).every(f=>d[f.key]);
-    }).length;
-    document.getElementById('tm-docs-stats').textContent=`${complete}/${total} completos`;
-    const body=document.getElementById('tm-docs-body');
-    if(!players.length){ body.innerHTML=`<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted)">Sem atletas.</td></tr>`; return; }
-    body.innerHTML=players.map(p=>{
-      const d=DB.getAthleteDoc(p.id)||{};
-      const minor=isMinor(p);
-      const born07=isBorn2007Plus(p);
-      const intl=!!d.isInternational;
-      const allOk=TM_DOC_FIELDS.filter(f=>(!f.minorOnly||minor)&&(!f.born2007||born07)).every(f=>d[f.key]);
-      const docCells=TM_DOC_FIELDS.map(f=>{
-        if(f.minorOnly && !minor){
-          return `<td style="text-align:center;padding:10px;color:var(--muted);font-size:18px" title="Não aplicável">—</td>`;
-        }
-        if(f.born2007 && !born07){
-          return `<td style="text-align:center;padding:10px;color:var(--muted);font-size:18px" title="Não aplicável">—</td>`;
-        }
-        const ok=!!d[f.key];
-        return `<td style="text-align:center;padding:10px">
-          <button class="tm-doc-btn" data-pid="${p.id}" data-field="${f.key}" data-val="${ok?'1':'0'}"
-            style="background:${ok?'#e8f5e9':'#fafafa'};border:1.5px solid ${ok?'#66bb6a':'var(--border)'};border-radius:6px;padding:5px 12px;cursor:pointer;font-size:15px;transition:all .15s"
-            title="${ok?'Entregue — clica para remover':'Pendente — clica para marcar como entregue'}">${ok?'✅':'⏳'}</button>
-        </td>`;
-      }).join('');
-      const intlCell=`<td style="text-align:center;padding:10px">
-        <button class="tm-intl-btn" data-pid="${p.id}" data-val="${intl?'1':'0'}"
-          style="background:${intl?'#fff3e0':'#fafafa'};border:1.5px solid ${intl?'#fb8c00':'var(--border)'};border-radius:6px;padding:5px 12px;cursor:pointer;font-size:15px;transition:all .15s"
-          title="${intl?'Internacional — clica para remover':'Marcar como internacional'}">${intl?'🌍':'—'}</button>
-      </td>`;
-      const rowBg=intl?'background:#fff3e0':allOk?'background:#f9fff9':'';
-      return `<tr style="border-bottom:1px solid var(--border);${rowBg}">
-        <td style="padding:10px 14px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="av" style="width:30px;height:30px;font-size:11px;flex-shrink:0">${p.photoUrl?`<img src="${p.photoUrl}">`:ini(dn(p))}</div>
-            <div>
-              <div style="font-weight:600;font-size:13px">${dn(p)}</div>
-              <div style="font-size:11px;color:var(--muted)">${SQUADS[p.squad]||p.squad}${p.number?' · #'+p.number:''}${intl?' · 🌍 Internacional':''}</div>
-            </div>
-          </div>
-        </td>${docCells}${intlCell}
-      </tr>`;
-    }).join('');
-    // toggle handlers
-    body.querySelectorAll('.tm-doc-btn').forEach(btn=>{
-      btn.onclick=()=>{
-        const pid=btn.dataset.pid;
-        const field=btn.dataset.field;
-        const newVal=btn.dataset.val!=='1';
-        DB.setAthleteDoc(pid,{[field]:newVal});
-        renderDocs();
-      };
-    });
-    body.querySelectorAll('.tm-intl-btn').forEach(btn=>{
-      btn.onclick=()=>{
-        const pid=btn.dataset.pid;
-        const newVal=btn.dataset.val!=='1';
-        DB.setAthleteDoc(pid,{isInternational:newVal});
-        renderDocs();
-      };
-    });
-  };
-  docsSquadSel.onchange=renderDocs;
-  docsSearch.oninput=renderDocs;
-  renderDocs();
-
-  // Kit squad selector mirrors docs squad selector lock
+  // Kit squad selector
   const kitSquadSel=document.getElementById('tm-kit-squad');
   if(u?.squad && u.role!=='admin'){
     kitSquadSel.value=u.squad;
@@ -13034,6 +12950,270 @@ function renderTM(){
     kitSquadSel.style.display='';
   }
   kitSquadSel.onchange=renderKitTab;
+  // Render kit on load (it's the default active tab)
+  DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
+
+  // Transport tab selectors
+  const transpSquadSel=document.getElementById('tm-transp-squad');
+  const transpMonthSel=document.getElementById('tm-transp-month');
+  if(u?.squad && u.role!=='admin'){
+    transpSquadSel.value=u.squad;
+    transpSquadSel.style.display='none';
+  }
+  // Populate month selector: past 3 months + next 6
+  (()=>{
+    const now=new Date();
+    const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    transpMonthSel.innerHTML='';
+    for(let i=-3;i<=6;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+      const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const opt=document.createElement('option');
+      opt.value=val; opt.textContent=`${MN[d.getMonth()]} ${d.getFullYear()}`;
+      if(i===0) opt.selected=true;
+      transpMonthSel.appendChild(opt);
+    }
+  })();
+  transpSquadSel.onchange=renderTransportTab;
+  transpMonthSel.onchange=renderTransportTab;
+}
+
+// ── TRANSPORT TAB ──────────────────────────────────────────────────────────────
+const TRANSP_KEY='scv_transport_meta'; // localStorage: {[eventId]: {requested, approved, driver}}
+
+function getTransportMeta(){ return JSON.parse(localStorage.getItem(TRANSP_KEY)||'{}'); }
+function setTransportMeta(id, patch){
+  const all=getTransportMeta();
+  all[id]=Object.assign(all[id]||{},patch);
+  localStorage.setItem(TRANSP_KEY,JSON.stringify(all));
+}
+
+function renderTransportTab(){
+  const body=document.getElementById('tm-transp-body');
+  const empty=document.getElementById('tm-transp-empty');
+  if(!body) return;
+
+  const sq=document.getElementById('tm-transp-squad')?.value||'';
+  const monthVal=document.getElementById('tm-transp-month')?.value||'';
+  const [year,month]=monthVal?monthVal.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
+  const mm=String(month).padStart(2,'0');
+  const from=`${year}-${mm}-01`;
+  const lastDay=new Date(year,month,0).getDate();
+  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+
+  // Collect away games for selected squads in selected month
+  const squads=sq?[sq]:Object.keys(SQUADS);
+  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
+    .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
+    .filter(e=>e.date>=from&&e.date<=to)
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+
+  if(!evs.length){
+    body.innerHTML=''; empty.style.display='';
+    return;
+  }
+  empty.style.display='none';
+
+  const meta=getTransportMeta();
+  const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const TRANSP_LABEL={van:'Carrinha 9 lugares',bus:'Mini-bus SCV / Autocarro'};
+  const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'};
+  const sqColor={eqa:'#555',sub23:'#1a3d6e',sub19:'#8a6600'};
+
+  body.innerHTML=evs.map((ev,i)=>{
+    const d=new Date(ev.date+'T00:00:00');
+    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}${ev.time?' · '+ev.time:''}`;
+    const transpLabels=(ev.transport||[]).map(t=>TRANSP_LABEL[t]||t).join('<br>');
+    const m=meta[ev.id]||{};
+    const isRequested=!!m.requested;
+    const isApproved=!!m.approved;
+    const driver=m.driver||'';
+    const rowBg=i%2===0?'':'background:#f8faff';
+    return `<tr style="border-bottom:1px solid var(--border);${rowBg}">
+      <td style="padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap">${dateStr}</td>
+      <td style="padding:10px;font-size:13px;font-weight:600">${ev.opponent||'—'}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${ev.location?ev.location+(ev.city?', '+ev.city:''):''}</span></td>
+      <td style="padding:10px;text-align:center">
+        <span style="background:${sqColor[ev.squad]};color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">${sqLabel[ev.squad]||ev.squad}</span>
+      </td>
+      <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="padding:10px;text-align:center">
+        <button class="transp-toggle" data-id="${ev.id}" data-field="requested" data-val="${isRequested?'1':'0'}"
+          style="background:${isRequested?'#e8f5e9':'#fafafa'};border:1.5px solid ${isRequested?'#66bb6a':'var(--border)'};border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">
+          ${isRequested?'✅':'⏳'}
+        </button>
+      </td>
+      <td style="padding:10px;text-align:center">
+        <button class="transp-toggle" data-id="${ev.id}" data-field="approved" data-val="${isApproved?'1':'0'}"
+          style="background:${isApproved?'#e3f2fd':'#fafafa'};border:1.5px solid ${isApproved?'#1976d2':'var(--border)'};border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">
+          ${isApproved?'✅':'⏳'}
+        </button>
+      </td>
+      <td style="padding:8px 10px">
+        <input type="text" class="si transp-driver" data-id="${ev.id}" value="${driver.replace(/"/g,'&quot;')}"
+          placeholder="Nome do condutor…"
+          style="width:100%;min-width:140px;padding:6px 8px;font-size:12px">
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Toggle handlers
+  body.querySelectorAll('.transp-toggle').forEach(btn=>{
+    btn.onclick=()=>{
+      const newVal=btn.dataset.val!=='1';
+      setTransportMeta(btn.dataset.id,{[btn.dataset.field]:newVal});
+      renderTransportTab();
+    };
+  });
+
+  // Driver input handlers (save on blur / Enter)
+  body.querySelectorAll('.transp-driver').forEach(inp=>{
+    const save=()=>setTransportMeta(inp.dataset.id,{driver:inp.value.trim()});
+    inp.onblur=save;
+    inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); inp.blur(); } };
+  });
+}
+
+async function exportTransportPDF(){
+  const sq=document.getElementById('tm-transp-squad')?.value||'';
+  const monthVal=document.getElementById('tm-transp-month')?.value||'';
+  const [year,month]=monthVal?monthVal.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
+  const mm=String(month).padStart(2,'0');
+  const from=`${year}-${mm}-01`;
+  const lastDay=new Date(year,month,0).getDate();
+  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+
+  const squads=sq?[sq]:Object.keys(SQUADS);
+  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
+    .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
+    .filter(e=>e.date>=from&&e.date<=to)
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+
+  if(!evs.length){ toast('⚠️ Sem jogos fora neste período.'); return; }
+
+  toast('⏳ A gerar PDF...');
+  if(!window.jspdf) await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
+  });
+  const {jsPDF}=window.jspdf;
+
+  const MONTHS_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const TRANSP_LABEL={van:'Carrinha 9 lugares',bus:'Mini-bus SCV / Autocarro'};
+  const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'};
+  const monthLabel=`${MONTHS_PT[month-1]} ${year}`;
+
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const PW=297, PH=210, ML=15, MR=15, MT=15, MB=15;
+  const W=PW-ML-MR;
+
+  // Header
+  doc.setFillColor(14,36,68);
+  doc.rect(ML,MT,W,16,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('SC Vianense SAD',ML+5,MT+7);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(`Transporte – Jogos Fora · ${monthLabel}${sq?' · '+(sqLabel[sq]||sq):''}`,ML+5,MT+13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.setTextColor(180,200,230);
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
+
+  // Column widths
+  const C_DATE=40, C_OPP=60, C_SQ=22, C_LOC=60, C_TRANSP=40, C_REQ=18, C_APR=18, C_DRV=W-C_DATE-C_OPP-C_SQ-C_LOC-C_TRANSP-C_REQ-C_APR;
+  const xDate=ML, xOpp=xDate+C_DATE, xSq=xOpp+C_OPP, xLoc=xSq+C_SQ, xTransp=xLoc+C_LOC, xReq=xTransp+C_TRANSP, xApr=xReq+C_REQ, xDrv=xApr+C_APR;
+  const ROW_H=14;
+  const meta=getTransportMeta();
+
+  function drawHeader(y){
+    doc.setFillColor(26,61,110);
+    doc.rect(ML,y,W,7,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+    doc.text('DATA / HORA',xDate+2,y+4.8);
+    doc.text('ADVERSÁRIO',xOpp+2,y+4.8);
+    doc.text('ESC.',xSq+2,y+4.8);
+    doc.text('LOCAL',xLoc+2,y+4.8);
+    doc.text('TRANSPORTE',xTransp+2,y+4.8);
+    doc.text('PEDIDO',xReq+C_REQ/2,y+4.8,{align:'center'});
+    doc.text('APROV.',xApr+C_APR/2,y+4.8,{align:'center'});
+    doc.text('CONDUTOR',xDrv+2,y+4.8);
+    return y+7;
+  }
+
+  let ry=drawHeader(MT+20);
+
+  evs.forEach((ev,i)=>{
+    if(ry+ROW_H>PH-MB){
+      doc.addPage('a4','landscape');
+      ry=MT;
+      ry=drawHeader(ry);
+    }
+    const d=new Date(ev.date+'T00:00:00');
+    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}`;
+    const m=meta[ev.id]||{};
+    const even=i%2===0;
+
+    doc.setFillColor(even?255:243,even?255:247,even?255:252);
+    doc.rect(ML,ry,W,ROW_H,'F');
+    doc.setDrawColor(208,218,234); doc.setLineWidth(0.1);
+    doc.line(ML,ry+ROW_H,ML+W,ry+ROW_H);
+
+    doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.text(dateStr,xDate+2,ry+6);
+    if(ev.time){ doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80); doc.text(ev.time,xDate+2,ry+10.5); }
+
+    doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    const oppLines=doc.splitTextToSize(ev.opponent||'—',C_OPP-3);
+    doc.text(oppLines[0],xOpp+2,ry+6);
+    if(oppLines[1]){ doc.setFontSize(7); doc.text(oppLines[1],xOpp+2,ry+10); }
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
+    const sqC={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]}[ev.squad]||[80,80,80];
+    doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+4,C_SQ-3,6,1,1,'F');
+    doc.text(sqLabel[ev.squad]||ev.squad,xSq+1+(C_SQ-3)/2,ry+8.5,{align:'center'});
+
+    const loc=[ev.location,ev.city].filter(Boolean).join(', ')||'—';
+    doc.setTextColor(60,60,60); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    const locLines=doc.splitTextToSize(loc,C_LOC-3);
+    doc.text(locLines[0]||'',xLoc+2,ry+5.5);
+    if(locLines[1]) doc.text(locLines[1],xLoc+2,ry+9.5);
+
+    const tLabels=(ev.transport||[]).map(t=>TRANSP_LABEL[t]||t);
+    doc.setFontSize(6.5); doc.setTextColor(40,40,40);
+    tLabels.forEach((lbl,ti)=>{
+      const lines=doc.splitTextToSize(lbl,C_TRANSP-3);
+      lines.slice(0,2).forEach((ln,li)=>doc.text(ln,xTransp+2,ry+5+(ti*6)+(li*3.5)));
+    });
+
+    // Requested / Approved checkboxes
+    const drawStatus=(x,val)=>{
+      doc.setFillColor(val?232:250,val?245:250,val?233:250);
+      doc.roundedRect(x+2,ry+3.5,C_REQ-4,7,1.5,1.5,'F');
+      doc.setTextColor(val?27:160,val?94:160,val?32:160);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      doc.text(val?'Sim':'Nao',x+C_REQ/2,ry+9,{align:'center'});
+    };
+    drawStatus(xReq,!!m.requested);
+    drawStatus(xApr,!!m.approved);
+
+    doc.setTextColor(17,17,17); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    const drv=m.driver||'';
+    if(drv){ const dl=doc.splitTextToSize(drv,C_DRV-3); doc.text(dl[0],xDrv+2,ry+7); }
+    else { doc.setTextColor(180,180,180); doc.text('—',xDrv+2,ry+7); }
+
+    ry+=ROW_H;
+  });
+
+  // Footer
+  doc.setDrawColor(14,36,68); doc.setLineWidth(0.3);
+  doc.line(ML,ry+3,ML+W,ry+3);
+  doc.setTextColor(160,160,160); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('SC Vianense SAD · Gestão Desportiva',ML,ry+7);
+  doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
+
+  doc.save(`Transporte_${monthLabel.replace(/\s/g,'_')}.pdf`);
+  toast('✅ PDF de transporte descarregado!');
 }
 
 function renderTMFines(){
