@@ -1170,7 +1170,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
             <tr style="background:var(--bg)">
               <th style="text-align:left;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)">Data</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Adversário</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Escalão</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Escalão</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">C/F</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Transporte</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Pedido</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Aprovado</th>
@@ -12985,9 +12986,9 @@ function renderTransportTab(){
   const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
   const today=new Date().toISOString().slice(0,10);
 
-  // Collect all away games for selected squads
-  const squads=sq?[sq]:Object.keys(SQUADS);
-  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
+  // Collect all games (home + away) for selected squads
+  const squads=sq?[sq]:['eqa','sub23','sub19'];
+  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
     .filter(e=>showPast||e.date>=today)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
@@ -13006,18 +13007,24 @@ function renderTransportTab(){
 
   body.innerHTML=evs.map((ev,i)=>{
     const d=new Date(ev.date+'T00:00:00');
-    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}${ev.time?' · '+ev.time:''}`;
+    const yr=d.getFullYear();
+    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${yr}${ev.time?' · '+ev.time:''}`;
+    const isAway=ev.homeAway==='away';
     const transpLabels=(ev.transport||[]).map(t=>TRANSP_LABEL[t]||t).join('<br>');
     const m=meta[ev.id]||{};
     const isRequested=!!m.requested;
     const isApproved=!!m.approved;
     const driver=m.driver||'';
     const rowBg=i%2===0?'':'background:#f8faff';
+    const haStyle=isAway?'background:#b71c1c;color:#fff':'background:#1b5e20;color:#fff';
     return `<tr style="border-bottom:1px solid var(--border);${rowBg}">
       <td style="padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap">${dateStr}</td>
       <td style="padding:10px;font-size:13px;font-weight:600">${ev.opponent||'—'}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${ev.location?ev.location+(ev.city?', '+ev.city:''):''}</span></td>
       <td style="padding:10px;text-align:center">
         <span style="background:${sqColor[ev.squad]};color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">${sqLabel[ev.squad]||ev.squad}</span>
+      </td>
+      <td style="padding:10px;text-align:center">
+        <span style="${haStyle};border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">${isAway?'Fora':'Casa'}</span>
       </td>
       <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}</td>
       <td style="padding:10px;text-align:center">
@@ -13062,13 +13069,13 @@ async function exportTransportPDF(){
   const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
   const today=new Date().toISOString().slice(0,10);
 
-  const squads=sq?[sq]:Object.keys(SQUADS);
-  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.homeAway==='away'&&e.squad===s))
+  const squads=sq?[sq]:['eqa','sub23','sub19'];
+  let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
     .filter(e=>showPast||e.date>=today)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
 
-  if(!evs.length){ toast('⚠️ Sem jogos fora neste período.'); return; }
+  if(!evs.length){ toast('⚠️ Sem jogos neste período.'); return; }
 
   toast('⏳ A gerar PDF...');
   if(!window.jspdf) await new Promise((res,rej)=>{
@@ -13099,9 +13106,9 @@ async function exportTransportPDF(){
   doc.setTextColor(180,200,230);
   doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
-  // Column widths
-  const C_DATE=40, C_OPP=60, C_SQ=22, C_LOC=60, C_TRANSP=40, C_REQ=18, C_APR=18, C_DRV=W-C_DATE-C_OPP-C_SQ-C_LOC-C_TRANSP-C_REQ-C_APR;
-  const xDate=ML, xOpp=xDate+C_DATE, xSq=xOpp+C_OPP, xLoc=xSq+C_SQ, xTransp=xLoc+C_LOC, xReq=xTransp+C_TRANSP, xApr=xReq+C_REQ, xDrv=xApr+C_APR;
+  // Column widths (added C_HA for Casa/Fora)
+  const C_DATE=40, C_OPP=55, C_SQ=20, C_HA=16, C_LOC=52, C_TRANSP=38, C_REQ=18, C_APR=18, C_DRV=W-C_DATE-C_OPP-C_SQ-C_HA-C_LOC-C_TRANSP-C_REQ-C_APR;
+  const xDate=ML, xOpp=xDate+C_DATE, xSq=xOpp+C_OPP, xHa=xSq+C_SQ, xLoc=xHa+C_HA, xTransp=xLoc+C_LOC, xReq=xTransp+C_TRANSP, xApr=xReq+C_REQ, xDrv=xApr+C_APR;
   const ROW_H=14;
   const meta=getTransportMeta();
 
@@ -13112,6 +13119,7 @@ async function exportTransportPDF(){
     doc.text('DATA / HORA',xDate+2,y+4.8);
     doc.text('ADVERSÁRIO',xOpp+2,y+4.8);
     doc.text('ESC.',xSq+2,y+4.8);
+    doc.text('C/F',xHa+C_HA/2,y+4.8,{align:'center'});
     doc.text('LOCAL',xLoc+2,y+4.8);
     doc.text('TRANSPORTE',xTransp+2,y+4.8);
     doc.text('PEDIDO',xReq+C_REQ/2,y+4.8,{align:'center'});
@@ -13129,7 +13137,8 @@ async function exportTransportPDF(){
       ry=drawHeader(ry);
     }
     const d=new Date(ev.date+'T00:00:00');
-    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}`;
+    const yr=d.getFullYear();
+    const dateStr=`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${yr}`;
     const m=meta[ev.id]||{};
     const even=i%2===0;
 
@@ -13151,6 +13160,12 @@ async function exportTransportPDF(){
     const sqC={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]}[ev.squad]||[80,80,80];
     doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+4,C_SQ-3,6,1,1,'F');
     doc.text(sqLabel[ev.squad]||ev.squad,xSq+1+(C_SQ-3)/2,ry+8.5,{align:'center'});
+
+    const isAway=ev.homeAway==='away';
+    doc.setFillColor(...(isAway?[183,28,28]:[27,94,32]));
+    doc.roundedRect(xHa+1,ry+4,C_HA-3,6,1,1,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
+    doc.text(isAway?'Fora':'Casa',xHa+1+(C_HA-3)/2,ry+8.5,{align:'center'});
 
     const loc=[ev.location,ev.city].filter(Boolean).join(', ')||'—';
     doc.setTextColor(60,60,60); doc.setFont('helvetica','normal'); doc.setFontSize(7);
