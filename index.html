@@ -6366,9 +6366,9 @@ async function _renderGameListPDF(selSquads, year, month){
   });
   const {jsPDF}=window.jspdf;
 
-  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const PW=210, ML=15, MR=15, MT=15;
-  const W=PW-ML-MR; // 180mm
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const PW=297, PH=210, ML=15, MR=15, MT=15, MB=15;
+  const W=PW-ML-MR; // 267mm
 
   // ── Cabeçalho ──
   doc.setFillColor(14,36,68);
@@ -6383,31 +6383,41 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  const C_DATE=40, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=30, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
+  const C_DATE=48, C_SQ=multiSq?25:0, C_HA=22, C_OPP=multiSq?60:72, C_TRANSP=42, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
   const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xTransp=xOpp+C_OPP, xLoc=xTransp+C_TRANSP;
-
-  // Cabeçalho da tabela
-  const THY=MT+20;
-  doc.setFillColor(26,61,110);
-  doc.rect(ML,THY,W,7,'F');
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
-  doc.text('DATA / HORA',xDate+2,THY+4.8);
-  if(multiSq) doc.text('ESCALÃO',xSq+2,THY+4.8);
-  doc.text('',xHa+2,THY+4.8);
-  doc.text('ADVERSÁRIO',xOpp+2,THY+4.8);
-  doc.text('TRANSPORTE',xTransp+2,THY+4.8);
-  doc.text('LOCAL / ESTÁDIO',xLoc+2,THY+4.8);
 
   // ── Linhas ──
   const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const ROW_H=13;
-  let ry=THY+7;
+
+  // Função para desenhar cabeçalho de tabela (usado em cada página)
+  function drawTableHeader(y){
+    doc.setFillColor(26,61,110);
+    doc.rect(ML,y,W,7,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
+    doc.text('DATA / HORA',xDate+2,y+4.8);
+    if(multiSq) doc.text('ESCALÃO',xSq+2,y+4.8);
+    doc.text('ADVERSÁRIO',xOpp+2,y+4.8);
+    doc.text('TRANSPORTE',xTransp+2,y+4.8);
+    doc.text('LOCAL / ESTÁDIO',xLoc+2,y+4.8);
+    return y+7;
+  }
+
+  const THY=MT+20;
+  let ry=drawTableHeader(THY);
 
   evs.forEach((ev,i)=>{
     const d=new Date(ev.date+'T00:00:00');
     const isAway=ev.homeAway==='away';
     const even=i%2===0;
+
+    // Quebra de página se necessário
+    if(ry+ROW_H>PH-MB){
+      doc.addPage('a4','landscape');
+      ry=MT;
+      ry=drawTableHeader(ry);
+    }
 
     // Fundo alternado
     doc.setFillColor(even?255:243,even?255:247,even?255:252);
