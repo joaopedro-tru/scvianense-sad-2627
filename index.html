@@ -6383,7 +6383,7 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=22, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
+  const C_DATE=48, C_SQ=multiSq?22:0, C_HA=20, C_OPP=multiSq?46:54, C_TRANSP=34, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
   const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xTransp=xOpp+C_OPP, xLoc=xTransp+C_TRANSP;
 
   // Cabeçalho da tabela
@@ -6395,7 +6395,7 @@ async function _renderGameListPDF(selSquads, year, month){
   if(multiSq) doc.text('ESCALÃO',xSq+2,THY+4.8);
   doc.text('',xHa+2,THY+4.8);
   doc.text('ADVERSÁRIO',xOpp+2,THY+4.8);
-  doc.text('TRANSP.',xTransp+2,THY+4.8);
+  doc.text('TRANSPORTE',xTransp+2,THY+4.8);
   doc.text('LOCAL / ESTÁDIO',xLoc+2,THY+4.8);
 
   // ── Linhas ──
@@ -6452,9 +6452,14 @@ async function _renderGameListPDF(selSquads, year, month){
     // Transporte
     const transport=ev.transport||[];
     if(transport.length){
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(40,40,40);
-      if(transport.includes('van')) doc.text('🚐 Van',xTransp+2,ry+(transport.includes('bus')?5.5:7));
-      if(transport.includes('bus')) doc.text('🚌 Bus',xTransp+2,ry+(transport.includes('van')?9.5:7));
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(40,40,40);
+      const tLabels=[];
+      if(transport.includes('van')) tLabels.push('Carrinha 9 lugares');
+      if(transport.includes('bus')) tLabels.push('Mini-bus SCV / Autocarro');
+      tLabels.forEach((lbl,ti)=>{
+        const lines=doc.splitTextToSize(lbl,C_TRANSP-3);
+        lines.slice(0,2).forEach((ln,li)=> doc.text(ln,xTransp+2,ry+4+(ti*8.5)+(li*3.8)));
+      });
     }
 
     // Local / Estádio
