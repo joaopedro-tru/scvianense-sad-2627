@@ -14062,7 +14062,6 @@ function renderScouting(){
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:14px;font-weight:700;color:var(--text)">${p.name||'—'}</span>
           ${p.team?`<span style="font-size:11px;color:var(--muted)">${p.team}</span>`:''}
-          <span style="margin-left:auto;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${st.bg};color:${st.color}">${st.label}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;margin-top:3px;flex-wrap:wrap">
           ${stars}
@@ -14071,7 +14070,10 @@ function renderScouting(){
         ${gameRef}
         ${notesEl}
       </div>
-      <button onclick="openScoutModal('${p.id}')" style="flex-shrink:0;padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text)">✏️</button>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${st.bg};color:${st.color};white-space:nowrap">${st.label}</span>
+        <button onclick="openScoutModal('${p.id}')" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text)">✏️</button>
+      </div>
     </div>`;
   }
 
