@@ -697,6 +697,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-pse-link"><span class="ic">🔗</span> Link PSE</div>
     <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
     <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
+    <div class="nl" id="nl-bilhetes-eqb" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa B</div>
     <hr class="nd">
     <div class="nsl" id="nsl-scouting">Prospeção</div>
     <div class="nl" id="nl-scouting" data-view="scouting"><span class="ic">🔭</span> Prospeção</div>
@@ -1430,6 +1431,22 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <div><h1>🎟️ Bilhetes Equipa A</h1><div class="sub">Pedidos Sub-23 e Sub-19</div></div>
     </div>
     <div id="v-bilhetes-content" style="padding-bottom:60px"></div>
+  </div>
+
+  <!-- BILHETES EQB FORM (public) -->
+  <div class="view" id="v-bilhetes-eqb-form">
+    <div class="pfh" style="background:linear-gradient(135deg,#0f2027,#1a3a5c)">
+      <div class="pfhl"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/SC_Vianense.png/200px-SC_Vianense.png" style="height:48px;margin-bottom:6px" onerror="this.style.display='none'"><br><span style="font-size:20px;font-weight:700;color:#fff">SC Vianense SAD</span></div>
+    </div>
+    <div class="card" id="bilhetes-eqb-form-content"></div>
+  </div>
+
+  <!-- BILHETES EQB ADMIN VIEW -->
+  <div class="view" id="v-bilhetes-eqb">
+    <div class="tb">
+      <div><h1>🎟️ Bilhetes Equipa B</h1><div class="sub">Gestão de pedidos de convites</div></div>
+    </div>
+    <div id="v-bilhetes-eqb-content" style="padding-bottom:60px"></div>
   </div>
 
   <!-- MONITORING VIEW (staff) -->
@@ -2475,6 +2492,28 @@ const DB = {
       return arr.sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
     }catch(e){ console.error('getBilhetes:',e); return []; }
   },
+  // ── Bilhetes Equipa B ────────────────────────────────────────────────────────
+  async addBilheteEqb(entry){
+    entry.id=uid(); entry.createdAt=new Date().toISOString();
+    if(firestoreDb){
+      await firestoreDb.collection('bilhetes_eqb_requests').doc(entry.id).set(entry).catch(e=>{
+        console.error('FS addBilheteEqb:',e);
+        throw e;
+      });
+    } else {
+      throw new Error('Firestore não disponível');
+    }
+    return entry;
+  },
+  async getBilhetesEqb(gameId){
+    if(!firestoreDb) return [];
+    try{
+      const col=firestoreDb.collection('bilhetes_eqb_requests');
+      const snap=gameId ? await col.where('gameId','==',gameId).get() : await col.get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      return arr.sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+    }catch(e){ console.error('getBilhetesEqb:',e); return []; }
+  },
   // ── PSE & Wellness ──────────────────────────────────────────────────────────
   async addPSE(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
@@ -3163,6 +3202,8 @@ function nav(v,opts={}){
   else if(v==='wellness-form'){ show('v-wellness-form') }
   else if(v==='bilhetes-form'){ show('v-bilhetes-form') }
   else if(v==='bilhetes'){ show('v-bilhetes'); setActive('[data-view="bilhetes"]'); renderBilhetesAdmin(); }
+  else if(v==='bilhetes-eqb'){ show('v-bilhetes-eqb'); setActive('[data-view="bilhetes-eqb"]'); renderBilhetesEqbAdmin(); }
+  else if(v==='bilhetes-eqb-form'){ show('v-bilhetes-eqb-form') }
   else if(v==='monitoring'){
     show('v-monitoring'); setActive('[data-view="monitoring"]');
     // Init squad selector
@@ -11275,6 +11316,7 @@ document.getElementById('nl-publink').addEventListener('click',()=>{
 })();
 document.getElementById('nl-monitoring').addEventListener('click',()=>nav('monitoring'));
 document.getElementById('nl-bilhetes').addEventListener('click',()=>nav('bilhetes'));
+document.getElementById('nl-bilhetes-eqb').addEventListener('click',()=>nav('bilhetes-eqb'));
 // Close modals on overlay click
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.classList.remove('open') }));
 
@@ -13795,6 +13837,139 @@ function printBilhetes(){
   w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
 }
 
+// ── BILHETES EQUIPA B (Sub-23) ────────────────────────────────────────────────
+function renderBilhetesEqbForm(params){
+  const el=document.getElementById('bilhetes-eqb-form-content');
+  if(!el) return;
+  const gameId=params.get('id')||'sem-id';
+  const gameDate=params.get('d')||'';
+  const gameAdversario=decodeURIComponent(params.get('a')||'Adversário');
+  const gameHora=decodeURIComponent(params.get('h')||'');
+  const dateLabel=gameDate?new Date(gameDate+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'}):'';
+  el.innerHTML=`
+    <div id="bilhetes-eqb-success" style="display:none;background:#d4edda;color:#155724;padding:16px;border-radius:8px;margin-bottom:18px;font-weight:600;text-align:center;font-size:15px">✅ Pedido registado! Obrigado.</div>
+    <div id="bilhetes-eqb-error" style="display:none;background:#fde8e8;color:#b02020;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px"></div>
+    <div style="background:#f0f4ff;border:1px solid #c7d4f0;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Próximo Jogo em Casa — Sub-23</div>
+      <div style="font-size:18px;font-weight:700;color:var(--fg)">SC Vianense vs ${gameAdversario}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${dateLabel}${gameHora?' · '+gameHora:''}</div>
+    </div>
+    <form id="bilhetes-eqb-form">
+      <div class="fg" style="margin-bottom:16px">
+        <label style="font-weight:700;font-size:13px">Nome Completo *</label>
+        <input type="text" id="beqb-name" required placeholder="O teu nome">
+      </div>
+      <div class="fg" style="margin-bottom:16px">
+        <label style="font-weight:700;font-size:13px">Função *</label>
+        <select id="beqb-role" required>
+          <option value="">— selecionar —</option>
+          <option value="Atleta">Atleta</option>
+          <option value="Staff">Staff</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:20px">
+        <label style="font-weight:700;font-size:13px">Nº de Convites *</label>
+        <select id="beqb-tickets" required>
+          <option value="1">1 convite</option>
+          <option value="2">2 convites</option>
+          <option value="3">3 convites</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetesEqb('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'")}','${gameHora}')">Confirmar Pedido →</button>
+    </form>`;
+}
+
+async function submitBilhetesEqb(gameId, gameDate, gameAdversario, gameHora){
+  const name=(document.getElementById('beqb-name')?.value||'').trim();
+  const role=document.getElementById('beqb-role')?.value||'';
+  const tickets=parseInt(document.getElementById('beqb-tickets')?.value||'1',10);
+  if(!name||!role){ toast('❌ Preenche todos os campos'); return; }
+  const errEl=document.getElementById('bilhetes-eqb-error');
+  if(errEl) errEl.style.display='none';
+  try{
+    await DB.addBilheteEqb({gameId,gameDate,gameAdversario,gameHora,name,role,tickets,squad:'sub23'});
+    document.getElementById('bilhetes-eqb-success').style.display='block';
+    document.getElementById('bilhetes-eqb-form').style.display='none';
+  }catch(e){
+    console.error('submitBilhetesEqb:',e);
+    if(errEl){ errEl.textContent='❌ Erro ao guardar: '+(e?.message||'verifica a consola'); errEl.style.display='block'; }
+  }
+}
+
+async function renderBilhetesEqbAdmin(){
+  const el=document.getElementById('v-bilhetes-eqb-content');
+  if(!el) return;
+  el.innerHTML=`<div style="padding:20px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--muted);font-size:13px">A carregar...</p></div>`;
+  const today=new Date().toISOString().split('T')[0];
+  const allEvs=DB.events('sub23').filter(e=>e.type==='game'&&e.homeAway==='home'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  const nextGame=allEvs[0];
+  if(!nextGame){
+    el.innerHTML=`<div style="padding:32px;text-align:center;color:var(--muted)"><p>Não há jogos em casa do Sub-23 agendados.</p></div>`;
+    return;
+  }
+  const dateLabel=new Date(nextGame.date+'T12:00:00').toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'});
+  const opponent=nextGame.opponent||'Adversário';
+  const hora=nextGame.time||'';
+  const baseUrl=window.location.origin+window.location.pathname;
+  const link=`${baseUrl}?mode=bilhetes-eqb&id=${nextGame.id}&d=${nextGame.date}&a=${encodeURIComponent(opponent)}&h=${encodeURIComponent(hora)}`;
+  let requests=[];
+  try{ requests=await DB.getBilhetesEqb(nextGame.id); }catch(e){ console.error(e); }
+  const totalConvites=requests.reduce((s,r)=>s+(r.tickets||1),0);
+  function buildRows(rows){
+    if(!rows.length) return `<p style="color:var(--muted);font-size:13px;padding:6px 0">Sem pedidos.</p>`;
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Nome</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Função</th>
+        <th style="text-align:center;padding:6px 8px;color:var(--muted);font-weight:600">Convites</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr style="border-bottom:1px solid var(--border)${i%2?';background:rgba(0,0,0,.02)':''}">
+        <td style="padding:7px 8px;font-weight:500">${r.name}</td>
+        <td style="padding:7px 8px;color:var(--muted)">${r.role}</td>
+        <td style="padding:7px 8px;text-align:center;font-weight:700">${r.tickets||1}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  el.innerHTML=`
+    <div style="padding:0 16px 80px">
+      <p style="color:var(--muted);font-size:13px;margin:0 0 16px">${dateLabel}${hora?' · '+hora:''} · vs ${opponent}</p>
+
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;font-weight:600">🔗 Link para partilhar</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input readonly value="${link}" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:11px;min-width:0">
+          <button onclick="navigator.clipboard.writeText(document.querySelector('#v-bilhetes-eqb-content input[readonly]').value).then(()=>toast('✅ Link copiado!'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap">Copiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div>
+            <div style="font-size:14px;font-weight:700">Pedidos recebidos</div>
+            <div style="font-size:12px;color:var(--muted)">${requests.length} pessoa${requests.length!==1?'s':''} · ${totalConvites} convite${totalConvites!==1?'s':''} no total</div>
+          </div>
+          <button onclick="printBilhetesEqb()" style="padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:13px;cursor:pointer">🖨️ Imprimir</button>
+        </div>
+        ${requests.length===0?`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Ainda não há pedidos.</p>`:buildRows(requests)}
+      </div>
+    </div>
+    <div id="bilhetes-eqb-print-tpl" style="display:none">
+      <h2 style="font-size:16px;margin-bottom:4px">SC Vianense SAD — Pedidos de Convites Sub-23</h2>
+      <p style="font-size:12px;color:#666;margin-bottom:20px">${dateLabel}${hora?' · '+hora:''} · vs ${opponent} · <strong>${requests.length} pessoa${requests.length!==1?'s':''} · ${totalConvites} convite${totalConvites!==1?'s':''}</strong></p>
+      ${requests.length?`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Nome</th><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left">Função</th><th style="background:#1a3a5c;color:#fff;padding:6px 8px;text-align:center">Convites</th></tr></thead><tbody>${requests.map((r,i)=>`<tr style="${i%2?'background:#f5f5f5':''}"><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.name}</td><td style="padding:6px 8px;border-bottom:1px solid #eee">${r.role}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-weight:700">${r.tickets||1}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:#999">Sem pedidos.</p>'}
+    </div>`;
+}
+
+function printBilhetesEqb(){
+  const tpl=document.getElementById('bilhetes-eqb-print-tpl');
+  if(!tpl) return;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Convites Sub-23 — SC Vianense</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px;color:#000;max-width:700px;margin:0 auto}@media print{body{padding:0}}</style>
+    </head><body>${tpl.innerHTML}</body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
+}
+
 async function renderMonitoring(){
   const sq=document.getElementById('mon-squad').value||coachSquad()||'sub23';
   const date=document.getElementById('mon-date').value||(new Date().toISOString().slice(0,10));
@@ -14336,6 +14511,7 @@ function applyRoleUI(){
   const nlWeeklyPlan=document.getElementById('nl-weekly-plan');
   const monSection=[document.getElementById('nsl-monitoring'),document.getElementById('nl-monitoring'),document.getElementById('nl-pse-link'),document.getElementById('nl-wellness-link')];
   const nlBilhetes=document.getElementById('nl-bilhetes');
+  const nlBilhetesEqb=document.getElementById('nl-bilhetes-eqb');
   const nlScouting=document.getElementById('nl-scouting');
   const nslScouting=document.getElementById('nsl-scouting');
   function showScouting(show){ [nlScouting,nslScouting].forEach(el=>el&&(el.style.display=show?'':'none')); }
@@ -14428,6 +14604,7 @@ function applyRoleUI(){
     // Admin vê monitorização, links PSE/Bem-Estar e bilhetes
     monSection.forEach(el=>el&&(el.style.display=''));
     if(nlBilhetes) nlBilhetes.style.display='';
+    if(nlBilhetesEqb) nlBilhetesEqb.style.display='';
   }
 }
 
@@ -14847,6 +15024,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.classList.add('pm');
     nav('bilhetes-form');
     renderBilhetesForm(params);
+    return;
+  }
+  if(params.get('mode')==='bilhetes-eqb'){
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.body.classList.add('pm');
+    nav('bilhetes-eqb-form');
+    renderBilhetesEqbForm(params);
     return;
   }
   if(params.get('mode')==='wellness'){
