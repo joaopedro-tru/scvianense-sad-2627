@@ -6248,17 +6248,29 @@ function exportCalPDF(){
   selOverlay.id='kit-print-overlay';
   selOverlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
   const initSquads={'eqa':calFilter.includes('eqa'),'sub23':calFilter.includes('sub23'),'sub19':calFilter.includes('sub19')};
-  selOverlay.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:300px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
-    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:#0e2444">📄 Exportar Calendário — ${MONTHS[calMonth]} ${calYear}</div>
+  // Pre-fill date range with first/last day of current calendar month
+  const _mm=String(calMonth+1).padStart(2,'0');
+  const _lastDay=new Date(calYear,calMonth+1,0).getDate();
+  const _defFrom=`${calYear}-${_mm}-01`;
+  const _defTo=`${calYear}-${_mm}-${String(_lastDay).padStart(2,'0')}`;
+  selOverlay.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:320px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:#0e2444">📄 Exportar Calendário</div>
     <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:10px">Escalões a incluir:</div>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cpdf-eqa" ${initSquads.eqa?'checked':''}> Equipa A</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cpdf-sub23" ${initSquads.sub23?'checked':''}> Sub-23</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cpdf-sub19" ${initSquads.sub19?'checked':''}> Sub-19</label>
     </div>
-    <div style="border-top:1px solid #eee;margin-top:4px;padding-top:14px;display:flex;flex-direction:column;gap:8px">
+    <div style="background:#f5f7fa;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Intervalo de datas (para lista de jogos)</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:#555;display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">De<input type="date" id="cpdf-from" value="${_defFrom}" style="padding:6px 8px;border:1.5px solid #d0d7e3;border-radius:6px;font-size:13px;background:#fff;color:#1a1a1a"></label>
+        <label style="font-size:12px;color:#555;display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">Até<input type="date" id="cpdf-to" value="${_defTo}" style="padding:6px 8px;border:1.5px solid #d0d7e3;border-radius:6px;font-size:13px;background:#fff;color:#1a1a1a"></label>
+      </div>
+    </div>
+    <div style="border-top:1px solid #eee;padding-top:14px;display:flex;flex-direction:column;gap:8px">
       <button id="cpdf-gen" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📅 Calendário mensal (grelha)</button>
-      <button id="cpdf-games" style="padding:9px 18px;background:#1a6b3a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">⚽ Lista de jogos do mês</button>
+      <button id="cpdf-games" style="padding:9px 18px;background:#1a6b3a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">⚽ Lista de jogos (intervalo)</button>
       <button id="cpdf-cancel" style="padding:7px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#555">Cancelar</button>
     </div>
   </div>`;
@@ -6273,8 +6285,12 @@ function exportCalPDF(){
   document.getElementById('cpdf-games').onclick=async()=>{
     const selSquads=['eqa','sub23','sub19'].filter(s=>document.getElementById('cpdf-'+s)?.checked);
     if(!selSquads.length){ toast('⚠️ Seleciona pelo menos um escalão'); return; }
+    const from=document.getElementById('cpdf-from').value;
+    const to=document.getElementById('cpdf-to').value;
+    if(!from||!to){ toast('⚠️ Define as datas de início e fim'); return; }
+    if(from>to){ toast('⚠️ A data de início é posterior à data de fim'); return; }
     selOverlay.remove();
-    await _renderGameListPDF(selSquads, calYear, calMonth);
+    await _renderGameListPDF(selSquads, from, to);
   };
 }
 
@@ -6409,24 +6425,21 @@ async function _renderCalPDF(selSquads){
   toast('✅ PDF descarregado!');
 }
 
-// ── GAME LIST PDF (jogos do mês em lista limpa) ────────────────────────────────
-async function _renderGameListPDF(selSquads, year, month){
-  const mm=String(month+1).padStart(2,'0');
-  const from=`${year}-${mm}-01`;
-  const lastDay=new Date(year,month+1,0).getDate();
-  const to=`${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
-
+// ── GAME LIST PDF (jogos por intervalo de datas) ───────────────────────────────
+async function _renderGameListPDF(selSquads, from, to){
   // Collect games from selected squads, deduplicated
   let evs=selSquads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
     .filter(e=>e.date>=from&&e.date<=to)
     .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
 
-  if(!evs.length){ toast('⚠️ Sem jogos neste mês para os escalões selecionados.'); return; }
+  if(!evs.length){ toast('⚠️ Sem jogos no período selecionado para os escalões selecionados.'); return; }
 
   const multiSq=selSquads.length>1;
   const squadLabel=selSquads.length===3?'Todos os escalões':selSquads.map(s=>({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[s])).join(' + ');
-  const monthLabel=`${MONTHS[month]} ${year}`;
+  // Format date range label (pt-PT)
+  const fmtLbl=d=>{ const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+  const rangeLabel=from===to?fmtLbl(from):`${fmtLbl(from)} a ${fmtLbl(to)}`;
 
   toast('⏳ A gerar PDF...');
   if(!window.jspdf) await new Promise((res,rej)=>{
@@ -6447,7 +6460,7 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text('SC Vianense SAD',ML+5,MT+7);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text(`Jogos de ${monthLabel}  ·  ${squadLabel}`,ML+5,MT+13);
+  doc.text(`Jogos de ${rangeLabel}  ·  ${squadLabel}`,ML+5,MT+13);
   doc.setFont('helvetica','normal'); doc.setFontSize(7);
   doc.setTextColor(180,200,230);
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
@@ -6499,7 +6512,7 @@ async function _renderGameListPDF(selSquads, year, month){
     doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
     doc.text(WD[d.getDay()],xDate+2,ry+4);
     doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${year}`,xDate+2,ry+8.5);
+    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${d.getFullYear()}`,xDate+2,ry+8.5);
     if(ev.time){
       doc.setTextColor(60,60,60); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
       doc.text(ev.time,xDate+C_DATE-3,ry+5,{align:'right'});
@@ -6559,7 +6572,7 @@ async function _renderGameListPDF(selSquads, year, month){
   doc.text('SC Vianense SAD · Gestão Desportiva',ML,ry+7);
   doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
 
-  doc.save(`Jogos_${monthLabel.replace(/\s/g,'_')}.pdf`);
+  doc.save(`Jogos_${from}_${to}.pdf`);
   toast('✅ PDF de jogos descarregado!');
 }
 
