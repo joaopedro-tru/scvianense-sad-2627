@@ -1981,6 +1981,18 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           </label>
         </div>
         <div id="e-km-grp" style="display:none;margin-top:12px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">🚐 Local de partida</label>
+              <input type="text" id="e-dep-location" placeholder="Estádio Dr José de Matos"
+                style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit">
+            </div>
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">🏟️ Local de chegada</label>
+              <input type="text" id="e-arr-location" placeholder="Estádio Dr José de Matos"
+                style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit">
+            </div>
+          </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap">
             <div style="flex:0 0 auto">
               <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância (km)</label>
@@ -1998,8 +2010,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <div id="e-transport-preview" style="display:none;margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 14px;border:1px solid #c5d3f5">
             <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⏱️ Horários calculados</div>
             <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
-              <div><span style="color:var(--muted);font-size:11px">🚐 Saída do Estádio</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
-              <div><span style="color:var(--muted);font-size:11px">🏟️ Chegada ao Estádio</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">🚐 Saída</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">🏟️ Chegada</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
             </div>
           </div>
         </div>
@@ -6577,12 +6589,21 @@ async function _renderGameListPDF(selSquads, from, to){
       if(transport.includes('bus')){ doc.text('🚌 Autocarro',xTransp+2,transpY); transpY+=3.8; }
     }
     if(ev.distanceKm) { doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(100,100,100); doc.text(`${ev.distanceKm} km`,xTransp+2,transpY); transpY+=3.2; }
-    if(tt&&ev.time){
+    if(tt&&ev.time&&transport.length){
+      const _depLoc=ev.departureLocation||'Est. Dr José de Matos';
+      const _arrLoc=ev.arrivalLocation||'Est. Dr José de Matos';
       doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(14,36,68);
-      doc.text(`Saída: ${tt.departureHome}`,xTransp+2,transpY); transpY+=3.2;
-      doc.setTextColor(150,20,20);
-      doc.text(`Saída campo: ${tt.departureAfterGame}`,xTransp+2,transpY); transpY+=3.2;
-      if(_travelMins>0){ doc.setTextColor(30,90,30); doc.text(`Regresso: ${tt.estimatedReturn}`,xTransp+2,transpY); }
+      doc.text(`Saída: ${tt.departureHome}`,xTransp+2,transpY); transpY+=3;
+      doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(100,100,100);
+      const depLocLine=doc.splitTextToSize(_depLoc,C_TRANSP-4)[0];
+      doc.text(depLocLine,xTransp+2,transpY); transpY+=3.5;
+      if(_travelMins>0){
+        doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(30,90,30);
+        doc.text(`Regresso: ${tt.estimatedReturn}`,xTransp+2,transpY); transpY+=3;
+        doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(100,100,100);
+        const arrLocLine=doc.splitTextToSize(_arrLoc,C_TRANSP-4)[0];
+        doc.text(arrLocLine,xTransp+2,transpY);
+      }
     }
 
     // Local / Estádio
@@ -7029,6 +7050,11 @@ function openEventModal(ev=null,date=null,defaults={}){
   if(kmEl) kmEl.value=ev?.distanceKm||'';
   const tmEl=document.getElementById('e-travel-mins');
   if(tmEl) tmEl.value=ev?.travelMins||'';
+  const HOME_STAD='Estádio Dr José de Matos';
+  const depLocEl=document.getElementById('e-dep-location');
+  if(depLocEl) depLocEl.value=ev?.departureLocation||HOME_STAD;
+  const arrLocEl=document.getElementById('e-arr-location');
+  if(arrLocEl) arrLocEl.value=ev?.arrivalLocation||HOME_STAD;
   // Reset preview then recalculate after toggleOpp runs
   const prevEl=document.getElementById('e-transport-preview');
   if(prevEl) prevEl.style.display='none';
@@ -7163,7 +7189,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -13218,14 +13244,20 @@ function renderTransportTab(){
       <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}${ev.distanceKm?`<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${ev.distanceKm} km</div>`:''}</td>
       <td style="padding:8px 10px;font-size:11px;min-width:130px">${(()=>{
         if(!ev.time) return '<span style="color:var(--muted)">—</span>';
+        if(!(ev.transport||[]).length) return '<span style="color:var(--muted)">—</span>';
         const travelMins=ev.travelMins||0;
         const t=calcTransportTimes(ev.time, travelMins);
         if(!t) return '<span style="color:var(--muted)">—</span>';
-        return `<div style="line-height:2">
-          <div><span style="color:var(--muted);font-size:10px">🚐 Saída do Estádio</span><br><strong style="font-size:13px">${t.departureHome}</strong></div>
+        const HOME_STAD='Estádio Dr José de Matos';
+        const depLoc=ev.departureLocation||HOME_STAD;
+        const arrLoc=ev.arrivalLocation||HOME_STAD;
+        return `<div style="line-height:1.7">
+          <div><span style="color:var(--muted);font-size:10px">🚐 Saída</span> <strong style="font-size:13px">${t.departureHome}</strong></div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${depLoc}</div>
           ${travelMins>0
-            ? `<div style="margin-top:2px"><span style="color:var(--muted);font-size:10px">🏟️ Chegada ao Estádio</span><br><strong style="font-size:13px;color:#1b5e20">${t.estimatedReturn}</strong></div>`
-            : `<div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:2px">Define o tempo de viagem<br>para ver o regresso</div>`
+            ? `<div><span style="color:var(--muted);font-size:10px">🏟️ Chegada</span> <strong style="font-size:13px;color:#1b5e20">${t.estimatedReturn}</strong></div>
+               <div style="font-size:10px;color:var(--muted)">${arrLoc}</div>`
+            : `<div style="font-size:10px;color:var(--muted);font-style:italic">Define o tempo de viagem<br>para ver o regresso</div>`
           }
         </div>`;
       })()}</td>
