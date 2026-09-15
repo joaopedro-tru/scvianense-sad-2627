@@ -1990,7 +1990,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
             <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;width:fit-content">
               <input type="checkbox" id="e-diff-arr-location"
                 style="width:14px;height:14px;cursor:pointer;accent-color:var(--green)"
-                onchange="document.getElementById('e-arr-location-grp').style.display=this.checked?'block':'none'">
+                onchange="toggleDiffArrival(this.checked)">
               Local de chegada diferente
             </label>
             <div id="e-arr-location-grp" style="display:none;margin-top:8px">
@@ -1999,16 +1999,32 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
                 style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit">
             </div>
           </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <!-- Campos Ida -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px">
             <div style="flex:0 0 auto">
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância (km)</label>
+              <label id="e-km-label" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância (km)</label>
               <input type="number" id="e-km" min="0" step="1" placeholder="Ex: 45"
                 style="width:100px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
                 oninput="updateTransportPreview()">
             </div>
             <div style="flex:0 0 auto">
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">⏱️ Tempo de viagem (min)</label>
+              <label id="e-tm-label" style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">⏱️ Tempo de viagem (min)</label>
               <input type="number" id="e-travel-mins" min="0" step="1" placeholder="Ex: 35"
+                style="width:110px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
+                oninput="updateTransportPreview()">
+            </div>
+          </div>
+          <!-- Campos Regresso (só quando locais diferentes) -->
+          <div id="e-return-dist-grp" style="display:none;display:none;gap:12px;flex-wrap:wrap;margin-top:2px">
+            <div style="flex:0 0 auto">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância regresso (km)</label>
+              <input type="number" id="e-km-ret" min="0" step="1" placeholder="Ex: 45"
+                style="width:100px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
+                oninput="updateTransportPreview()">
+            </div>
+            <div style="flex:0 0 auto">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">⏱️ Tempo regresso (min)</label>
+              <input type="number" id="e-travel-mins-ret" min="0" step="1" placeholder="Ex: 35"
                 style="width:110px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
                 oninput="updateTransportPreview()">
             </div>
@@ -2016,8 +2032,8 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <div id="e-transport-preview" style="display:none;margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 14px;border:1px solid #c5d3f5">
             <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⏱️ Horários calculados</div>
             <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
-              <div><span style="color:var(--muted);font-size:11px">🚐 Saída</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
-              <div><span style="color:var(--muted);font-size:11px">🏟️ Chegada</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px" id="e-tp-dep-lbl">🚐 Saída</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px" id="e-tp-ret-lbl">🏟️ Chegada</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
             </div>
           </div>
         </div>
@@ -6586,8 +6602,9 @@ async function _renderGameListPDF(selSquads, from, to){
 
     // Transporte + horários
     const transport=ev.transport||[];
-    const _travelMins=ev.travelMins||0;
-    const tt=calcTransportTimes(ev.time||'',_travelMins);
+    const _travelMinsOut=ev.travelMins||0;
+    const _travelMinsRet=ev.travelMinsReturn>0?ev.travelMinsReturn:_travelMinsOut;
+    const tt=calcTransportTimes(ev.time||'',_travelMinsOut,_travelMinsRet);
     let transpY=ry+3.5;
     if(transport.length){
       doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
@@ -6603,7 +6620,7 @@ async function _renderGameListPDF(selSquads, from, to){
       doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(100,100,100);
       const depLocLine=doc.splitTextToSize(_depLoc,C_TRANSP-4)[0];
       doc.text(depLocLine,xTransp+2,transpY); transpY+=3.5;
-      if(_travelMins>0){
+      if(_travelMinsOut>0||_travelMinsRet>0){
         doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(30,90,30);
         doc.text(`Regresso: ${tt.estimatedReturn}`,xTransp+2,transpY); transpY+=3;
         doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(100,100,100);
@@ -7059,11 +7076,16 @@ function openEventModal(ev=null,date=null,defaults={}){
   const HOME_STAD='Estádio Dr José de Matos';
   const depLocEl=document.getElementById('e-dep-location');
   if(depLocEl) depLocEl.value=ev?.departureLocation||HOME_STAD;
-  const diffArr=!!(ev?.arrivalLocation&&ev.arrivalLocation!==ev.departureLocation&&ev.arrivalLocation!==HOME_STAD);
+  const diffArr=!!(ev?.arrivalLocation&&ev.arrivalLocation!==(ev?.departureLocation||HOME_STAD));
   const diffChk=document.getElementById('e-diff-arr-location');
-  if(diffChk){ diffChk.checked=diffArr; document.getElementById('e-arr-location-grp').style.display=diffArr?'block':'none'; }
+  if(diffChk) diffChk.checked=diffArr;
   const arrLocEl=document.getElementById('e-arr-location');
   if(arrLocEl) arrLocEl.value=ev?.arrivalLocation||HOME_STAD;
+  const kmRetEl=document.getElementById('e-km-ret');
+  if(kmRetEl) kmRetEl.value=ev?.distanceKmReturn||'';
+  const tmRetEl=document.getElementById('e-travel-mins-ret');
+  if(tmRetEl) tmRetEl.value=ev?.travelMinsReturn||'';
+  toggleDiffArrival(diffArr);
   // Reset preview then recalculate after toggleOpp runs
   const prevEl=document.getElementById('e-transport-preview');
   if(prevEl) prevEl.style.display='none';
@@ -7118,8 +7140,10 @@ function updateCompetitionOptions(sq, currentVal=''){
   sel.innerHTML = comps.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
 }
 // ── TRANSPORT TIME CALCULATOR ─────────────────────────────────────────────────
-function calcTransportTimes(gameTime, travelMins){
+// travelMinsOut: travel time to venue; travelMinsRet: return travel time (defaults to travelMinsOut)
+function calcTransportTimes(gameTime, travelMinsOut, travelMinsRet){
   if(!gameTime) return null;
+  travelMinsRet = travelMinsRet ?? travelMinsOut;
   const [h,m]=gameTime.split(':').map(Number);
   const gameMins=h*60+m;
   const toTime=mins=>{
@@ -7127,12 +7151,27 @@ function calcTransportTimes(gameTime, travelMins){
     return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
   };
   return {
-    travelMins,
-    departureHome:toTime(gameMins-90-travelMins),
-    arrivalDestination:toTime(gameMins-90),
+    travelMinsOut, travelMinsRet,
+    departureHome:toTime(gameMins-90-travelMinsOut),
     departureAfterGame:toTime(gameMins+150),
-    estimatedReturn:toTime(gameMins+150+travelMins),
+    estimatedReturn:toTime(gameMins+150+travelMinsRet),
   };
+}
+
+function toggleDiffArrival(on){
+  document.getElementById('e-arr-location-grp').style.display=on?'block':'none';
+  document.getElementById('e-return-dist-grp').style.display=on?'flex':'none';
+  const depLoc=document.getElementById('e-dep-location')?.value||'Local de partida';
+  const arrLoc=on?(document.getElementById('e-arr-location')?.value||'Local de chegada'):depLoc;
+  const kmLbl=document.getElementById('e-km-label');
+  const tmLbl=document.getElementById('e-tm-label');
+  if(kmLbl) kmLbl.textContent=on?'📍 Distância ida (km)':'📍 Distância (km)';
+  if(tmLbl) tmLbl.textContent=on?'⏱️ Tempo ida (min)':'⏱️ Tempo de viagem (min)';
+  const depLbl=document.getElementById('e-tp-dep-lbl');
+  const retLbl=document.getElementById('e-tp-ret-lbl');
+  if(depLbl) depLbl.textContent=`🚐 Saída — ${depLoc}`;
+  if(retLbl) retLbl.textContent=`🏟️ Chegada — ${arrLoc}`;
+  updateTransportPreview();
 }
 
 function updateTransportPreview(){
@@ -7140,12 +7179,14 @@ function updateTransportPreview(){
   const prev=document.getElementById('e-transport-preview');
   if(!prev) return;
   if(!time){ prev.style.display='none'; return; }
-  const travelMins=parseFloat(document.getElementById('e-travel-mins')?.value)||0;
-  const t=calcTransportTimes(time, travelMins);
+  const travelMinsOut=parseFloat(document.getElementById('e-travel-mins')?.value)||0;
+  const diffOn=document.getElementById('e-diff-arr-location')?.checked;
+  const travelMinsRet=diffOn?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):travelMinsOut;
+  const t=calcTransportTimes(time, travelMinsOut, travelMinsRet);
   if(!t){ prev.style.display='none'; return; }
   prev.style.display='block';
   document.getElementById('e-tp-dep').textContent=t.departureHome;
-  document.getElementById('e-tp-ret').textContent=travelMins>0?t.estimatedReturn:'—';
+  document.getElementById('e-tp-ret').textContent=(travelMinsOut>0||travelMinsRet>0)?t.estimatedReturn:'—';
 }
 
 function _isAway(){ return document.querySelector('input[name="e-ha"]:checked')?.value==='away'; }
@@ -7198,7 +7239,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):'', distanceKmReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-km-ret')?.value)||0):0, travelMinsReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):0};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -13254,16 +13295,18 @@ function renderTransportTab(){
       <td style="padding:8px 10px;font-size:11px;min-width:130px">${(()=>{
         if(!ev.time) return '<span style="color:var(--muted)">—</span>';
         if(!(ev.transport||[]).length) return '<span style="color:var(--muted)">—</span>';
-        const travelMins=ev.travelMins||0;
-        const t=calcTransportTimes(ev.time, travelMins);
+        const travelMinsOut=ev.travelMins||0;
+        const travelMinsRet=ev.travelMinsReturn>0?ev.travelMinsReturn:travelMinsOut;
+        const t=calcTransportTimes(ev.time, travelMinsOut, travelMinsRet);
         if(!t) return '<span style="color:var(--muted)">—</span>';
         const HOME_STAD='Estádio Dr José de Matos';
         const depLoc=ev.departureLocation||HOME_STAD;
         const arrLoc=ev.arrivalLocation||HOME_STAD;
+        const hasReturn=travelMinsOut>0||travelMinsRet>0;
         return `<div style="line-height:1.7">
           <div><span style="color:var(--muted);font-size:10px">🚐 Saída</span> <strong style="font-size:13px">${t.departureHome}</strong></div>
           <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${depLoc}</div>
-          ${travelMins>0
+          ${hasReturn
             ? `<div><span style="color:var(--muted);font-size:10px">🏟️ Chegada</span> <strong style="font-size:13px;color:#1b5e20">${t.estimatedReturn}</strong></div>
                <div style="font-size:10px;color:var(--muted)">${arrLoc}</div>`
             : `<div style="font-size:10px;color:var(--muted);font-style:italic">Define o tempo de viagem<br>para ver o regresso</div>`
