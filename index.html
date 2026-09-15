@@ -1171,6 +1171,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <input type="checkbox" id="tm-transp-show-past" style="width:15px;height:15px;cursor:pointer">
           Mostrar realizados
         </label>
+        <button onclick="exportTransportPDF()" style="margin-left:auto;padding:6px 14px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">📄 Exportar PDF</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <table id="tm-transp-table" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -13225,6 +13226,264 @@ function setTranspFilter(val){
 }
 
 function getTransportMeta(){ return JSON.parse(localStorage.getItem(TRANSP_KEY)||'{}'); }
+
+// ── TRANSPORT PDF EXPORT ───────────────────────────────────────────────────────
+function exportTransportPDF(){
+  // Pre-fill dates: today → end of current month
+  const today=new Date();
+  const _y=today.getFullYear(), _m=today.getMonth();
+  const _mm=String(_m+1).padStart(2,'0');
+  const _defFrom=`${_y}-${_mm}-${String(today.getDate()).padStart(2,'0')}`;
+  const _lastDay=new Date(_y,_m+1,0).getDate();
+  const _defTo=`${_y}-${_mm}-${String(_lastDay).padStart(2,'0')}`;
+
+  const sqNow=document.getElementById('tm-transp-squad')?.value||'';
+  const haOpts=['away','home','all'];
+  const haLabels={away:'Fora',home:'Casa',all:'Todos'};
+
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:4000;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:320px;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:#0e2444">📄 Exportar PDF — Transporte</div>
+    <div style="background:#f5f7fa;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Período</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <label style="font-size:12px;color:#555;display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">De<input type="date" id="tpdf-from" value="${_defFrom}" style="padding:6px 8px;border:1.5px solid #d0d7e3;border-radius:6px;font-size:13px;background:#fff;color:#1a1a1a"></label>
+        <label style="font-size:12px;color:#555;display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">Até<input type="date" id="tpdf-to" value="${_defTo}" style="padding:6px 8px;border:1.5px solid #d0d7e3;border-radius:6px;font-size:13px;background:#fff;color:#1a1a1a"></label>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Escalões</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-eqa" ${!sqNow||sqNow==='eqa'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Equipa A</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub23" ${!sqNow||sqNow==='sub23'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-23</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub19" ${!sqNow||sqNow==='sub19'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-19</label>
+      </div>
+    </div>
+    <div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Jogos</div>
+      <div style="display:flex;gap:4px">
+        ${haOpts.map(k=>`<button id="tpdf-ha-${k}" onclick="(()=>{['away','home','all'].forEach(x=>{ const b=document.getElementById('tpdf-ha-'+x); b.style.background=x==='${k}'?'#0e2444':'#f0f0f0'; b.style.color=x==='${k}'?'#fff':'#444'; }); })();" style="flex:1;padding:7px 0;font-size:12px;font-weight:700;border:none;border-radius:6px;cursor:pointer;background:${k===_transpFilter?'#0e2444':'#f0f0f0'};color:${k===_transpFilter?'#fff':'#444'}">${haLabels[k]}</button>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button id="tpdf-gen" style="padding:9px 18px;background:#0e2444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📄 Gerar PDF</button>
+      <button id="tpdf-cancel" style="padding:7px 18px;border:1.5px solid #ccc;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:#555">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('tpdf-cancel').onclick=()=>overlay.remove();
+  document.getElementById('tpdf-gen').onclick=async()=>{
+    const from=document.getElementById('tpdf-from').value;
+    const to=document.getElementById('tpdf-to').value;
+    if(!from||!to){ toast('⚠️ Define o período'); return; }
+    if(from>to){ toast('⚠️ Data de início posterior à data de fim'); return; }
+    const selSquads=['eqa','sub23','sub19'].filter(s=>document.getElementById('tpdf-'+s)?.checked);
+    if(!selSquads.length){ toast('⚠️ Seleciona pelo menos um escalão'); return; }
+    const haActive=['away','home','all'].find(k=>{ const b=document.getElementById('tpdf-ha-'+k); return b?.style.background==='rgb(14, 36, 68)'; })||'away';
+    overlay.remove();
+    await _renderTransportPDF(selSquads, from, to, haActive);
+  };
+}
+
+async function _renderTransportPDF(selSquads, from, to, haFilter){
+  // Collect and filter events
+  let evs=selSquads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
+    .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
+    .filter(e=>e.date>=from&&e.date<=to)
+    .filter(e=>{
+      if(haFilter==='away') return e.homeAway==='away';
+      if(haFilter==='home') return e.homeAway!=='away';
+      return true;
+    })
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+
+  if(!evs.length){ toast('⚠️ Sem jogos no período/filtro selecionado.'); return; }
+
+  const meta=getTransportMeta();
+  const fmtLbl=d=>{ const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+  const rangeLabel=from===to?fmtLbl(from):`${fmtLbl(from)} a ${fmtLbl(to)}`;
+  const haLabel={away:'Fora',home:'Casa',all:'Todos'}[haFilter]||'';
+  const squadLabel=selSquads.length===3?'Todos os escalões':selSquads.map(s=>({eqa:'Equipa A',sub23:'Sub-23',sub19:'Sub-19'}[s])).join(' + ');
+
+  toast('⏳ A gerar PDF...');
+  if(!window.jspdf) await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
+  });
+  const {jsPDF}=window.jspdf;
+
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const PW=297, PH=210, ML=12, MR=12, MT=12, MB=12;
+  const W=PW-ML-MR;
+  const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const TRANSP_LABEL={van:'Carrinha',bus:'Autocarro'};
+  const sqColor={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]};
+  const sqLabel={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'};
+  const multiSq=selSquads.length>1;
+
+  // ── Cabeçalho ──
+  doc.setFillColor(14,36,68);
+  doc.rect(ML,MT,W,16,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('SC Vianense SAD — Plano de Transportes',ML+5,MT+7);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(`${rangeLabel}  ·  ${squadLabel}  ·  Jogos: ${haLabel}`,ML+5,MT+13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.setTextColor(180,200,230);
+  doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
+
+  // ── Colunas ──
+  // Data | Escalão | Adversário | C/F | Veículo | Local Partida | Saída | Chegada | Km | Condutor | Req | Apr
+  const C_DATE=34, C_SQ=multiSq?20:0, C_HA=14, C_OPP=46, C_VEH=22, C_TIME=28, C_KM=14, C_DRV=34, C_REQ=12, C_APR=12;
+  const C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_VEH-C_TIME-C_KM-C_DRV-C_REQ-C_APR;
+  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xVeh=xOpp+C_OPP, xLoc=xVeh+C_VEH, xTime=xLoc+C_LOC, xKm=xTime+C_TIME, xDrv=xKm+C_KM, xReq=xDrv+C_DRV, xApr=xReq+C_REQ;
+
+  function drawHeader(y){
+    doc.setFillColor(26,61,110);
+    doc.rect(ML,y,W,6.5,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+    doc.text('DATA',xDate+1,y+4.5);
+    if(multiSq) doc.text('ESC.',xSq+1,y+4.5);
+    doc.text('ADVERSÁRIO',xOpp+1,y+4.5);
+    doc.text('C/F',xHa+1,y+4.5);
+    doc.text('VEÍCULO',xVeh+1,y+4.5);
+    doc.text('LOCAL PARTIDA / CHEGADA',xLoc+1,y+4.5);
+    doc.text('SAÍDA / CHEGADA',xTime+1,y+4.5);
+    doc.text('KM',xKm+1,y+4.5);
+    doc.text('CONDUTOR',xDrv+1,y+4.5);
+    doc.text('PED.',xReq+1,y+4.5);
+    doc.text('APR.',xApr+1,y+4.5);
+    return y+6.5;
+  }
+
+  const ROW_H=17;
+  const THY=MT+20;
+  let ry=drawHeader(THY);
+
+  evs.forEach((ev,i)=>{
+    if(ry+ROW_H>PH-MB){ doc.addPage('a4','landscape'); ry=MT; ry=drawHeader(ry); }
+
+    const d=new Date(ev.date+'T00:00:00');
+    const isAway=ev.homeAway==='away';
+    const even=i%2===0;
+    const m=meta[ev.id]||{};
+    const travelMinsOut=ev.travelMins||0;
+    const travelMinsRet=ev.travelMinsReturn>0?ev.travelMinsReturn:travelMinsOut;
+    const tt=ev.time?calcTransportTimes(ev.time,travelMinsOut,travelMinsRet):null;
+    const HOME_STAD='Estádio Dr José de Matos';
+    const depLoc=ev.departureLocation||HOME_STAD;
+    const arrLoc=ev.arrivalLocation||HOME_STAD;
+    const sameLocation=depLoc===arrLoc;
+    const transport=(ev.transport||[]).map(t=>TRANSP_LABEL[t]||t).join('+');
+    const hasTransport=!!transport;
+
+    // Fundo
+    doc.setFillColor(even?255:246,even?255:248,even?255:255);
+    doc.rect(ML,ry,W,ROW_H,'F');
+    doc.setDrawColor(210,220,235); doc.setLineWidth(0.1);
+    doc.line(ML,ry+ROW_H,ML+W,ry+ROW_H);
+
+    // Data
+    doc.setTextColor(110,110,110); doc.setFont('helvetica','normal'); doc.setFontSize(6);
+    doc.text(WD[d.getDay()],xDate+1,ry+4);
+    doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]}`,xDate+1,ry+8.5);
+    doc.setFontSize(7); doc.setTextColor(80,80,80);
+    doc.text(String(d.getFullYear()),xDate+1,ry+12.5);
+    if(ev.time){ doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(14,36,68); doc.text(ev.time,xDate+1,ry+16); }
+
+    // Escalão
+    if(multiSq){
+      const sc=sqColor[ev.squad]||[80,80,80];
+      doc.setFillColor(...sc); doc.roundedRect(xSq+1,ry+5,C_SQ-3,5,1,1,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+      doc.text(sqLabel[ev.squad]||'',xSq+1+(C_SQ-3)/2,ry+8.5,{align:'center'});
+    }
+
+    // Casa/Fora
+    const haC=isAway?[183,28,28]:[22,101,52];
+    doc.setFillColor(...haC); doc.roundedRect(xHa+0.5,ry+5,C_HA-2,5,1,1,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5);
+    doc.text(isAway?'FORA':'CASA',xHa+0.5+(C_HA-2)/2,ry+8.5,{align:'center'});
+
+    // Adversário + competição
+    doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    const oppLine=doc.splitTextToSize(ev.opponent||'—',C_OPP-2)[0]||'';
+    doc.text(oppLine,xOpp+1,ry+8);
+    if(ev.competition){ doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.text(ev.competition,xOpp+1,ry+12); }
+
+    // Veículo
+    if(hasTransport){
+      doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
+      doc.text(transport,xVeh+1,ry+8.5);
+    } else {
+      doc.setTextColor(180,180,180); doc.setFont('helvetica','italic'); doc.setFontSize(6);
+      doc.text('—',xVeh+1,ry+8.5);
+    }
+
+    // Local partida / chegada
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(60,60,60);
+    const depLine=doc.splitTextToSize('↑ '+depLoc,C_LOC-2)[0];
+    doc.text(depLine,xLoc+1,ry+5.5);
+    if(!sameLocation){
+      const arrLine=doc.splitTextToSize('↓ '+arrLoc,C_LOC-2)[0];
+      doc.setTextColor(30,90,30);
+      doc.text(arrLine,xLoc+1,ry+9.5);
+    }
+
+    // Saída / Chegada
+    if(tt&&hasTransport){
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(14,36,68);
+      doc.text(tt.departureHome,xTime+1,ry+6.5);
+      doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
+      doc.text('saída',xTime+1,ry+9.5);
+      if(travelMinsOut>0||travelMinsRet>0){
+        doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(30,90,30);
+        doc.text(tt.estimatedReturn,xTime+1,ry+13);
+        doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
+        doc.text('chegada',xTime+1,ry+16);
+      }
+    } else {
+      doc.setTextColor(180,180,180); doc.setFont('helvetica','italic'); doc.setFontSize(6);
+      doc.text('—',xTime+1,ry+8.5);
+    }
+
+    // Km
+    if(ev.distanceKm||ev.distanceKmReturn){
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(80,80,80);
+      if(ev.distanceKm) doc.text(`${ev.distanceKm}`,xKm+1,ry+7);
+      if(ev.distanceKmReturn&&ev.distanceKmReturn!==ev.distanceKm){
+        doc.setTextColor(30,90,30);
+        doc.text(`${ev.distanceKmReturn}`,xKm+1,ry+12);
+      }
+    }
+
+    // Condutor
+    if(m.driver){ doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(40,40,40); const dl=doc.splitTextToSize(m.driver,C_DRV-2); dl.slice(0,2).forEach((l,li)=>doc.text(l,xDrv+1,ry+6+li*4)); }
+
+    // Pedido / Aprovado
+    doc.setFontSize(10);
+    doc.text(m.requested?'✅':'⬜',xReq+C_REQ/2,ry+9,{align:'center'});
+    doc.text(m.approved?'✅':'⬜',xApr+C_APR/2,ry+9,{align:'center'});
+
+    ry+=ROW_H;
+  });
+
+  // ── Rodapé ──
+  doc.setDrawColor(14,36,68); doc.setLineWidth(0.3);
+  doc.line(ML,ry+3,ML+W,ry+3);
+  doc.setTextColor(160,160,160); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('SC Vianense SAD · Plano de Transportes',ML,ry+7);
+  doc.text(new Date().toLocaleDateString('pt-PT'),ML+W,ry+7,{align:'right'});
+
+  doc.save(`Transportes_${from}_${to}.pdf`);
+  toast('✅ PDF de transportes descarregado!');
+}
 function setTransportMeta(id, patch){
   const all=getTransportMeta();
   all[id]=Object.assign(all[id]||{},patch);
