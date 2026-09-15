@@ -1980,28 +1980,23 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
             🚌 Autocarro
           </label>
         </div>
-        <input type="hidden" id="e-travel-mins" value="">
         <div id="e-km-grp" style="display:none;margin-top:12px">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
             <div style="flex:0 0 auto">
               <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância (km)</label>
               <input type="number" id="e-km" min="0" step="1" placeholder="Ex: 45"
                 style="width:100px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
-                oninput="document.getElementById('e-travel-mins').value='';updateTransportPreview()">
+                oninput="updateTransportPreview()">
             </div>
-            <div style="display:flex;flex-direction:column;gap:5px;margin-top:14px">
-              <button type="button" id="e-osrm-btn" onclick="calcOsrmRoute()"
-                style="padding:6px 12px;background:#1a6b3a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-                🗺️ Calcular rota real
-              </button>
-              <div id="e-osrm-status" style="font-size:10px;color:var(--muted);text-align:center"></div>
+            <div style="flex:0 0 auto">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">⏱️ Tempo de viagem (min)</label>
+              <input type="number" id="e-travel-mins" min="0" step="1" placeholder="Ex: 35"
+                style="width:110px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
+                oninput="updateTransportPreview()">
             </div>
           </div>
           <div id="e-transport-preview" style="display:none;margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 14px;border:1px solid #c5d3f5">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px">⏱️ Horários calculados</div>
-              <div id="e-tp-source" style="font-size:10px;color:var(--muted)"></div>
-            </div>
+            <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⏱️ Horários calculados</div>
             <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
               <div><span style="color:var(--muted);font-size:11px">🏠 Saída de Viana</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
               <div><span style="color:var(--muted);font-size:11px">📍 Chegada ao campo</span><br><strong id="e-tp-arr" style="color:#0e2444"></strong></div>
@@ -2971,7 +2966,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-04a';
+const APP_BUILD='2026-09-15a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -6575,7 +6570,7 @@ async function _renderGameListPDF(selSquads, from, to){
 
     // Transporte + horários
     const transport=ev.transport||[];
-    const _travelMins=ev.travelMins||(ev.distanceKm>0?Math.round(ev.distanceKm/80*60):0);
+    const _travelMins=ev.travelMins||0;
     const tt=calcTransportTimes(ev.time||'',_travelMins);
     let transpY=ry+3.5;
     if(transport.length){
@@ -7036,8 +7031,6 @@ function openEventModal(ev=null,date=null,defaults={}){
   if(kmEl) kmEl.value=ev?.distanceKm||'';
   const tmEl=document.getElementById('e-travel-mins');
   if(tmEl) tmEl.value=ev?.travelMins||'';
-  const osrmStatus=document.getElementById('e-osrm-status');
-  if(osrmStatus) osrmStatus.textContent=ev?.travelMins?`🗺️ ${ev.travelMins} min (rota guardada)`:'';
   // Reset preview then recalculate after toggleOpp runs
   const prevEl=document.getElementById('e-transport-preview');
   if(prevEl) prevEl.style.display='none';
@@ -7092,7 +7085,6 @@ function updateCompetitionOptions(sq, currentVal=''){
   sel.innerHTML = comps.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
 }
 // ── TRANSPORT TIME CALCULATOR ─────────────────────────────────────────────────
-// travelMins: real minutes from OSRM, or estimated from km (km/80*60)
 function calcTransportTimes(gameTime, travelMins){
   if(!gameTime) return null;
   const [h,m]=gameTime.split(':').map(Number);
@@ -7110,95 +7102,19 @@ function calcTransportTimes(gameTime, travelMins){
   };
 }
 
-// ── OSRM / NOMINATIM ──────────────────────────────────────────────────────────
-const OSRM_CACHE_KEY='scv_osrm_geocache';
-// Coordenadas fixas do Estádio Dr José de Matos (origem sempre a mesma)
-const HOME_COORDS={lon:-8.8321, lat:41.6980};
-
-function _geoCache(){ return JSON.parse(localStorage.getItem(OSRM_CACHE_KEY)||'{}'); }
-function _geoStore(addr,coords){ const c=_geoCache(); c[addr]=coords; localStorage.setItem(OSRM_CACHE_KEY,JSON.stringify(c)); }
-
-async function nominatimGeocode(address){
-  const cache=_geoCache();
-  if(cache[address]) return cache[address];
-  const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=pt`;
-  const res=await fetch(url,{headers:{'Accept-Language':'pt-PT','User-Agent':'SCVianenseSAD/1.0'}});
-  const data=await res.json();
-  if(!data.length) return null;
-  const coords={lon:parseFloat(data[0].lon), lat:parseFloat(data[0].lat)};
-  _geoStore(address, coords);
-  return coords;
-}
-
-async function osrmDrivingMins(origin, dest){
-  const url=`https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${dest.lon},${dest.lat}?overview=false`;
-  const res=await fetch(url);
-  const data=await res.json();
-  if(data.code!=='Ok'||!data.routes.length) return null;
-  return Math.round(data.routes[0].duration/60);
-}
-
-async function calcOsrmRoute(){
-  const btn=document.getElementById('e-osrm-btn');
-  const status=document.getElementById('e-osrm-status');
-  // Build destination string from city + address fields
-  const city=document.getElementById('e-city')?.value.trim();
-  const addr=document.getElementById('e-address')?.value.trim()||document.getElementById('e-loc')?.value.trim();
-  const dest=[addr,city,'Portugal'].filter(Boolean).join(', ');
-  if(!city&&!addr){ toast('⚠️ Preenche a cidade ou morada do jogo para calcular a rota.'); return; }
-  btn.disabled=true; btn.textContent='⏳ A calcular…'; if(status) status.textContent='';
-  try{
-    const destCoords=await nominatimGeocode(dest);
-    if(!destCoords){ toast('⚠️ Não foi possível geolocalizar o destino. Verifica a cidade/morada.'); return; }
-    const mins=await osrmDrivingMins(HOME_COORDS, destCoords);
-    if(mins===null){ toast('⚠️ OSRM não devolveu rota. Tenta de novo ou usa a estimativa por km.'); return; }
-    document.getElementById('e-travel-mins').value=mins;
-    // Also fill km field if empty (based on OSRM distance would be better but we only have duration — estimate reverse)
-    if(!document.getElementById('e-km')?.value) {
-      // We can get distance from OSRM too — re-fetch with annotations
-      try{
-        const distUrl=`https://router.project-osrm.org/route/v1/driving/${HOME_COORDS.lon},${HOME_COORDS.lat};${destCoords.lon},${destCoords.lat}?overview=false`;
-        const distRes=await fetch(distUrl); const distData=await distRes.json();
-        if(distData.code==='Ok'&&distData.routes.length){
-          const km=Math.round(distData.routes[0].distance/1000);
-          const kmEl=document.getElementById('e-km');
-          if(kmEl&&km) kmEl.value=km;
-        }
-      }catch(e){}
-    }
-    if(status) status.textContent=`🗺️ ${mins} min (rota real)`;
-    updateTransportPreview();
-  }catch(e){
-    toast('⚠️ Erro ao contactar o serviço de rotas. Verifica a ligação.');
-    console.error('OSRM error:',e);
-  }finally{
-    btn.disabled=false; btn.textContent='🗺️ Calcular rota real';
-  }
-}
-
-function _getTravelMins(){
-  // Prefer OSRM result; fallback to km/80km/h
-  const stored=parseFloat(document.getElementById('e-travel-mins')?.value);
-  if(stored>0) return {mins:stored, source:'osrm'};
-  const km=parseFloat(document.getElementById('e-km')?.value)||0;
-  return {mins:km>0?Math.round(km/80*60):0, source:'est'};
-}
-
 function updateTransportPreview(){
   const time=document.getElementById('e-time')?.value;
   const prev=document.getElementById('e-transport-preview');
   if(!prev) return;
   if(!time){ prev.style.display='none'; return; }
-  const {mins, source}=_getTravelMins();
-  const t=calcTransportTimes(time, mins);
+  const travelMins=parseFloat(document.getElementById('e-travel-mins')?.value)||0;
+  const t=calcTransportTimes(time, travelMins);
   if(!t){ prev.style.display='none'; return; }
   prev.style.display='block';
   document.getElementById('e-tp-dep').textContent=t.departureHome;
   document.getElementById('e-tp-arr').textContent=t.arrivalDestination;
   document.getElementById('e-tp-gdep').textContent=t.departureAfterGame;
-  document.getElementById('e-tp-ret').textContent=mins>0?t.estimatedReturn:'—';
-  const srcEl=document.getElementById('e-tp-source');
-  if(srcEl) srcEl.textContent=source==='osrm'?`🗺️ rota real · ${mins} min`:(mins>0?`~${mins} min (estimativa)`:'');
+  document.getElementById('e-tp-ret').textContent=travelMins>0?t.estimatedReturn:'—';
 }
 
 function _isAway(){ return document.querySelector('input[name="e-ha"]:checked')?.value==='away'; }
@@ -13306,12 +13222,10 @@ function renderTransportTab(){
       <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}${ev.distanceKm?`<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${ev.distanceKm} km</div>`:''}</td>
       <td style="padding:8px 10px;font-size:11px;min-width:130px">${(()=>{
         if(!ev.time) return '<span style="color:var(--muted)">—</span>';
-        const travelMins=ev.travelMins||(ev.distanceKm>0?Math.round(ev.distanceKm/80*60):0);
+        const travelMins=ev.travelMins||0;
         const t=calcTransportTimes(ev.time, travelMins);
         if(!t) return '<span style="color:var(--muted)">—</span>';
-        const srcTag=ev.travelMins?'<span style="font-size:9px;color:#1a6b3a">🗺️ rota real</span>':'<span style="font-size:9px;color:var(--muted)">estimativa</span>';
         return `<div style="line-height:1.8">
-          <div>${srcTag}</div>
           <div><span style="color:var(--muted)">🏠 Saída:</span> <strong>${t.departureHome}</strong></div>
           <div><span style="color:var(--muted)">🚗 Após jogo:</span> <strong style="color:#b71c1c">${t.departureAfterGame}</strong></div>
           ${travelMins>0?`<div><span style="color:var(--muted)">🏠 Regresso:</span> <strong style="color:#1b5e20">${t.estimatedReturn}</strong></div>`:''}
