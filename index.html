@@ -1981,13 +1981,19 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           </label>
         </div>
         <div id="e-km-grp" style="display:none;margin-top:12px">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-            <div style="flex:1;min-width:160px">
-              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">🚐 Local de partida</label>
+          <div style="margin-bottom:10px">
+            <div style="margin-bottom:8px">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">🚐 Local de partida / chegada</label>
               <input type="text" id="e-dep-location" placeholder="Estádio Dr José de Matos"
                 style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit">
             </div>
-            <div style="flex:1;min-width:160px">
+            <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;width:fit-content">
+              <input type="checkbox" id="e-diff-arr-location"
+                style="width:14px;height:14px;cursor:pointer;accent-color:var(--green)"
+                onchange="document.getElementById('e-arr-location-grp').style.display=this.checked?'block':'none'">
+              Local de chegada diferente
+            </label>
+            <div id="e-arr-location-grp" style="display:none;margin-top:8px">
               <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">🏟️ Local de chegada</label>
               <input type="text" id="e-arr-location" placeholder="Estádio Dr José de Matos"
                 style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit">
@@ -7053,6 +7059,9 @@ function openEventModal(ev=null,date=null,defaults={}){
   const HOME_STAD='Estádio Dr José de Matos';
   const depLocEl=document.getElementById('e-dep-location');
   if(depLocEl) depLocEl.value=ev?.departureLocation||HOME_STAD;
+  const diffArr=!!(ev?.arrivalLocation&&ev.arrivalLocation!==ev.departureLocation&&ev.arrivalLocation!==HOME_STAD);
+  const diffChk=document.getElementById('e-diff-arr-location');
+  if(diffChk){ diffChk.checked=diffArr; document.getElementById('e-arr-location-grp').style.display=diffArr?'block':'none'; }
   const arrLocEl=document.getElementById('e-arr-location');
   if(arrLocEl) arrLocEl.value=ev?.arrivalLocation||HOME_STAD;
   // Reset preview then recalculate after toggleOpp runs
@@ -7189,7 +7198,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):''};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):''};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
