@@ -1997,11 +1997,9 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           </div>
           <div id="e-transport-preview" style="display:none;margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 14px;border:1px solid #c5d3f5">
             <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">⏱️ Horários calculados</div>
-            <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
-              <div><span style="color:var(--muted);font-size:11px">🏠 Saída de Viana</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
-              <div><span style="color:var(--muted);font-size:11px">📍 Chegada ao campo</span><br><strong id="e-tp-arr" style="color:#0e2444"></strong></div>
-              <div><span style="color:var(--muted);font-size:11px">🚗 Saída do campo</span><br><strong id="e-tp-gdep" style="color:#b71c1c"></strong></div>
-              <div><span style="color:var(--muted);font-size:11px">🏠 Regresso previsto</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">
+              <div><span style="color:var(--muted);font-size:11px">🚐 Saída do Estádio</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">🏟️ Chegada ao Estádio</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
             </div>
           </div>
         </div>
@@ -7112,8 +7110,6 @@ function updateTransportPreview(){
   if(!t){ prev.style.display='none'; return; }
   prev.style.display='block';
   document.getElementById('e-tp-dep').textContent=t.departureHome;
-  document.getElementById('e-tp-arr').textContent=t.arrivalDestination;
-  document.getElementById('e-tp-gdep').textContent=t.departureAfterGame;
   document.getElementById('e-tp-ret').textContent=travelMins>0?t.estimatedReturn:'—';
 }
 
@@ -13225,10 +13221,12 @@ function renderTransportTab(){
         const travelMins=ev.travelMins||0;
         const t=calcTransportTimes(ev.time, travelMins);
         if(!t) return '<span style="color:var(--muted)">—</span>';
-        return `<div style="line-height:1.8">
-          <div><span style="color:var(--muted)">🏠 Saída:</span> <strong>${t.departureHome}</strong></div>
-          <div><span style="color:var(--muted)">🚗 Após jogo:</span> <strong style="color:#b71c1c">${t.departureAfterGame}</strong></div>
-          ${travelMins>0?`<div><span style="color:var(--muted)">🏠 Regresso:</span> <strong style="color:#1b5e20">${t.estimatedReturn}</strong></div>`:''}
+        return `<div style="line-height:2">
+          <div><span style="color:var(--muted);font-size:10px">🚐 Saída do Estádio</span><br><strong style="font-size:13px">${t.departureHome}</strong></div>
+          ${travelMins>0
+            ? `<div style="margin-top:2px"><span style="color:var(--muted);font-size:10px">🏟️ Chegada ao Estádio</span><br><strong style="font-size:13px;color:#1b5e20">${t.estimatedReturn}</strong></div>`
+            : `<div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:2px">Define o tempo de viagem<br>para ver o regresso</div>`
+          }
         </div>`;
       })()}</td>
       <td style="padding:10px;text-align:center">
