@@ -1182,6 +1182,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Escalão</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">C/F</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Transporte</th>
+              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Horários</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Pedido</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Aprovado</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Condutor</th>
@@ -1978,6 +1979,36 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
             <input type="checkbox" id="e-transport-bus" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
             🚌 Autocarro
           </label>
+        </div>
+        <input type="hidden" id="e-travel-mins" value="">
+        <div id="e-km-grp" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="flex:0 0 auto">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📍 Distância (km)</label>
+              <input type="number" id="e-km" min="0" step="1" placeholder="Ex: 45"
+                style="width:100px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit"
+                oninput="document.getElementById('e-travel-mins').value='';updateTransportPreview()">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:14px">
+              <button type="button" id="e-osrm-btn" onclick="calcOsrmRoute()"
+                style="padding:6px 12px;background:#1a6b3a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+                🗺️ Calcular rota real
+              </button>
+              <div id="e-osrm-status" style="font-size:10px;color:var(--muted);text-align:center"></div>
+            </div>
+          </div>
+          <div id="e-transport-preview" style="display:none;margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 14px;border:1px solid #c5d3f5">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:11px;font-weight:700;color:#1a3d6e;text-transform:uppercase;letter-spacing:.4px">⏱️ Horários calculados</div>
+              <div id="e-tp-source" style="font-size:10px;color:var(--muted)"></div>
+            </div>
+            <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
+              <div><span style="color:var(--muted);font-size:11px">🏠 Saída de Viana</span><br><strong id="e-tp-dep" style="color:#0e2444"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">📍 Chegada ao campo</span><br><strong id="e-tp-arr" style="color:#0e2444"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">🚗 Saída do campo</span><br><strong id="e-tp-gdep" style="color:#b71c1c"></strong></div>
+              <div><span style="color:var(--muted);font-size:11px">🏠 Regresso previsto</span><br><strong id="e-tp-ret" style="color:#1b5e20"></strong></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="fr">
@@ -6472,7 +6503,7 @@ async function _renderGameListPDF(selSquads, from, to){
   // ── Linhas ──
   const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const ROW_H=13;
+  const ROW_H=16;
 
   // Função para desenhar cabeçalho de tabela (usado em cada página)
   function drawTableHeader(y){
@@ -6542,17 +6573,23 @@ async function _renderGameListPDF(selSquads, from, to){
       doc.text(ev.competition,xOpp+2,ry+11);
     }
 
-    // Transporte
+    // Transporte + horários
     const transport=ev.transport||[];
+    const _travelMins=ev.travelMins||(ev.distanceKm>0?Math.round(ev.distanceKm/80*60):0);
+    const tt=calcTransportTimes(ev.time||'',_travelMins);
+    let transpY=ry+3.5;
     if(transport.length){
-      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(40,40,40);
-      const tLabels=[];
-      if(transport.includes('van')) tLabels.push('Carrinha 9 lugares');
-      if(transport.includes('bus')) tLabels.push('Mini-bus SCV / Autocarro');
-      tLabels.forEach((lbl,ti)=>{
-        const lines=doc.splitTextToSize(lbl,C_TRANSP-3);
-        lines.slice(0,2).forEach((ln,li)=> doc.text(ln,xTransp+2,ry+4+(ti*8.5)+(li*3.8)));
-      });
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
+      if(transport.includes('van')){ doc.text('🚐 Carrinha',xTransp+2,transpY); transpY+=3.8; }
+      if(transport.includes('bus')){ doc.text('🚌 Autocarro',xTransp+2,transpY); transpY+=3.8; }
+    }
+    if(ev.distanceKm) { doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(100,100,100); doc.text(`${ev.distanceKm} km`,xTransp+2,transpY); transpY+=3.2; }
+    if(tt&&ev.time){
+      doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(14,36,68);
+      doc.text(`Saída: ${tt.departureHome}`,xTransp+2,transpY); transpY+=3.2;
+      doc.setTextColor(150,20,20);
+      doc.text(`Saída campo: ${tt.departureAfterGame}`,xTransp+2,transpY); transpY+=3.2;
+      if(_travelMins>0){ doc.setTextColor(30,90,30); doc.text(`Regresso: ${tt.estimatedReturn}`,xTransp+2,transpY); }
     }
 
     // Local / Estádio
@@ -6995,6 +7032,15 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-address').value=ev?.address||'';
   document.getElementById('e-transport-van').checked=(ev?.transport||[]).includes('van');
   document.getElementById('e-transport-bus').checked=(ev?.transport||[]).includes('bus');
+  const kmEl=document.getElementById('e-km');
+  if(kmEl) kmEl.value=ev?.distanceKm||'';
+  const tmEl=document.getElementById('e-travel-mins');
+  if(tmEl) tmEl.value=ev?.travelMins||'';
+  const osrmStatus=document.getElementById('e-osrm-status');
+  if(osrmStatus) osrmStatus.textContent=ev?.travelMins?`🗺️ ${ev.travelMins} min (rota guardada)`:'';
+  // Reset preview then recalculate after toggleOpp runs
+  const prevEl=document.getElementById('e-transport-preview');
+  if(prevEl) prevEl.style.display='none';
   // Regime de contração — usa guardado, ou defaults por escalão/dia
   const _evSq=ev?.squad||defaults.squad||squad||'sub19';
   const _evDate=ev?.date||date||new Date().toISOString().split('T')[0];
@@ -7036,6 +7082,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-repeat-until').value='';
   document.getElementById('e-repeat-until-grp').style.display='none';
   toggleOpp();
+  updateTransportPreview();
   document.getElementById('mo-event').classList.add('open');
 }
 function closeEventModal(){ document.getElementById('mo-event').classList.remove('open') }
@@ -7044,6 +7091,116 @@ function updateCompetitionOptions(sq, currentVal=''){
   const sel = document.getElementById('e-comp');
   sel.innerHTML = comps.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
 }
+// ── TRANSPORT TIME CALCULATOR ─────────────────────────────────────────────────
+// travelMins: real minutes from OSRM, or estimated from km (km/80*60)
+function calcTransportTimes(gameTime, travelMins){
+  if(!gameTime) return null;
+  const [h,m]=gameTime.split(':').map(Number);
+  const gameMins=h*60+m;
+  const toTime=mins=>{
+    const total=((mins%1440)+1440)%1440;
+    return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+  };
+  return {
+    travelMins,
+    departureHome:toTime(gameMins-90-travelMins),
+    arrivalDestination:toTime(gameMins-90),
+    departureAfterGame:toTime(gameMins+150),
+    estimatedReturn:toTime(gameMins+150+travelMins),
+  };
+}
+
+// ── OSRM / NOMINATIM ──────────────────────────────────────────────────────────
+const OSRM_CACHE_KEY='scv_osrm_geocache';
+// Coordenadas fixas do Estádio Dr José de Matos (origem sempre a mesma)
+const HOME_COORDS={lon:-8.8321, lat:41.6980};
+
+function _geoCache(){ return JSON.parse(localStorage.getItem(OSRM_CACHE_KEY)||'{}'); }
+function _geoStore(addr,coords){ const c=_geoCache(); c[addr]=coords; localStorage.setItem(OSRM_CACHE_KEY,JSON.stringify(c)); }
+
+async function nominatimGeocode(address){
+  const cache=_geoCache();
+  if(cache[address]) return cache[address];
+  const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=pt`;
+  const res=await fetch(url,{headers:{'Accept-Language':'pt-PT','User-Agent':'SCVianenseSAD/1.0'}});
+  const data=await res.json();
+  if(!data.length) return null;
+  const coords={lon:parseFloat(data[0].lon), lat:parseFloat(data[0].lat)};
+  _geoStore(address, coords);
+  return coords;
+}
+
+async function osrmDrivingMins(origin, dest){
+  const url=`https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${dest.lon},${dest.lat}?overview=false`;
+  const res=await fetch(url);
+  const data=await res.json();
+  if(data.code!=='Ok'||!data.routes.length) return null;
+  return Math.round(data.routes[0].duration/60);
+}
+
+async function calcOsrmRoute(){
+  const btn=document.getElementById('e-osrm-btn');
+  const status=document.getElementById('e-osrm-status');
+  // Build destination string from city + address fields
+  const city=document.getElementById('e-city')?.value.trim();
+  const addr=document.getElementById('e-address')?.value.trim()||document.getElementById('e-loc')?.value.trim();
+  const dest=[addr,city,'Portugal'].filter(Boolean).join(', ');
+  if(!city&&!addr){ toast('⚠️ Preenche a cidade ou morada do jogo para calcular a rota.'); return; }
+  btn.disabled=true; btn.textContent='⏳ A calcular…'; if(status) status.textContent='';
+  try{
+    const destCoords=await nominatimGeocode(dest);
+    if(!destCoords){ toast('⚠️ Não foi possível geolocalizar o destino. Verifica a cidade/morada.'); return; }
+    const mins=await osrmDrivingMins(HOME_COORDS, destCoords);
+    if(mins===null){ toast('⚠️ OSRM não devolveu rota. Tenta de novo ou usa a estimativa por km.'); return; }
+    document.getElementById('e-travel-mins').value=mins;
+    // Also fill km field if empty (based on OSRM distance would be better but we only have duration — estimate reverse)
+    if(!document.getElementById('e-km')?.value) {
+      // We can get distance from OSRM too — re-fetch with annotations
+      try{
+        const distUrl=`https://router.project-osrm.org/route/v1/driving/${HOME_COORDS.lon},${HOME_COORDS.lat};${destCoords.lon},${destCoords.lat}?overview=false`;
+        const distRes=await fetch(distUrl); const distData=await distRes.json();
+        if(distData.code==='Ok'&&distData.routes.length){
+          const km=Math.round(distData.routes[0].distance/1000);
+          const kmEl=document.getElementById('e-km');
+          if(kmEl&&km) kmEl.value=km;
+        }
+      }catch(e){}
+    }
+    if(status) status.textContent=`🗺️ ${mins} min (rota real)`;
+    updateTransportPreview();
+  }catch(e){
+    toast('⚠️ Erro ao contactar o serviço de rotas. Verifica a ligação.');
+    console.error('OSRM error:',e);
+  }finally{
+    btn.disabled=false; btn.textContent='🗺️ Calcular rota real';
+  }
+}
+
+function _getTravelMins(){
+  // Prefer OSRM result; fallback to km/80km/h
+  const stored=parseFloat(document.getElementById('e-travel-mins')?.value);
+  if(stored>0) return {mins:stored, source:'osrm'};
+  const km=parseFloat(document.getElementById('e-km')?.value)||0;
+  return {mins:km>0?Math.round(km/80*60):0, source:'est'};
+}
+
+function updateTransportPreview(){
+  const time=document.getElementById('e-time')?.value;
+  const prev=document.getElementById('e-transport-preview');
+  if(!prev) return;
+  if(!time){ prev.style.display='none'; return; }
+  const {mins, source}=_getTravelMins();
+  const t=calcTransportTimes(time, mins);
+  if(!t){ prev.style.display='none'; return; }
+  prev.style.display='block';
+  document.getElementById('e-tp-dep').textContent=t.departureHome;
+  document.getElementById('e-tp-arr').textContent=t.arrivalDestination;
+  document.getElementById('e-tp-gdep').textContent=t.departureAfterGame;
+  document.getElementById('e-tp-ret').textContent=mins>0?t.estimatedReturn:'—';
+  const srcEl=document.getElementById('e-tp-source');
+  if(srcEl) srcEl.textContent=source==='osrm'?`🗺️ rota real · ${mins} min`:(mins>0?`~${mins} min (estimativa)`:'');
+}
+
 function _isAway(){ return document.querySelector('input[name="e-ha"]:checked')?.value==='away'; }
 function toggleOpp(){
   const t=document.getElementById('e-type').value;
@@ -7056,6 +7213,8 @@ function toggleOpp(){
   document.getElementById('city-grp').style.display=isGame?'block':'none';
   document.getElementById('address-grp').style.display=away?'block':'none';
   document.getElementById('transport-grp').style.display=isGame?'block':'none';
+  const kmGrp=document.getElementById('e-km-grp');
+  if(kmGrp) kmGrp.style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
   // Objetivos táticos apenas para treino de campo
   document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
@@ -7067,6 +7226,7 @@ document.getElementById('e-squad').addEventListener('change',function(){
 });
 document.getElementById('e-repeat').addEventListener('change',function(){ document.getElementById('e-repeat-until-grp').style.display=this.checked?'block':'none'; });
 document.getElementById('e-type').addEventListener('change',toggleOpp);
+document.getElementById('e-time').addEventListener('input',updateTransportPreview);
 document.querySelectorAll('input[name="e-ha"]').forEach(r=>r.addEventListener('change',function(){
   const locEl=document.getElementById('e-loc');
   const HOME_STAD='Estádio Dr José de Matos';
@@ -7075,6 +7235,7 @@ document.querySelectorAll('input[name="e-ha"]').forEach(r=>r.addEventListener('c
   // Mostrar/esconder morada consoante casa/fora
   const addrGrp=document.getElementById('address-grp');
   if(addrGrp) addrGrp.style.display=this.value==='away'?'block':'none';
+  updateTransportPreview();
 }));
 document.getElementById('btn-add-event').addEventListener('click',()=>openEventModal());
 document.getElementById('btn-cal-pdf').addEventListener('click',exportCalPDF);
@@ -7090,7 +7251,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[]};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -13142,7 +13303,20 @@ function renderTransportTab(){
       <td style="padding:10px;text-align:center">
         <span style="${haStyle};border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">${isAway?'Fora':'Casa'}</span>
       </td>
-      <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="padding:10px;font-size:12px;color:#333">${transpLabels||'<span style="color:var(--muted)">—</span>'}${ev.distanceKm?`<div style="font-size:11px;color:var(--muted);margin-top:3px">📍 ${ev.distanceKm} km</div>`:''}</td>
+      <td style="padding:8px 10px;font-size:11px;min-width:130px">${(()=>{
+        if(!ev.time) return '<span style="color:var(--muted)">—</span>';
+        const travelMins=ev.travelMins||(ev.distanceKm>0?Math.round(ev.distanceKm/80*60):0);
+        const t=calcTransportTimes(ev.time, travelMins);
+        if(!t) return '<span style="color:var(--muted)">—</span>';
+        const srcTag=ev.travelMins?'<span style="font-size:9px;color:#1a6b3a">🗺️ rota real</span>':'<span style="font-size:9px;color:var(--muted)">estimativa</span>';
+        return `<div style="line-height:1.8">
+          <div>${srcTag}</div>
+          <div><span style="color:var(--muted)">🏠 Saída:</span> <strong>${t.departureHome}</strong></div>
+          <div><span style="color:var(--muted)">🚗 Após jogo:</span> <strong style="color:#b71c1c">${t.departureAfterGame}</strong></div>
+          ${travelMins>0?`<div><span style="color:var(--muted)">🏠 Regresso:</span> <strong style="color:#1b5e20">${t.estimatedReturn}</strong></div>`:''}
+        </div>`;
+      })()}</td>
       <td style="padding:10px;text-align:center">
         <button class="transp-toggle" data-id="${ev.id}" data-field="requested" data-val="${isRequested?'1':'0'}"
           style="background:${isRequested?'#e8f5e9':'#fafafa'};border:1.5px solid ${isRequested?'#66bb6a':'var(--border)'};border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">
