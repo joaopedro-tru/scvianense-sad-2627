@@ -2999,7 +2999,7 @@ function convName(p){
   return `${base} (<strong>${alias}</strong>)`;
 }
 function fmtDate(s){ if(!s)return '—'; const d=new Date(s+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-const APP_BUILD='2026-09-15a';
+const APP_BUILD='2026-09-17a';
 document.addEventListener('DOMContentLoaded',()=>{
   const bld=document.getElementById('sb-build'); if(bld) bld.textContent='v'+APP_BUILD;
 });
@@ -13338,10 +13338,10 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  // Data | Escalão | Adversário | C/F | Veículo | Local Partida | Saída | Chegada | Km | Condutor | Req | Apr
-  const C_DATE=34, C_SQ=multiSq?20:0, C_HA=14, C_OPP=46, C_VEH=22, C_TIME=28, C_KM=14, C_DRV=34, C_REQ=12, C_APR=12;
-  const C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_VEH-C_TIME-C_KM-C_DRV-C_REQ-C_APR;
-  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xVeh=xOpp+C_OPP, xLoc=xVeh+C_VEH, xTime=xLoc+C_LOC, xKm=xTime+C_TIME, xDrv=xKm+C_KM, xReq=xDrv+C_DRV, xApr=xReq+C_REQ;
+  // DATA | ESC. | C/F | ADVERSÁRIO | VEÍCULO | LOCAL PARTIDA/CHEGADA | SAÍDA/CHEGADA | TEMPO | KM
+  const C_DATE=34, C_SQ=multiSq?20:0, C_HA=14, C_OPP=50, C_VEH=22, C_TIME=28, C_TEMPO=22, C_KM=16;
+  const C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_VEH-C_TIME-C_TEMPO-C_KM;
+  const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xVeh=xOpp+C_OPP, xLoc=xVeh+C_VEH, xTime=xLoc+C_LOC, xTempo=xTime+C_TIME, xKm=xTempo+C_TEMPO;
 
   function drawHeader(y){
     doc.setFillColor(26,61,110);
@@ -13349,15 +13349,13 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
     doc.text('DATA',xDate+1,y+4.5);
     if(multiSq) doc.text('ESC.',xSq+1,y+4.5);
-    doc.text('ADVERSÁRIO',xOpp+1,y+4.5);
     doc.text('C/F',xHa+1,y+4.5);
-    doc.text('VEÍCULO',xVeh+1,y+4.5);
+    doc.text('ADVERSARIO',xOpp+1,y+4.5);
+    doc.text('VEICULO',xVeh+1,y+4.5);
     doc.text('LOCAL PARTIDA / CHEGADA',xLoc+1,y+4.5);
-    doc.text('SAÍDA / CHEGADA',xTime+1,y+4.5);
+    doc.text('SAIDA / CHEGADA',xTime+1,y+4.5);
+    doc.text('TEMPO',xTempo+1,y+4.5);
     doc.text('KM',xKm+1,y+4.5);
-    doc.text('CONDUTOR',xDrv+1,y+4.5);
-    doc.text('PED.',xReq+1,y+4.5);
-    doc.text('APR.',xApr+1,y+4.5);
     return y+6.5;
   }
 
@@ -13427,13 +13425,20 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
     }
 
     // Local partida / chegada
-    doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(60,60,60);
-    const depLine=doc.splitTextToSize('↑ '+depLoc,C_LOC-2)[0];
-    doc.text(depLine,xLoc+1,ry+5.5);
-    if(!sameLocation){
-      const arrLine=doc.splitTextToSize('↓ '+arrLoc,C_LOC-2)[0];
+    doc.setFont('helvetica','normal'); doc.setFontSize(5.5);
+    if(sameLocation){
+      // Uma única localização — sem prefixo
+      doc.setTextColor(60,60,60);
+      const locLine=doc.splitTextToSize(depLoc,C_LOC-2)[0];
+      doc.text(locLine,xLoc+1,ry+8.5);
+    } else {
+      // Locais diferentes — ida e regresso
+      doc.setTextColor(60,60,60);
+      const depLine=doc.splitTextToSize('Ida: '+depLoc,C_LOC-2)[0];
+      doc.text(depLine,xLoc+1,ry+5.5);
       doc.setTextColor(30,90,30);
-      doc.text(arrLine,xLoc+1,ry+9.5);
+      const arrLine=doc.splitTextToSize('Reg: '+arrLoc,C_LOC-2)[0];
+      doc.text(arrLine,xLoc+1,ry+10.5);
     }
 
     // Saída / Chegada
@@ -13441,7 +13446,7 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
       doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(14,36,68);
       doc.text(tt.departureHome,xTime+1,ry+6.5);
       doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
-      doc.text('saída',xTime+1,ry+9.5);
+      doc.text('saida',xTime+1,ry+9.5);
       if(travelMinsOut>0||travelMinsRet>0){
         doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(30,90,30);
         doc.text(tt.estimatedReturn,xTime+1,ry+13);
@@ -13453,23 +13458,35 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
       doc.text('—',xTime+1,ry+8.5);
     }
 
-    // Km
-    if(ev.distanceKm||ev.distanceKmReturn){
-      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(80,80,80);
-      if(ev.distanceKm) doc.text(`${ev.distanceKm}`,xKm+1,ry+7);
-      if(ev.distanceKmReturn&&ev.distanceKmReturn!==ev.distanceKm){
+    // Tempo de viagem
+    if(travelMinsOut>0||travelMinsRet>0){
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
+      if(sameLocation||travelMinsRet===travelMinsOut){
+        // mesmo tempo ida e volta
+        doc.setTextColor(80,80,80);
+        doc.text(`${travelMinsOut} min`,xTempo+1,ry+8.5);
+      } else {
+        // tempos diferentes
+        doc.setTextColor(60,60,60);
+        doc.text(`Ida: ${travelMinsOut} min`,xTempo+1,ry+6);
         doc.setTextColor(30,90,30);
-        doc.text(`${ev.distanceKmReturn}`,xKm+1,ry+12);
+        doc.text(`Reg: ${travelMinsRet} min`,xTempo+1,ry+11);
       }
+    } else {
+      doc.setTextColor(180,180,180); doc.setFont('helvetica','italic'); doc.setFontSize(6);
+      doc.text('—',xTempo+1,ry+8.5);
     }
 
-    // Condutor
-    if(m.driver){ doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(40,40,40); const dl=doc.splitTextToSize(m.driver,C_DRV-2); dl.slice(0,2).forEach((l,li)=>doc.text(l,xDrv+1,ry+6+li*4)); }
-
-    // Pedido / Aprovado
-    doc.setFontSize(10);
-    doc.text(m.requested?'✅':'⬜',xReq+C_REQ/2,ry+9,{align:'center'});
-    doc.text(m.approved?'✅':'⬜',xApr+C_APR/2,ry+9,{align:'center'});
+    // Km
+    if(ev.distanceKm||ev.distanceKmReturn){
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
+      if(sameLocation||!(ev.distanceKmReturn&&ev.distanceKmReturn!==ev.distanceKm)){
+        if(ev.distanceKm) doc.text(`${ev.distanceKm} km`,xKm+1,ry+8.5);
+      } else {
+        if(ev.distanceKm){ doc.setTextColor(60,60,60); doc.text(`${ev.distanceKm} km`,xKm+1,ry+6); }
+        if(ev.distanceKmReturn){ doc.setTextColor(30,90,30); doc.text(`${ev.distanceKmReturn} km`,xKm+1,ry+11); }
+      }
+    }
 
     ry+=ROW_H;
   });
