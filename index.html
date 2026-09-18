@@ -1455,14 +1455,24 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   <div class="view" id="v-monitoring">
     <div class="tb">
       <div><h1>PSE & Bem-Estar</h1><div class="sub" id="mon-sub">Monitorização da equipa</div></div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
         <select id="mon-squad" class="si btn-sm" onchange="renderMonitoring()"></select>
-        <input type="date" id="mon-date" class="si btn-sm" onchange="renderMonitoring()">
+        <input type="date" id="mon-date" class="si btn-sm" style="display:none" onchange="renderMonitoring()">
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button class="btn btn-sm" id="mon-tab-pse" onclick="monTab('pse')" style="background:var(--green-d);color:#fff">PSE</button>
-      <button class="btn btn-o btn-sm" id="mon-tab-well" onclick="monTab('well')">Bem-Estar</button>
+    <!-- Tipo de dados -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn-sm btn-p" id="mon-tab-pse" onclick="monTab('pse')">PSE</button>
+      <button class="btn btn-sm btn-o" id="mon-tab-well" onclick="monTab('well')">Bem-Estar</button>
+    </div>
+    <!-- Modo de visualização + período -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <button class="btn btn-sm btn-p" id="mon-mode-dash" onclick="monMode('dash')">📊 Dashboard</button>
+      <button class="btn btn-sm btn-o" id="mon-mode-day" onclick="monMode('day')">📅 Dia</button>
+      <div id="mon-period-wrap" style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn btn-sm btn-p" id="mon-period-3w" onclick="monPeriod('3w')">3 semanas</button>
+        <button class="btn btn-sm btn-o" id="mon-period-season" onclick="monPeriod('season')">Época</button>
+      </div>
     </div>
     <div id="mon-content"></div>
   </div>
@@ -14104,12 +14114,44 @@ async function submitWellness(e){
 // MONITORING VIEW
 // ══════════════════════════════════════════════════════════════════════════════
 let _monTab='pse';
+let _monMode='dash';
+let _monPeriod='3w';
 
 function monTab(t){
   _monTab=t;
-  document.getElementById('mon-tab-pse').className='btn btn-sm'+(t==='pse'?' btn-p':'  btn-o');
-  document.getElementById('mon-tab-well').className='btn btn-sm'+(t==='well'?' btn-p':'  btn-o');
+  document.getElementById('mon-tab-pse').className='btn btn-sm'+(t==='pse'?' btn-p':' btn-o');
+  document.getElementById('mon-tab-well').className='btn btn-sm'+(t==='well'?' btn-p':' btn-o');
   renderMonitoring();
+}
+
+function monMode(m){
+  _monMode=m;
+  const dateEl=document.getElementById('mon-date');
+  if(dateEl) dateEl.style.display=m==='day'?'':'none';
+  const pw=document.getElementById('mon-period-wrap');
+  if(pw) pw.style.display=m==='dash'?'':'none';
+  document.getElementById('mon-mode-dash').className='btn btn-sm'+(m==='dash'?' btn-p':' btn-o');
+  document.getElementById('mon-mode-day').className='btn btn-sm'+(m==='day'?' btn-p':' btn-o');
+  renderMonitoring();
+}
+
+function monPeriod(p){
+  _monPeriod=p;
+  document.getElementById('mon-period-3w').className='btn btn-sm'+(p==='3w'?' btn-p':' btn-o');
+  document.getElementById('mon-period-season').className='btn btn-sm'+(p==='season'?' btn-p':' btn-o');
+  renderMonitoring();
+}
+
+function _seasonStart(){
+  const now=new Date();
+  const yr=now.getMonth()>=6?now.getFullYear():now.getFullYear()-1;
+  return `${yr}-07-01`;
+}
+
+function _periodSince(){
+  if(_monPeriod==='season') return _seasonStart();
+  const d=new Date(); d.setDate(d.getDate()-20);
+  return d.toISOString().slice(0,10);
 }
 
 function pseColor(v){
@@ -14526,15 +14568,216 @@ function printBilhetesEqb(){
   w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
 }
 
+// ── PSE/WELLNESS SPARKLINE ────────────────────────────────────────────────────
+function _makeSparkline(vals, colorFn, maxVal=10){
+  const n=vals.length; if(!n) return '';
+  const bw=Math.max(3,Math.floor(200/n)-1);
+  const gap=Math.max(1,Math.floor(200/n)-bw);
+  const H=28;
+  const bars=vals.map((v,i)=>{
+    const x=i*(bw+gap);
+    if(v===null) return `<rect x="${x}" y="0" width="${bw}" height="${H}" fill="var(--border)" rx="1" opacity=".4"/>`;
+    const h=Math.max(2,Math.round((v/maxVal)*H));
+    return `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" fill="${colorFn(v)}" rx="1"/>`;
+  }).join('');
+  const tw=n*(bw+gap);
+  return `<svg viewBox="0 0 ${tw} ${H}" style="width:100%;height:${H}px;display:block">${bars}</svg>`;
+}
+
+// ── TEAM TREND CHART ──────────────────────────────────────────────────────────
+function _makeTeamChart(dailyData, colorFn, maxVal=10){
+  const n=dailyData.length; if(!n) return '';
+  const W=560; const H=68;
+  const bw=Math.max(2,Math.floor(W/n)-1);
+  const gap=Math.max(0,Math.floor(W/n)-bw);
+  const validVals=dailyData.filter(d=>d.avg!==null).map(d=>d.avg);
+  const avg=validVals.length?validVals.reduce((s,v)=>s+v,0)/validVals.length:null;
+  const refY=avg!==null?H-Math.round((avg/maxVal)*H):null;
+  const bars=dailyData.map((d,i)=>{
+    const x=i*(bw+gap);
+    if(d.avg===null) return `<rect x="${x}" y="${H-2}" width="${bw}" height="2" fill="var(--border)" rx="1" opacity=".5"/>`;
+    const h=Math.max(2,Math.round((d.avg/maxVal)*H));
+    return `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" fill="${colorFn(d.avg)}" rx="1" opacity=".88"/>`;
+  }).join('');
+  const refLine=refY!=null?`<line x1="0" y1="${refY}" x2="${n*(bw+gap)}" y2="${refY}" stroke="rgba(0,0,0,.18)" stroke-width="1" stroke-dasharray="3,2"/>`:'' ;
+  const interval=n>56?14:n>28?7:3;
+  const labels=dailyData.filter((_,i)=>i%interval===0||i===n-1).map(d=>{
+    const i=dailyData.findIndex(x=>x.date===d.date);
+    const x=i*(bw+gap)+bw/2;
+    const [,m,day]=d.date.split('-');
+    return `<text x="${x}" y="${H+11}" text-anchor="middle" font-size="7.5" fill="#94a3b8">${day}/${m}</text>`;
+  }).join('');
+  const tw=n*(bw+gap);
+  return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><svg viewBox="0 0 ${tw} ${H+14}" style="width:100%;min-width:300px;height:${H+14}px;display:block">${bars}${refLine}${labels}</svg></div>`;
+}
+
+// ── DASHBOARD GERAL ───────────────────────────────────────────────────────────
+async function renderMonDashboard(sq, since){
+  const el=document.getElementById('mon-content');
+  const isPse=_monTab==='pse';
+  const colorFn=isPse?pseColor:wellColor;
+
+  const allEntries=isPse?await DB.getPSEEntries(sq,since):await DB.getWellnessEntries(sq,since);
+  if(allEntries[0]?._error){
+    const err=allEntries[0]._error;
+    const isPerms=err.includes('permission')||err.includes('PERMISSION');
+    const isIndex=err.includes('index')||err.includes('INDEX');
+    el.innerHTML=`<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px;font-size:13px;color:#856404">
+      <strong>⚠️ Erro ao carregar dados.</strong><br>
+      ${isPerms?'Faltam permissões Firestore.':''}${isIndex?'Falta índice composto no Firestore.':''}
+      ${(!isPerms&&!isIndex)?`<code>${err}</code>`:''}
+    </div>`;
+    return;
+  }
+
+  const today=new Date().toISOString().slice(0,10);
+  // Construir lista de datas do período
+  const dates=[];
+  const dIt=new Date(since+'T00:00:00');
+  const dEnd=new Date(today+'T00:00:00');
+  while(dIt<=dEnd){ dates.push(dIt.toISOString().slice(0,10)); dIt.setDate(dIt.getDate()+1); }
+
+  const getVal=e=>isPse?(e.pse||0):((e.sleepQuality||0)+(e.stressLevel||0)+(e.muscleSoreness||0))/3;
+
+  // Agrupar por data (média do plantel)
+  const byDate={};
+  allEntries.forEach(e=>{ if(!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(getVal(e)); });
+  const dailyData=dates.map(date=>({
+    date,
+    avg:byDate[date]?.length?(byDate[date].reduce((s,v)=>s+v,0)/byDate[date].length):null,
+    count:byDate[date]?.length||0
+  }));
+
+  // KPIs globais
+  const allVals=allEntries.map(getVal).filter(v=>v>0);
+  const globalAvg=allVals.length?(allVals.reduce((s,v)=>s+v,0)/allVals.length).toFixed(1):null;
+  const totalResp=allEntries.length;
+  const uniqueDays=Object.keys(byDate).length;
+
+  // Tendência: últimos 7 dias vs 7 anteriores
+  const revDates=[...dates].reverse();
+  const l7=revDates.slice(0,7).flatMap(d=>byDate[d]||[]);
+  const p7=revDates.slice(7,14).flatMap(d=>byDate[d]||[]);
+  const l7avg=l7.length?l7.reduce((s,v)=>s+v,0)/l7.length:null;
+  const p7avg=p7.length?p7.reduce((s,v)=>s+v,0)/p7.length:null;
+  const trend=l7avg&&p7avg?l7avg-p7avg:null;
+  const trendAbs=trend!==null?Math.abs(trend).toFixed(1):null;
+  const trendArrow=trend===null?'—':trend>0.1?'↑':trend<-0.1?'↓':'→';
+  // Para PSE e Bem-Estar: valores maiores = pior (esforço alto / bem-estar baixo)
+  const trendGood=trend!==null&&trend<-0.1;
+  const trendBad=trend!==null&&trend>0.1;
+  const trendColor=trendBad?'#ef4444':trendGood?'#22c55e':'var(--muted)';
+
+  // Por jogador
+  const sqPlayers=DB.players(sq);
+  const allActive=DB.players(null);
+  const resolveName=jn=>{
+    if(jn==null) return '?';
+    let p=sqPlayers.find(p=>(p.number||p.jerseyNumber)==jn);
+    if(p) return dn(p);
+    p=allActive.find(p=>(p.number||p.jerseyNumber)==jn);
+    return p?dn(p):`#${jn}`;
+  };
+
+  const byPlayer={};
+  allEntries.forEach(e=>{
+    const key=String(e.jerseyNumber??e.playerName??'?');
+    if(!byPlayer[key]) byPlayer[key]={key,entries:[],jn:e.jerseyNumber,pn:e.playerName};
+    byPlayer[key].entries.push(e);
+  });
+
+  const sparkDates=dates.slice(-21);
+  const players=Object.values(byPlayer).map(p=>{
+    const vals=p.entries.map(getVal).filter(v=>v>0);
+    const avg=vals.length?(vals.reduce((s,v)=>s+v,0)/vals.length):null;
+    const name=p.jn!=null?resolveName(p.jn):(p.pn||'?');
+    // Tendência por jogador: últimos 7 vs 7 anteriores
+    const l7p=p.entries.filter(e=>e.date>=(revDates[6]||'')).map(getVal);
+    const p7p=p.entries.filter(e=>e.date>=(revDates[13]||'')&&e.date<(revDates[6]||'')).map(getVal);
+    const la=l7p.length?l7p.reduce((s,v)=>s+v,0)/l7p.length:null;
+    const pa=p7p.length?p7p.reduce((s,v)=>s+v,0)/p7p.length:null;
+    const pt=la&&pa?la-pa:null;
+    // Sparkline
+    const bdp={};
+    p.entries.forEach(e=>{ const v=getVal(e); if(v>0){ bdp[e.date]=bdp[e.date]||[]; bdp[e.date].push(v); }});
+    const sparkVals=sparkDates.map(d=>{ const vs=bdp[d]; return vs?.length?vs.reduce((s,v)=>s+v,0)/vs.length:null; });
+    const respRate=Math.round(p.entries.length/dates.length*100);
+    // Médias de Bem-Estar por dimensão
+    let wellDim='';
+    if(!isPse&&p.entries.length){
+      const as=(p.entries.reduce((s,e)=>s+(e.sleepQuality||0),0)/p.entries.length).toFixed(1);
+      const ast=(p.entries.reduce((s,e)=>s+(e.stressLevel||0),0)/p.entries.length).toFixed(1);
+      const am=(p.entries.reduce((s,e)=>s+(e.muscleSoreness||0),0)/p.entries.length).toFixed(1);
+      wellDim=`<div style="display:flex;gap:10px;font-size:10px;color:var(--muted);margin:4px 0 2px">
+        <span>😴 ${as}</span><span>🧠 ${ast}</span><span>💪 ${am}</span>
+      </div>`;
+    }
+    return {name,jn:p.jn,avg,pt,sparkVals,respRate,wellDim,entries:p.entries.length};
+  }).sort((a,b)=>(b.avg||0)-(a.avg||0));
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  const kpiCard=(val,label,sub,col)=>`
+    <div style="background:var(--card);border-radius:12px;padding:14px 18px;flex:1;min-width:120px">
+      <div style="font-size:28px;font-weight:800;color:${col};line-height:1">${val??'—'}</div>
+      <div style="font-size:12px;font-weight:700;margin-top:5px">${label}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>
+    </div>`;
+
+  const kpiRow=`<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+    ${kpiCard(globalAvg,'Média Global',isPse?'PSE — período':'Bem-Estar composite',colorFn(globalAvg))}
+    ${kpiCard(totalResp,'Respostas',`${uniqueDays} dia${uniqueDays!==1?'s':''} com dados`,'var(--accent)')}
+    ${trendAbs?kpiCard(`${trendArrow} ${trendAbs}`,'Tendência','últimos 7d vs 7 anteriores',trendColor):''}
+  </div>`;
+
+  const chartSection=`<div style="background:var(--card);border-radius:12px;padding:16px 18px;margin-bottom:20px">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📈 Evolução do Plantel</div>
+    ${_makeTeamChart(dailyData,colorFn)}
+  </div>`;
+
+  const playerCards=players.map(p=>{
+    const ac=colorFn(p.avg);
+    const ptArrow=p.pt===null?'':p.pt>0.1?'↑':p.pt<-0.1?'↓':'→';
+    const ptColor=p.pt===null?'':Math.abs(p.pt)<0.1?'var(--muted)':p.pt<0?'#22c55e':'#ef4444';
+    const ptStr=p.pt!==null&&Math.abs(p.pt)>=0.1?`<span style="font-size:11px;font-weight:700;color:${ptColor}">${ptArrow} ${Math.abs(p.pt).toFixed(1)}</span>`:'';
+    return `<div style="background:var(--card);border-radius:12px;padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="width:38px;height:38px;border-radius:50%;background:${ac}22;color:${ac};font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${p.avg?.toFixed(1)??'—'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}${p.jn!=null?` <span style="color:var(--muted);font-size:10px">#${p.jn}</span>`:''}</div>
+          <div style="font-size:10px;color:var(--muted)">${p.respRate}% respostas · ${p.entries}</div>
+        </div>
+        ${ptStr}
+      </div>
+      ${p.wellDim}
+      <div style="margin-top:4px">${_makeSparkline(p.sparkVals,colorFn)}</div>
+    </div>`;
+  }).join('');
+
+  const gridSection=`<div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👥 Por Jogador</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+      ${players.length?playerCards:'<div style="color:var(--muted);font-size:13px">Sem dados no período.</div>'}
+    </div>
+  </div>`;
+
+  el.innerHTML=kpiRow+chartSection+gridSection;
+}
+
 async function renderMonitoring(){
   const sq=document.getElementById('mon-squad').value||coachSquad()||'sub23';
-  const date=document.getElementById('mon-date').value||(new Date().toISOString().slice(0,10));
-
-  const since=new Date(date); since.setDate(since.getDate()-27);
-  const sinceStr=since.toISOString().slice(0,10);
-
   const el=document.getElementById('mon-content');
   el.innerHTML='<div style="color:var(--muted);padding:20px">A carregar…</div>';
+
+  // ── Dashboard ──
+  if(_monMode==='dash'){
+    await renderMonDashboard(sq, _periodSince());
+    return;
+  }
+
+  // ── Vista de Dia (comportamento original) ──
+  const date=document.getElementById('mon-date').value||(new Date().toISOString().slice(0,10));
+  const since=new Date(date); since.setDate(since.getDate()-27);
+  const sinceStr=since.toISOString().slice(0,10);
 
   // Resolve jersey → player, including cross-squad players
   const sqPlayers=DB.players(sq);
