@@ -13391,7 +13391,7 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
     return y+6.5;
   }
 
-  const ROW_H=17;
+  const ROW_H=20;
   const THY=MT+20;
   let ry=drawHeader(THY);
 
@@ -13441,11 +13441,17 @@ async function _renderTransportPDF(selSquads, from, to, haFilter){
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5);
     doc.text(isAway?'FORA':'CASA',xHa+0.5+(C_HA-2)/2,ry+8.5,{align:'center'});
 
-    // Adversário + competição
+    // Adversário + competição + campo
     doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
     const oppLine=doc.splitTextToSize(ev.opponent||'—',C_OPP-2)[0]||'';
-    doc.text(oppLine,xOpp+1,ry+8);
-    if(ev.competition){ doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.text(ev.competition,xOpp+1,ry+12); }
+    doc.text(oppLine,xOpp+1,ry+7);
+    if(ev.competition){ doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.text(ev.competition,xOpp+1,ry+11); }
+    if(ev.location){
+      doc.setTextColor(40,80,40); doc.setFont('helvetica','italic'); doc.setFontSize(5);
+      const venLines=doc.splitTextToSize(ev.location,C_OPP-2);
+      doc.text(venLines[0],xOpp+1,ry+14.5);
+      if(venLines[1]) doc.text(venLines[1],xOpp+1,ry+18.5);
+    }
 
     // Veículo
     if(hasTransport){
