@@ -15728,6 +15728,19 @@ function closeAccountsModal(){
   document.getElementById('mo-accounts').classList.remove('open');
 }
 
+// Apaga todos os documentos de staff_profiles e userProfiles ligados a um username
+async function _purgeUserProfiles(userId){
+  if(!firestoreDb) return;
+  const [spSnap, upSnap]=await Promise.all([
+    firestoreDb.collection('staff_profiles').where('username','==',userId).get(),
+    firestoreDb.collection('userProfiles').where('user','==',userId).get(),
+  ]);
+  const batch=firestoreDb.batch();
+  spSnap.forEach(d=>batch.delete(d.ref));   // apaga dados pessoais do perfil
+  upSnap.forEach(d=>batch.delete(d.ref));   // apaga registo de migração
+  await batch.commit();
+}
+
 async function createAccount(btn){
   const userId=(document.getElementById('nc-user')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
   const email=(document.getElementById('nc-email')?.value||'').trim().toLowerCase();
@@ -15736,12 +15749,17 @@ async function createAccount(btn){
   const staffRole=document.getElementById('nc-staffrole')?.value||'';
   if(!userId){ toast('❌ Username obrigatório'); return; }
   if(!email||!email.includes('@')){ toast('❌ Email obrigatório'); return; }
-  if(getAppUsers().find(x=>x.user===userId)){ toast('❌ Username já existe'); return; }
+  // Bloquear se já existe conta ativa com este username
+  if(getAppUsers().find(x=>x.user===userId&&!x.disabled)){ toast('❌ Username já está em uso'); return; }
   btn.disabled=true; btn.textContent='…';
   const newUser={user:userId, role, squad, email, ...(staffRole?{staffRole}:{})};
   try{
-    if(firestoreDb) await firestoreDb.collection('app_users').doc(userId).set(newUser);
-    _appUsers=[...getAppUsers(), newUser];
+    if(firestoreDb){
+      // Limpar perfis residuais do utilizador anterior com o mesmo username
+      await _purgeUserProfiles(userId);
+      await firestoreDb.collection('app_users').doc(userId).set(newUser);
+    }
+    _appUsers=[...getAppUsers().filter(x=>x.user!==userId), newUser];
     localStorage.setItem('scv_au',JSON.stringify(_appUsers));
     toast(`✅ Conta "${userId}" criada`);
     openAccountsModal();
@@ -15752,20 +15770,20 @@ async function createAccount(btn){
 }
 
 async function removeAccount(userId, btn){
-  if(!confirm(`Revogar acesso de "${userId}"?\n\nO utilizador não conseguirá fazer login mas o perfil mantém-se para reatribuição futura.`)) return;
+  if(!confirm(`Revogar acesso de "${userId}"?\n\nO utilizador não conseguirá fazer login e os dados do perfil serão apagados para proteger a privacidade.`)) return;
   btn.disabled=true; btn.textContent='…';
   try{
     if(firestoreDb){
       // Desativar em app_users (bloqueia fallback + UI)
       await firestoreDb.collection('app_users').doc(userId).update({disabled:true, email:''});
-      // Desativar em userProfiles (bloqueia login pós-migração)
-      const upSnap=await firestoreDb.collection('userProfiles').where('user','==',userId).get();
-      upSnap.forEach(d=>d.ref.update({disabled:true}));
+      // Apagar staff_profiles e userProfiles — evita que o próximo utilizador
+      // com o mesmo username herde dados pessoais do anterior
+      await _purgeUserProfiles(userId);
     }
     const arr=getAppUsers().map(x=>x.user===userId?{...x,disabled:true,email:''}:x);
     _appUsers=arr; localStorage.setItem('scv_au',JSON.stringify(arr));
-    toast(`✅ Acesso de "${userId}" revogado`);
-    openAccountsModal(); // refresh
+    toast(`✅ Acesso de "${userId}" revogado e dados de perfil removidos`);
+    openAccountsModal();
   }catch(e){
     toast('❌ '+(e.message||'Erro ao revogar'));
     btn.disabled=false; btn.textContent='🗑️';
