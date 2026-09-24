@@ -1153,12 +1153,11 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <!-- transport panel -->
     <div id="tm-panel-transp" style="display:none">
       <div class="sf" style="align-items:center;flex-wrap:wrap;gap:10px">
-        <select class="si" id="tm-transp-squad">
-          <option value="">Todos os escalões</option>
-          <option value="eqa">Equipa A</option>
-          <option value="sub19">Sub-19</option>
-          <option value="sub23">Sub-23</option>
-        </select>
+        <div style="display:flex;gap:4px" id="tm-transp-sq-pills">
+          <button onclick="toggleTranspSquad('eqa')" id="tm-tsq-eqa" style="padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;border:2px solid #555;background:transparent;color:#555;cursor:pointer;font-family:inherit;transition:all .15s">Eq. A</button>
+          <button onclick="toggleTranspSquad('sub23')" id="tm-tsq-sub23" style="padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;border:2px solid #1a3d6e;background:#1a3d6e;color:#fff;cursor:pointer;font-family:inherit;transition:all .15s">Sub-23</button>
+          <button onclick="toggleTranspSquad('sub19')" id="tm-tsq-sub19" style="padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;border:2px solid #8a6600;background:#8a6600;color:#fff;cursor:pointer;font-family:inherit;transition:all .15s">Sub-19</button>
+        </div>
         <div style="display:flex;gap:4px;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
           <button id="tm-transp-filter-away" onclick="setTranspFilter('away')"
             style="padding:6px 14px;font-size:12px;font-weight:600;border:none;background:#b71c1c;color:#fff;cursor:pointer">✈️ Fora</button>
@@ -13203,19 +13202,43 @@ function renderTM(){
   // Render kit on load (it's the default active tab)
   DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
 
-  // Transport tab selectors
-  const transpSquadSel=document.getElementById('tm-transp-squad');
+  // Transport tab: se o user tem escalão fixo, forçar só esse escalão
   if(u?.squad && u.role!=='admin'){
-    transpSquadSel.value=u.squad;
-    transpSquadSel.style.display='none';
+    _transpSquads=[u.squad];
+    document.getElementById('tm-transp-sq-pills').style.display='none';
   }
-  transpSquadSel.onchange=renderTransportTab;
+  _updateTranspSqPills();
   document.getElementById('tm-transp-show-past').onchange=renderTransportTab;
 }
 
 // ── TRANSPORT TAB ──────────────────────────────────────────────────────────────
 const TRANSP_KEY='scv_transport_meta'; // localStorage: {[eventId]: {requested, approved, driver}}
 let _transpFilter='away'; // 'away' | 'home' | 'all'
+let _transpSquads=['sub23','sub19']; // escalões selecionados (default: sub23+sub19)
+
+const _SQ_COLORS={eqa:'#555',sub23:'#1a3d6e',sub19:'#8a6600'};
+
+function toggleTranspSquad(sq){
+  if(_transpSquads.includes(sq)){
+    if(_transpSquads.length===1) return; // mínimo 1 sempre selecionado
+    _transpSquads=_transpSquads.filter(s=>s!==sq);
+  } else {
+    _transpSquads=[..._transpSquads,sq];
+  }
+  _updateTranspSqPills();
+  renderTransportTab();
+}
+
+function _updateTranspSqPills(){
+  ['eqa','sub23','sub19'].forEach(sq=>{
+    const btn=document.getElementById('tm-tsq-'+sq);
+    if(!btn) return;
+    const active=_transpSquads.includes(sq);
+    const c=_SQ_COLORS[sq];
+    btn.style.background=active?c:'transparent';
+    btn.style.color=active?'#fff':c;
+  });
+}
 
 function setTranspFilter(val){
   _transpFilter=val;
@@ -13247,7 +13270,6 @@ function exportTransportPDF(){
   const _lastDay=new Date(_y,_m+1,0).getDate();
   const _defTo=`${_y}-${_mm}-${String(_lastDay).padStart(2,'0')}`;
 
-  const sqNow=document.getElementById('tm-transp-squad')?.value||'';
   const haOpts=['away','home','all'];
   const haLabels={away:'Fora',home:'Casa',all:'Todos'};
 
@@ -13265,9 +13287,9 @@ function exportTransportPDF(){
     <div style="margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Escalões</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-eqa" ${!sqNow||sqNow==='eqa'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Equipa A</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub23" ${!sqNow||sqNow==='sub23'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-23</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub19" ${!sqNow||sqNow==='sub19'?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-19</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-eqa" ${_transpSquads.includes('eqa')?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Equipa A</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub23" ${_transpSquads.includes('sub23')?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-23</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="tpdf-sub19" ${_transpSquads.includes('sub19')?'checked':''} style="width:15px;height:15px;accent-color:var(--green)"> Sub-19</label>
       </div>
     </div>
     <div style="margin-bottom:18px">
@@ -13522,12 +13544,11 @@ function renderTransportTab(){
   const empty=document.getElementById('tm-transp-empty');
   if(!body) return;
 
-  const sq=document.getElementById('tm-transp-squad')?.value||'';
   const showPast=document.getElementById('tm-transp-show-past')?.checked||false;
   const today=new Date().toISOString().slice(0,10);
 
   // Collect games for selected squads, filtered by home/away
-  const squads=sq?[sq]:['eqa','sub23','sub19'];
+  const squads=_transpSquads.length?_transpSquads:['eqa','sub23','sub19'];
   let evs=squads.flatMap(s=>DB.events(s).filter(e=>e.type==='game'&&e.squad===s))
     .filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i)
     .filter(e=>{
