@@ -4254,7 +4254,7 @@ function renderDash(){
       <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrainings.length}</div><div class="ss">esta época</div></div>
       <div class="sc"><div class="sl">🏆 Jogos Oficiais</div><div class="sv">${recOff.total}</div><div class="ss" style="color:var(--green);font-weight:600">${recOff.total?`${recOff.v}V ${recOff.e}E ${recOff.d}D`:'sem jogos'}</div></div>
       <div class="sc"><div class="sl">% Vitórias Oficiais</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">⚽ Preparação: ${recFri.total?`${recFri.v}V ${recFri.e}E ${recFri.d}D`:'sem jogos'}</div></div>`;
-    const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+    const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
     const uEl=document.getElementById('d-coach-upcoming');
     uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
       upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
@@ -4318,8 +4318,8 @@ function renderDash(){
     const sfx='-dc-'+cs;
     const sqAthletes=DB.players(cs).length;
     const sqGames=es.filter(e=>e.type==='game'&&e.squad===cs);
-    const past=sqGames.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2).reverse();
-    const future=sqGames.filter(g=>g.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,2);
+    const past=sqGames.filter(g=>g.date<today).sort((a,b)=>b.date.localeCompare(a.date)||((b.time||'99:99').localeCompare(a.time||'99:99'))).slice(0,2).reverse();
+    const future=sqGames.filter(g=>g.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99'))).slice(0,2);
     let gamesHtml='';
     if(past.length) gamesHtml+=past.map(dashGameCard).join('');
     if(past.length&&future.length) gamesHtml+=`<div style="border-top:2px dashed var(--border);margin:6px 0"></div>`;
@@ -4477,7 +4477,7 @@ function renderAdminStaffView(userKey){
     return gf>ga;
   }).length;
   const winPct=pastGames.length?Math.round(wins/pastGames.length*100):null;
-  const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,6);
+  const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99'))).slice(0,6);
 
   const statsHtml=`<div class="sg" style="margin-bottom:16px">
     <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${m.color}">${ps.length}</div><div class="ss">${SQUADS[cs]||cs}</div></div>
@@ -9156,7 +9156,7 @@ document.getElementById('btn-gym-analytics').addEventListener('click', openGymAn
 // ── SQUAD GAMES LIST ──────────────────────────────────────────────────────────
 function renderSqGames(){
   const today=new Date().toISOString().split('T')[0];
-  const evs=DB.events(squad).filter(e=>e.type==='game'&&e.squad===squad).sort((a,b)=>a.date.localeCompare(b.date));
+  const evs=DB.events(squad).filter(e=>e.type==='game'&&e.squad===squad).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
   document.getElementById('sqgm-title').textContent=`Jogos ${SQUADS[squad]}`;
   document.getElementById('sqgm-sub').textContent=`${evs.length} jogo${evs.length!==1?'s':''}`;
   const lEl=document.getElementById('sqgm-list');
@@ -9228,7 +9228,7 @@ const WEEKDAYS_PT=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sába
 const MONTHS_LONG_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function generateGameCalendarPDF(sq, from, to, format='full'){
-  let evs=DB.events(sq).filter(e=>e.type==='game'&&e.squad===sq).sort((a,b)=>a.date.localeCompare(b.date));
+  let evs=DB.events(sq).filter(e=>e.type==='game'&&e.squad===sq).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
   if(from) evs=evs.filter(e=>e.date>=from);
   if(to)   evs=evs.filter(e=>e.date<=to);
   if(!evs.length){ toast('⚠️ Sem jogos no período selecionado.'); return; }
