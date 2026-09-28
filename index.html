@@ -11292,6 +11292,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
                   <option value="yellow">🟡 Cartão Amarelo</option>
                   <option value="red">🔴 Cartão Vermelho</option>
                   <option value="sub">🔄 Substituição</option>
+                  <option value="injury">🩺 Lesão</option>
                 </select>
               </div>
               <div id="me-extra" style="display:flex;gap:8px;flex:2;min-width:200px;flex-wrap:wrap;align-items:flex-end"></div>
@@ -11380,6 +11381,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(t==='yellow') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
     else if(t==='red') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label><select id="me-red-type" ${sel}><option value="direct">Direto</option><option value="double_yellow">Duplo Amarelo</option></select></div>`;
     else if(t==='sub') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Sai</label><select id="me-p-out" ${sel}>${pOpt(subOut,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Entra</label><select id="me-p-in" ${sel}>${pOpt(subIn,'Jogador...')}</select></div>`;
+    else if(t==='injury') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
     else meExtra.innerHTML='';
   }
   updExtra(); meType.addEventListener('change',updExtra);
@@ -11405,9 +11407,17 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       const pOut=document.getElementById('me-p-out')?.value, pIn=document.getElementById('me-p-in')?.value;
       if(!pOut||!pIn){ toast('❌ Seleciona os jogadores'); return; }
       ne.playerOutId=pOut; ne.playerInId=pIn;
+    } else if(t==='injury'){
+      const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o jogador'); return; }
+      ne.playerId=p1;
     }
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
     curMr.events.push(ne); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+    // Após registar lesão, oferecer criação de registo clínico
+    if(t==='injury' && ne.playerId){
+      const ev=DB.getEvent(gameEventId);
+      _offerClinicalAfterInjury(ne.playerId, gameEventId, ev?.date||new Date().toISOString().slice(0,10), ev?.squad);
+    }
   });
   document.querySelectorAll('[data-del-me]').forEach(btn=>btn.addEventListener('click',()=>{
     const eid=btn.dataset.delMe;
