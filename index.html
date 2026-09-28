@@ -9344,6 +9344,75 @@ function saveLiveEvent(){
   const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','ball_lost':'❌','ball_won':'✊'};
   toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
+  // Lesão com jogador identificado → oferecer registo clínico
+  if(type==='injury' && ne.playerId){
+    const ev=DB.getEvent(liveGameId);
+    _offerClinicalAfterInjury(ne.playerId, liveGameId, ev?.date||new Date().toISOString().slice(0,10), ev?.squad);
+  }
+}
+
+function _offerClinicalAfterInjury(playerId, gameId, gameDate, squad){
+  const p=DB.getPlayer(playerId); if(!p) return;
+  const name=dn(p);
+  const mo=document.createElement('div');
+  mo.className='mo open';
+  mo.id='mo-injury-clinical';
+  mo.innerHTML=`<div class="md" style="max-width:420px">
+    <div class="mh"><h2>🩺 Registar lesão — ${name}</h2><button class="mc" onclick="document.getElementById('mo-injury-clinical').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px">Ocorreu durante o jogo. Queres criar o registo clínico e/ou período de indisponibilidade?</p>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
+        <select id="icf-type" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)">
+          <option value="injury" selected>🩹 Lesão</option>
+          <option value="minor_injury">⚠️ Lesão Ligeira</option>
+        </select>
+      </div>
+      <input id="icf-diag" type="text" placeholder="Diagnóstico (ex: entorse tornozelo)" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:8px">
+      <input id="icf-treat" type="text" placeholder="Tratamento inicial" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:10px">
+      <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px">
+          <input type="checkbox" id="icf-unavail" checked style="width:16px;height:16px"> Criar período de indisponibilidade
+        </label>
+        <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">
+          Prev. recuperação
+          <input type="date" id="icf-edate" value="${gameDate}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)">
+        </label>
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-injury-clinical').remove()">Ignorar</button>
+      <button class="btn btn-p" onclick="_saveInjuryClinical('${playerId}','${gameId}','${gameDate}','${squad||''}')">💾 Guardar Registo</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+async function _saveInjuryClinical(playerId, gameId, gameDate, squad){
+  const type=document.getElementById('icf-type')?.value||'injury';
+  const diag=document.getElementById('icf-diag')?.value.trim()||'';
+  const treat=document.getElementById('icf-treat')?.value.trim()||'';
+  const edate=document.getElementById('icf-edate')?.value||'';
+  const createUnavail=document.getElementById('icf-unavail')?.checked;
+  try{
+    // Criar registo clínico
+    await DB.addClinicalRecord({
+      athleteId:playerId, eventId:gameId, date:gameDate, squad,
+      type, diagnostico:diag, treatment:treat, edate, notes:'Lesão registada durante jogo.',
+      source:'game'
+    });
+    // Criar indisponibilidade se pedido
+    if(createUnavail){
+      const p=DB.getPlayer(playerId);
+      await DB.addUnavailability({
+        personId:playerId, personName:p?dn(p):'', personType:'athlete',
+        squad:squad||p?.squad||'', startDate:gameDate, endDate:edate||gameDate,
+        type:'injury', reason:diag
+      });
+    }
+    document.getElementById('mo-injury-clinical').remove();
+    toast('✅ Registo clínico guardado');
+  }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
 }
 
 // Back button
