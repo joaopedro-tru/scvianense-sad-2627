@@ -696,6 +696,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-monitoring" data-view="monitoring"><span class="ic">📈</span> PSE & Bem-Estar</div>
     <div class="nl" id="nl-pse-link"><span class="ic">🔗</span> Link PSE</div>
     <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
+    <div class="nl" id="nl-clinical-map" style="display:none" onclick="openClinicalMap()"><span class="ic">🏥</span> Mapa Clínico</div>
     <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
     <div class="nl" id="nl-bilhetes-eqb" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa B</div>
     <hr class="nd">
@@ -6676,6 +6677,190 @@ async function _renderGameListPDF(selSquads, from, to){
 
   doc.save(`Jogos_${from}_${to}.pdf`);
   toast('✅ PDF de jogos descarregado!');
+}
+
+// ── MAPA CLÍNICO ──────────────────────────────────────────────────────────────
+let _cmTab='active';
+
+function openClinicalMap(){
+  const sq=coachSquads();
+  const sel=document.getElementById('cm-squad-filter');
+  if(sel&&sq.length===1) sel.value=sq[0]; // pré-filtrar para escalão do utilizador
+  document.getElementById('mo-clinical-map').classList.add('open');
+  renderClinicalMap();
+}
+function closeClinicalMap(){ document.getElementById('mo-clinical-map').classList.remove('open'); }
+
+function cmTab(t){
+  _cmTab=t;
+  ['active','history','stats'].forEach(id=>{
+    const btn=document.getElementById('cm-tab-'+id);
+    if(!btn) return;
+    const active=id===t;
+    btn.style.borderBottom=active?'2px solid var(--primary)':'2px solid transparent';
+    btn.style.color=active?'var(--primary)':'var(--muted)';
+    btn.style.fontWeight=active?'700':'400';
+  });
+  renderClinicalMap();
+}
+
+function renderClinicalMap(){
+  const today=new Date().toISOString().slice(0,10);
+  const sq=document.getElementById('cm-squad-filter')?.value||'';
+  const el=document.getElementById('cm-content');
+  if(!el) return;
+
+  const allPlayers=DB.players(sq||null);
+  const playerMap={}; allPlayers.forEach(p=>{ playerMap[p.id]=p; });
+  const allCR=DB.getClinicalRecords().filter(r=>!sq||playerMap[r.athleteId]?.squad===sq);
+  const allUnavail=DB.getUnavailability().filter(r=>r.personType==='athlete'&&(!sq||r.squad===sq));
+
+  if(_cmTab==='active'){
+    // Indisponibilidades ativas
+    const active=allUnavail.filter(r=>r.startDate<=today&&r.endDate>=today)
+      .sort((a,b)=>a.endDate.localeCompare(b.endDate));
+    // Recuperados recentemente (últimas 2 semanas)
+    const d14=new Date(); d14.setDate(d14.getDate()-14);
+    const d14str=d14.toISOString().slice(0,10);
+    const recent=allUnavail.filter(r=>r.endDate>=d14str&&r.endDate<today)
+      .sort((a,b)=>b.endDate.localeCompare(a.endDate));
+
+    if(!active.length&&!recent.length){
+      el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">✅</div><div style="font-size:15px;font-weight:600">Sem atletas lesionados</div><div style="font-size:13px;margin-top:4px">Todos os atletas estão disponíveis</div></div>`;
+      return;
+    }
+
+    function unavailCard(r, isPast){
+      const p=allPlayers.find(x=>x.id===r.personId);
+      const photo=p?.photoUrl;
+      const name=r.personName||(p?dn(p):'—');
+      const sqBadge=SQUADS[r.squad]||r.squad||'';
+      const daysLeft=isPast?null:Math.ceil((new Date(r.endDate)-new Date(today))/(1000*60*60*24));
+      const daysIn=Math.floor((new Date(today)-new Date(r.startDate))/(1000*60*60*24));
+      // Get last clinical record for this unavailability
+      const relCR=allCR.filter(c=>c.athleteId===r.personId&&c.date>=r.startDate&&c.date<=r.endDate)
+        .sort((a,b)=>b.date.localeCompare(a.date))[0];
+      const diag=r.reason||relCR?.diagnostico||'';
+      const treat=relCR?.treatment||'';
+      const avatar=photo
+        ?`<img src="${photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+        :`<div style="width:40px;height:40px;border-radius:50%;background:${isPast?'#aaa':'#b71c1c'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
+      const badge=isPast
+        ?`<span style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">✅ Recuperado</span>`
+        :daysLeft===0?`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Hoje</span>`
+        :`<span style="background:#fff8e1;color:#e65100;border:1px solid #ffcc02;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">⏳ ${daysLeft} dia${daysLeft!==1?'s':''}</span>`;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="if(event.target.closest('[data-cm-pid]')){}" data-cm-pid="${r.personId}">
+        ${avatar}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">${name}</span>
+            <span style="font-size:10px;background:#e8eef7;color:#1a3d6e;padding:1px 7px;border-radius:8px;font-weight:600">${sqBadge}</span>
+            ${badge}
+          </div>
+          ${diag?`<div style="font-size:12px;color:var(--text);margin-top:3px">🩹 ${diag}</div>`:''}
+          ${treat?`<div style="font-size:11px;color:var(--muted);margin-top:1px">💊 ${treat}</div>`:''}
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">
+            ${isPast?`${fmtDate(r.startDate)} → ${fmtDate(r.endDate)}`:`Desde ${fmtDate(r.startDate)} · ${daysIn} dia${daysIn!==1?'s':''} lesionado`}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    let html='';
+    if(active.length){
+      html+=`<div style="font-size:11px;font-weight:700;color:#b71c1c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🚨 ${active.length} Lesionado${active.length!==1?'s':''} Agora</div>`;
+      html+=`<div style="background:var(--card);border:1px solid #f5c6cb;border-radius:10px;padding:0 12px;margin-bottom:20px">${active.map(r=>unavailCard(r,false)).join('')}</div>`;
+    }
+    if(recent.length){
+      html+=`<div style="font-size:11px;font-weight:700;color:#2e7d32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">✅ Recuperados (últimas 2 semanas)</div>`;
+      html+=`<div style="background:var(--card);border:1px solid #c8e6c9;border-radius:10px;padding:0 12px">${recent.map(r=>unavailCard(r,true)).join('')}</div>`;
+    }
+    el.innerHTML=html;
+
+  } else if(_cmTab==='history'){
+    const injTypes=['injury','minor_injury','illness'];
+    const recs=allCR.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
+    if(!recs.length){ el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px">Sem registos clínicos</div></div>`; return; }
+
+    const rows=recs.map(r=>{
+      const p=playerMap[r.athleteId]||allPlayers.find(x=>x.id===r.athleteId);
+      const name=p?dn(p):(r.athleteId||'—');
+      const sqBadge=p?SQUADS[p.squad]||p.squad:'';
+      const typeLabel=CR_TYPES[r.type]||r.type||'—';
+      const isInj=injTypes.includes(r.type);
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.date)}</td>
+        <td style="padding:9px 8px;font-size:13px;font-weight:600">${name}${sqBadge?` <span style="font-size:10px;color:var(--muted)">${sqBadge}</span>`:''}</td>
+        <td style="padding:9px 8px;font-size:12px">${typeLabel}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted)">${r.diagnostico||r.notes||'—'}</td>
+        <td style="padding:9px 8px;font-size:11px;color:var(--muted)">${r.treatment||''}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML=`<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">DATA</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">ATLETA</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">TIPO</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">DIAGNÓSTICO / NOTAS</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">TRATAMENTO</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${allCR.length>80?`<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">A mostrar os 80 registos mais recentes de ${allCR.length} total</div>`:''}`;
+
+  } else if(_cmTab==='stats'){
+    const seasonStart=(()=>{ const n=new Date(); const y=n.getMonth()>=6?n.getFullYear():n.getFullYear()-1; return `${y}-07-01`; })();
+    const seasonCR=allCR.filter(r=>r.date>=seasonStart);
+    const injuries=seasonCR.filter(r=>r.type==='injury'||r.type==='minor_injury');
+    const byType={};
+    seasonCR.forEach(r=>{ byType[r.type]=(byType[r.type]||0)+1; });
+    // players with most occurrences
+    const byPlayer={};
+    injuries.forEach(r=>{ byPlayer[r.athleteId]=(byPlayer[r.athleteId]||0)+1; });
+    const topPlayers=Object.entries(byPlayer).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([pid,n])=>{
+      const p=playerMap[pid]; return {name:p?dn(p):pid, n, squad:p?SQUADS[p.squad]||p.squad:''};
+    });
+    // avg recovery time
+    const completedUnavail=allUnavail.filter(r=>r.endDate<today&&r.startDate>=seasonStart);
+    const avgDays=completedUnavail.length?Math.round(completedUnavail.reduce((s,r)=>{
+      return s+Math.floor((new Date(r.endDate)-new Date(r.startDate))/(1000*60*60*24));
+    },0)/completedUnavail.length):null;
+    // monthly distribution
+    const byMonth={};
+    injuries.forEach(r=>{ const m=r.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+1; });
+
+    const kpiStyle='background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;flex:1;min-width:120px';
+    const kpi=(val,label,color='var(--text)')=>`<div style="${kpiStyle}"><div style="font-size:28px;font-weight:800;color:${color}">${val}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${label}</div></div>`;
+    const typeRows=Object.entries(CR_TYPES).filter(([k])=>byType[k]).sort((a,b)=>(byType[b[0]]||0)-(byType[a[0]]||0))
+      .map(([k,label])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px">${label}</span>
+        <span style="font-weight:700;font-size:14px">${byType[k]}</span>
+      </div>`).join('');
+    const playerRows=topPlayers.map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:700;color:var(--muted);width:18px">#${i+1}</span>
+        <span style="flex:1;font-size:13px;font-weight:600">${p.name}</span>
+        ${p.squad?`<span style="font-size:10px;background:#e8eef7;color:#1a3d6e;padding:1px 6px;border-radius:8px">${p.squad}</span>`:''}
+        <span style="font-weight:700;font-size:13px;color:#b71c1c">${p.n}x</span>
+      </div>`).join('');
+
+    el.innerHTML=`
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+        ${kpi(injuries.length,'Lesões esta época','#b71c1c')}
+        ${kpi(seasonCR.length,'Total registos','var(--primary)')}
+        ${kpi(allUnavail.filter(r=>r.startDate<=today&&r.endDate>=today).length,'Ativos agora','#e65100')}
+        ${kpi(avgDays!==null?avgDays+'d':'—','Média recuperação','#2e7d32')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Por Tipo (época)</div>
+          ${typeRows||'<div style="color:var(--muted);font-size:13px">Sem registos</div>'}
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Atletas com mais ocorrências</div>
+          ${playerRows||'<div style="color:var(--muted);font-size:13px">Sem dados</div>'}
+        </div>
+      </div>`;
+  }
 }
 
 // Show back button in standalone (PWA) mode
@@ -15456,10 +15641,17 @@ function applyRoleUI(){
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
     if(accountsEl) accountsEl.style.display='';
-    // Admin vê monitorização, links PSE/Bem-Estar e bilhetes
+    // Admin vê monitorização, links PSE/Bem-Estar, bilhetes e mapa clínico
     monSection.forEach(el=>el&&(el.style.display=''));
     if(nlBilhetes) nlBilhetes.style.display='';
     if(nlBilhetesEqb) nlBilhetesEqb.style.display='';
+    const nlClinical=document.getElementById('nl-clinical-map');
+    if(nlClinical) nlClinical.style.display='';
+  }
+  // Mapa Clínico visível para médicos
+  if(u.role==='medical'){
+    const nlClinical=document.getElementById('nl-clinical-map');
+    if(nlClinical) nlClinical.style.display='';
   }
 }
 
@@ -16176,6 +16368,30 @@ if('serviceWorker' in navigator){
       <button class="btn btn-g" onclick="document.getElementById('mo-gps-import').classList.remove('open')">Cancelar</button>
       <button class="btn btn-p" id="btn-gps-confirm" style="display:none" onclick="confirmGPSImport()">✅ Importar Presenças</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: MAPA CLÍNICO -->
+<div class="mo" id="mo-clinical-map">
+  <div class="md" style="max-width:820px;width:95vw">
+    <div class="mh">
+      <h2>🏥 Mapa Clínico</h2>
+      <button class="mc" onclick="closeClinicalMap()">✕</button>
+    </div>
+    <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card);flex-wrap:wrap;align-items:flex-end">
+      <button id="cm-tab-active" onclick="cmTab('active')" style="border:none;border-bottom:2px solid var(--primary);background:transparent;color:var(--primary);font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">🚨 Lesionados</button>
+      <button id="cm-tab-history" onclick="cmTab('history')" style="border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;padding:10px 14px;cursor:pointer">📋 Histórico</button>
+      <button id="cm-tab-stats" onclick="cmTab('stats')" style="border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;padding:10px 14px;cursor:pointer">📊 Estatísticas</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 0">
+        <select id="cm-squad-filter" onchange="renderClinicalMap()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);color:var(--text)">
+          <option value="">Todos os escalões</option>
+          <option value="eqa">Equipa A</option>
+          <option value="sub23">Sub-23</option>
+          <option value="sub19">Sub-19</option>
+        </select>
+      </div>
+    </div>
+    <div id="cm-content" class="mb" style="padding:16px 20px;max-height:70vh;overflow-y:auto"></div>
   </div>
 </div>
 
