@@ -2408,7 +2408,8 @@ async function loadAppUsers(){
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
 function isAdmin(){ return currentUser()?.role==='admin'; }
-function coachSquad(){ return currentUser()?.squad||null; }
+function coachSquads(){ const u=currentUser(); if(!u) return []; if(u.squads&&u.squads.length) return u.squads; if(u.squad) return [u.squad]; return []; }
+function coachSquad(){ const sqs=coachSquads(); return sqs.length===1?sqs[0]:null; }
 function isStaff(){ return currentUser()?.role==='staff'; }
 function isMedical(){ return currentUser()?.role==='medical'; }
 function staffRole(){ return currentUser()?.staffRole||null; }
@@ -3168,9 +3169,9 @@ function trainingLabel(ev){
 
 function nav(v,opts={}){
   if(clockInterval){clearInterval(clockInterval);clockInterval=null;}
-  // Treinadores só acedem ao seu escalão
-  const cs=coachSquad();
-  if(cs && opts.squad && opts.squad!==cs && opts.squad!=='both'){ return; }
+  // Utilizadores restritos só acedem aos seus escalões
+  const _sqs=coachSquads();
+  if(_sqs.length>0 && opts.squad && !_sqs.includes(opts.squad) && opts.squad!=='both'){ return; }
   // Push current state to nav stack (unless we're going back or staying on same view)
   if(!_navBack && v!==view){
     const curOpts={};
@@ -5760,7 +5761,8 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
     if(!u){ info.style.display='none'; fields.style.display='none'; alreadyBanner.style.display='none'; if(errEl) errEl.textContent=''; return; }
     const role=userRole(u);
     document.getElementById('sf-account-role').textContent=ROLE_LABEL[role]||role||u.role;
-    document.getElementById('sf-account-squad').textContent=SQUAD_LABEL[u.squad]||'—';
+    const _uSqs=u.squads&&u.squads.length?u.squads:(u.squad?[u.squad]:[]);
+    document.getElementById('sf-account-squad').textContent=_uSqs.map(s=>SQUAD_LABEL[s]||s).join(' + ')||'—';
     info.style.display='';
     alreadyBanner.style.display='none';
     if(errEl) errEl.textContent='';
@@ -15350,13 +15352,14 @@ function applyRoleUI(){
     showScouting(true);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
     monSection.forEach(el=>el&&(el.style.display=''));
+    const _allowedSqs=coachSquads();
     const allSquads=['eqa','sub19','sub23'];
-    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+    allSquads.filter(s=>!_allowedSqs.includes(s)).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const profile=DB.getStaffProfile(u.user);
     const sbUser=document.getElementById('sb-user');
-    if(sbUser) sbUser.textContent=`${profile?.name||'Treinador'} · ${SQUADS[u.squad]||u.squad}`;
+    if(sbUser) sbUser.textContent=`${profile?.name||'Treinador'} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='staff'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
@@ -15370,14 +15373,15 @@ function applyRoleUI(){
     document.getElementById('nl-monitoring').style.display='';
     document.getElementById('nl-pse-link').style.display='none';
     document.getElementById('nl-wellness-link').style.display='none';
+    const _allowedSqs=coachSquads();
     const allSquads=['eqa','sub19','sub23'];
-    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+    allSquads.filter(s=>!_allowedSqs.includes(s)).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const profile=DB.getStaffProfile(u.user);
     const roleName=profile?STAFF_ROLES_LABEL[profile.staffRole]||staffRoleName():staffRoleName()||'Staff';
     const sbUser=document.getElementById('sb-user');
-    if(sbUser) sbUser.textContent=`${profile?.name||roleName} · ${SQUADS[u.squad]||u.squad}`;
+    if(sbUser) sbUser.textContent=`${profile?.name||roleName} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='medical'){
     document.getElementById('btn-sync-athletes').style.display='none';
     document.getElementById('nl-publink').style.display='none';
@@ -15391,13 +15395,14 @@ function applyRoleUI(){
     document.getElementById('nl-monitoring').style.display='';
     document.getElementById('nl-pse-link').style.display='none';
     document.getElementById('nl-wellness-link').style.display='none';
+    const _allowedSqs=coachSquads();
     const allSquads=['eqa','sub19','sub23'];
-    allSquads.filter(s=>s!==u.squad).forEach(other=>{
+    allSquads.filter(s=>!_allowedSqs.includes(s)).forEach(other=>{
       document.querySelectorAll(`[data-squad="${other}"]`).forEach(el=>el.style.display='none');
     });
     const profile=DB.getStaffProfile(u.user);
     const sbUser=document.getElementById('sb-user');
-    if(sbUser) sbUser.textContent=`${profile?.name||'Clínica'} · ${SQUADS[u.squad]||u.squad}`;
+    if(sbUser) sbUser.textContent=`${profile?.name||'Clínica'} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='teammanager'){
     document.getElementById('btn-sync-athletes').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
@@ -15697,12 +15702,18 @@ async function openAccountsModal(){
         </select>
       </div>
       <div>
-        <label style="font-size:11px;color:var(--muted)">Escalão</label>
-        <select id="nc-squad" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
-          <option value="eqa">Equipa A</option>
-          <option value="sub23">Sub-23</option>
-          <option value="sub19">Sub-19</option>
-        </select>
+        <label style="font-size:11px;color:var(--muted)">Escalão(ões)</label>
+        <div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:5px">
+            <input type="checkbox" name="nc-squad" value="eqa"> Eq. A
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:5px">
+            <input type="checkbox" name="nc-squad" value="sub23" checked> Sub-23
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:5px">
+            <input type="checkbox" name="nc-squad" value="sub19"> Sub-19
+          </label>
+        </div>
       </div>
       <div>
         <label style="font-size:11px;color:var(--muted)">Cargo de staff</label>
@@ -15751,14 +15762,16 @@ async function createAccount(btn){
   const userId=(document.getElementById('nc-user')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
   const email=(document.getElementById('nc-email')?.value||'').trim().toLowerCase();
   const role=document.getElementById('nc-role')?.value||'staff';
-  const squad=document.getElementById('nc-squad')?.value||'eqa';
+  const squads=[...document.querySelectorAll('[name="nc-squad"]:checked')].map(c=>c.value);
+  if(!squads.length){ toast('❌ Seleciona pelo menos um escalão'); return; }
+  const squad=squads[0]; // escalão primário (retrocompatibilidade)
   const staffRole=document.getElementById('nc-staffrole')?.value||'';
   if(!userId){ toast('❌ Username obrigatório'); return; }
   if(!email||!email.includes('@')){ toast('❌ Email obrigatório'); return; }
   // Bloquear se já existe conta ativa com este username
   if(getAppUsers().find(x=>x.user===userId&&!x.disabled)){ toast('❌ Username já está em uso'); return; }
   btn.disabled=true; btn.textContent='…';
-  const newUser={user:userId, role, squad, email, ...(staffRole?{staffRole}:{})};
+  const newUser={user:userId, role, squad, squads, email, ...(staffRole?{staffRole}:{})};
   try{
     if(firestoreDb){
       // Limpar perfis residuais do utilizador anterior com o mesmo username
