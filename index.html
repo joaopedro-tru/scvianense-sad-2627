@@ -1120,6 +1120,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <button class="tm-tab active" data-tab="kit" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-1px">👕 Equipamento</button>
       <button class="tm-tab" data-tab="transp" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">🚌 Transporte</button>
       <button class="tm-tab" data-tab="fines" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⏱ Atrasos / Multas</button>
+      <button class="tm-tab" data-tab="conduct" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⚠️ Conduta</button>
     </div>
     <!-- kit panel -->
     <div id="tm-panel-kit">
@@ -1198,6 +1199,20 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <!-- fines panel -->
     <div id="tm-panel-fines" style="display:none">
       <div id="tm-fines-content"></div>
+    </div>
+    <!-- CONDUTA PANEL -->
+    <div id="tm-panel-conduct" style="display:none">
+      <div class="sf" style="align-items:center;flex-wrap:wrap;gap:10px">
+        <select class="si" id="conduct-squad-sel" onchange="renderTMConduct()">
+          <option value="">Todos os escalões</option>
+          <option value="eqa">Equipa A</option>
+          <option value="sub19">Sub-19</option>
+          <option value="sub23">Sub-23</option>
+        </select>
+        <input type="month" id="conduct-month-sel" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)" onchange="renderTMConduct()">
+        <button class="btn btn-p" onclick="openConductModal()" style="margin-left:auto">+ Registar Infração</button>
+      </div>
+      <div id="tm-conduct-content"></div>
     </div>
   </div>
 
@@ -2730,6 +2745,25 @@ const DB = {
       const snap=await this._funavail().get();
       const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sunavail(arr);
     }catch(e){ console.warn('syncUnavail:',e); }
+  },
+  // ── Conduct Records (SPC) ────────────────────────────────────────────────────
+  _fconduct(){ return firestoreDb?.collection('conductRecords') },
+  _conduct(){ try{ return JSON.parse(localStorage.getItem('scv_conduct')||'[]'); }catch{ return []; } },
+  _sconduct(arr){ localStorage.setItem('scv_conduct',JSON.stringify(arr)); },
+  getConductRecords(athleteId){ const all=this._conduct(); return athleteId?all.filter(r=>r.athleteId===athleteId):all; },
+  async addConductRecord(rec){
+    rec.id=uid(); rec.createdAt=new Date().toISOString();
+    const arr=this._conduct(); arr.push(rec); this._sconduct(arr);
+    if(this._fconduct()) await this._fconduct().doc(rec.id).set(rec).catch(e=>console.error('FS addConduct:',e));
+    return rec;
+  },
+  async deleteConductRecord(id){
+    const arr=this._conduct().filter(r=>r.id!==id); this._sconduct(arr);
+    if(this._fconduct()) await this._fconduct().doc(id).delete().catch(e=>console.error('FS delConduct:',e));
+  },
+  async syncConductFromFirestore(){
+    if(!this._fconduct()) return;
+    try{ const snap=await this._fconduct().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sconduct(arr); }catch(e){ console.warn('syncConduct:',e); }
   },
   // ── Staff Profiles ────────────────────────────────────────────────────────────
   _fssp(){ return firestoreDb?.collection('staff_profiles') },
@@ -6786,27 +6820,48 @@ function renderClinicalMap(){
     el.innerHTML=html;
 
   } else if(_cmTab==='history'){
-    const recs=allCR.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
-    if(!recs.length){ el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px">Sem registos clínicos</div></div>`; return; }
+    // Incluir também registos de indisponibilidade do tipo 'lesao' sem registo clínico associado
+    const crUnavailIds=new Set(allCR.map(r=>r.unavailId).filter(Boolean));
+    const orphanUnavail=allUnavail
+      .filter(r=>r.type==='lesao' && !crUnavailIds.has(r.id))
+      .map(r=>({
+        id:'unavail-'+r.id, _unavailId:r.id, _isUnavail:true,
+        athleteId:r.personId, date:r.startDate,
+        type:'injury', diagnostico:r.reason||'', treatment:'', notes:'',
+        squad:r.squad
+      }));
+    const allRecs=[...allCR, ...orphanUnavail].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
+    if(!allRecs.length){ el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px">Sem registos clínicos</div></div>`; return; }
 
-    const rows=recs.map(r=>{
+    const rows=allRecs.map(r=>{
       const p=playerMap[r.athleteId]||allPlayers.find(x=>x.id===r.athleteId);
       const name=p?dn(p):(r.athleteId||'—');
-      const sqBadge=p?SQUADS[p.squad]||p.squad:'';
+      const sqBadge=p?SQUADS[p.squad]||p.squad:(r.squad?SQUADS[r.squad]||r.squad:'');
       const typeLabel=CR_TYPES[r.type]||r.type||'—';
-      const editBtns=canEdit?`<td style="padding:9px 4px;white-space:nowrap">
-        <button onclick="cmEditCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
-        <button onclick="cmDeleteCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
-      </td>`:'<td></td>';
-      return `<tbody id="cm-cr-row-${r.id}"><tr style="border-bottom:1px solid var(--border)">
+      let editBtns;
+      if(r._isUnavail){
+        editBtns=canEdit?`<td style="padding:9px 4px;white-space:nowrap">
+          <button onclick="cmEditUnavail('${r._unavailId}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
+          <button onclick="cmDeleteUnavail('${r._unavailId}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
+        </td>`:'<td></td>';
+      } else {
+        editBtns=canEdit?`<td style="padding:9px 4px;white-space:nowrap">
+          <button onclick="cmEditCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
+          <button onclick="cmDeleteCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
+        </td>`:'<td></td>';
+      }
+      const rowId=r._isUnavail?`cm-ucard-hist-${r._unavailId}`:`cm-cr-row-${r.id}`;
+      const srcTag=r._isUnavail?` <span style="font-size:9px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;padding:1px 5px;border-radius:6px;vertical-align:middle">indisponibilidade</span>`:'';
+      return `<tbody id="${rowId}"><tr style="border-bottom:1px solid var(--border)">
         <td style="padding:9px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.date)}</td>
         <td style="padding:9px 8px;font-size:13px;font-weight:600">${name}${sqBadge?` <span style="font-size:10px;color:var(--muted)">${sqBadge}</span>`:''}</td>
-        <td style="padding:9px 8px;font-size:12px">${typeLabel}</td>
+        <td style="padding:9px 8px;font-size:12px">${typeLabel}${srcTag}</td>
         <td style="padding:9px 8px;font-size:12px;color:var(--muted)">${r.diagnostico||r.notes||'—'}</td>
         <td style="padding:9px 8px;font-size:11px;color:var(--muted)">${r.treatment||''}</td>
         ${editBtns}
       </tr></tbody>`;
     }).join('');
+    const total=allCR.length+orphanUnavail.length;
     el.innerHTML=`<table style="width:100%;border-collapse:collapse">
       <thead><tr style="border-bottom:2px solid var(--border)">
         <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">DATA</th>
@@ -6818,7 +6873,7 @@ function renderClinicalMap(){
       </tr></thead>
       ${rows}
     </table>
-    ${allCR.length>80?`<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">A mostrar os 80 registos mais recentes de ${allCR.length} total</div>`:''}`;
+    ${total>80?`<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">A mostrar os 80 registos mais recentes de ${total} total</div>`:''}`;
 
   } else if(_cmTab==='stats'){
     const seasonStart=(()=>{ const n=new Date(); const y=n.getMonth()>=6?n.getFullYear():n.getFullYear()-1; return `${y}-07-01`; })();
@@ -7571,6 +7626,41 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
 });
 
 // ── TRAINING VIEW ─────────────────────────────────────────────────────────────
+// ── SPC — SISTEMA DE PONTOS DE CONDUTA ────────────────────────────────────────
+const SPC_INFRACTIONS=[
+  {key:'late_training',   label:'Atraso ao treino (cada 5 min ou fração)',           pts:2,  unit:'5min', ctx:['training','game','both']},
+  {key:'late_game',       label:'Atraso ao jogo (cada 2 min ou fração)',              pts:2,  unit:'2min', ctx:['game']},
+  {key:'late_event',      label:'Atraso a convívio / evento de equipa (cada 5 min)', pts:2,  unit:'5min', ctx:['both']},
+  {key:'no_mat_training', label:'Falta de material para o treino (caneleiras, etc.)',pts:2,  unit:null,   ctx:['training']},
+  {key:'no_mat_game',     label:'Falta de material para o jogo',                     pts:3,  unit:null,   ctx:['game']},
+  {key:'no_tracksuit',    label:'Sem fato de treino no dia de jogo',                 pts:2,  unit:null,   ctx:['game']},
+  {key:'mat_on_field',    label:'Material deixado no campo (por artigo)',             pts:1,  unit:'per',  ctx:['training','game','both']},
+  {key:'basket_locker',   label:'Cesto no balneário',                                pts:1,  unit:null,   ctx:['training','game','both']},
+  {key:'shot_unauth',     label:'Remate sem autorização no treino',                  pts:1,  unit:null,   ctx:['training']},
+  {key:'urinate_field',   label:'Urinar na zona do relvado',                         pts:8,  unit:null,   ctx:['training','game','both']},
+  {key:'medical_no_kit',  label:'Entrar no dep. médico sem equipamento adequado',    pts:2,  unit:null,   ctx:['training','game','both']},
+  {key:'phone_game',      label:'Telemóvel durante palestra ou jogo',                pts:4,  unit:null,   ctx:['game']},
+  {key:'yellow_protest',  label:'Cartão amarelo por protestos',                      pts:4,  unit:null,   ctx:['game']},
+  {key:'red_protest',     label:'Cartão vermelho por protestos',                     pts:8,  unit:null,   ctx:['game']},
+  {key:'expulsion',       label:'Expulsão',                                          pts:5,  unit:null,   ctx:['game']},
+  {key:'leave_locker',    label:'Sair para balneário sem autorização durante o jogo',pts:8,  unit:null,   ctx:['game']},
+  {key:'absent_training', label:'Falta a treino sem aviso prévio',                   pts:6,  unit:null,   ctx:['training']},
+  {key:'absent_game',     label:'Falta a jogo sem aviso prévio',                     pts:12, unit:null,   ctx:['game']},
+];
+const SPC_THRESHOLDS=[
+  {pts:20, label:'Suspensão 1 semana (treinos + jogo)', color:'#b71c1c', bg:'#ffebee'},
+  {pts:10, label:'Excluído da próxima convocatória',    color:'#e65100', bg:'#fff3e0'},
+  {pts:5,  label:'Conversa formal + registo',           color:'#f9a825', bg:'#fffde7'},
+];
+function spcThreshold(pts){
+  return SPC_THRESHOLDS.find(t=>pts>=t.pts)||null;
+}
+function spcMonth(dateStr){ return (dateStr||new Date().toISOString().slice(0,10)).slice(0,7); }
+function spcMonthPts(athleteId, month){
+  const m=month||spcMonth();
+  return DB.getConductRecords(athleteId).filter(r=>r.month===m).reduce((s,r)=>s+(r.totalPts||r.pts||0),0);
+}
+
 // ── CLINICAL RECORDS HELPERS ──────────────────────────────────────────────────
 const CR_TYPES={injury:'🩹 Lesão',minor_injury:'⚠️ Lesão Ligeira',treatment:'💊 Tratamento',assessment:'📋 Avaliação',illness:'🤒 Doença',prevention:'🛡️ Prevenção',other:'📝 Outro'};
 const CR_HAS_INJURY_FIELDS=t=>t==='injury'||t==='minor_injury';
@@ -13563,6 +13653,8 @@ function renderTM(){
       document.getElementById('tm-panel-kit').style.display=tab==='kit'?'':'none';
       document.getElementById('tm-panel-transp').style.display=tab==='transp'?'':'none';
       document.getElementById('tm-panel-fines').style.display=tab==='fines'?'':'none';
+      document.getElementById('tm-panel-conduct').style.display=tab==='conduct'?'':'none';
+      if(tab==='conduct'){ DB.syncConductFromFirestore().then(()=>renderTMConduct()).catch(()=>renderTMConduct()); }
       if(tab==='kit'){
         // Always re-sync athlete_docs before rendering kit tab
         // (athletes may have filled the public form after the last login sync)
@@ -13572,6 +13664,13 @@ function renderTM(){
       if(tab==='fines') renderTMFines();
     };
   });
+
+  // Conduta month selector — default to current month
+  const condMonSel=document.getElementById('conduct-month-sel');
+  if(condMonSel && !condMonSel.value) condMonSel.value=new Date().toISOString().slice(0,7);
+  // Squad filter default to user's squad
+  const condSqSel=document.getElementById('conduct-squad-sel');
+  if(condSqSel && u?.squad && u.role!=='admin') condSqSel.value=u.squad;
 
   // Kit squad selector
   const kitSquadSel=document.getElementById('tm-kit-squad');
@@ -14219,6 +14318,185 @@ function renderTMFines(){
     inp.addEventListener('blur',save);
     inp.addEventListener('change',save);
   });
+}
+
+// ── SPC CONDUTA ──────────────────────────────────────────────────────────────
+function renderTMConduct(){
+  const el=document.getElementById('tm-conduct-content'); if(!el) return;
+  const month=document.getElementById('conduct-month-sel')?.value||new Date().toISOString().slice(0,7);
+  const sq=document.getElementById('conduct-squad-sel')?.value||'';
+  const allRecs=DB.getConductRecords().filter(r=>r.month===month&&(!sq||r.squad===sq));
+  const players=DB.players(sq||null).sort((a,b)=>dn(a).localeCompare(dn(b)));
+  const canEdit=isAdmin()||isTeamManager();
+
+  // ── Top banner: alertas ──
+  const alerts=[];
+  players.forEach(p=>{
+    const pts=allRecs.filter(r=>r.athleteId===p.id).reduce((s,r)=>s+(r.totalPts||r.pts||0),0);
+    const thr=spcThreshold(pts);
+    if(thr) alerts.push({name:dn(p),pts,thr});
+  });
+  let alertHtml='';
+  if(alerts.length){
+    alertHtml=`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">
+      ${alerts.sort((a,b)=>b.pts-a.pts).map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;background:${a.thr.bg};border:1px solid ${a.thr.color}22">
+        <span style="font-size:16px">⚠️</span>
+        <span style="font-size:13px;font-weight:700;color:${a.thr.color}">${a.name}</span>
+        <span style="font-size:12px;color:${a.thr.color}">${a.pts} pts — ${a.thr.label}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  // ── Player cards ──
+  const playerRows=players.map(p=>{
+    const recs=allRecs.filter(r=>r.athleteId===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+    const pts=recs.reduce((s,r)=>s+(r.totalPts||r.pts||0),0);
+    const thr=spcThreshold(pts);
+    const ptsBadgeColor=pts===0?'var(--muted)':thr?thr.color:'var(--green)';
+    const ptsBg=pts===0?'var(--bg)':thr?thr.bg:'#e8f5e9';
+    const ptsLabel=pts===0?'0 pts':`${pts} pts`;
+    const recentRows=recs.slice(0,5).map(r=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--muted);min-width:72px">${fmtDate(r.date)}</span>
+        <span style="flex:1;color:var(--text)">${r.label||r.type}</span>
+        <span style="font-weight:700;color:#e65100;min-width:36px;text-align:right">${r.totalPts||r.pts} pts</span>
+        ${canEdit?`<button onclick="deleteConductRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:''}
+      </div>`).join('');
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+        <span style="font-size:14px;font-weight:700;flex:1">${dn(p)}</span>
+        <span style="font-size:10px;color:var(--muted)">${SQUADS[p.squad]||p.squad}</span>
+        <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;background:${ptsBg};color:${ptsBadgeColor}">${ptsLabel}</span>
+        ${canEdit?`<button onclick="event.stopPropagation();openConductModal('${p.id}')" style="padding:4px 10px;font-size:11px;font-weight:700;border:1.5px solid var(--primary);border-radius:6px;background:transparent;color:var(--primary);cursor:pointer;white-space:nowrap">+ Infração</button>`:''}
+      </div>
+      <div style="display:none;padding:0 14px 10px;border-top:1px solid var(--border)">
+        ${recs.length===0?'<div style="color:var(--muted);font-size:12px;padding:8px 0">Sem infrações este mês.</div>':recentRows}
+        ${recs.length>5?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${recs.length-5} infração(ões) mais antigas — ver histórico</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const monthLabel=new Date(month+'-15').toLocaleString('pt-PT',{month:'long',year:'numeric'});
+  const total=allRecs.reduce((s,r)=>s+(r.totalPts||r.pts||0),0);
+  el.innerHTML=`
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px">${monthLabel}</span>
+      <span style="font-size:12px;color:var(--muted)">${allRecs.length} infração(ões) · ${total} pts totais</span>
+    </div>
+    ${alertHtml}
+    ${players.length===0?'<div style="text-align:center;padding:40px;color:var(--muted)">Sem atletas.</div>':playerRows}`;
+}
+
+function openConductModal(preselectedPlayerId){
+  const sq=document.getElementById('conduct-squad-sel')?.value||coachSquad()||'';
+  const players=DB.players(sq||null).sort((a,b)=>dn(a).localeCompare(dn(b)));
+  const today=new Date().toISOString().slice(0,10);
+
+  // infraction options HTML — grouped
+  const trainingOpts=SPC_INFRACTIONS.filter(i=>i.ctx.includes('training')||i.ctx.includes('both'));
+  const gameOpts=SPC_INFRACTIONS.filter(i=>i.ctx.includes('game')||i.ctx.includes('both'));
+
+  function infraGroup(label, list){
+    return `<optgroup label="${label}">${list.map(i=>`<option value="${i.key}" data-pts="${i.pts}" data-unit="${i.unit||''}">${i.label} (${i.pts} pts)</option>`).join('')}</optgroup>`;
+  }
+
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-conduct';
+  mo.innerHTML=`<div class="md" style="max-width:460px">
+    <div class="mh"><h2>⚠️ Registar Infração</h2><button class="mc" onclick="document.getElementById('mo-conduct').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Atleta</label>
+        <select id="cond-player" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
+          <option value="">— Selecionar atleta —</option>
+          ${players.map(p=>`<option value="${p.id}" ${p.id===preselectedPlayerId?'selected':''}>${dn(p)}${p.squad?' ('+( SQUADS[p.squad]||p.squad)+')':''}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data</label>
+        <input type="date" id="cond-date" value="${today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Infração</label>
+        <select id="cond-type" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)" onchange="_conductUpdatePts()">
+          <option value="">— Selecionar —</option>
+          ${infraGroup('Treino',trainingOpts)}
+          ${infraGroup('Jogo',gameOpts)}
+        </select>
+      </div>
+      <div id="cond-mult-wrap" style="display:none">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px" id="cond-mult-label">Quantidade</label>
+        <input type="number" id="cond-mult" min="1" max="30" value="1" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box" oninput="_conductUpdatePts()">
+      </div>
+      <div id="cond-pts-preview" style="display:none;padding:10px 14px;border-radius:8px;background:#fff3e0;border:1px solid #ffcc80;font-size:13px;font-weight:600;color:#e65100"></div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Observações (opcional)</label>
+        <textarea id="cond-notes" rows="2" placeholder="Notas adicionais..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-conduct').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveConductRecord()">💾 Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+function _conductUpdatePts(){
+  const sel=document.getElementById('cond-type');
+  const opt=sel.options[sel.selectedIndex];
+  const pts=parseInt(opt?.dataset?.pts||'0');
+  const unit=opt?.dataset?.unit||'';
+  const multWrap=document.getElementById('cond-mult-wrap');
+  const preview=document.getElementById('cond-pts-preview');
+  const multLbl=document.getElementById('cond-mult-label');
+  if(!pts){ multWrap.style.display='none'; preview.style.display='none'; return; }
+  if(unit==='5min'){ multWrap.style.display=''; multLbl.textContent='Blocos de 5 min (arredondado para cima)'; }
+  else if(unit==='2min'){ multWrap.style.display=''; multLbl.textContent='Blocos de 2 min (arredondado para cima)'; }
+  else if(unit==='per'){ multWrap.style.display=''; multLbl.textContent='Quantidade (artigos / ocorrências)'; }
+  else { multWrap.style.display='none'; document.getElementById('cond-mult').value=1; }
+  const mult=parseInt(document.getElementById('cond-mult')?.value||'1')||1;
+  const total=pts*mult;
+  preview.style.display='';
+  const thr=spcThreshold(total);
+  preview.innerHTML=`${total} pts${mult>1?` (${mult} × ${pts})`:''}${thr?` — ⚠️ ${thr.label}`:''}`;
+}
+
+async function saveConductRecord(){
+  const pid=document.getElementById('cond-player')?.value;
+  const date=document.getElementById('cond-date')?.value;
+  const type=document.getElementById('cond-type')?.value;
+  const notes=document.getElementById('cond-notes')?.value.trim()||'';
+  if(!pid){ toast('❌ Seleciona o atleta'); return; }
+  if(!date){ toast('❌ Seleciona a data'); return; }
+  if(!type){ toast('❌ Seleciona a infração'); return; }
+  const inf=SPC_INFRACTIONS.find(i=>i.key===type);
+  if(!inf) return;
+  const mult=parseInt(document.getElementById('cond-mult')?.value||'1')||1;
+  const totalPts=inf.pts*mult;
+  const p=DB.getPlayer(pid);
+  const rec={
+    athleteId:pid, athleteName:p?dn(p):'', squad:p?.squad||'',
+    date, month:date.slice(0,7), type, label:inf.label,
+    pts:inf.pts, multiplier:mult, totalPts,
+    notes, registeredBy:currentUser()?.user||''
+  };
+  try{
+    await DB.addConductRecord(rec);
+    document.getElementById('mo-conduct')?.remove();
+    toast(`✅ ${totalPts} pts registados — ${dn(p)}`);
+    // Alert if threshold reached
+    const newTotal=spcMonthPts(pid, date.slice(0,7));
+    const thr=spcThreshold(newTotal);
+    if(thr) setTimeout(()=>toast(`⚠️ ${dn(p)} atingiu ${newTotal} pts — ${thr.label}`),700);
+    renderTMConduct();
+  }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
+}
+
+async function deleteConductRecord(id){
+  if(!confirm('Eliminar esta infração?')) return;
+  await DB.deleteConductRecord(id);
+  renderTMConduct();
 }
 
 function renderKitTab(){
