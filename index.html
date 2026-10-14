@@ -3333,7 +3333,7 @@ function nav(v,opts={}){
       }).catch(err=>console.warn('Fresh game read:',err));
     }
   }
-  else if(v==='scouting'){ show('v-scouting'); setActive('[data-view="scouting"]'); renderScouting() }
+  else if(v==='scouting'){ show('v-scouting'); setActive('[data-view="scouting"]'); DB.syncScoutedFromFirestore().then(()=>renderScouting()).catch(()=>renderScouting()); }
   else if(v==='help'){ show('v-help'); setActive('[data-view="help"]'); renderHelp() }
   else if(v==='public-form'){ show('v-pf') }
   else if(v==='pse-form'){ show('v-pse-form') }
@@ -7646,6 +7646,8 @@ const SPC_INFRACTIONS=[
   {key:'leave_locker',    label:'Sair para balneário sem autorização durante o jogo',pts:8,  unit:null,   ctx:['game']},
   {key:'absent_training', label:'Falta a treino sem aviso prévio',                   pts:6,  unit:null,   ctx:['training']},
   {key:'absent_game',     label:'Falta a jogo sem aviso prévio',                     pts:12, unit:null,   ctx:['game']},
+  {key:'no_return_bus',   label:'Ir na carrinha/autocarro do clube e não voltar',     pts:5,  unit:null,   ctx:['training','game','both']},
+  {key:'no_bus_away',     label:'Jogo fora com autocarro — não ir com a equipa',      pts:10, unit:null,   ctx:['game']},
 ];
 const SPC_THRESHOLDS=[
   {pts:20, label:'Suspensão 1 semana (treinos + jogo)', color:'#b71c1c', bg:'#ffebee'},
@@ -14327,7 +14329,7 @@ function renderTMConduct(){
   const sq=document.getElementById('conduct-squad-sel')?.value||'';
   const allRecs=DB.getConductRecords().filter(r=>r.month===month&&(!sq||r.squad===sq));
   const players=DB.players(sq||null).sort((a,b)=>dn(a).localeCompare(dn(b)));
-  const canEdit=isAdmin()||isTeamManager();
+  const canEdit=isAdmin()||isTeamManager()||currentUser()?.role==='coach';
 
   // ── Top banner: alertas ──
   const alerts=[];
@@ -14363,16 +14365,16 @@ function renderTMConduct(){
         ${canEdit?`<button onclick="deleteConductRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:''}
       </div>`).join('');
     return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px">
         <span style="font-size:14px;font-weight:700;flex:1">${dn(p)}</span>
         <span style="font-size:10px;color:var(--muted)">${SQUADS[p.squad]||p.squad}</span>
         <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;background:${ptsBg};color:${ptsBadgeColor}">${ptsLabel}</span>
-        ${canEdit?`<button onclick="event.stopPropagation();openConductModal('${p.id}')" style="padding:4px 10px;font-size:11px;font-weight:700;border:1.5px solid var(--primary);border-radius:6px;background:transparent;color:var(--primary);cursor:pointer;white-space:nowrap">+ Infração</button>`:''}
+        ${canEdit?`<button onclick="openConductModal('${p.id}')" style="padding:4px 10px;font-size:11px;font-weight:700;border:1.5px solid var(--primary);border-radius:6px;background:transparent;color:var(--primary);cursor:pointer;white-space:nowrap">+ Infração</button>`:''}
       </div>
-      <div style="display:none;padding:0 14px 10px;border-top:1px solid var(--border)">
-        ${recs.length===0?'<div style="color:var(--muted);font-size:12px;padding:8px 0">Sem infrações este mês.</div>':recentRows}
-        ${recs.length>5?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${recs.length-5} infração(ões) mais antigas — ver histórico</div>`:''}
-      </div>
+      ${recs.length>0?`<div style="padding:0 14px 10px;border-top:1px solid var(--border)">
+        ${recentRows}
+        ${recs.length>5?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${recs.length-5} infração(ões) mais antigas não mostradas.</div>`:''}
+      </div>`:''}
     </div>`;
   }).join('');
 
@@ -16278,7 +16280,7 @@ function initCoordApp(){
     const bgSyncs=[DB.syncStaffProfilesFromFirestore(), DB.syncAthleteDocsFromFirestore()];
     if(canSeeClinical()) bgSyncs.push(DB.syncClinicalFromFirestore());
     if(isAdmin()||isStaff()||currentUser()?.role==='coach') bgSyncs.push(DB.syncTrialFromFirestore());
-    if(isAdmin()||currentUser()?.role==='coach') bgSyncs.push(DB.syncScoutedFromFirestore());
+    if(isAdmin()||currentUser()?.role==='coach'||isTeamManager()) bgSyncs.push(DB.syncScoutedFromFirestore());
     Promise.race([Promise.all(bgSyncs),new Promise(r=>setTimeout(r,8000))]).catch(()=>{});
 
     if(isAdmin()){
