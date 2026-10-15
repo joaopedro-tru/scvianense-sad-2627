@@ -15466,7 +15466,7 @@ function renderBilhetesForm(params){
           <option value="Staff">Staff</option>
         </select>
       </div>
-      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetes('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'")}','${gameHora}')">Confirmar Pedido →</button>
+      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetes('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${gameHora}')">Confirmar Pedido →</button>
     </form>`;
 }
 
@@ -15631,7 +15631,7 @@ function renderBilhetesEqbForm(params){
           <option value="3">3 convites</option>
         </select>
       </div>
-      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetesEqb('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'")}','${gameHora}')">Confirmar Pedido →</button>
+      <button type="button" class="btn btn-p" style="width:100%;padding:14px;font-size:15px" onclick="submitBilhetesEqb('${gameId}','${gameDate}','${gameAdversario.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${gameHora}')">Confirmar Pedido →</button>
     </form>`;
 }
 
