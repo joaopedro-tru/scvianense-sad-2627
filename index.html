@@ -6960,8 +6960,16 @@ function renderClinicalMap(){
       const name=r.athleteName||(p?dn(p):r.athleteId||'—');
       const sqLabel=SQUADS[r.squad||p?.squad||'']||r.squad||'—';
       const isManual=r._source==='manual';
-      const delBtn=canEdit&&isManual?`<button onclick="deleteOccurrenceRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:'';
-      const editBtn=canEdit&&isManual?`<button onclick="openOccurrenceModal('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`:'';
+      let delBtn='', editBtn='';
+      if(canEdit){
+        if(isManual){
+          delBtn=`<button onclick="deleteOccurrenceRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`;
+          editBtn=`<button onclick="openOccurrenceModal('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`;
+        } else {
+          delBtn=`<button onclick="cmDeleteCR('${r._crId}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`;
+          editBtn=`<button onclick="cmEditCR('${r._crId}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`;
+        }
+      }
       const srcBadge=isManual?'':` <span style="font-size:9px;background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;padding:1px 5px;border-radius:6px">auto</span>`;
       return `<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:8px 8px;font-size:12px;white-space:nowrap;color:var(--muted)">${fmtDate(r.date)}</td>
