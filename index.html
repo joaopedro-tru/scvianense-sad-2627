@@ -2773,7 +2773,12 @@ const DB = {
   },
   async syncConductFromFirestore(){
     if(!this._fconduct()) return;
-    try{ const snap=await this._fconduct().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sconduct(arr); }catch(e){ console.warn('syncConduct:',e); }
+    try{
+      const snap=await this._fconduct().get();
+      const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      // Só sobrescreve localStorage se o Firestore tiver dados (evita apagar dados locais por sync vazio)
+      if(arr.length>0) this._sconduct(arr);
+    }catch(e){ console.warn('syncConduct:',e); }
   },
   // ── Player Evaluations ───────────────────────────────────────────────────────
   _feval(){ return firestoreDb?.collection('playerEvaluations') },
@@ -2783,7 +2788,7 @@ const DB = {
   async addPlayerEvaluation(rec){ rec.id=uid(); rec.createdAt=new Date().toISOString(); const arr=this._eval(); arr.push(rec); this._seval(arr); if(this._feval()) await this._feval().doc(rec.id).set(rec).catch(e=>console.error('FS addEval:',e)); return rec; },
   async updatePlayerEvaluation(id,data){ const arr=this._eval().map(r=>r.id===id?{...r,...data}:r); this._seval(arr); if(this._feval()) await this._feval().doc(id).update(data).catch(e=>console.error('FS updateEval:',e)); },
   async deletePlayerEvaluation(id){ const arr=this._eval().filter(r=>r.id!==id); this._seval(arr); if(this._feval()) await this._feval().doc(id).delete().catch(e=>console.error('FS delEval:',e)); },
-  async syncEvalsFromFirestore(){ if(!this._feval()) return; try{ const snap=await this._feval().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._seval(arr); }catch(e){ console.warn('syncEval:',e); } },
+  async syncEvalsFromFirestore(){ if(!this._feval()) return; try{ const snap=await this._feval().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); if(arr.length>0) this._seval(arr); }catch(e){ console.warn('syncEval:',e); } },
   // ── Occurrence Records (FPF) ─────────────────────────────────────────────────
   _focr(){ return firestoreDb?.collection('occurrenceRecords') },
   _ocr(){ try{ return JSON.parse(localStorage.getItem('scv_ocr')||'[]'); }catch{ return []; } },
@@ -2792,7 +2797,7 @@ const DB = {
   async addOccurrenceRecord(rec){ rec.id=uid(); rec.createdAt=new Date().toISOString(); const arr=this._ocr(); arr.push(rec); this._socr(arr); if(this._focr()) await this._focr().doc(rec.id).set(rec).catch(e=>console.error('FS addOcr:',e)); return rec; },
   async updateOccurrenceRecord(id,data){ const arr=this._ocr().map(r=>r.id===id?{...r,...data}:r); this._socr(arr); if(this._focr()) await this._focr().doc(id).update(data).catch(e=>console.error('FS updateOcr:',e)); },
   async deleteOccurrenceRecord(id){ const arr=this._ocr().filter(r=>r.id!==id); this._socr(arr); if(this._focr()) await this._focr().doc(id).delete().catch(e=>console.error('FS delOcr:',e)); },
-  async syncOcrFromFirestore(){ if(!this._focr()) return; try{ const snap=await this._focr().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._socr(arr); }catch(e){ console.warn('syncOcr:',e); } },
+  async syncOcrFromFirestore(){ if(!this._focr()) return; try{ const snap=await this._focr().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); if(arr.length>0) this._socr(arr); }catch(e){ console.warn('syncOcr:',e); } },
   // ── Staff Profiles ────────────────────────────────────────────────────────────
   _fssp(){ return firestoreDb?.collection('staff_profiles') },
   _sp(){ try{ return JSON.parse(localStorage.getItem('scv_sp')||'[]'); }catch{ return []; } },
