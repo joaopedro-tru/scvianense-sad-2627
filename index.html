@@ -6936,16 +6936,19 @@ function renderClinicalMap(){
     // 2. Auto from clinical records (injuries + illness, enriched with return date)
     const linkedUnavailMap={};
     allUnavail.forEach(u=>{ if(u.id) linkedUnavailMap[u.id]=u; });
-    const autoCrOcr=allCR.map(r=>{
-      const returnDate=r.returnDate||(r.unavailId&&linkedUnavailMap[r.unavailId]?.endDate)||'';
-      const p=playerMap[r.athleteId];
-      return {
-        _source:'clinical', _crId:r.id,
-        athleteId:r.athleteId, athleteName:p?dn(p):(r.athleteId||''), squad:p?.squad||r.squad||'',
-        date:r.date, occurrence:(r.diagnostico||r.notes||CR_TYPES[r.type]||r.type||''),
-        treatment:r.treatment||'', returnDate, registeredBy:r.registeredBy||''
-      };
-    });
+    const autoCrOcr=allCR
+      .filter(r=>r.athleteId&&!r.athleteId.startsWith('trial_'))
+      .map(r=>{
+        const returnDate=r.returnDate||(r.unavailId&&linkedUnavailMap[r.unavailId]?.endDate)||'';
+        const p=playerMap[r.athleteId];
+        if(!p) return null; // ignorar registos sem atleta reconhecido
+        return {
+          _source:'clinical', _crId:r.id,
+          athleteId:r.athleteId, athleteName:dn(p), squad:p.squad||r.squad||'',
+          date:r.date, occurrence:(r.diagnostico||r.notes||CR_TYPES[r.type]||r.type||''),
+          treatment:r.treatment||'', returnDate, registeredBy:r.registeredBy||''
+        };
+      }).filter(Boolean);
     // Merge: prefer manual if same CR is already in manual (by _crId link)
     const linkedCrIds=new Set(manualOcr.filter(r=>r.linkedCrId).map(r=>r.linkedCrId));
     const crRows=autoCrOcr.filter(r=>!linkedCrIds.has(r._crId));
@@ -6967,7 +6970,7 @@ function renderClinicalMap(){
           editBtn=`<button onclick="openOccurrenceModal('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`;
         } else {
           delBtn=`<button onclick="cmDeleteCR('${r._crId}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`;
-          editBtn=`<button onclick="cmEditCR('${r._crId}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`;
+          editBtn=`<button onclick="openOcrCrEdit('${r._crId}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`;
         }
       }
       const srcBadge=isManual?'':` <span style="font-size:9px;background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;padding:1px 5px;border-radius:6px">auto</span>`;
@@ -7102,6 +7105,68 @@ async function cmDeleteCR(id){
 }
 
 // ── Ocorrências FPF ───────────────────────────────────────────────────────────
+function openOcrCrEdit(crId){
+  // Edita um registo clínico a partir do contexto da tab Ocorrências (modal próprio)
+  const rec=DB.getClinicalRecords().find(r=>r.id===crId);
+  if(!rec){ toast('❌ Registo não encontrado'); return; }
+  const allPlayers=DB.players(null);
+  const p=allPlayers.find(x=>x.id===rec.athleteId);
+  const allUnavail=DB.getUnavailability();
+  const linkedUnavail=rec.unavailId?allUnavail.find(u=>u.id===rec.unavailId):null;
+  const returnDate=rec.returnDate||linkedUnavail?.endDate||'';
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-ocr-cr';
+  mo.innerHTML=`<div class="md" style="max-width:480px">
+    <div class="mh"><h2>✏️ Editar Ocorrência</h2><button class="mc" onclick="document.getElementById('mo-ocr-cr').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div style="padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:13px">
+        <span style="font-weight:700">${p?dn(p):rec.athleteId}</span>
+        ${p?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${SQUADS[p.squad]||p.squad||''}</span>`:''}
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data</label>
+        <input type="date" id="ocrcr-date" value="${rec.date||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Ocorrência (Doença/Lesão)</label>
+        <input type="text" id="ocrcr-occ" value="${(rec.diagnostico||rec.notes||'').replace(/"/g,'&quot;')}" placeholder="Diagnóstico / descrição" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Tratamento</label>
+        <input type="text" id="ocrcr-treat" value="${(rec.treatment||'').replace(/"/g,'&quot;')}" placeholder="Tratamento aplicado" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data de regresso sem limitações</label>
+        <input type="date" id="ocrcr-ret" value="${returnDate}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Registado por</label>
+        <input type="text" id="ocrcr-regby" value="${(rec.registeredBy||currentUser()?.user||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-ocr-cr').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveOcrCrEdit('${crId}')">💾 Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+async function saveOcrCrEdit(crId){
+  const date=document.getElementById('ocrcr-date')?.value;
+  const diagnostico=document.getElementById('ocrcr-occ')?.value.trim();
+  const treatment=document.getElementById('ocrcr-treat')?.value.trim()||'';
+  const returnDate=document.getElementById('ocrcr-ret')?.value||'';
+  const registeredBy=document.getElementById('ocrcr-regby')?.value.trim()||'';
+  if(!date){ toast('❌ Seleciona a data'); return; }
+  try{
+    await DB.updateClinicalRecord(crId,{ date, diagnostico, treatment, returnDate, registeredBy });
+    document.getElementById('mo-ocr-cr')?.remove();
+    toast('✅ Atualizado');
+    renderClinicalMap();
+  }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
+}
+
 function openOccurrenceModal(editId){
   const existing=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
   const players=DB.players(null).sort((a,b)=>dn(a).localeCompare(dn(b)));
