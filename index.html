@@ -789,6 +789,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <button class="btn btn-p btn-sm" id="sq-btn-grid" style="border-radius:5px">⊞ Grelha</button>
           <button class="btn btn-g btn-sm" id="sq-btn-pitch" style="border-radius:5px;background:transparent;color:var(--muted)">⬛ Campo</button>
         </div>
+        <button class="btn btn-g" id="btn-bulk-eval" style="display:none" onclick="openBulkEval()">📊 Avaliar Plantel</button>
         <button class="btn btn-p" id="btn-add-player">+ Adicionar Atleta</button>
       </div>
     </div>
@@ -5538,6 +5539,119 @@ async function deletePlayerEval(id){
   _renderPlayerEval(player);
 }
 
+// ── AVALIAÇÃO EM MASSA ────────────────────────────────────────────────────────
+let _bulkEvalPlayers=[];
+
+function openBulkEval(){
+  const today=new Date().toISOString().slice(0,10);
+  const players=DB.players(squad).filter(p=>p.status!=='inactive');
+  if(!players.length){ toast('Sem atletas no plantel'); return; }
+  _bulkEvalPlayers=[...sortByPos(players)];
+
+  function ratingBtns(athleteId,dimKey){
+    return [1,2,3,4,5].map(v=>`<button class="bev-btn${v===3?' bev-sel':''}"
+      data-aid="${athleteId}" data-dim="${dimKey}" data-val="${v}"
+      onclick="setBulkRating(this)"
+      style="width:30px;height:28px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-weight:700;background:${v===3?'var(--primary)':'var(--bg)'};color:${v===3?'#fff':'var(--text)'};cursor:pointer;padding:0;font-family:inherit;transition:all .1s">${v}</button>`).join('');
+  }
+
+  const dimHeaders=EVAL_DIMS.map(d=>`<th style="font-size:11px;font-weight:700;color:${d.color};text-align:center;padding:6px 4px;white-space:nowrap">${d.label}</th>`).join('');
+
+  const rows=_bulkEvalPlayers.map(p=>{
+    const name=dn(p);
+    const avatar=p.photoUrl
+      ?`<img src="${p.photoUrl}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      :`<div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:11px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
+    const dimCells=EVAL_DIMS.map(d=>`<td style="text-align:center;padding:4px 4px">
+      <div style="display:flex;gap:2px;justify-content:center">${ratingBtns(p.id,d.key)}</div>
+    </td>`).join('');
+    return `<tr id="bev-row-${p.id}" style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 8px;min-width:140px">
+        <div style="display:flex;align-items:center;gap:8px">
+          ${avatar}
+          <div>
+            <div style="font-size:13px;font-weight:700">${name}</div>
+            <div style="font-size:10px;color:var(--muted)">${POS[p.position]||p.position||'—'}</div>
+          </div>
+        </div>
+      </td>
+      ${dimCells}
+      <td style="padding:4px 8px;min-width:110px">
+        <input type="text" id="bev-notes-${p.id}" placeholder="Notas..."
+          style="width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;font-family:inherit">
+      </td>
+    </tr>`;
+  }).join('');
+
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-bulk-eval';
+  mo.innerHTML=`<div class="md" style="max-width:920px;width:96vw">
+    <div class="mh"><h2>📊 Avaliação do Plantel</h2><button class="mc" onclick="document.getElementById('mo-bulk-eval').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px">
+      <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data</label>
+          <input type="date" id="bev-date" value="${today}" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Avaliado por</label>
+          <input type="text" id="bev-by" value="${currentUser()?.user||''}" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);min-width:140px">
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding-bottom:10px">${players.length} atleta${players.length!==1?'s':''} · 1 = Fraco · 5 = Excelente</div>
+      </div>
+      <div style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:620px">
+          <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Atleta</th>
+            ${dimHeaders}
+            <th style="text-align:left;padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Notas</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-bulk-eval').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveBulkEval()">💾 Guardar Tudo (${players.length})</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+function setBulkRating(btn){
+  btn.closest('div').querySelectorAll('.bev-btn').forEach(b=>{
+    b.classList.remove('bev-sel');
+    b.style.background='var(--bg)'; b.style.color='var(--text)';
+  });
+  btn.classList.add('bev-sel');
+  btn.style.background='var(--primary)'; btn.style.color='#fff';
+}
+
+async function saveBulkEval(){
+  const date=document.getElementById('bev-date')?.value;
+  if(!date){ toast('❌ Seleciona a data'); return; }
+  const evaluatedBy=document.getElementById('bev-by')?.value.trim()||'';
+  const btn=document.querySelector('#mo-bulk-eval .btn-p');
+  if(btn){ btn.disabled=true; btn.textContent='A guardar...'; }
+  let count=0;
+  try{
+    for(const p of _bulkEvalPlayers){
+      const rec={athleteId:p.id,date,evaluatedBy,squad:p.squad||'',notes:document.getElementById('bev-notes-'+p.id)?.value.trim()||''};
+      EVAL_DIMS.forEach(d=>{
+        const sel=document.querySelector(`#bev-row-${p.id} .bev-sel[data-dim="${d.key}"]`);
+        rec[d.key]=sel?parseInt(sel.dataset.val):3;
+      });
+      await DB.addPlayerEvaluation(rec);
+      count++;
+    }
+    document.getElementById('mo-bulk-eval').remove();
+    toast(`✅ ${count} avaliações guardadas`);
+  }catch(e){
+    toast('❌ '+(e.message||'Erro ao guardar'));
+    if(btn){ btn.disabled=false; btn.textContent=`💾 Guardar Tudo (${_bulkEvalPlayers.length})`; }
+  }
+}
+
 // ── PLAYER WELLNESS TAB ───────────────────────────────────────────────────────
 async function _checkPlayerWellnessData(p){
   const jnum=p.jerseyNumber??p.number;
@@ -6923,15 +7037,29 @@ function openClinicalMap(){
   const sq=coachSquads();
   const sel=document.getElementById('cm-squad-filter');
   if(sel&&sq.length===1) sel.value=sq[0]; // pré-filtrar para escalão do utilizador
+  // Para equipa técnica: bloquear filtro ao seu escalão e esconder tabs clínicas
+  const coachOnly=!canSeeClinical()&&currentUser()?.role==='coach';
+  if(sel) sel.style.display=coachOnly?'none':'';
+  ['cm-tab-history','cm-tab-stats','cm-tab-occurrences'].forEach(id=>{
+    const btn=document.getElementById(id);
+    if(btn) btn.style.display=coachOnly?'none':'';
+  });
+  if(coachOnly&&_cmTab!=='active') _cmTab='active';
   document.getElementById('mo-clinical-map').classList.add('open');
-  DB.syncOcrFromFirestore().catch(()=>{});
+  if(canSeeClinical()){
+    DB.syncOcrFromFirestore().catch(()=>{});
+    DB.syncClinicalFromFirestore().catch(()=>{});
+  }
+  DB.syncUnavailFromFirestore().catch(()=>{});
   renderClinicalMap();
 }
 function closeClinicalMap(){ document.getElementById('mo-clinical-map').classList.remove('open'); }
 
 function cmTab(t){
+  // Bloquear tabs clínicas para equipa técnica
+  if(!canSeeClinical()&&currentUser()?.role==='coach'&&t!=='active') return;
   _cmTab=t;
-  ['active','history','stats'].forEach(id=>{
+  ['active','history','stats','occurrences'].forEach(id=>{
     const btn=document.getElementById('cm-tab-'+id);
     if(!btn) return;
     const active=id===t;
@@ -6975,8 +7103,9 @@ function renderClinicalMap(){
       const daysIn=Math.floor((new Date(today)-new Date(r.startDate))/(1000*60*60*24));
       const relCR=allCR.filter(c=>c.athleteId===r.personId&&c.date>=r.startDate&&c.date<=r.endDate)
         .sort((a,b)=>b.date.localeCompare(a.date))[0];
-      const diag=r.reason||relCR?.diagnostico||'';
-      const treat=relCR?.treatment||'';
+      const showClinicalDetail=canSeeClinical();
+      const diag=showClinicalDetail?(r.reason||relCR?.diagnostico||''):'';
+      const treat=showClinicalDetail?(relCR?.treatment||''):'';
       const avatar=p?.photoUrl
         ?`<img src="${p.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
         :`<div style="width:40px;height:40px;border-radius:50%;background:${isPast?'#aaa':'#b71c1c'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
@@ -16634,10 +16763,15 @@ function applyRoleUI(){
     const nlClinical=document.getElementById('nl-clinical-map');
     if(nlClinical) nlClinical.style.display='';
   }
-  // Mapa Clínico visível para médicos
-  if(u.role==='medical'){
+  // Mapa Clínico visível para médicos e equipa técnica (coaches)
+  if(u.role==='medical'||u.role==='coach'){
     const nlClinical=document.getElementById('nl-clinical-map');
     if(nlClinical) nlClinical.style.display='';
+  }
+  // Avaliar Plantel visível para coaches, teammanager e admin
+  if(['admin','coach','teammanager'].includes(u.role)){
+    const btnBulkEval=document.getElementById('btn-bulk-eval');
+    if(btnBulkEval) btnBulkEval.style.display='';
   }
 }
 
