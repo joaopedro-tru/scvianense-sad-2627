@@ -2574,6 +2574,10 @@ const DB = {
   async addBilhete(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
     if(firestoreDb){
+      // Formulário público — garante auth anónima para satisfazer regras Firestore
+      if(firebaseAuth && !firebaseAuth.currentUser){
+        try{ await firebaseAuth.signInAnonymously(); }catch(ae){ console.warn('anon auth:',ae); }
+      }
       await firestoreDb.collection('bilhetes_requests').doc(entry.id).set(entry).catch(e=>{
         console.error('FS addBilhete:',e);
         throw e; // propaga para o submitBilhetes mostrar o erro
@@ -2596,6 +2600,10 @@ const DB = {
   async addBilheteEqb(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
     if(firestoreDb){
+      // Formulário público — garante auth anónima para satisfazer regras Firestore
+      if(firebaseAuth && !firebaseAuth.currentUser){
+        try{ await firebaseAuth.signInAnonymously(); }catch(ae){ console.warn('anon auth:',ae); }
+      }
       await firestoreDb.collection('bilhetes_eqb_requests').doc(entry.id).set(entry).catch(e=>{
         console.error('FS addBilheteEqb:',e);
         throw e;
