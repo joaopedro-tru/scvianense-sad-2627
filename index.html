@@ -23,6 +23,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2765,6 +2767,15 @@ const DB = {
     if(!this._fconduct()) return;
     try{ const snap=await this._fconduct().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sconduct(arr); }catch(e){ console.warn('syncConduct:',e); }
   },
+  // ── Occurrence Records (FPF) ─────────────────────────────────────────────────
+  _focr(){ return firestoreDb?.collection('occurrenceRecords') },
+  _ocr(){ try{ return JSON.parse(localStorage.getItem('scv_ocr')||'[]'); }catch{ return []; } },
+  _socr(arr){ localStorage.setItem('scv_ocr',JSON.stringify(arr)); },
+  getOccurrenceRecords(athleteId){ const all=this._ocr(); return athleteId?all.filter(r=>r.athleteId===athleteId):all; },
+  async addOccurrenceRecord(rec){ rec.id=uid(); rec.createdAt=new Date().toISOString(); const arr=this._ocr(); arr.push(rec); this._socr(arr); if(this._focr()) await this._focr().doc(rec.id).set(rec).catch(e=>console.error('FS addOcr:',e)); return rec; },
+  async updateOccurrenceRecord(id,data){ const arr=this._ocr().map(r=>r.id===id?{...r,...data}:r); this._socr(arr); if(this._focr()) await this._focr().doc(id).update(data).catch(e=>console.error('FS updateOcr:',e)); },
+  async deleteOccurrenceRecord(id){ const arr=this._ocr().filter(r=>r.id!==id); this._socr(arr); if(this._focr()) await this._focr().doc(id).delete().catch(e=>console.error('FS delOcr:',e)); },
+  async syncOcrFromFirestore(){ if(!this._focr()) return; try{ const snap=await this._focr().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._socr(arr); }catch(e){ console.warn('syncOcr:',e); } },
   // ── Staff Profiles ────────────────────────────────────────────────────────────
   _fssp(){ return firestoreDb?.collection('staff_profiles') },
   _sp(){ try{ return JSON.parse(localStorage.getItem('scv_sp')||'[]'); }catch{ return []; } },
@@ -6726,6 +6737,7 @@ function openClinicalMap(){
   const sel=document.getElementById('cm-squad-filter');
   if(sel&&sq.length===1) sel.value=sq[0]; // pré-filtrar para escalão do utilizador
   document.getElementById('mo-clinical-map').classList.add('open');
+  DB.syncOcrFromFirestore().catch(()=>{});
   renderClinicalMap();
 }
 function closeClinicalMap(){ document.getElementById('mo-clinical-map').classList.remove('open'); }
@@ -6916,6 +6928,76 @@ function renderClinicalMap(){
           ${playerRows||'<div style="color:var(--muted);font-size:13px">Sem dados</div>'}
         </div>
       </div>`;
+
+  } else if(_cmTab==='occurrences'){
+    // ── Ocorrências FPF ──────────────────────────────────────────────────────
+    // 1. From manual occurrence records
+    const manualOcr=DB.getOccurrenceRecords();
+    // 2. Auto from clinical records (injuries + illness, enriched with return date)
+    const linkedUnavailMap={};
+    allUnavail.forEach(u=>{ if(u.id) linkedUnavailMap[u.id]=u; });
+    const autoCrOcr=allCR.map(r=>{
+      const returnDate=r.returnDate||(r.unavailId&&linkedUnavailMap[r.unavailId]?.endDate)||'';
+      const p=playerMap[r.athleteId];
+      return {
+        _source:'clinical', _crId:r.id,
+        athleteId:r.athleteId, athleteName:p?dn(p):(r.athleteId||''), squad:p?.squad||r.squad||'',
+        date:r.date, occurrence:(r.diagnostico||r.notes||CR_TYPES[r.type]||r.type||''),
+        treatment:r.treatment||'', returnDate, registeredBy:r.registeredBy||''
+      };
+    });
+    // Merge: prefer manual if same CR is already in manual (by _crId link)
+    const linkedCrIds=new Set(manualOcr.filter(r=>r.linkedCrId).map(r=>r.linkedCrId));
+    const crRows=autoCrOcr.filter(r=>!linkedCrIds.has(r._crId));
+    const allOcr=[...manualOcr.map(r=>({...r,_source:'manual'})), ...crRows]
+      .sort((a,b)=>b.date.localeCompare(a.date));
+
+    const sq=document.getElementById('cm-squad-filter')?.value||'';
+    const filteredOcr=allOcr.filter(r=>!sq||r.squad===sq);
+
+    const tableRows=filteredOcr.map(r=>{
+      const p=playerMap[r.athleteId]||allPlayers.find(x=>x.id===r.athleteId);
+      const name=r.athleteName||(p?dn(p):r.athleteId||'—');
+      const sqLabel=SQUADS[r.squad||p?.squad||'']||r.squad||'—';
+      const isManual=r._source==='manual';
+      const delBtn=canEdit&&isManual?`<button onclick="deleteOccurrenceRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:'';
+      const editBtn=canEdit&&isManual?`<button onclick="openOccurrenceModal('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px" title="Editar">✏️</button>`:'';
+      const srcBadge=isManual?'':` <span style="font-size:9px;background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;padding:1px 5px;border-radius:6px">auto</span>`;
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 8px;font-size:12px;white-space:nowrap;color:var(--muted)">${fmtDate(r.date)}</td>
+        <td style="padding:8px 8px;font-size:13px;font-weight:600">${name}${srcBadge}</td>
+        <td style="padding:8px 8px;font-size:12px;color:var(--muted)">${sqLabel}</td>
+        <td style="padding:8px 8px;font-size:12px">${r.occurrence||'—'}</td>
+        <td style="padding:8px 8px;font-size:12px;color:var(--muted)">${r.treatment||'—'}</td>
+        <td style="padding:8px 8px;font-size:12px;color:var(--muted)">${r.returnDate?fmtDate(r.returnDate):'—'}</td>
+        <td style="padding:8px 8px;font-size:11px;color:var(--muted)">${r.registeredBy||'—'}</td>
+        <td style="padding:4px 4px;white-space:nowrap">${editBtn}${delBtn}</td>
+      </tr>`;
+    }).join('');
+
+    el.innerHTML=`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--muted)">${filteredOcr.length} ocorrência(s)</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          ${canEdit?`<button onclick="openOccurrenceModal()" class="btn btn-p" style="font-size:12px;padding:6px 14px">+ Nova Ocorrência</button>`:''}
+          <button onclick="exportOccurrencesPDF()" class="btn btn-g" style="font-size:12px;padding:6px 14px">📥 Exportar PDF FPF</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:700px">
+        <thead><tr style="border-bottom:2px solid var(--border);background:var(--bg)">
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Data</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Jogador</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Escalão</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Ocorrência (Doença/Lesão)</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Tratamento</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Regresso sem limitações</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Registado por</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${tableRows||`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Sem ocorrências registadas.</td></tr>`}</tbody>
+      </table>
+      </div>`;
   }
 }
 
@@ -7009,6 +7091,171 @@ async function cmDeleteCR(id){
   await DB.deleteClinicalRecord(id);
   toast('🗑️ Eliminado');
   renderClinicalMap();
+}
+
+// ── Ocorrências FPF ───────────────────────────────────────────────────────────
+function openOccurrenceModal(editId){
+  const existing=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
+  const players=DB.players(null).sort((a,b)=>dn(a).localeCompare(dn(b)));
+  const today=new Date().toISOString().slice(0,10);
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-ocr';
+  mo.innerHTML=`<div class="md" style="max-width:480px">
+    <div class="mh"><h2>${existing?'✏️ Editar':'📄 Nova'} Ocorrência FPF</h2><button class="mc" onclick="document.getElementById('mo-ocr').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Jogador</label>
+        <select id="ocr-player" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
+          <option value="">— Selecionar atleta —</option>
+          ${players.map(p=>`<option value="${p.id}" ${p.id===existing?.athleteId?'selected':''}>${dn(p)} (${SQUADS[p.squad]||p.squad||'?'})</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data da ocorrência</label>
+        <input type="date" id="ocr-date" value="${existing?.date||today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Ocorrência (Doença/Lesão)</label>
+        <input type="text" id="ocr-occurrence" value="${existing?.occurrence||''}" placeholder="Ex: Entorse tornozelo, Gripe, Contractura..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Tratamento</label>
+        <input type="text" id="ocr-treatment" value="${existing?.treatment||''}" placeholder="Ex: Fisioterapia, Repouso, Medicação..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data de regresso aos treinos sem limitações</label>
+        <input type="date" id="ocr-return" value="${existing?.returnDate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Registado por</label>
+        <input type="text" id="ocr-regby" value="${existing?.registeredBy||currentUser()?.user||''}" placeholder="Nome do responsável" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-ocr').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveOccurrenceRecord('${editId||''}')">💾 Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+async function saveOccurrenceRecord(editId){
+  const pid=document.getElementById('ocr-player')?.value;
+  const date=document.getElementById('ocr-date')?.value;
+  const occurrence=document.getElementById('ocr-occurrence')?.value.trim();
+  const treatment=document.getElementById('ocr-treatment')?.value.trim()||'';
+  const returnDate=document.getElementById('ocr-return')?.value||'';
+  const registeredBy=document.getElementById('ocr-regby')?.value.trim()||currentUser()?.user||'';
+  if(!pid){ toast('❌ Seleciona o atleta'); return; }
+  if(!date){ toast('❌ Seleciona a data'); return; }
+  if(!occurrence){ toast('❌ Descreve a ocorrência'); return; }
+  const p=DB.getPlayer(pid);
+  const data={ athleteId:pid, athleteName:p?dn(p):'', squad:p?.squad||'', date, occurrence, treatment, returnDate, registeredBy };
+  try{
+    if(editId){ await DB.updateOccurrenceRecord(editId, data); toast('✅ Atualizado'); }
+    else { await DB.addOccurrenceRecord(data); toast('✅ Ocorrência registada'); }
+    document.getElementById('mo-ocr')?.remove();
+    renderClinicalMap();
+  }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
+}
+
+async function deleteOccurrenceRecord(id){
+  if(!confirm('Eliminar esta ocorrência?')) return;
+  await DB.deleteOccurrenceRecord(id);
+  renderClinicalMap();
+}
+
+function exportOccurrencesPDF(){
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('❌ jsPDF não carregado'); return; }
+  const sq=document.getElementById('cm-squad-filter')?.value||'';
+  const allPlayers=DB.players(null);
+  const playerMap={};
+  allPlayers.forEach(p=>{ playerMap[p.id]=p; });
+  const allCR=DB.getClinicalRecords().filter(r=>!sq||r.squad===sq||(playerMap[r.athleteId]?.squad===sq));
+  const allUnavail=DB.getUnavailability();
+  const linkedUnavailMap={};
+  allUnavail.forEach(u=>{ if(u.id) linkedUnavailMap[u.id]=u; });
+  const manualOcr=DB.getOccurrenceRecords().filter(r=>!sq||r.squad===sq);
+  const linkedCrIds=new Set(manualOcr.filter(r=>r.linkedCrId).map(r=>r.linkedCrId));
+  const autoCrOcr=allCR.filter(r=>!linkedCrIds.has(r.id)).map(r=>{
+    const p=playerMap[r.athleteId];
+    return {
+      athleteName:p?dn(p):(r.athleteId||''), squad:p?.squad||r.squad||'',
+      date:r.date, occurrence:(r.diagnostico||r.notes||CR_TYPES[r.type]||r.type||''),
+      treatment:r.treatment||'', returnDate:r.returnDate||(r.unavailId&&linkedUnavailMap[r.unavailId]?.endDate)||'',
+      registeredBy:r.registeredBy||''
+    };
+  });
+  const allOcr=[...manualOcr, ...autoCrOcr].sort((a,b)=>b.date.localeCompare(a.date));
+  if(!allOcr.length){ toast('Sem ocorrências para exportar'); return; }
+
+  const doc=new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const W=doc.internal.pageSize.getWidth();
+
+  // Header background
+  doc.setFillColor(13,26,46);
+  doc.rect(0,0,W,28,'F');
+  // Season top-right
+  doc.setTextColor(180,200,160);
+  doc.setFontSize(8);
+  doc.text('2025 · 2026',W-10,7,{align:'right'});
+  // Title
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(18);
+  doc.setFont(undefined,'bold');
+  doc.text('REGISTO DE OCORRÊNCIAS',W/2,14,{align:'center'});
+  // Subtitle
+  doc.setFont(undefined,'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(180,200,160);
+  doc.text('Critério Médico-Desportivo',W/2,20,{align:'center'});
+  // Club name
+  doc.setFontSize(8);
+  doc.setTextColor(200,210,200);
+  doc.text('SPORT CLUBE VIANENSE - FUTEBOL SAD',W/2,26,{align:'center'});
+
+  // FPF accent left bar
+  doc.setFillColor(164,214,0);
+  doc.rect(0,0,3,28,'F');
+
+  // Table
+  const tableData=allOcr.map(r=>[
+    r.date?new Date(r.date+'T12:00').toLocaleDateString('pt-PT'):'',
+    r.athleteName||'',
+    SQUADS[r.squad]||r.squad||'',
+    r.occurrence||'',
+    r.treatment||'',
+    r.returnDate?new Date(r.returnDate+'T12:00').toLocaleDateString('pt-PT'):'',
+    r.registeredBy||''
+  ]);
+
+  doc.autoTable({
+    startY:32,
+    head:[['DATA','JOGADOR (NOME COMPLETO)','ESCALÃO','OCORRÊNCIA (DOENÇA/LESÃO)','TRATAMENTO','DATA DE REGRESSO AOS TREINOS SEM LIMITAÇÕES','REGISTADO POR']],
+    body:tableData,
+    styles:{ fontSize:8, cellPadding:3, overflow:'linebreak' },
+    headStyles:{ fillColor:[13,26,46], textColor:[255,255,255], fontStyle:'bold', fontSize:7 },
+    alternateRowStyles:{ fillColor:[245,248,245] },
+    columnStyles:{
+      0:{ cellWidth:22 }, 1:{ cellWidth:45 }, 2:{ cellWidth:20 },
+      3:{ cellWidth:60 }, 4:{ cellWidth:40 }, 5:{ cellWidth:38 }, 6:{ cellWidth:32 }
+    },
+    margin:{ left:10, right:10 },
+    didDrawPage:(data)=>{
+      // Footer
+      const pg=doc.internal.getCurrentPageInfo().pageNumber;
+      doc.setFontSize(7); doc.setTextColor(150,150,150);
+      doc.text(`fpf.pt`,10,doc.internal.pageSize.getHeight()-5);
+      doc.text(`${pg}`,W-10,doc.internal.pageSize.getHeight()-5,{align:'right'});
+      // Accent bar on continuation pages
+      if(pg>1){ doc.setFillColor(164,214,0); doc.rect(0,0,3,doc.internal.pageSize.getHeight(),'F'); }
+    }
+  });
+
+  const fname=`Ocorrencias_SCV${sq?'_'+sq:''}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+  toast('✅ PDF exportado');
 }
 
 // Show back button in standalone (PWA) mode
@@ -16861,6 +17108,7 @@ if('serviceWorker' in navigator){
       <button id="cm-tab-active" onclick="cmTab('active')" style="border:none;border-bottom:2px solid var(--primary);background:transparent;color:var(--primary);font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">🚨 Lesionados</button>
       <button id="cm-tab-history" onclick="cmTab('history')" style="border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;padding:10px 14px;cursor:pointer">📋 Histórico</button>
       <button id="cm-tab-stats" onclick="cmTab('stats')" style="border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;padding:10px 14px;cursor:pointer">📊 Estatísticas</button>
+      <button id="cm-tab-occurrences" onclick="cmTab('occurrences')" style="border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font-size:13px;padding:10px 14px;cursor:pointer">📄 Ocorrências</button>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 0">
         <select id="cm-squad-filter" onchange="renderClinicalMap()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);color:var(--text)">
           <option value="">Todos os escalões</option>
