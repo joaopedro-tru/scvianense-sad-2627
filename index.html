@@ -2767,6 +2767,15 @@ const DB = {
     if(!this._fconduct()) return;
     try{ const snap=await this._fconduct().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._sconduct(arr); }catch(e){ console.warn('syncConduct:',e); }
   },
+  // ── Player Evaluations ───────────────────────────────────────────────────────
+  _feval(){ return firestoreDb?.collection('playerEvaluations') },
+  _eval(){ try{ return JSON.parse(localStorage.getItem('scv_eval')||'[]'); }catch{ return []; } },
+  _seval(arr){ localStorage.setItem('scv_eval',JSON.stringify(arr)); },
+  getPlayerEvaluations(athleteId){ const all=this._eval(); return athleteId?all.filter(r=>r.athleteId===athleteId).sort((a,b)=>b.date.localeCompare(a.date)):all; },
+  async addPlayerEvaluation(rec){ rec.id=uid(); rec.createdAt=new Date().toISOString(); const arr=this._eval(); arr.push(rec); this._seval(arr); if(this._feval()) await this._feval().doc(rec.id).set(rec).catch(e=>console.error('FS addEval:',e)); return rec; },
+  async updatePlayerEvaluation(id,data){ const arr=this._eval().map(r=>r.id===id?{...r,...data}:r); this._seval(arr); if(this._feval()) await this._feval().doc(id).update(data).catch(e=>console.error('FS updateEval:',e)); },
+  async deletePlayerEvaluation(id){ const arr=this._eval().filter(r=>r.id!==id); this._seval(arr); if(this._feval()) await this._feval().doc(id).delete().catch(e=>console.error('FS delEval:',e)); },
+  async syncEvalsFromFirestore(){ if(!this._feval()) return; try{ const snap=await this._feval().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); this._seval(arr); }catch(e){ console.warn('syncEval:',e); } },
   // ── Occurrence Records (FPF) ─────────────────────────────────────────────────
   _focr(){ return firestoreDb?.collection('occurrenceRecords') },
   _ocr(){ try{ return JSON.parse(localStorage.getItem('scv_ocr')||'[]'); }catch{ return []; } },
@@ -5236,6 +5245,7 @@ function renderPlayer(){
     <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
     ${playerWellnessHasData===true?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
     ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
+    ${(isAdmin()||currentUser()?.role==='coach')?`<button class="tab-btn${playerTab==='eval'?' tab-active':''}" data-ptab="eval" style="padding:10px 18px">⭐ Avaliação</button>`:''}
   </div>`;
 
   const isInactive=p.status==='inactive';
@@ -5310,7 +5320,9 @@ function renderPlayer(){
         ?`<div id="player-wellness-tab"><div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">A carregar...</div></div>`
         :playerTab==='coord'
           ?`<div>${coordTabHTML}</div>`
-          :dadosHTML}`;
+          :playerTab==='eval'
+            ?`<div id="player-eval-tab"><div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">A carregar...</div></div>`
+            :dadosHTML}`;
 
   // Tab click handlers
   document.querySelectorAll('[data-ptab]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -5349,6 +5361,168 @@ function renderPlayer(){
   // Wellness: verificar dados sempre (para mostrar/esconder o tab), renderizar só se activo
   if(playerWellnessHasData===null) _checkPlayerWellnessData(p);
   if(playerTab==='wellness') _renderPlayerWellness(p);
+  if(playerTab==='eval') _renderPlayerEval(p);
+}
+
+// ── PLAYER EVALUATION TAB ────────────────────────────────────────────────────
+const EVAL_DIMS=[
+  {key:'tecnica',    label:'Técnica',      color:'#1565c0'},
+  {key:'tatica',     label:'Tática',       color:'#2e7d32'},
+  {key:'fisico',     label:'Físico',       color:'#e65100'},
+  {key:'psicologico',label:'Psicológico',  color:'#6a1b9a'},
+  {key:'potencial',  label:'Potencial',    color:'#c62828'},
+];
+
+function _evalRadar(evals){
+  // Latest eval for radar
+  const ev=evals[0];
+  if(!ev) return '';
+  const W=160, CX=80, CY=80, R=62;
+  const N=EVAL_DIMS.length;
+  function pt(i,v){ const a=(Math.PI*2*i/N)-Math.PI/2; const r=R*(v/5); return [CX+r*Math.cos(a), CY+r*Math.sin(a)]; }
+  function ptR(i){ const a=(Math.PI*2*i/N)-Math.PI/2; return [CX+R*Math.cos(a), CY+R*Math.sin(a)]; }
+  // Grid circles
+  const grid=[1,2,3,4,5].map(lvl=>{
+    const pts=EVAL_DIMS.map((_,i)=>{ const a=(Math.PI*2*i/N)-Math.PI/2; const r=R*(lvl/5); return `${CX+r*Math.cos(a)},${CY+r*Math.sin(a)}`; }).join(' ');
+    return `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="${lvl===5?1.5:0.7}"/>`;
+  }).join('');
+  // Axes
+  const axes=EVAL_DIMS.map((_,i)=>{ const [x,y]=ptR(i); return `<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="0.7"/>`; }).join('');
+  // Data polygon
+  const dataPts=EVAL_DIMS.map((d,i)=>{ const v=Math.max(1,Math.min(5,ev[d.key]||1)); return pt(i,v).join(','); }).join(' ');
+  // Labels
+  const labels=EVAL_DIMS.map((d,i)=>{
+    const [x,y]=ptR(i);
+    const dx=x-CX, dy=y-CY;
+    const lx=CX+dx*1.22, ly=CY+dy*1.22;
+    const anchor=dx>5?'start':dx<-5?'end':'middle';
+    return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="9" fill="var(--muted)" font-family="sans-serif" dominant-baseline="middle">${d.label}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${W}" width="${W}" height="${W}" style="overflow:visible">
+    ${grid}${axes}
+    <polygon points="${dataPts}" fill="#1a3d6e22" stroke="#1a3d6e" stroke-width="2" stroke-linejoin="round"/>
+    ${EVAL_DIMS.map((d,i)=>{ const v=Math.max(1,Math.min(5,ev[d.key]||1)); const [x,y]=pt(i,v); return `<circle cx="${x}" cy="${y}" r="3.5" fill="${d.color}"/>`; }).join('')}
+    ${labels}
+  </svg>`;
+}
+
+async function _renderPlayerEval(p){
+  const el=document.getElementById('player-eval-tab'); if(!el) return;
+  await DB.syncEvalsFromFirestore().catch(()=>{});
+  const evals=DB.getPlayerEvaluations(p.id);
+  const latest=evals[0];
+  const canEdit=isAdmin()||currentUser()?.role==='coach';
+
+  // Bars for latest eval
+  const barsHTML=latest?EVAL_DIMS.map(d=>{
+    const v=latest[d.key]||0;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-size:12px;width:90px;color:var(--text);flex-shrink:0">${d.label}</span>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${v*20}%;background:${d.color};border-radius:6px;transition:width .3s"></div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${d.color};min-width:16px;text-align:right">${v}</span>
+    </div>`;
+  }).join(''):'';
+
+  const latestCard=latest?`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;flex:1">Avaliação mais recente — ${fmtDate(latest.date)}</span>
+        <span style="font-size:11px;color:var(--muted)">${latest.evaluatedBy||''}</span>
+        ${canEdit?`<button onclick="deletePlayerEval('${latest.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:''}
+      </div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div style="flex:0 0 auto">${_evalRadar(evals)}</div>
+        <div style="flex:1;min-width:160px">${barsHTML}</div>
+      </div>
+      ${latest.notes?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.5">${latest.notes}</div>`:''}
+    </div>`
+    :`<div style="text-align:center;padding:40px 0;color:var(--muted)"><div style="font-size:32px;margin-bottom:10px">📋</div><div style="font-size:13px">Sem avaliações registadas</div></div>`;
+
+  // History list (older evals)
+  const historyHTML=evals.length>1?`
+    <div style="margin-top:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Histórico</div>
+      ${evals.slice(1).map(ev=>`
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--muted);min-width:80px">${fmtDate(ev.date)}</span>
+          ${EVAL_DIMS.map(d=>`<span style="font-size:11px;padding:2px 7px;border-radius:10px;background:${d.color}18;color:${d.color};font-weight:700">${d.label[0]} ${ev[d.key]||'—'}</span>`).join('')}
+          <span style="font-size:11px;color:var(--muted);flex:1;text-align:right">${ev.evaluatedBy||''}</span>
+          ${canEdit?`<button onclick="deletePlayerEval('${ev.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:11px;padding:2px 4px" title="Eliminar">🗑️</button>`:''}
+        </div>`).join('')}
+    </div>`:'';
+
+  el.innerHTML=`
+    <div style="padding:4px 0">
+      ${canEdit?`<div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+        <button onclick="openEvalModal('${p.id}')" class="btn btn-p" style="font-size:12px;padding:6px 16px">+ Nova Avaliação</button>
+      </div>`:''}
+      ${latestCard}
+      ${historyHTML}
+    </div>`;
+}
+
+function openEvalModal(athleteId){
+  const today=new Date().toISOString().slice(0,10);
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-eval';
+  const sliders=EVAL_DIMS.map(d=>`
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <label style="font-size:12px;font-weight:600;color:${d.color}">${d.label}</label>
+        <span id="eval-val-${d.key}" style="font-size:13px;font-weight:700;color:${d.color}">3</span>
+      </div>
+      <input type="range" id="eval-${d.key}" min="1" max="5" step="1" value="3"
+        oninput="document.getElementById('eval-val-${d.key}').textContent=this.value"
+        style="width:100%;accent-color:${d.color}">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:1px">
+        <span>Fraco</span><span>Médio</span><span>Excelente</span>
+      </div>
+    </div>`).join('');
+  mo.innerHTML=`<div class="md" style="max-width:460px">
+    <div class="mh"><h2>⭐ Nova Avaliação</h2><button class="mc" onclick="document.getElementById('mo-eval').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:4px">
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data</label>
+        <input type="date" id="eval-date" value="${today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      ${sliders}
+      <div style="margin-top:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Observações</label>
+        <textarea id="eval-notes" rows="3" placeholder="Notas sobre o atleta..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Avaliado por</label>
+        <input type="text" id="eval-by" value="${currentUser()?.user||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-eval').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="savePlayerEval('${athleteId}')">💾 Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+async function savePlayerEval(athleteId){
+  const date=document.getElementById('eval-date')?.value;
+  if(!date){ toast('❌ Seleciona a data'); return; }
+  const rec={ athleteId, date, evaluatedBy:document.getElementById('eval-by')?.value.trim()||'', notes:document.getElementById('eval-notes')?.value.trim()||'' };
+  EVAL_DIMS.forEach(d=>{ rec[d.key]=parseInt(document.getElementById('eval-'+d.key)?.value||'3'); });
+  rec.squad=player?.squad||'';
+  try{
+    await DB.addPlayerEvaluation(rec);
+    document.getElementById('mo-eval')?.remove();
+    toast('✅ Avaliação guardada');
+    _renderPlayerEval(player);
+  }catch(e){ toast('❌ '+(e.message||'Erro')); }
+}
+
+async function deletePlayerEval(id){
+  if(!confirm('Eliminar esta avaliação?')) return;
+  await DB.deletePlayerEvaluation(id);
+  _renderPlayerEval(player);
 }
 
 // ── PLAYER WELLNESS TAB ───────────────────────────────────────────────────────
