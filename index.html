@@ -13315,7 +13315,7 @@ function switchPerioTab(tab){
 }
 
 function onPerioSquadChange(){
-  _periAnaliseWeek='__full__'; // reset to default when squad changes
+  _periAnaliseWeek=null; // reset to most recent week when squad changes
   if(_periTab==='meso') renderPeriodization();
   else if(_periTab==='micro') renderMicrocicloBase(document.getElementById('perio-squad')?.value||'eqa');
   else renderPerioAnalise(document.getElementById('perio-squad')?.value||'eqa');
@@ -13604,41 +13604,9 @@ async function renderPeriodization(){
 }
 
 // ── Análise Semanal ──────────────────────────────────────────────────────────
-const _SUB19_DAY_DIMS={
-  mon:{label:'Segunda (Dia 1)',dims:{tt:30,res:5,forca:40,flex:5,coord:20}},
-  tue:{label:'Terça (Dia 2)',  dims:{tt:30,res:35,vel:10,flex:5,coord:20}},
-  thu:{label:'Quinta (Dia 3)', dims:{tt:30,res:35,vel:10,forca:5,coord:20}},
-};
 const _DIM_COLORS={tt:'#1565c0',res:'#e65100',vel:'#c62828',forca:'#37474f',flex:'#f9a825',coord:'#2e7d32'};
 const _DIM_LABELS={tt:'Técnico-Tático',res:'Resistência',vel:'Velocidade',forca:'Força',flex:'Flexibilidade',coord:'Coordenação'};
-let _periAnaliseWeek='__full__'; // persisted across re-renders
-
-function _periWeeksList(season){
-  const weeks=[];
-  const cur=new Date(season,6,1);
-  const end=new Date(season+1,6,1);
-  const dow=cur.getDay();
-  cur.setDate(cur.getDate()+(dow===1?0:dow===0?1:8-dow));
-  while(cur<end){
-    const mon=new Date(cur);
-    const thu=new Date(cur); thu.setDate(thu.getDate()+3);
-    const sun=new Date(cur); sun.setDate(sun.getDate()+6);
-    weeks.push({mon,thu,sun,key:mon.toISOString().slice(0,10)});
-    cur.setDate(cur.getDate()+7);
-  }
-  return weeks;
-}
-
-function _calcWeekDims(dayKeys){
-  const total={};
-  dayKeys.forEach(k=>{
-    const d=_SUB19_DAY_DIMS[k].dims;
-    Object.entries(d).forEach(([dim,val])=>{ total[dim]=(total[dim]||0)+val; });
-  });
-  const n=dayKeys.length;
-  Object.keys(total).forEach(k=>{ total[k]=Math.round(total[k]/n*10)/10; });
-  return total;
-}
+let _periAnaliseWeek=null;
 
 function _donutSVG(dims,size){
   size=size||220;
@@ -13664,6 +13632,26 @@ function _donutSVG(dims,size){
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">${paths}<circle cx="${cx}" cy="${cy}" r="${r*0.88}" fill="var(--bg)"/></svg>`;
 }
 
+// Reuses same aggregation logic as the dashboard
+function _periAggMoments(evs){
+  const acc={};
+  let hasMins=false;
+  evs.forEach(ev=>{
+    if(ev.momentSummary&&Object.keys(ev.momentSummary).length){
+      hasMins=true;
+      Object.entries(ev.momentSummary).forEach(([mk,mins])=>{
+        if(mins>0&&TACTICS_TAXONOMY[mk]&&mk!=='PF'&&mk!=='SJ') acc[mk]=(acc[mk]||0)+mins;
+      });
+    } else {
+      const arr=normalizePrimaryArr(ev.objectivePrimary);
+      if(!arr.length) return;
+      const w=1/arr.length;
+      arr.forEach(k=>{ if(TACTICS_TAXONOMY[k]) acc[k]=(acc[k]||0)+w; });
+    }
+  });
+  return {entries:Object.entries(acc).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a), hasMins};
+}
+
 function periAnaliseSetWeek(val){ _periAnaliseWeek=val; renderPerioAnalise(); }
 
 function renderPerioAnalise(squad){
@@ -13672,84 +13660,154 @@ function renderPerioAnalise(squad){
   const sq=squad||document.getElementById('perio-squad')?.value||'eqa';
   document.getElementById('perio-sub').textContent=`${SQUADS[sq]||sq} · Análise Semanal`;
 
-  if(sq!=='sub19'){
+  const today=new Date().toISOString().slice(0,10);
+  const trainEvs=DB.events(sq).filter(e=>
+    e.type==='training'&&(e.momentSummary||e.objectivePrimary)&&e.date<=today
+  );
+
+  if(!trainEvs.length){
     el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--muted)">
       <div style="font-size:40px;margin-bottom:12px">📊</div>
-      <div style="font-size:15px;font-weight:600;margin-bottom:6px">Análise não disponível</div>
-      <div style="font-size:13px">A análise de microciclos está configurada para os Sub-19.</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px">Sem dados</div>
+      <div style="font-size:13px">Ainda não há treinos com objetivos registados para ${SQUADS[sq]||sq}.</div>
     </div>`;
     return;
   }
 
-  const season=parseInt(document.getElementById('perio-season')?.value||periSeasonYear());
-  const weeks=_periWeeksList(season);
-  const today=new Date();
+  // Group by week (Monday key)
+  function mondayOf(dateStr){
+    const d=new Date(dateStr);
+    const dow=d.getDay();
+    d.setDate(d.getDate()-(dow===0?6:dow-1));
+    return d.toISOString().slice(0,10);
+  }
+  const weekMap={};
+  trainEvs.forEach(ev=>{
+    const wk=mondayOf(ev.date);
+    if(!weekMap[wk]) weekMap[wk]=[];
+    weekMap[wk].push(ev);
+  });
+  const weekKeys=Object.keys(weekMap).sort();
 
-  // If opening for first time or __full__, default to most recent complete week
-  if(!_periAnaliseWeek||_periAnaliseWeek==='__full__'){
-    const complete=weeks.filter(w=>w.thu<today);
-    _periAnaliseWeek=complete.length?complete[complete.length-1].key:'__full__';
+  // Default to most recent week with data
+  if(!_periAnaliseWeek||!weekMap[_periAnaliseWeek]){
+    _periAnaliseWeek=weekKeys[weekKeys.length-1];
+  }
+  const selKey=_periAnaliseWeek;
+  const selEvs=weekMap[selKey]||[];
+
+  // Week selector (newest first)
+  const weekOpts=[...weekKeys].reverse().map(wk=>{
+    const mon=new Date(wk);
+    const sun=new Date(wk); sun.setDate(sun.getDate()+6);
+    const n=weekMap[wk].length;
+    const lbl=`${mon.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})} – ${sun.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})} · ${n} treino${n!==1?'s':''}`;
+    return `<option value="${wk}" ${wk===selKey?'selected':''}>${lbl}</option>`;
+  }).join('');
+
+  // Aggregated chart for selected week
+  const {entries:weekEntries,hasMins}=_periAggMoments(selEvs);
+  const weekTotal=weekEntries.reduce((s,[,v])=>s+v,0);
+  const unit=hasMins?'min':'sess.';
+
+  // Donut using TACTICS_TAXONOMY colors
+  function donutSVG(entries,size){
+    size=size||200;
+    const cx=size/2,cy=size/2,R=size*0.38,r=size*0.22;
+    const total=entries.reduce((s,[,v])=>s+v,0);
+    if(!total) return `<svg width="${size}" height="${size}"></svg>`;
+    let paths=''; let angle=-Math.PI/2;
+    entries.forEach(([key,val])=>{
+      const sweep=(val/total)*2*Math.PI;
+      const x1=cx+R*Math.cos(angle),y1=cy+R*Math.sin(angle);
+      const x2=cx+R*Math.cos(angle+sweep),y2=cy+R*Math.sin(angle+sweep);
+      const ix1=cx+r*Math.cos(angle+sweep),iy1=cy+r*Math.sin(angle+sweep);
+      const ix2=cx+r*Math.cos(angle),iy2=cy+r*Math.sin(angle);
+      const large=sweep>Math.PI?1:0;
+      const col=TACTICS_TAXONOMY[key]?.color||'#64748b';
+      paths+=`<path d="M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${ix1},${iy1} A${r},${r} 0 ${large},0 ${ix2},${iy2} Z" fill="${col}"/>`;
+      const midA=angle+sweep/2;
+      const lx=cx+(R+r)/2*Math.cos(midA),ly=cy+(R+r)/2*Math.sin(midA);
+      const pct=Math.round(val/total*100);
+      if(pct>=8) paths+=`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="${size*0.055}" font-weight="700">${pct}%</text>`;
+      angle+=sweep;
+    });
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">${paths}<circle cx="${cx}" cy="${cy}" r="${r*0.88}" fill="var(--bg)"/></svg>`;
   }
 
-  const FULL_KEY='__full__';
-  const isAll=_periAnaliseWeek===FULL_KEY;
-  const selKey=_periAnaliseWeek;
-
-  const dims=_calcWeekDims(['mon','tue','thu']); // same structure every week (template-based)
-  const wk=weeks.find(w=>w.key===selKey);
-  const subtitle=isAll
-    ?'Média do microciclo completo (3 treinos)'
-    :(wk?`Semana de ${wk.mon.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})} a ${wk.sun.toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'})}`:'');
-
-  const weekOpts=`<option value="${FULL_KEY}" ${isAll?'selected':''}>Microciclo completo (base)</option>`
-    +weeks.map(w=>{
-      const lbl=`${w.mon.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})} – ${w.sun.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}`;
-      const future=w.mon>today;
-      return `<option value="${w.key}" ${w.key===selKey&&!isAll?'selected':''}>${lbl}${future?' ↑':''}</option>`;
-    }).join('');
-
-  const legendRows=Object.entries(dims).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <div style="width:12px;height:12px;border-radius:50%;background:${_DIM_COLORS[k]};flex-shrink:0"></div>
-      <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${_DIM_LABELS[k]}</div>
-      <div style="width:120px;background:#f0f0f0;border-radius:6px;height:8px;overflow:hidden">
-        <div style="width:${v}%;background:${_DIM_COLORS[k]};height:8px;border-radius:6px"></div>
+  const legendRows=weekEntries.map(([k,v])=>{
+    const col=TACTICS_TAXONOMY[k]?.color||'#64748b';
+    const lbl=TACTICS_TAXONOMY[k]?.label||k;
+    const pct=weekTotal?Math.round(v/weekTotal*100):0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
+      <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${lbl}</div>
+      <div style="width:90px;background:#f0f0f0;border-radius:6px;height:7px;overflow:hidden">
+        <div style="width:${pct}%;background:${col};height:7px;border-radius:6px"></div>
       </div>
-      <div style="width:32px;text-align:right;font-size:12px;font-weight:700;color:${_DIM_COLORS[k]}">${v}%</div>
-    </div>`).join('');
+      <div style="width:38px;text-align:right;font-size:11px;color:var(--muted)">${Math.round(v)}${unit}</div>
+      <div style="width:28px;text-align:right;font-size:12px;font-weight:700;color:${col}">${pct}%</div>
+    </div>`;
+  }).join('');
 
-  const dayBreakHtml=`<div style="margin-top:24px">
-    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Detalhe por Dia de Treino</div>
-    ${Object.entries(_SUB19_DAY_DIMS).map(([dk,dv])=>{
-      const d2=dv.dims;
-      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">${dv.label}</div>
-        <div style="display:flex;gap:0;height:14px;border-radius:6px;overflow:hidden">
-          ${Object.entries(d2).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="flex:${v};background:${_DIM_COLORS[k]}" title="${_DIM_LABELS[k]}: ${v}%"></div>`).join('')}
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-          ${Object.entries(d2).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span style="font-size:10px;font-weight:600;color:${_DIM_COLORS[k]}">${_DIM_LABELS[k]} ${v}%</span>`).join('')}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
+  // Per-session cards
+  const dayNames=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const sessCards=selEvs.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(ev=>{
+    const {entries:evEntries,hasMins:eHasMins}=_periAggMoments([ev]);
+    const evTotal=evEntries.reduce((s,[,v])=>s+v,0);
+    const d=new Date(ev.date);
+    const hasData=evEntries.length>0;
+    const bars=evEntries.map(([k,v])=>`<div style="flex:${v};background:${TACTICS_TAXONOMY[k]?.color||'#64748b'}" title="${TACTICS_TAXONOMY[k]?.label||k}: ${Math.round(v)}${eHasMins?'min':''}"></div>`).join('');
+    const tags=evEntries.slice(0,4).map(([k,v])=>{
+      const col=TACTICS_TAXONOMY[k]?.color||'#64748b';
+      const pct=evTotal?Math.round(v/evTotal*100):0;
+      return `<span style="font-size:10px;font-weight:600;color:${col}">${TACTICS_TAXONOMY[k]?.label||k} ${pct}%</span>`;
+    }).join('');
+    // Específicos: objectivesPerMoment
+    const opm=ev.objectivesPerMoment||{};
+    const specifics=Object.entries(opm).flatMap(([mk,tags2])=>
+      Array.isArray(tags2)?tags2.map(t=>`<span style="font-size:10px;background:${TACTICS_TAXONOMY[mk]?.color||'#64748b'}22;color:${TACTICS_TAXONOMY[mk]?.color||'#64748b'};border-radius:4px;padding:1px 6px;font-weight:600">${t}</span>`):[]
+    ).join('');
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:${hasData?'8px':'0'}">${dayNames[d.getDay()]} ${d.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}${ev.time?' · '+ev.time:''}</div>
+      ${hasData?`
+        <div style="display:flex;gap:0;height:11px;border-radius:6px;overflow:hidden;margin-bottom:6px">${bars}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:${specifics?'6px':'0'}">${tags}</div>
+        ${specifics?`<div style="display:flex;gap:4px;flex-wrap:wrap">${specifics}</div>`:''}
+      `:`<div style="font-size:11px;color:var(--muted)">Sem objetivos registados</div>`}
+    </div>`;
+  }).join('');
+
+  // Season overview mini-chips (one per week with data)
+  const seasonChips=weekKeys.map(wk=>{
+    const {entries:we}=_periAggMoments(weekMap[wk]);
+    const top=we[0];
+    const col=top?TACTICS_TAXONOMY[top[0]]?.color||'#64748b':'#ccc';
+    const isSel=wk===selKey;
+    const mon=new Date(wk);
+    return `<div onclick="periAnaliseSetWeek('${wk}')" style="cursor:pointer;border-radius:6px;padding:4px 6px;background:${isSel?col+'22':'var(--card)'};border:1.5px solid ${isSel?col:'var(--border)'};font-size:9px;font-weight:600;color:${isSel?col:'var(--muted)'};white-space:nowrap">${mon.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}</div>`;
+  }).join('');
 
   el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <label style="font-size:12px;font-weight:600;color:var(--muted)">Semana:</label>
-      <select class="si" style="max-width:280px;font-size:13px" onchange="periAnaliseSetWeek(this.value)">${weekOpts}</select>
+      <select class="si" style="max-width:320px;font-size:13px" onchange="periAnaliseSetWeek(this.value)">${weekOpts}</select>
+      <span style="font-size:11px;color:var(--muted)">${weekKeys.length} semana${weekKeys.length!==1?'s':''} com dados</span>
     </div>
-    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px">${seasonChips}</div>
+    ${weekEntries.length?`
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:24px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
-        ${_donutSVG(dims,220)}
-        <div style="font-size:11px;color:var(--muted);text-align:center;max-width:220px">${subtitle}</div>
+        ${donutSVG(weekEntries,200)}
+        <div style="font-size:11px;color:var(--muted)">${selEvs.length} treino${selEvs.length!==1?'s':''} · ${Math.round(weekTotal)} ${unit}</div>
       </div>
-      <div style="flex:1;min-width:240px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Dimensão Treino — Semana</div>
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Objetivos Gerais — Semana</div>
         ${legendRows}
       </div>
-    </div>
-    ${dayBreakHtml}`;
+    </div>`:`<div style="color:var(--muted);font-size:13px;padding:20px 0">Sem objetivos registados nesta semana.</div>`}
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Treinos da Semana</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${sessCards}</div>`;
 }
 
 function openMesoModal(id){
