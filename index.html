@@ -2465,6 +2465,8 @@ function isMedical(){ return currentUser()?.role==='medical'; }
 function staffRole(){ return currentUser()?.staffRole||null; }
 function staffRoleName(){ const r=staffRole(); return STAFF_ROLES_LABEL[r]||r||null; }
 function canSeeClinical(){ return isAdmin()||isMedical(); }
+// Avaliações: apenas admin e treinador principal (role=coach OU staff com staffRole=headcoach)
+function canSeeEvals(){ return isAdmin()||(currentUser()?.role==='coach')||(currentUser()?.role==='staff'&&staffRole()==='headcoach'); }
 function canViewClinicalSummary(){ return ['admin','coach','staff','medical'].includes(currentUser()?.role); }
 // Any logged-in staff can see/manage unavailabilities; only admin+medical can add lesão
 function canManageUnavail(){ return ['admin','coach','staff','medical','teammanager'].includes(currentUser()?.role); }
@@ -5287,7 +5289,7 @@ function renderPlayer(){
     <button class="tab-btn${playerTab==='stats'?' tab-active':''}" data-ptab="stats" style="padding:10px 18px">📊 Stats</button>
     ${playerWellnessHasData===true?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
     ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
-    ${(isAdmin()||currentUser()?.role==='coach')?`<button class="tab-btn${playerTab==='eval'?' tab-active':''}" data-ptab="eval" style="padding:10px 18px">⭐ Avaliação</button>`:''}
+    ${canSeeEvals()?`<button class="tab-btn${playerTab==='eval'?' tab-active':''}" data-ptab="eval" style="padding:10px 18px">⭐ Avaliação</button>`:''}
   </div>`;
 
   const isInactive=p.status==='inactive';
@@ -5453,7 +5455,7 @@ async function _renderPlayerEval(p){
   await DB.syncEvalsFromFirestore().catch(()=>{});
   const evals=DB.getPlayerEvaluations(p.id);
   const latest=evals[0];
-  const canEdit=isAdmin()||currentUser()?.role==='coach';
+  const canEdit=canSeeEvals();
 
   // Bars for latest eval
   const barsHTML=latest?EVAL_DIMS.map(d=>{
@@ -17031,8 +17033,8 @@ function applyRoleUI(){
     const nlClinical=document.getElementById('nl-clinical-map');
     if(nlClinical) nlClinical.style.display='';
   }
-  // Avaliar Plantel visível para coaches, teammanager e admin
-  if(['admin','coach','teammanager'].includes(u.role)){
+  // Avaliar Plantel visível apenas para admin e treinador principal
+  if(canSeeEvals()){
     const btnBulkEval=document.getElementById('btn-bulk-eval');
     if(btnBulkEval) btnBulkEval.style.display='';
   }
