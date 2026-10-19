@@ -710,6 +710,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nsl" id="nsl-tm">Gestão Clube</div>
     <div class="nl" id="nl-tm" data-view="tm"><span class="ic">📋</span> Team Manager</div>
     <div class="nl" id="nl-weekly-plan" data-view="weekly-plan"><span class="ic">🗓️</span> Plano Semanal</div>
+    <div class="nl" id="nl-periodization" style="display:none" data-view="periodization"><span class="ic">📊</span> Periodização</div>
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
     <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
@@ -1282,6 +1283,23 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <button class="btn btn-p" onclick="printWeeklyPlan()">🖨️ Imprimir / PDF</button>
       </div>
     </div>
+  </div>
+
+  <!-- PERIODIZAÇÃO -->
+  <div class="view" id="v-periodization">
+    <div class="tb">
+      <div><h1>📊 Periodização</h1><div class="sub" id="perio-sub">Planeamento por mesociclos</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="perio-squad" class="si" style="max-width:130px" onchange="renderPeriodization()">
+          <option value="eqa">Equipa A</option>
+          <option value="sub23">Sub-23</option>
+          <option value="sub19">Sub-19</option>
+        </select>
+        <select id="perio-season" class="si" style="max-width:110px" onchange="renderPeriodization()"></select>
+        <button class="btn btn-p" onclick="openMesoModal()">+ Mesociclo</button>
+      </div>
+    </div>
+    <div id="perio-content" style="padding-bottom:40px"></div>
   </div>
 
   <!-- MATCH DAY HUB -->
@@ -2790,6 +2808,15 @@ const DB = {
   async updatePlayerEvaluation(id,data){ const arr=this._eval().map(r=>r.id===id?{...r,...data}:r); this._seval(arr); if(this._feval()) await this._feval().doc(id).update(data).catch(e=>console.error('FS updateEval:',e)); },
   async deletePlayerEvaluation(id){ const arr=this._eval().filter(r=>r.id!==id); this._seval(arr); if(this._feval()) await this._feval().doc(id).delete().catch(e=>console.error('FS delEval:',e)); },
   async syncEvalsFromFirestore(){ if(!this._feval()) return; try{ const snap=await this._feval().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); if(arr.length>0) this._seval(arr); }catch(e){ console.warn('syncEval:',e); } },
+  // ── Mesociclos ───────────────────────────────────────────────────────────────
+  _fmeso(){ return firestoreDb?.collection('mesocycles') },
+  _meso(){ try{ return JSON.parse(localStorage.getItem('scv_mesocycles')||'[]'); }catch{ return []; } },
+  _smeso(arr){ localStorage.setItem('scv_mesocycles',JSON.stringify(arr)); },
+  getMesocycles(squad){ const all=this._meso(); return squad?all.filter(r=>r.squad===squad).sort((a,b)=>a.startDate.localeCompare(b.startDate)):all.sort((a,b)=>a.startDate.localeCompare(b.startDate)); },
+  async addMesocycle(rec){ rec.id=uid(); rec.createdAt=new Date().toISOString(); const arr=this._meso(); arr.push(rec); this._smeso(arr); if(this._fmeso()) await this._fmeso().doc(rec.id).set(rec).catch(e=>console.error('FS addMeso:',e)); return rec; },
+  async updateMesocycle(id,data){ const arr=this._meso().map(r=>r.id===id?{...r,...data}:r); this._smeso(arr); if(this._fmeso()) await this._fmeso().doc(id).update(data).catch(e=>console.error('FS updMeso:',e)); },
+  async deleteMesocycle(id){ const arr=this._meso().filter(r=>r.id!==id); this._smeso(arr); if(this._fmeso()) await this._fmeso().doc(id).delete().catch(e=>console.error('FS delMeso:',e)); },
+  async syncMesosFromFirestore(){ if(!this._fmeso()) return; try{ const snap=await this._fmeso().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); if(arr.length>0) this._smeso(arr); }catch(e){ console.warn('syncMeso:',e); } },
   // ── Occurrence Records (FPF) ─────────────────────────────────────────────────
   _focr(){ return firestoreDb?.collection('occurrenceRecords') },
   _ocr(){ try{ return JSON.parse(localStorage.getItem('scv_ocr')||'[]'); }catch{ return []; } },
@@ -3367,6 +3394,7 @@ function nav(v,opts={}){
       }).catch(err=>console.warn('Fresh game read:',err));
     }
   }
+  else if(v==='periodization'){ show('v-periodization'); setActive('[data-view="periodization"]'); openPeriodization(); }
   else if(v==='scouting'){ show('v-scouting'); setActive('[data-view="scouting"]'); DB.syncScoutedFromFirestore().then(()=>renderScouting()).catch(()=>renderScouting()); }
   else if(v==='help'){ show('v-help'); setActive('[data-view="help"]'); renderHelp() }
   else if(v==='public-form'){ show('v-pf') }
@@ -13226,6 +13254,241 @@ async function wpExecPrint(){
   }
 }
 
+// ── PERIODIZAÇÃO ─────────────────────────────────────────────────────────────
+const MESO_PHASES={
+  preseason:   {label:'Pré-época',   color:'#1565c0',bg:'#e3f2fd'},
+  preparation: {label:'Preparação',  color:'#2e7d32',bg:'#e8f5e9'},
+  competition: {label:'Competição',  color:'#c62828',bg:'#ffebee'},
+  peak:        {label:'Pico',        color:'#e65100',bg:'#fff3e0'},
+  transition:  {label:'Transição',   color:'#6a1b9a',bg:'#f3e5f5'},
+  deload:      {label:'Descarga',    color:'#00838f',bg:'#e0f7fa'},
+};
+const MONTHS_PT=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function periSeasonYear(){
+  // current football season start year: if month >= Jul, current year; else previous year
+  const now=new Date();
+  return now.getMonth()>=6?now.getFullYear():now.getFullYear()-1;
+}
+
+function _periInitSeasonSel(){
+  const sel=document.getElementById('perio-season');
+  if(!sel||sel.options.length) return;
+  const cur=periSeasonYear();
+  for(let y=cur+1;y>=cur-2;y--){
+    const opt=document.createElement('option');
+    opt.value=y; opt.textContent=`${y}/${String(y+1).slice(2)}`;
+    if(y===cur) opt.selected=true;
+    sel.appendChild(opt);
+  }
+}
+
+function openPeriodization(){
+  _periInitSeasonSel();
+  const sq=coachSquads();
+  const sel=document.getElementById('perio-squad');
+  if(sel&&sq.length===1) sel.value=sq[0];
+  DB.syncMesosFromFirestore().catch(()=>{});
+  renderPeriodization();
+}
+
+async function renderPeriodization(){
+  _periInitSeasonSel();
+  const el=document.getElementById('perio-content');
+  if(!el) return;
+  const sq=document.getElementById('perio-squad')?.value||'eqa';
+  const season=parseInt(document.getElementById('perio-season')?.value||periSeasonYear());
+  document.getElementById('perio-sub').textContent=`${SQUADS[sq]||sq} · Época ${season}/${String(season+1).slice(2)}`;
+
+  // ── Generate week list ────────────────────────────────────────────────────
+  const seasonStart=new Date(season,6,1); // Jul 1
+  const seasonEndEx=new Date(season+1,6,1); // Jul 1 next year (exclusive)
+  // Start from Monday on or before Jul 1
+  const firstMon=new Date(seasonStart);
+  const dow=firstMon.getDay();
+  firstMon.setDate(firstMon.getDate()-(dow===0?6:dow-1));
+
+  const weeks=[];
+  for(let d=new Date(firstMon);d<seasonEndEx;d.setDate(d.getDate()+7)){
+    weeks.push(new Date(d));
+  }
+
+  // ── Month groups for header ───────────────────────────────────────────────
+  const monthGroups=[];
+  weeks.forEach((w,i)=>{
+    const m=w.getMonth();
+    if(!monthGroups.length||monthGroups[monthGroups.length-1].month!==m){
+      monthGroups.push({month:m,year:w.getFullYear(),start:i,count:1});
+    } else {
+      monthGroups[monthGroups.length-1].count++;
+    }
+  });
+
+  // ── Mesocycles ────────────────────────────────────────────────────────────
+  const mesos=DB.getMesocycles(sq);
+  const canManage=isAdmin()||currentUser()?.role==='coach'||currentUser()?.role==='teammanager';
+
+  // ── Week date string helper ───────────────────────────────────────────────
+  function ws(w){ return w.toISOString().slice(0,10); }
+  function we(w){ const d=new Date(w); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); }
+
+  // ── Table header rows ─────────────────────────────────────────────────────
+  const WCELL=38; // px per week cell
+  const monthHeader=monthGroups.map(mg=>`<th colspan="${mg.count}" style="background:var(--bg);border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;padding:6px 4px;white-space:nowrap;min-width:${mg.count*WCELL}px">${MONTHS_PT[mg.month]}</th>`).join('');
+  const weekHeader=weeks.map(w=>`<th style="width:${WCELL}px;min-width:${WCELL}px;font-size:9px;color:var(--muted);font-weight:400;padding:3px 1px;border-right:1px solid #f0f0f0;text-align:center">${w.getDate()}/${w.getMonth()+1}</th>`).join('');
+
+  // ── Mesocycle rows ────────────────────────────────────────────────────────
+  function mesoRow(m){
+    const ph=MESO_PHASES[m.phase]||MESO_PHASES.competition;
+    let firstIn=-1;
+    const cells=weeks.map((w,i)=>{
+      const inMeso=m.startDate<=we(w)&&m.endDate>=ws(w);
+      if(inMeso&&firstIn<0) firstIn=i;
+      if(!inMeso) return `<td style="width:${WCELL}px;min-width:${WCELL}px;border-right:1px solid #f0f0f0"></td>`;
+      const isFirst=(i===firstIn);
+      return `<td style="width:${WCELL}px;min-width:${WCELL}px;background:${ph.bg};border-top:2px solid ${ph.color};border-bottom:2px solid ${ph.color};border-right:1px solid ${ph.color}44;padding:2px 0">
+        ${isFirst?`<span style="font-size:9px;font-weight:700;color:${ph.color};white-space:nowrap;padding:0 4px">${m.name}</span>`:''}
+      </td>`;
+    }).join('');
+    const editBtns=canManage?`<div style="display:flex;gap:4px;flex-shrink:0">
+      <button onclick="openMesoModal('${m.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 4px" title="Editar">✏️</button>
+      <button onclick="deleteMeso('${m.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 4px" title="Eliminar">🗑️</button>
+    </div>`:'';
+    return `<tr>
+      <td style="white-space:nowrap;padding:4px 10px;border-right:1px solid var(--border);min-width:160px;max-width:180px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ph.color};flex-shrink:0"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis">${m.name}</div>
+            <div style="font-size:10px;color:var(--muted)">${ph.label} · ${fmtDate(m.startDate)} – ${fmtDate(m.endDate)}</div>
+          </div>
+          ${editBtns}
+        </div>
+      </td>
+      ${cells}
+    </tr>`;
+  }
+
+  // ── PSE row (async) ───────────────────────────────────────────────────────
+  const pseRowId='perio-pse-row-'+sq+'-'+season;
+
+  // ── Build table ───────────────────────────────────────────────────────────
+  const mesoRows=mesos.length
+    ? mesos.map(mesoRow).join('')
+    : `<tr><td colspan="${weeks.length+1}" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Sem mesociclos para esta época. Clica em "+ Mesociclo" para começar.</td></tr>`;
+
+  el.innerHTML=`
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:20px">
+      <table style="border-collapse:collapse;min-width:${160+weeks.length*WCELL}px">
+        <thead>
+          <tr><th style="border-right:1px solid var(--border);padding:6px 10px;font-size:11px;color:var(--muted)">Mesociclo</th>${monthHeader}</tr>
+          <tr><th style="border-right:1px solid var(--border)"></th>${weekHeader}</tr>
+        </thead>
+        <tbody>
+          ${mesoRows}
+          <tr id="${pseRowId}">
+            <td style="font-size:11px;font-weight:700;color:var(--muted);padding:6px 10px;border-right:1px solid var(--border);vertical-align:middle;white-space:nowrap">📊 PSE Real</td>
+            ${weeks.map(()=>`<td style="width:${WCELL}px;min-width:${WCELL}px;height:32px;border-right:1px solid #f0f0f0;vertical-align:bottom;padding:0 2px"><div style="height:4px;background:#eee;border-radius:2px"></div></td>`).join('')}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ${mesos.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+      ${Object.entries(MESO_PHASES).map(([k,v])=>`<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:${v.color};background:${v.bg};border:1px solid ${v.color}44;padding:3px 10px;border-radius:20px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:${v.color};display:inline-block"></span>${v.label}</span>`).join('')}
+    </div>`:''}`;
+
+  // ── Load PSE data async ───────────────────────────────────────────────────
+  const sinceStr=ws(firstMon);
+  DB.getPSEEntries(sq,sinceStr).then(entries=>{
+    if(!entries||entries[0]?._error) return;
+    // Aggregate avg PSE per week-start
+    const byWeek={};
+    entries.forEach(e=>{
+      if(!e.date||!e.pse) return;
+      const wd=new Date(e.date);
+      const d2=new Date(wd);
+      const d2dow=d2.getDay();
+      d2.setDate(d2.getDate()-(d2dow===0?6:d2dow-1));
+      const key=d2.toISOString().slice(0,10);
+      if(!byWeek[key]){byWeek[key]={sum:0,n:0};}
+      byWeek[key].sum+=Number(e.pse); byWeek[key].n++;
+    });
+    const row=document.getElementById(pseRowId);
+    if(!row) return;
+    const tds=row.querySelectorAll('td');
+    weeks.forEach((w,i)=>{
+      const key=ws(w);
+      const d=byWeek[key];
+      if(!d||i+1>=tds.length) return;
+      const avg=d.sum/d.n; // PSE 1-10
+      const pct=Math.round(avg/10*100);
+      const col=avg<=4?'#43a047':avg<=6?'#fb8c00':'#e53935';
+      tds[i+1].innerHTML=`<div title="PSE médio: ${avg.toFixed(1)}" style="height:${Math.max(4,pct*0.28)}px;background:${col};border-radius:2px;margin-bottom:2px"></div><div style="font-size:8px;color:var(--muted);text-align:center">${avg.toFixed(1)}</div>`;
+    });
+  }).catch(()=>{});
+}
+
+function openMesoModal(id){
+  const existing=id?DB.getMesocycles(null).find(m=>m.id===id):null;
+  const today=new Date().toISOString().slice(0,10);
+  const sq=document.getElementById('perio-squad')?.value||'eqa';
+  const mo=document.createElement('div');
+  mo.className='mo open'; mo.id='mo-meso';
+  const phases=Object.entries(MESO_PHASES).map(([k,v])=>`<option value="${k}" ${existing?.phase===k?'selected':''}>${v.label}</option>`).join('');
+  mo.innerHTML=`<div class="md" style="max-width:440px">
+    <div class="mh"><h2>${existing?'✏️ Editar':'+ Novo'} Mesociclo</h2><button class="mc" onclick="document.getElementById('mo-meso').remove()">✕</button></div>
+    <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Nome</label>
+        <input type="text" id="meso-name" value="${existing?.name||''}" placeholder="Ex: Pré-época 2026/27" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Fase</label>
+        <select id="meso-phase" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">${phases}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Início</label>
+          <input type="date" id="meso-start" value="${existing?.startDate||today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+        <div><label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Fim</label>
+          <input type="date" id="meso-end" value="${existing?.endDate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      </div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Notas</label>
+        <textarea id="meso-notes" rows="2" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;resize:vertical;font-family:inherit">${existing?.notes||''}</textarea></div>
+    </div>
+    <div class="fa">
+      <button class="btn btn-g" onclick="document.getElementById('mo-meso').remove()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveMeso('${id||''}','${sq}')">💾 Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mo);
+}
+
+async function saveMeso(id,sq){
+  const name=document.getElementById('meso-name')?.value.trim();
+  const start=document.getElementById('meso-start')?.value;
+  const end=document.getElementById('meso-end')?.value;
+  if(!name){toast('❌ Nome obrigatório');return;}
+  if(!start||!end){toast('❌ Datas obrigatórias');return;}
+  if(start>end){toast('❌ Data de fim deve ser após o início');return;}
+  const data={
+    name,squad:sq,
+    phase:document.getElementById('meso-phase')?.value||'competition',
+    startDate:start,endDate:end,
+    notes:document.getElementById('meso-notes')?.value.trim()||'',
+    updatedBy:currentUser()?.user||''
+  };
+  try{
+    if(id) await DB.updateMesocycle(id,data);
+    else await DB.addMesocycle(data);
+    document.getElementById('mo-meso').remove();
+    toast(`✅ Mesociclo ${id?'atualizado':'criado'}`);
+    renderPeriodization();
+  }catch(e){toast('❌ '+(e.message||'Erro'));}
+}
+
+async function deleteMeso(id){
+  if(!confirm('Eliminar este mesociclo?')) return;
+  await DB.deleteMesocycle(id);
+  toast('🗑️ Mesociclo eliminado');
+  renderPeriodization();
+}
+
 // ── TEAM MANAGER MODULE ───────────────────────────────────────────────────────
 const TM_DOC_FIELDS=[
   {key:'cc',label:'CC'},
@@ -16772,6 +17035,11 @@ function applyRoleUI(){
   if(['admin','coach','teammanager'].includes(u.role)){
     const btnBulkEval=document.getElementById('btn-bulk-eval');
     if(btnBulkEval) btnBulkEval.style.display='';
+  }
+  // Periodização visível para coaches, teammanager e admin
+  if(['admin','coach','teammanager'].includes(u.role)){
+    const nlPer=document.getElementById('nl-periodization');
+    if(nlPer) nlPer.style.display='';
   }
 }
 
