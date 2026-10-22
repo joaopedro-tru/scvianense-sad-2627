@@ -676,31 +676,22 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="eqa"><span class="ic">📋</span> Treinos</div>
     <div class="nl nl-sub" data-view="sq-gym" data-squad="eqa"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="eqa"><span class="ic">⚽</span> Jogos</div>
-    <div class="nl" data-view="squad" data-squad="sub19"><span class="ic">🟡</span> Sub-19</div>
-    <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub19"><span class="ic">📋</span> Treinos</div>
-    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub19"><span class="ic">🏋️</span> Ginásio</div>
-    <div class="nl nl-sub" data-view="sq-games" data-squad="sub19"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub23"><span class="ic">🔵</span> Sub-23</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub23"><span class="ic">📋</span> Treinos</div>
     <div class="nl nl-sub" data-view="sq-gym" data-squad="sub23"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub23"><span class="ic">⚽</span> Jogos</div>
+    <div class="nl" data-view="squad" data-squad="sub19"><span class="ic">🟡</span> Sub-19</div>
+    <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub19"><span class="ic">📋</span> Treinos</div>
+    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub19"><span class="ic">🏋️</span> Ginásio</div>
+    <div class="nl nl-sub" data-view="sq-games" data-squad="sub19"><span class="ic">⚽</span> Jogos</div>
     <hr class="nd">
     <div class="nsl">Agenda</div>
     <div class="nl" data-view="calendar"><span class="ic">📅</span> Calendário</div>
     <div class="nl" data-view="matchday"><span class="ic">🎮</span> Dia de Jogo</div>
     <hr class="nd">
-    <div class="nsl">Atletas</div>
-    <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
-    <div class="nl" id="nl-unavailabilities" data-view="unavailabilities"><span class="ic">📆</span> Indisponibilidades</div>
-    <div class="nl" id="btn-sync-athletes"><span class="ic">🔄</span> Sincronizar <span id="sync-badge" style="display:none;background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto"></span></div>
-    <hr class="nd">
     <div class="nsl" id="nsl-monitoring">Monitorização</div>
     <div class="nl" id="nl-monitoring" data-view="monitoring"><span class="ic">📈</span> PSE & Bem-Estar</div>
-    <div class="nl" id="nl-pse-link"><span class="ic">🔗</span> Link PSE</div>
-    <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
     <div class="nl" id="nl-clinical-map" style="display:none" onclick="openClinicalMap()"><span class="ic">🏥</span> Mapa Clínico</div>
-    <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
-    <div class="nl" id="nl-bilhetes-eqb" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa B</div>
     <hr class="nd">
     <div class="nsl" id="nsl-scouting">Prospeção</div>
     <div class="nl" id="nl-scouting" data-view="scouting"><span class="ic">🔭</span> Prospeção</div>
@@ -711,9 +702,18 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nl" id="nl-tm" data-view="tm"><span class="ic">📋</span> Team Manager</div>
     <div class="nl" id="nl-weekly-plan" data-view="weekly-plan"><span class="ic">🗓️</span> Plano Semanal</div>
     <div class="nl" id="nl-periodization" style="display:none" data-view="periodization"><span class="ic">📊</span> Periodização</div>
+    <hr class="nd">
+    <div class="nsl">Links</div>
+    <div class="nl" id="nl-publink"><span class="ic">🔗</span> Link do Formulário</div>
+    <div class="nl" id="nl-unavailabilities" data-view="unavailabilities"><span class="ic">📆</span> Indisponibilidades</div>
+    <div class="nl" id="nl-pse-link"><span class="ic">🔗</span> Link PSE</div>
+    <div class="nl" id="nl-wellness-link"><span class="ic">💤</span> Link Bem-Estar</div>
+    <div class="nl" id="nl-bilhetes" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa A</div>
+    <div class="nl" id="nl-bilhetes-eqb" style="display:none"><span class="ic">🎟️</span> Bilhetes Equipa B</div>
+    <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
+    <hr class="nd">
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
-    <div class="nl" id="nl-stafflink"><span class="ic">🔗</span> Link do Staff</div>
   </nav>
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
@@ -13158,7 +13158,7 @@ async function syncPendingAthletes(silent=false){
     } else if(!silent){
       toast('Sem submissões novas.');
     }
-    document.getElementById('sync-badge').style.display='none';
+    const _sb=document.getElementById('sync-badge'); if(_sb) _sb.style.display='none';
     return added;
   } catch(e){
     console.error('Sync error:',e);
@@ -13171,7 +13171,7 @@ async function checkPendingBadge(){
   if(!firestoreDb) return;
   try {
     const snap=await firestoreDb.collection('pending_athletes').get();
-    const badge=document.getElementById('sync-badge');
+    const badge=document.getElementById('sync-badge'); if(!badge) return;
     if(!snap.empty){ badge.textContent=snap.size; badge.style.display='inline'; }
     else { badge.style.display='none'; }
   } catch(e){}
@@ -17617,7 +17617,7 @@ function applyRoleUI(){
   function showScouting(show){ [nlScouting,nslScouting].forEach(el=>el&&(el.style.display=show?'':'none')); }
 
   if(u.role==='coach'){
-    document.getElementById('btn-sync-athletes').style.display='none';
+    {const _bsa=document.getElementById('btn-sync-athletes'); if(_bsa) _bsa.style.display='none';}
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
@@ -17633,7 +17633,7 @@ function applyRoleUI(){
     const sbUser=document.getElementById('sb-user');
     if(sbUser) sbUser.textContent=`${profile?.name||'Treinador'} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='staff'){
-    document.getElementById('btn-sync-athletes').style.display='none';
+    {const _bsa=document.getElementById('btn-sync-athletes'); if(_bsa) _bsa.style.display='none';}
     document.getElementById('nl-publink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
@@ -17655,7 +17655,7 @@ function applyRoleUI(){
     const sbUser=document.getElementById('sb-user');
     if(sbUser) sbUser.textContent=`${profile?.name||roleName} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='medical'){
-    document.getElementById('btn-sync-athletes').style.display='none';
+    {const _bsa=document.getElementById('btn-sync-athletes'); if(_bsa) _bsa.style.display='none';}
     document.getElementById('nl-publink').style.display='none';
     staffSection.forEach(el=>el&&(el.style.display='none'));
     tmSection.forEach(el=>el&&(el.style.display='none'));
@@ -17676,7 +17676,7 @@ function applyRoleUI(){
     const sbUser=document.getElementById('sb-user');
     if(sbUser) sbUser.textContent=`${profile?.name||'Clínica'} · ${_allowedSqs.map(s=>SQUADS[s]||s).join(' + ')}`;
   } else if(u.role==='teammanager'){
-    document.getElementById('btn-sync-athletes').style.display='none';
+    {const _bsa=document.getElementById('btn-sync-athletes'); if(_bsa) _bsa.style.display='none';}
     staffSection.forEach(el=>el&&(el.style.display='none'));
     showScouting(false);
     myProfileSection.forEach(el=>el&&(el.style.display=''));
@@ -18392,7 +18392,7 @@ document.getElementById('btn-logout').addEventListener('click',()=>{
   if(firebaseAuth){ firebaseAuth.signOut().then(()=>location.reload()); }
   else { location.reload(); }
 });
-document.getElementById('btn-sync-athletes').addEventListener('click',()=>syncPendingAthletes(false));
+document.getElementById('btn-sync-athletes')?.addEventListener('click',()=>syncPendingAthletes(false));
 
 // ── PWA: Service Worker ───────────────────────────────────────────
 if('serviceWorker' in navigator){
