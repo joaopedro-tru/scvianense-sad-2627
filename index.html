@@ -1622,6 +1622,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <div><h1 id="gm-title">Jogo</h1><div class="sub" id="gm-sub"></div></div>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="btn btn-o btn-sm" id="btn-export-game-pdf" style="display:none" onclick="exportGamePDF()" title="Exportar relatório em PDF">📄 PDF</button>
         <button class="btn btn-d btn-sm" id="btn-del-game">🗑️</button>
         <button class="btn btn-o btn-sm" id="btn-clear-game-data" style="display:none" title="Limpar todos os dados do jogo (matchReport)">🧹</button>
         <button class="btn btn-o btn-sm" id="btn-edit-game">✏️ Editar</button>
@@ -3107,6 +3108,58 @@ function sortByPos(players){
     if(an!==bn) return an-bn;
     return (a.number||99)-(b.number||99);
   });
+}
+
+function buildNaturalLayout(players){
+  const ZONE={
+    GR: {x:5, y:50},
+    LE: {x:20,y:13}, DC:{x:20,y:50}, LD:{x:20,y:87},
+    ALE:{x:31,y:13},                  ALD:{x:31,y:87},
+    MD: {x:38,y:50},
+    MC: {x:53,y:50},
+    MO: {x:65,y:50},
+    EE: {x:78,y:13}, AV:{x:78,y:33}, PL:{x:78,y:50}, ED:{x:78,y:87}
+  };
+  const MAX={GR:2,DC:4,LD:2,LE:2,ALD:2,ALE:2,MD:2,MC:4,MO:2,ED:2,EE:2,PL:2,AV:2};
+  const FALLBACK={
+    DC: ['MD'],
+    LD: ['ALD','ED'],   ALD:['LD','ED'],
+    LE: ['ALE','EE'],   ALE:['LE','EE'],
+    EE: ['ALE','AV','MO'],
+    ED: ['ALD','AV','MO'],
+    MC: ['MD','MO'],
+    MO: ['MC','AV'],
+    MD: ['MC','DC'],
+    PL: ['AV'],
+    AV: ['PL','MO']
+  };
+  const zoneCount={};
+  const assigned={};
+  sortByPos(players).forEach(p=>{
+    const primary=p.position||'MC';
+    const candidates=[primary,...(FALLBACK[primary]||[])];
+    let picked=primary;
+    for(const z of candidates){
+      if(!ZONE[z]) continue;
+      if((zoneCount[z]||0)<(MAX[z]||2)){ picked=z; break; }
+    }
+    assigned[p.id]=picked;
+    zoneCount[picked]=(zoneCount[picked]||0)+1;
+  });
+  const groups={};
+  players.forEach(p=>{ const z=assigned[p.id]||(p.position||'MC'); (groups[z]=groups[z]||[]).push(p); });
+  const out={};
+  Object.entries(groups).forEach(([zone,list])=>{
+    const z=ZONE[zone]||{x:50,y:50};
+    const n=list.length;
+    list.forEach((p,i)=>{
+      if(n===1){ out[p.id]={x:z.x,y:z.y}; return; }
+      const spread=Math.min(20,10*(n-1));
+      const y=z.y-spread+(i/(n-1))*2*spread;
+      out[p.id]={x:z.x,y:Math.max(8,Math.min(92,y))};
+    });
+  });
+  return out;
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -10590,6 +10643,8 @@ function renderGame(){
   const gameFinished=(clock.phase==='finished');
   // GR e Adjunto só ficam visíveis após o jogo terminar
   if(!gameFinished && (gameTab==='gr'||gameTab==='adj'||gameTab==='tm'||gameTab==='coord')) gameTab='pre';
+  const pdfBtn=document.getElementById('btn-export-game-pdf');
+  if(pdfBtn) pdfBtn.style.display=gameFinished?'':'none';
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
@@ -11453,66 +11508,6 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   // Suplentes: convocados que não estão no lineup
   const sups=sortByPos(convocados.filter(p=>!lineup.includes(p.id)));
 
-  // Layout por posição natural com redistribuição quando há excedentes
-  function buildNaturalLayout(players){
-    // Coordenadas de cada posição no campo (x=profundidade, y=lateral)
-    const ZONE={
-      GR: {x:5, y:50},
-      LE: {x:20,y:13}, DC:{x:20,y:50}, LD:{x:20,y:87},
-      ALE:{x:31,y:13},                  ALD:{x:31,y:87},
-      MD: {x:38,y:50},
-      MC: {x:53,y:50},
-      MO: {x:65,y:50},
-      EE: {x:78,y:13}, AV:{x:78,y:33}, PL:{x:78,y:50}, ED:{x:78,y:87}
-    };
-    // Máximo razoável por zona antes de redistribuir excedentes
-    const MAX={GR:2,DC:4,LD:2,LE:2,ALD:2,ALE:2,MD:2,MC:4,MO:2,ED:2,EE:2,PL:2,AV:2};
-    // Posições alternativas por ordem de preferência (segundo o utilizador)
-    const FALLBACK={
-      DC: ['MD'],
-      LD: ['ALD','ED'],   ALD:['LD','ED'],
-      LE: ['ALE','EE'],   ALE:['LE','EE'],
-      EE: ['ALE','AV','MO'],
-      ED: ['ALD','AV','MO'],
-      MC: ['MD','MO'],
-      MO: ['MC','AV'],
-      MD: ['MC','DC'],
-      PL: ['AV'],
-      AV: ['PL','MO']
-    };
-
-    // Atribui zona efectiva a cada jogador respeitando o máximo por zona
-    const zoneCount={};
-    const assigned={};
-    sortByPos(players).forEach(p=>{
-      const primary=p.position||'MC';
-      const candidates=[primary,...(FALLBACK[primary]||[])];
-      let picked=primary;
-      for(const z of candidates){
-        if(!ZONE[z]) continue;
-        if((zoneCount[z]||0)<(MAX[z]||2)){ picked=z; break; }
-      }
-      assigned[p.id]=picked;
-      zoneCount[picked]=(zoneCount[picked]||0)+1;
-    });
-
-    // Agrupa por zona e distribui verticalmente dentro de cada zona
-    const groups={};
-    players.forEach(p=>{ const z=assigned[p.id]||(p.position||'MC'); (groups[z]=groups[z]||[]).push(p); });
-    const out={};
-    Object.entries(groups).forEach(([zone,list])=>{
-      const z=ZONE[zone]||{x:50,y:50};
-      const n=list.length;
-      list.forEach((p,i)=>{
-        if(n===1){ out[p.id]={x:z.x,y:z.y}; return; }
-        const spread=Math.min(20,10*(n-1));
-        const y=z.y-spread+(i/(n-1))*2*spread;
-        out[p.id]={x:z.x,y:Math.max(8,Math.min(92,y))};
-      });
-    });
-    return out;
-  }
-
   // Resolve position for each player: saved drag → formation default → natural layout
   const formationPos=formation&&tits.length>0?buildDefaultPositions(formation,tits):{};
   const naturalPos=buildNaturalLayout(tits);
@@ -11856,6 +11851,327 @@ function renderGameCoord(ev, sqPlayers, conv, mr){
       </div>`:''}
       <button class="btn btn-p" id="btn-save-coord" onclick="saveCoordReport('${ev.id}')">💾 Guardar Relatório</button>
     </div>`;
+}
+
+// ── PDF EXPORT ────────────────────────────────────────────────────────────────
+function _buildPitchSvgForPdf(mr, tits, sups, evList, ratings){
+  const formation=mr.formation||null;
+  const savedPos=mr.fieldPositions||{};
+  const motmId=mr.motm||null;
+  const subbedOut=new Set(evList.filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerOutId).map(e=>e.playerOutId));
+  const subbedIn=new Set(evList.filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId));
+  const yellowPids=new Set(evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId).map(e=>e.playerId).filter(Boolean));
+  const expelledPids=new Set(evList.filter(e=>(e.type==='red'||e.type==='yellow2')&&e.playerId).map(e=>e.playerId).filter(Boolean));
+  function pAbr(p){ if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+  const formPos=formation&&tits.length>0?buildDefaultPositions(formation,tits):{};
+  const natPos=buildNaturalLayout(tits);
+  function gpp(p){ return savedPos[p.id]||formPos[p.id]||natPos[p.id]||{x:50,y:50}; }
+  function rClr(rv){ if(rv==null)return '#9ca3af'; const n=parseFloat(rv); return n>=8?'#21d07a':n>=7?'#d2d849':n>=6?'#f5a623':'#e84444'; }
+  const R=3.2;
+  const tokSvg=tits.map(p=>{
+    const pos=gpp(p);
+    const cx=pos.x.toFixed(2);
+    const cy=(pos.y*62/100).toFixed(2);
+    const wasOut=subbedOut.has(p.id),cameIn=subbedIn.has(p.id);
+    const hasY=yellowPids.has(p.id),isExp=expelledPids.has(p.id);
+    const isMvp=p.id===motmId;
+    const rv0=ratings[p.id]; const rv=rv0!=null?(typeof rv0==='object'?rv0.rating:rv0):null;
+    const rc=rClr(rv); const rt=rv!=null?parseFloat(rv).toFixed(1):'';
+    const name=pAbr(p); const ns=name.length>10?name.slice(0,9)+'.':name;
+    let g=`<g transform="translate(${cx},${cy})">`;
+    if(isMvp) g+=`<circle r="${R+1.2}" fill="none" stroke="#ffd700" stroke-width="0.7" opacity="0.9"/>`;
+    g+=`<circle r="${R}" fill="rgba(255,255,255,0.95)" stroke="${isMvp?'#ffd700':'rgba(255,255,255,0.3)'}" stroke-width="${isMvp?'0.7':'0.3'}"/>`;
+    g+=`<text y="1.1" text-anchor="middle" font-size="2.8" font-weight="800" fill="#0e2444" font-family="Arial,sans-serif">${p.number||'?'}</text>`;
+    g+=`<text y="${R+2.4}" text-anchor="middle" font-size="1.9" font-weight="600" fill="white" font-family="Arial,sans-serif" stroke="#0d5a28" stroke-width="0.4" paint-order="stroke">${ns}</text>`;
+    if(rv!=null){
+      g+=`<rect x="${-(2.75)}" y="${R-1.1}" width="5.5" height="2.5" rx="0.6" fill="${rc}"/>`;
+      g+=`<text y="${R+0.85}" text-anchor="middle" font-size="1.7" font-weight="800" fill="${parseFloat(rv)>=7&&parseFloat(rv)<8?'#111':'white'}" font-family="Arial,sans-serif">${rt}</text>`;
+    }
+    if(isExp) g+=`<text x="${R+0.3}" y="${-R+1.5}" text-anchor="middle" font-size="2.2">🔴</text>`;
+    else if(hasY) g+=`<text x="${R+0.3}" y="${-R+1.5}" text-anchor="middle" font-size="2.2">🟡</text>`;
+    if(wasOut){ g+=`<circle cx="${-R+0.5}" cy="${R-0.5}" r="1.5" fill="#e84444"/><text x="${-R+0.5}" y="${R+0.15}" text-anchor="middle" font-size="1.5" font-weight="900" fill="white" font-family="Arial,sans-serif">↓</text>`; }
+    else if(cameIn){ g+=`<circle cx="${-R+0.5}" cy="${R-0.5}" r="1.5" fill="#21d07a"/><text x="${-R+0.5}" y="${R+0.15}" text-anchor="middle" font-size="1.5" font-weight="900" fill="white" font-family="Arial,sans-serif">↑</text>`; }
+    if(isMvp) g+=`<text y="${-R-1.3}" text-anchor="middle" font-size="2.5">⭐</text>`;
+    g+='</g>';
+    return g;
+  }).join('');
+  const benchHtml=sups.length===0?'':
+    `<div style="margin-top:8px;padding:8px 10px;background:#f9fafb;border-radius:6px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:6px">Banco de Suplentes</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${sups.map(p=>{
+          const rv0=ratings[p.id]; const rv=rv0!=null?(typeof rv0==='object'?rv0.rating:rv0):null;
+          const rc=rClr(rv);
+          return `<div style="display:flex;align-items:center;gap:5px;padding:3px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
+            <span style="font-weight:700;color:#16a34a;font-size:12px;min-width:16px;text-align:right">${p.number||'—'}</span>
+            <span style="font-size:11px">${pAbr(p)}</span>
+            ${rv!=null?`<span style="background:${rc};color:${parseFloat(rv)>=7&&parseFloat(rv)<8?'#111':'white'};font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px">${parseFloat(rv).toFixed(1)}</span>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 62" style="width:100%;display:block;border-radius:8px">
+    <defs>
+      <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1e7a3e"/>
+        <stop offset="55%" stop-color="#0d5a28"/>
+        <stop offset="100%" stop-color="#1a6e36"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="62" fill="url(#pg)" rx="8"/>
+    <rect x="2" y="2" width="96" height="58" fill="none" stroke="rgba(255,255,255,.22)" stroke-width=".7"/>
+    <line x1="50" y1="2" x2="50" y2="60" stroke="rgba(255,255,255,.2)" stroke-width=".5"/>
+    <circle cx="50" cy="31" r="9" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".5"/>
+    <circle cx="50" cy="31" r=".8" fill="rgba(255,255,255,.35)"/>
+    <rect x="2" y="13" width="18" height="36" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+    <rect x="80" y="13" width="18" height="36" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".5"/>
+    <rect x="2" y="22" width="7" height="18" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+    <rect x="91" y="22" width="7" height="18" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".4"/>
+    <rect x="0" y="26" width="2" height="10" fill="none" stroke="rgba(255,255,255,.3)" stroke-width=".7"/>
+    <rect x="98" y="26" width="2" height="10" fill="none" stroke="rgba(255,255,255,.3)" stroke-width=".7"/>
+    <circle cx="14" cy="31" r=".7" fill="rgba(255,255,255,.3)"/>
+    <circle cx="86" cy="31" r=".7" fill="rgba(255,255,255,.3)"/>
+    ${tokSvg}
+  </svg>`;
+  return `<div>${svg}${benchHtml}</div>`;
+}
+
+function exportGamePDF(){
+  const ev=DB.getEvent(gameEventId); if(!ev) return;
+  const mr=ev.matchReport||{};
+  const evList=mr.events||[];
+  const allPlayers=DB.players();
+  const conv=ev.convocatoria||{players:{}};
+  const convocados=sortByPos(allPlayers.filter(p=>!!conv.players[p.id]));
+  const lineup=mr.lineup||[];
+  const ratings=mr.ratings||{};
+  const staffObs=mr.staffObs||{};
+  const teamEval=mr.teamEval||{};
+  const isHome=ev.homeAway!=='away';
+
+  function pn(id){ const p=DB.getPlayer(id)||allPlayers.find(x=>x.id===id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+  function fullName(id){ const p=DB.getPlayer(id)||allPlayers.find(x=>x.id===id); return p?p.name:'—'; }
+
+  // ── Score ──
+  const goals=evList.filter(e=>e.type==='goal').length;
+  const goalsCon=evList.filter(e=>e.type==='goal_conceded').length;
+  const scoreUs=isHome?goals:goalsCon, scoreAdv=isHome?goalsCon:goals;
+  const teamName=isHome?'SC Vianense SAD':(ev.opponent||'Adversário');
+  const advName=isHome?(ev.opponent||'Adversário'):'SC Vianense SAD';
+  const resultLabel=scoreUs>scoreAdv?'Vitória':scoreUs<scoreAdv?'Derrota':'Empate';
+  const resultColor=scoreUs>scoreAdv?'#16a34a':scoreUs<scoreAdv?'#dc2626':'#d97706';
+
+  // ── 1. Equipa — minutos ──
+  const subsIn=evList.filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId).map(e=>e.playerInId);
+  const subsOut=evList.filter(e=>(e.type==='sub'||e.type==='medical')&&e.playerOutId).map(e=>e.playerOutId);
+  const playedIds=new Set([...lineup,...subsIn]);
+  const titulares=convocados.filter(p=>lineup.includes(p.id));
+  const subsUsed=convocados.filter(p=>!lineup.includes(p.id)&&subsIn.includes(p.id));
+  const toEval=[...titulares,...subsUsed];
+  const titsForPdf=sortByPos(allPlayers.filter(p=>lineup.includes(p.id)));
+  const supsForPdf=sortByPos(convocados.filter(p=>!lineup.includes(p.id)));
+  const pitchSection=titsForPdf.length>0?`<section style="page-break-inside:avoid">
+    <h2>Posicionamento em Campo</h2>
+    ${_buildPitchSvgForPdf(mr,titsForPdf,supsForPdf,evList,ratings)}
+  </section>`:'';
+
+  function playerMins(p){
+    const isTit=lineup.includes(p.id);
+    const subInEv=evList.find(e=>(e.type==='sub'||e.type==='medical')&&e.playerInId===p.id);
+    const subOutEv=evList.find(e=>(e.type==='sub'||e.type==='medical')&&e.playerOutId===p.id);
+    if(isTit) return subOutEv?.minute??90;
+    if(subInEv) return subOutEv?.minute?(subOutEv.minute-(subInEv.minute||0)):(90-(subInEv.minute||0));
+    return 0;
+  }
+
+  const teamRows=toEval.map(p=>{
+    const mins=playerMins(p);
+    const gls=evList.filter(e=>e.type==='goal'&&e.playerId===p.id).length;
+    const ast=evList.filter(e=>e.type==='goal'&&e.assistId===p.id).length;
+    const ylw=evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId===p.id).length;
+    const red=evList.filter(e=>e.type==='red'&&e.playerId===p.id).length;
+    const r=ratings[p.id]; const rv=r!=null?(typeof r==='object'?r.rating:r):null;
+    return `<tr>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#6b7280;text-align:center">${p.number||'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600">${fullName(p.id)}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:11px">${p.position||'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${lineup.includes(p.id)?'Titular':'Sub.'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${mins}'</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${gls||'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${ast||'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${ylw?'🟡'.repeat(ylw):'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${red?'🔴':'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:${rv!=null?'#1a56db':'#9ca3af'}">${rv!=null?parseFloat(rv).toFixed(1):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // ── 2. Sumário por período ──
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub']);
+  const sumEvs=evList.filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
+  function periodOf(e){
+    if(e.period==='pen') return 'Grandes Penalidades';
+    if(e.period==='et2'||(e.minute>=106)) return 'Prolongamento 2';
+    if(e.period==='et1'||(e.minute>=91&&e.minute<=105)) return 'Prolongamento 1';
+    if(e.period==='p2'||e.minute>45) return '2ª Parte';
+    return '1ª Parte';
+  }
+  const PERIOD_ORDER=['1ª Parte','2ª Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
+  const byPer={};
+  sumEvs.forEach(e=>{ const p=periodOf(e); if(!byPer[p])byPer[p]=[]; byPer[p].push(e); });
+  let sumHtml='';
+  let og=0,ag=0;
+  PERIOD_ORDER.filter(p=>byPer[p]).forEach(period=>{
+    sumHtml+=`<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">${period}</div>`;
+    byPer[period].forEach(e=>{
+      let icon='',desc='';
+      if(e.type==='goal'){ og++; const a=isHome?og:ag,b=isHome?ag:og; icon='⚽'; desc=`<b>${pn(e.playerId)}</b>${e.assistId?` (${pn(e.assistId)})`:''}  <span style="font-weight:700;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px">${a}–${b}</span>`; }
+      else if(e.type==='goal_conceded'){ ag++; const a=isHome?og:ag,b=isHome?ag:og; icon='🥅'; desc=`Golo sofrido  <span style="font-weight:700;background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px">${a}–${b}</span>`; }
+      else if(e.type==='yellow') { icon='🟡'; desc=pn(e.playerId); }
+      else if(e.type==='yellow2') { icon='🟡🔴'; desc=`${pn(e.playerId)} (2º amarelo)`; }
+      else if(e.type==='red') { icon='🔴'; desc=`${pn(e.playerId)} (direto)`; }
+      else if(e.type==='sub') { icon='🔄'; desc=`${pn(e.playerOutId)} → <b>${pn(e.playerInId)}</b>`; }
+      sumHtml+=`<div style="padding:3px 0;display:flex;gap:8px;align-items:baseline"><span style="min-width:36px;font-size:11px;color:#6b7280">${e.minute?e.minute+"'":'—'}</span><span>${icon}</span><span style="font-size:12px">${desc}</span></div>`;
+    });
+  });
+  if(!sumHtml) sumHtml='<p style="color:#9ca3af;font-size:12px">Sem eventos registados.</p>';
+
+  // ── 3. Estatísticas gerais ──
+  const statDefs=[
+    {label:'Golos Marcados',val:goals},
+    {label:'Golos Sofridos',val:goalsCon},
+    {label:'Remates Enquad.',val:evList.filter(e=>e.type==='shot_on').length},
+    {label:'Remates Fora',val:evList.filter(e=>e.type==='shot_off').length},
+    {label:'Faltas Cometidas',val:evList.filter(e=>e.type==='foul_committed').length},
+    {label:'Cartões Amarelos',val:evList.filter(e=>e.type==='yellow'||e.type==='yellow2').length},
+    {label:'Cartões Vermelhos',val:evList.filter(e=>e.type==='red').length},
+    {label:'Substituições',val:evList.filter(e=>e.type==='sub').length},
+    {label:'Bolas Recuperadas',val:evList.filter(e=>e.type==='ball_won').length},
+    {label:'Bolas Perdidas',val:evList.filter(e=>e.type==='ball_lost').length},
+  ].filter(s=>s.val>0);
+  const statsHtml=statDefs.length
+    ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${statDefs.map(s=>`<div style="background:#f9fafb;border-radius:6px;padding:8px 10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#1a56db">${s.val}</div><div style="font-size:10px;color:#6b7280">${s.label}</div></div>`).join('')}</div>`
+    : '<p style="color:#9ca3af;font-size:12px">Sem estatísticas registadas.</p>';
+
+  // ── 4. Momentos de jogo ──
+  const momentsHtml=TEAM_MOMENTS.map(m=>{
+    const val=teamEval[m.key]||0;
+    const stars='★★★★★'.split('').map((s,i)=>`<span style="color:${val>i?'#f59e0b':'#d1d5db'}">${s}</span>`).join('');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f3f4f6">
+      <span style="flex:1;font-size:12px;font-weight:600">${m.label}</span>
+      <span style="font-size:16px;letter-spacing:1px">${stars}</span>
+    </div>`;
+  }).join('')+(teamEval.comment?`<div style="margin-top:8px;padding:8px;background:#f9fafb;border-radius:6px;font-size:12px;color:#374151;white-space:pre-wrap">${teamEval.comment}</div>`:'');
+
+  // ── 5. Avaliação individual ──
+  const evalRows=toEval.map(p=>{
+    const r=ratings[p.id]; const rv=r!=null?(typeof r==='object'?r.rating:r):null;
+    const comment=typeof r==='object'?r.comment||'':'';
+    return `<tr>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#6b7280;text-align:center">${p.number||'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600">${fullName(p.id)}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:700;color:${rv!=null?'#1a56db':'#9ca3af'};text-align:center">${rv!=null?parseFloat(rv).toFixed(1):'—'}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:12px">${comment||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // ── 6. Observações técnicas ──
+  const obsHtml=Object.entries(staffObs).map(([usr,obs])=>{
+    const u=getAppUsers().find(x=>x.user===usr);
+    const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):usr;
+    return `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e5e7eb">
+      <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
+      <div style="font-size:12px;color:#374151;white-space:pre-wrap;line-height:1.6">${obs.text||'—'}</div>
+    </div>`;
+  }).join('') || '<p style="color:#9ca3af;font-size:12px">Sem observações registadas.</p>';
+
+  // ── Build HTML ──
+  const squad=SQUADS[ev.squad]||ev.squad||'';
+  const html=`<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Jogo — ${evLabel(ev)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:24px 32px}
+  h1{font-size:20px;font-weight:800;color:#111;margin-bottom:2px}
+  h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e5e7eb}
+  table{width:100%;border-collapse:collapse}
+  th{padding:5px 8px;text-align:left;font-size:11px;color:#6b7280;background:#f9fafb;font-weight:700;border-bottom:2px solid #e5e7eb}
+  @media print{body{padding:12px 18px}h2{page-break-after:avoid}section{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #1a56db">
+    <div>
+      <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">SC Vianense SAD · ${squad}</div>
+      <h1>${isHome?'SC Vianense SAD':ev.opponent||'Adversário'} <span style="color:${resultColor}">${scoreUs} — ${scoreAdv}</span> ${isHome?ev.opponent||'Adversário':'SC Vianense SAD'}</h1>
+      <div style="font-size:12px;color:#6b7280;margin-top:4px">${ev.competition||''}${ev.competition?' · ':''}${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:28px;font-weight:900;color:${resultColor}">${resultLabel}</div>
+      <div style="font-size:10px;color:#6b7280">Gerado em ${new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'})}</div>
+    </div>
+  </div>
+
+  ${pitchSection}
+
+  <section>
+    <h2>Equipa — Minutos Realizados</h2>
+    <table>
+      <thead><tr>
+        <th style="text-align:center;width:36px">#</th>
+        <th>Nome</th><th>Posição</th><th>Tipo</th>
+        <th style="text-align:center">Min.</th>
+        <th style="text-align:center">⚽</th><th style="text-align:center">Ass.</th>
+        <th style="text-align:center">Cart.</th><th style="text-align:center">🔴</th>
+        <th style="text-align:center">Nota</th>
+      </tr></thead>
+      <tbody>${teamRows}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Sumário</h2>
+    ${sumHtml}
+  </section>
+
+  <section>
+    <h2>Estatísticas Gerais</h2>
+    ${statsHtml}
+  </section>
+
+  <section>
+    <h2>Momentos de Jogo</h2>
+    ${momentsHtml}
+  </section>
+
+  <section>
+    <h2>Avaliação Individual</h2>
+    ${evalRows?`<table>
+      <thead><tr>
+        <th style="text-align:center;width:36px">#</th>
+        <th>Nome</th>
+        <th style="text-align:center;width:60px">Nota</th>
+        <th>Observação</th>
+      </tr></thead>
+      <tbody>${evalRows}</tbody>
+    </table>`:'<p style="color:#9ca3af;font-size:12px">Sem avaliações registadas.</p>'}
+  </section>
+
+  <section>
+    <h2>Observações da Equipa Técnica</h2>
+    ${obsHtml}
+  </section>
+</body>
+</html>`;
+
+  const win=window.open('','_blank','width=900,height=700');
+  if(!win){ toast('⚠️ Permite popups para exportar o PDF.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),400);
 }
 
 function saveCoordReport(gameId){
