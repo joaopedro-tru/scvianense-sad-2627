@@ -4645,21 +4645,22 @@ function renderAdminStaffView(userKey){
   const ps=DB.players(cs);
   const es=DB.events(cs);
   const pastGames=es.filter(e=>e.type==='game'&&e.date<today);
+  const pastOfficialGames=pastGames.filter(e=>getGameType(e)==='league'||getGameType(e)==='cup');
   const pastTrains=es.filter(e=>e.type==='training'&&e.date<today);
-  const wins=pastGames.filter(g=>{
+  const wins=pastOfficialGames.filter(g=>{
     const mr=g.matchReport||{events:[]};
     const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
     const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
     return gf>ga;
   }).length;
-  const winPct=pastGames.length?Math.round(wins/pastGames.length*100):null;
+  const winPct=pastOfficialGames.length?Math.round(wins/pastOfficialGames.length*100):null;
   const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99'))).slice(0,6);
 
   const statsHtml=`<div class="sg" style="margin-bottom:16px">
     <div class="sc"><div class="sl">Atletas</div><div class="sv" style="color:${m.color}">${ps.length}</div><div class="ss">${SQUADS[cs]||cs}</div></div>
     <div class="sc"><div class="sl">Treinos Realizados</div><div class="sv">${pastTrains.length}</div><div class="ss">esta época</div></div>
-    <div class="sc"><div class="sl">Jogos Realizados</div><div class="sv">${pastGames.length}</div><div class="ss">esta época</div></div>
-    <div class="sc"><div class="sl">% Vitórias</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">${wins} vitória${wins!==1?'s':''} em ${pastGames.length} jogo${pastGames.length!==1?'s':''}</div></div>
+    <div class="sc"><div class="sl">🏆 Jogos Oficiais</div><div class="sv">${pastOfficialGames.length}</div><div class="ss">esta época</div></div>
+    <div class="sc"><div class="sl">% Vitórias Oficiais</div><div class="sv" style="color:var(--green)">${winPct===null?'—':winPct+'%'}</div><div class="ss">${wins} vitória${wins!==1?'s':''} em ${pastOfficialGames.length} jogo${pastOfficialGames.length!==1?'s':''}</div></div>
   </div>`;
 
   const upcomingHtml=upcoming.length===0
