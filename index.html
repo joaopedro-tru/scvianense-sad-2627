@@ -4936,7 +4936,13 @@ function renderPitch(allPs){
 
 // ── PLAYER DETAIL ─────────────────────────────────────────────────────────────
 function buildPlayerClinicalCard(athleteId){
-  const recs=DB.getClinicalRecords(athleteId).sort((a,b)=>b.date.localeCompare(a.date));
+  const crRecs=DB.getClinicalRecords(athleteId).sort((a,b)=>b.date.localeCompare(a.date));
+  // Include manual occurrences (FPF) not already linked to a CR
+  const linkedOcrIds=new Set(crRecs.map(r=>r.linkedOcrId).filter(Boolean));
+  const ocrRecs=DB.getOccurrenceRecords()
+    .filter(r=>r.athleteId===athleteId&&!linkedOcrIds.has(r.id))
+    .map(r=>({...r, _isManualOcr:true, type:'other', diagnostico:r.occurrence||''}));
+  const recs=[...crRecs, ...ocrRecs].sort((a,b)=>b.date.localeCompare(a.date));
   const today=new Date().toISOString().split('T')[0];
   const activeInj=getActiveInjury(athleteId,today);
   const canEdit=isAdmin()||isMedical();
@@ -4949,6 +4955,26 @@ function buildPlayerClinicalCard(athleteId){
   if(recs.length===0) return `<div class="card">${header}<p style="color:var(--muted);font-size:13px">Sem registos clínicos.</p></div>`;
 
   const rows=recs.map(r=>{
+    // Manual FPF occurrence row
+    if(r._isManualOcr){
+      const editBtn=canEdit?`<button style="padding:2px 7px;background:#e8f0fe;color:#1a56db;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" onclick="openOccurrenceModal('${r.id}')">✏️</button>`:'';
+      const delBtn=canEdit?`<button style="padding:2px 7px;background:#fce4ec;color:#c62828;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" onclick="deleteOccurrenceRecord('${r.id}').then(renderPlayer)">🗑️</button>`:'';
+      return `<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="font-size:16px;flex-shrink:0;margin-top:1px">📄</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:11px;font-weight:700;color:#fff;background:#1565c0;padding:1px 7px;border-radius:10px">Ocorrência FPF</span>
+              <span style="font-size:11px;color:var(--muted)">${fmtDate(r.date)}</span>
+            </div>
+            ${r.occurrence?`<div style="font-size:12px;font-weight:600;margin-top:4px">${r.occurrence}</div>`:''}
+            ${r.treatment?`<div style="font-size:12px;color:var(--text);margin-top:2px"><span style="color:var(--muted)">Tratamento:</span> ${r.treatment}</div>`:''}
+            ${r.returnDate?`<div style="font-size:12px;color:#2e7d32;font-weight:600;margin-top:2px">✅ Regresso previsto: ${fmtDate(r.returnDate)}</div>`:''}
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">${editBtn}${delBtn}</div>
+        </div>
+      </div>`;
+    }
     const ev=r.eventId?DB.getEvent(r.eventId):null;
     const evLabel=ev?`${ev.type==='game'?'Jogo vs '+ev.opponent:'Treino'} · `:'';
     const isInjury=CR_HAS_INJURY_FIELDS(r.type);
@@ -7605,14 +7631,15 @@ function ocrUpdatePlayers(sq, selectedId=''){
 }
 
 function openOccurrenceModal(editId){
-  const existing=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
+  // editId can be an OCR id (legacy) or a CR id (new records)
+  const existingOcr=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
+  const existingCr=editId&&!existingOcr?DB.getClinicalRecords().find(r=>r.id===editId):null;
+  const existing=existingOcr||existingCr||null;
   const cu=currentUser();
   const admin=isAdmin();
   const today=new Date().toISOString().slice(0,10);
-  // Determine squad scope
   const userSquad=cu?.squad||(cu?.squads?.length===1?cu.squads[0]:null);
   const editSquad=existing?.squad||'';
-  // For non-admin: fixed to their squad; for admin editing: fixed to existing squad; for admin new: cascade select
   const fixedSquad=!admin?userSquad:(editId?editSquad:null);
   const squadSelectorHtml=admin&&!editId?`
     <div>
@@ -7625,10 +7652,20 @@ function openOccurrenceModal(editId){
       </select>
     </div>`:'';
   const initialPlayers=fixedSquad?DB.players(fixedSquad).sort((a,b)=>a.name.localeCompare(b.name)):[];
+  // Resolve pre-filled values (OCR legacy fields vs CR fields)
+  const preType=existing?.type||'injury';
+  const preDiag=existing?.diagnostico||existing?.occurrence||'';
+  const preTreatment=existing?.treatment||'';
+  const preEdate=existing?.estimatedRecoveryDate||existing?.returnDate||'';
+  const preAdate=existing?.actualRecoveryDate||'';
+  const preNotes=existing?.notes||'';
+  const preRegBy=existing?.registeredBy||existing?.addedBy||cu?.user||'';
+  const typeOpts=Object.entries(CR_TYPES).map(([k,v])=>`<option value="${k}"${k===preType?' selected':''}>${v}</option>`).join('');
+  const injVis=CR_HAS_INJURY_FIELDS(preType)?'block':'none';
   const mo=document.createElement('div');
   mo.className='mo open'; mo.id='mo-ocr';
   mo.innerHTML=`<div class="md" style="max-width:480px">
-    <div class="mh"><h2>${existing?'✏️ Editar':'📄 Nova'} Ocorrência FPF</h2><button class="mc" onclick="document.getElementById('mo-ocr').remove()">✕</button></div>
+    <div class="mh"><h2>${existing?'✏️ Editar':'📄 Nova'} Ocorrência</h2><button class="mc" onclick="document.getElementById('mo-ocr').remove()">✕</button></div>
     <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
       ${squadSelectorHtml}
       <div>
@@ -7638,52 +7675,80 @@ function openOccurrenceModal(editId){
           ${initialPlayers.map(p=>`<option value="${p.id}"${p.id===existing?.athleteId?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('')}
         </select>
       </div>
-      <div>
-        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data da ocorrência</label>
-        <input type="date" id="ocr-date" value="${existing?.date||today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data</label>
+          <input type="date" id="ocr-date" value="${existing?.date||today}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Tipo</label>
+          <select id="ocr-type" onchange="document.getElementById('ocr-inj-fields').style.display=CR_HAS_INJURY_FIELDS(this.value)?'flex':'none'" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">${typeOpts}</select>
+        </div>
       </div>
       <div>
-        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Ocorrência (Doença/Lesão)</label>
-        <input type="text" id="ocr-occurrence" value="${existing?.occurrence||''}" placeholder="Ex: Entorse tornozelo, Gripe, Contractura..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Diagnóstico / Descrição</label>
+        <input type="text" id="ocr-diag" value="${preDiag}" placeholder="Ex: Entorse tornozelo, Gripe, Contractura..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
       </div>
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Tratamento</label>
-        <input type="text" id="ocr-treatment" value="${existing?.treatment||''}" placeholder="Ex: Fisioterapia, Repouso, Medicação..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        <input type="text" id="ocr-treatment" value="${preTreatment}" placeholder="Ex: Fisioterapia, Repouso, Medicação..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+      <div id="ocr-inj-fields" style="display:${injVis};gap:10px">
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Prev. recuperação</label>
+          <input type="date" id="ocr-edate" value="${preEdate}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Recuperação efectiva</label>
+          <input type="date" id="ocr-adate" value="${preAdate}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
       </div>
       <div>
-        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Data de regresso aos treinos sem limitações</label>
-        <input type="date" id="ocr-return" value="${existing?.returnDate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Notas</label>
+        <textarea id="ocr-notes" rows="2" placeholder="Notas adicionais..." style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical">${preNotes}</textarea>
       </div>
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Registado por</label>
-        <input type="text" id="ocr-regby" value="${existing?.registeredBy||currentUser()?.user||''}" placeholder="Nome do responsável" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        <input type="text" id="ocr-regby" value="${preRegBy}" placeholder="Nome do responsável" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
       </div>
     </div>
     <div class="fa">
       <button class="btn btn-g" onclick="document.getElementById('mo-ocr').remove()">Cancelar</button>
-      <button class="btn btn-p" onclick="saveOccurrenceRecord('${editId||''}')">💾 Guardar</button>
+      <button class="btn btn-p" onclick="saveOccurrenceRecord('${editId||''}','${existingOcr?'ocr':'cr'}')">💾 Guardar</button>
     </div>
   </div>`;
   document.body.appendChild(mo);
 }
 
-async function saveOccurrenceRecord(editId){
+async function saveOccurrenceRecord(editId, editSource){
   const pid=document.getElementById('ocr-player')?.value;
   const date=document.getElementById('ocr-date')?.value;
-  const occurrence=document.getElementById('ocr-occurrence')?.value.trim();
+  const type=document.getElementById('ocr-type')?.value||'other';
+  const diagnostico=document.getElementById('ocr-diag')?.value.trim();
   const treatment=document.getElementById('ocr-treatment')?.value.trim()||'';
-  const returnDate=document.getElementById('ocr-return')?.value||'';
+  const estimatedRecoveryDate=document.getElementById('ocr-edate')?.value||'';
+  const actualRecoveryDate=document.getElementById('ocr-adate')?.value||'';
+  const notes=document.getElementById('ocr-notes')?.value.trim()||'';
   const registeredBy=document.getElementById('ocr-regby')?.value.trim()||currentUser()?.user||'';
   if(!pid){ toast('❌ Seleciona o atleta'); return; }
   if(!date){ toast('❌ Seleciona a data'); return; }
-  if(!occurrence){ toast('❌ Descreve a ocorrência'); return; }
+  if(!diagnostico){ toast('❌ Preenche o diagnóstico / descrição'); return; }
   const p=DB.getPlayer(pid);
-  const data={ athleteId:pid, athleteName:p?dn(p):'', squad:p?.squad||'', date, occurrence, treatment, returnDate, registeredBy };
+  const crData={ athleteId:pid, squad:p?.squad||'', date, type, diagnostico, treatment, notes, registeredBy, addedBy:registeredBy };
+  if(CR_HAS_INJURY_FIELDS(type)){ crData.estimatedRecoveryDate=estimatedRecoveryDate; crData.actualRecoveryDate=actualRecoveryDate; }
   try{
-    if(editId){ await DB.updateOccurrenceRecord(editId, data); toast('✅ Atualizado'); }
-    else { await DB.addOccurrenceRecord(data); toast('✅ Ocorrência registada'); }
+    if(editId&&editSource==='ocr'){
+      // Legacy: update old OCR record
+      await DB.updateOccurrenceRecord(editId,{athleteId:pid,athleteName:p?dn(p):'',squad:p?.squad||'',date,occurrence:diagnostico,treatment,returnDate:estimatedRecoveryDate,registeredBy});
+      toast('✅ Atualizado');
+    } else if(editId&&editSource==='cr'){
+      await DB.updateClinicalRecord(editId, crData); toast('✅ Atualizado');
+    } else {
+      await DB.addClinicalRecord(crData); toast('✅ Ocorrência registada');
+    }
     document.getElementById('mo-ocr')?.remove();
     renderClinicalMap();
+    if(view==='player') renderPlayer();
   }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
 }
 
@@ -7691,6 +7756,7 @@ async function deleteOccurrenceRecord(id){
   if(!confirm('Eliminar esta ocorrência?')) return;
   await DB.deleteOccurrenceRecord(id);
   renderClinicalMap();
+  if(view==='player') renderPlayer();
 }
 
 function exportOccurrencesPDF(){
