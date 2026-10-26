@@ -3531,6 +3531,8 @@ function bdayCards(ps,containerEl,staffPs=[]){
 function _squadLoadCards(cs, sfx=''){
   const now=new Date();
   const today=now.toISOString().split('T')[0];
+  const _cuRole=currentUser()?.role;
+  const _showObjChart=_cuRole!=='teammanager'&&_cuRole!=='medical';
   const cutoff5w=new Date(now-35*24*3600*1000).toISOString().split('T')[0];
   const allEvs=DB.events(cs);
   const gymEvs=allEvs.filter(e=>e.type==='gym'&&e.gymPlan?.exercises?.length&&e.date<=today);
@@ -3685,7 +3687,7 @@ function _squadLoadCards(cs, sfx=''){
   const pb5=pieBlock(tp5,tPrimaryColorFn,tPrimaryLabelFn,'5w',130,unit5,trFooter(train5w.length,noAn5w));
   const pbEp=pieBlock(tpS,tPrimaryColorFn,tPrimaryLabelFn,'ep',130,unitS,trFooter(trainEvs.length,noAnEp));
   const noObjData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
-  const primaryCard=(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
+  const primaryCard=_showObjChart&&(pb5||pbEp)?`<div class="card" id="obj-primary-card${sfx}" style="margin:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <div style="font-size:12px;font-weight:700">🎯 Objetivos Gerais</div>
       ${tglBtns('o')}
@@ -3694,7 +3696,7 @@ function _squadLoadCards(cs, sfx=''){
     <div id="lc-o-5w${sfx}">${pb5||noObjData}</div>
     <div id="lc-o-ep${sfx}" style="display:none">${pbEp||noObjData}</div>
   </div>`:'';
-  const secondaryPlaceholder=`<div id="obj-secondary-card${sfx}" style="display:none"></div>`;
+  const secondaryPlaceholder=_showObjChart?`<div id="obj-secondary-card${sfx}" style="display:none"></div>`:'';
 
   const noGymData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
   const gymCard=(g5||gS)?`<div class="card" style="margin:0">
@@ -7659,7 +7661,7 @@ function exportOccurrencesPDF(){
   const autoCrOcr=allCR.filter(r=>!linkedCrIds.has(r.id)).map(r=>{
     const p=playerMap[r.athleteId];
     return {
-      athleteName:p?dn(p):(r.athleteId||''), squad:p?.squad||r.squad||'',
+      athleteName:p?p.name:(r.athleteId||''), squad:p?.squad||r.squad||'',
       date:r.date, occurrence:(r.diagnostico||r.notes||CR_TYPES[r.type]||r.type||''),
       treatment:r.treatment||'', returnDate:r.returnDate||(r.unavailId&&linkedUnavailMap[r.unavailId]?.endDate)||'',
       registeredBy:r.registeredBy||''
@@ -7698,15 +7700,17 @@ function exportOccurrencesPDF(){
   doc.rect(0,0,3,28,'F');
 
   // Table
-  const tableData=allOcr.map(r=>[
+  const tableData=allOcr.map(r=>{
+    const _p=r.athleteId?playerMap[r.athleteId]:null;
+    return [
     r.date?new Date(r.date+'T12:00').toLocaleDateString('pt-PT'):'',
-    r.athleteName||'',
+    _p?_p.name:(r.athleteName||''),
     SQUADS[r.squad]||r.squad||'',
     r.occurrence||'',
     r.treatment||'',
     r.returnDate?new Date(r.returnDate+'T12:00').toLocaleDateString('pt-PT'):'',
     r.registeredBy||''
-  ]);
+  ]; });
 
   doc.autoTable({
     startY:32,
