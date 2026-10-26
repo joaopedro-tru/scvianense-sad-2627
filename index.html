@@ -7249,7 +7249,19 @@ function renderClinicalMap(){
         type:'injury', diagnostico:r.reason||'', treatment:'', notes:'',
         squad:r.squad
       }));
-    const allRecs=[...allCR, ...orphanUnavail].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
+    // Incluir ocorrências manuais registadas no separador Ocorrências
+    const manualOcrHist=DB.getOccurrenceRecords()
+      .filter(r=>!sq||r.squad===sq)
+      .map(r=>({
+        id:r.id, _isManualOcr:true,
+        athleteId:r.athleteId, date:r.date,
+        type:'other', diagnostico:r.occurrence||'',
+        treatment:r.treatment||'', notes:'', squad:r.squad
+      }));
+    // Deduplica: se já existe um registo clínico ligado a esta ocorrência, não duplicar
+    const linkedOcrIds=new Set(allCR.map(r=>r.linkedOcrId).filter(Boolean));
+    const dedupedManual=manualOcrHist.filter(r=>!linkedOcrIds.has(r.id));
+    const allRecs=[...allCR, ...orphanUnavail, ...dedupedManual].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
     if(!allRecs.length){ el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📋</div><div style="font-size:14px">Sem registos clínicos</div></div>`; return; }
 
     const rows=allRecs.map(r=>{
@@ -7263,14 +7275,19 @@ function renderClinicalMap(){
           <button onclick="cmEditUnavail('${r._unavailId}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
           <button onclick="cmDeleteUnavail('${r._unavailId}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
         </td>`:'<td></td>';
+      } else if(r._isManualOcr){
+        editBtns=canEdit?`<td style="padding:9px 4px;white-space:nowrap">
+          <button onclick="openOccurrenceModal('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
+          <button onclick="deleteOccurrenceRecord('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
+        </td>`:'<td></td>';
       } else {
         editBtns=canEdit?`<td style="padding:9px 4px;white-space:nowrap">
           <button onclick="cmEditCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px" title="Editar">✏️</button>
           <button onclick="cmDeleteCR('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:12px;padding:2px 5px" title="Eliminar">🗑️</button>
         </td>`:'<td></td>';
       }
-      const rowId=r._isUnavail?`cm-ucard-hist-${r._unavailId}`:`cm-cr-row-${r.id}`;
-      const srcTag=r._isUnavail?` <span style="font-size:9px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;padding:1px 5px;border-radius:6px;vertical-align:middle">indisponibilidade</span>`:'';
+      const rowId=r._isUnavail?`cm-ucard-hist-${r._unavailId}`:r._isManualOcr?`cm-ocr-hist-${r.id}`:`cm-cr-row-${r.id}`;
+      const srcTag=r._isUnavail?` <span style="font-size:9px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;padding:1px 5px;border-radius:6px;vertical-align:middle">indisponibilidade</span>`:r._isManualOcr?` <span style="font-size:9px;background:#e8f0fe;color:#1a56db;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px;vertical-align:middle">ocorrência</span>`:'';
       return `<tbody id="${rowId}"><tr style="border-bottom:1px solid var(--border)">
         <td style="padding:9px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.date)}</td>
         <td style="padding:9px 8px;font-size:13px;font-weight:600">${name}${sqBadge?` <span style="font-size:10px;color:var(--muted)">${sqBadge}</span>`:''}</td>
@@ -7280,7 +7297,7 @@ function renderClinicalMap(){
         ${editBtns}
       </tr></tbody>`;
     }).join('');
-    const total=allCR.length+orphanUnavail.length;
+    const total=allCR.length+orphanUnavail.length+dedupedManual.length;
     el.innerHTML=`<table style="width:100%;border-collapse:collapse">
       <thead><tr style="border-bottom:2px solid var(--border)">
         <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:600">DATA</th>
@@ -7297,11 +7314,16 @@ function renderClinicalMap(){
   } else if(_cmTab==='stats'){
     const seasonStart=(()=>{ const n=new Date(); const y=n.getMonth()>=6?n.getFullYear():n.getFullYear()-1; return `${y}-07-01`; })();
     const seasonCR=allCR.filter(r=>r.date>=seasonStart);
+    // Incluir ocorrências manuais nas estatísticas
+    const seasonManualOcr=DB.getOccurrenceRecords().filter(r=>r.date>=seasonStart&&(!sq||r.squad===sq));
+    const seasonAll=[...seasonCR, ...seasonManualOcr.map(r=>({...r,type:'other',diagnostico:r.occurrence||''}))];
     const injuries=seasonCR.filter(r=>r.type==='injury'||r.type==='minor_injury');
     const byType={};
-    seasonCR.forEach(r=>{ byType[r.type]=(byType[r.type]||0)+1; });
+    seasonAll.forEach(r=>{ byType[r.type]=(byType[r.type]||0)+1; });
     const byPlayer={};
     injuries.forEach(r=>{ byPlayer[r.athleteId]=(byPlayer[r.athleteId]||0)+1; });
+    // Também contar ocorrências manuais por atleta
+    seasonManualOcr.forEach(r=>{ if(r.athleteId) byPlayer[r.athleteId]=(byPlayer[r.athleteId]||0)+1; });
     const topPlayers=Object.entries(byPlayer).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([pid,n])=>{
       const p=playerMap[pid]; return {name:p?dn(p):pid, n, squad:p?SQUADS[p.squad]||p.squad:''};
     });
@@ -7321,7 +7343,7 @@ function renderClinicalMap(){
     el.innerHTML=`
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
         ${kpi(injuries.length,'Lesões esta época','#b71c1c')}
-        ${kpi(seasonCR.length,'Total registos','var(--primary)')}
+        ${kpi(seasonAll.length,'Total registos','var(--primary)')}
         ${kpi(allUnavail.filter(r=>r.startDate<=today&&r.endDate>=today).length,'Ativos agora','#e65100')}
         ${kpi(avgDays!==null?avgDays+'d':'—','Média recuperação','#2e7d32')}
       </div>
@@ -7574,20 +7596,46 @@ async function saveOcrCrEdit(crId){
   }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
 }
 
+function ocrUpdatePlayers(sq, selectedId=''){
+  const sel=document.getElementById('ocr-player');
+  if(!sel) return;
+  const ps=DB.players(sq||null).sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML=`<option value="">— Selecionar atleta —</option>`+
+    ps.map(p=>`<option value="${p.id}"${p.id===selectedId?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('');
+}
+
 function openOccurrenceModal(editId){
   const existing=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
-  const players=DB.players(null).sort((a,b)=>dn(a).localeCompare(dn(b)));
+  const cu=currentUser();
+  const admin=isAdmin();
   const today=new Date().toISOString().slice(0,10);
+  // Determine squad scope
+  const userSquad=cu?.squad||(cu?.squads?.length===1?cu.squads[0]:null);
+  const editSquad=existing?.squad||'';
+  // For non-admin: fixed to their squad; for admin editing: fixed to existing squad; for admin new: cascade select
+  const fixedSquad=!admin?userSquad:(editId?editSquad:null);
+  const squadSelectorHtml=admin&&!editId?`
+    <div>
+      <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Plantel</label>
+      <select id="ocr-squad" onchange="ocrUpdatePlayers(this.value)" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
+        <option value="">— Selecionar plantel —</option>
+        <option value="eqa">⚫ ${SQUADS.eqa}</option>
+        <option value="sub23">🔵 ${SQUADS.sub23}</option>
+        <option value="sub19">🟡 ${SQUADS.sub19}</option>
+      </select>
+    </div>`:'';
+  const initialPlayers=fixedSquad?DB.players(fixedSquad).sort((a,b)=>a.name.localeCompare(b.name)):[];
   const mo=document.createElement('div');
   mo.className='mo open'; mo.id='mo-ocr';
   mo.innerHTML=`<div class="md" style="max-width:480px">
     <div class="mh"><h2>${existing?'✏️ Editar':'📄 Nova'} Ocorrência FPF</h2><button class="mc" onclick="document.getElementById('mo-ocr').remove()">✕</button></div>
     <div class="mb" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      ${squadSelectorHtml}
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Jogador</label>
         <select id="ocr-player" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
           <option value="">— Selecionar atleta —</option>
-          ${players.map(p=>`<option value="${p.id}" ${p.id===existing?.athleteId?'selected':''}>${dn(p)} (${SQUADS[p.squad]||p.squad||'?'})</option>`).join('')}
+          ${initialPlayers.map(p=>`<option value="${p.id}"${p.id===existing?.athleteId?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('')}
         </select>
       </div>
       <div>
@@ -7679,7 +7727,7 @@ function exportOccurrencesPDF(){
   // Season top-right
   doc.setTextColor(180,200,160);
   doc.setFontSize(8);
-  doc.text('2025 · 2026',W-10,7,{align:'right'});
+  doc.text('2026 · 2027',W-10,7,{align:'right'});
   // Title
   doc.setTextColor(255,255,255);
   doc.setFontSize(18);
