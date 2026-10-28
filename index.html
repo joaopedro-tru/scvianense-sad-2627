@@ -8131,7 +8131,7 @@ function exportClinicalFilePDF(){
     secTitle('Histórico Lesional — Presente Época (2026/2027)');
     seasonCR.forEach(r=>{
       if(y>265){ doc.addPage(); y=16; }
-      doc.setFillColor(248,250,255); doc.roundedRect(ML,y,CW,1,'F');
+      doc.setFillColor(248,250,255); doc.rect(ML,y,CW,1,'F');
       const typeLabel=CR_TYPES[r.type]||r.type||'—';
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...azul);
       doc.text(`${typeLabel.replace(/^\S+\s/,'')} — ${fmtd(r.date)}`,ML+2,y+4);
