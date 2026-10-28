@@ -5698,11 +5698,19 @@ function _renderPlayerClinicalFile(p){
   const today=new Date().toISOString().slice(0,10);
   const seasonStart=today.slice(0,4)>='2026'?'2026-07-01':'2025-07-01';
   const allEvs=DB.events(p.squad).filter(e=>e.type==='game'&&e.date>=seasonStart&&e.date<=today);
-  const jogados=allEvs.filter(e=>(e.lineup||[]).includes(p.id));
+  const jogados=allEvs.filter(e=>{
+    const mr=e.matchReport||{};
+    const isStarter=(mr.lineup||[]).includes(p.id);
+    const subbedIn=(mr.events||[]).some(ev=>ev.type==='sub'&&ev.playerInId===p.id);
+    return isStarter||subbedIn;
+  });
   const totalMins=jogados.reduce((s,e)=>{
-    const sub=e.substitutions?.find?.(x=>x.out===p.id||x.in===p.id);
-    if(sub?.in===p.id) return s+(90-(sub.minute||0));
-    if(sub?.out===p.id) return s+(sub.minute||0);
+    const mr=e.matchReport||{};
+    const evList=mr.events||[];
+    const subbedOff=evList.find(ev=>ev.type==='sub'&&ev.playerOutId===p.id);
+    const subbedIn=evList.find(ev=>ev.type==='sub'&&ev.playerInId===p.id);
+    if(subbedIn&&!subbedOff) return s+(90-(subbedIn.minute||0));
+    if(subbedOff) return s+(subbedOff.minute||0);
     return s+90;
   },0);
 
@@ -8040,8 +8048,8 @@ function exportClinicalFilePDF(){
   doc.setTextColor(...preto); doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text(p.name,ML+4,y+8);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  const dn=p.birthDate?new Date(p.birthDate+'T12:00').toLocaleDateString('pt-PT'):'—';
-  const idade=p.birthDate?Math.floor((new Date()-new Date(p.birthDate))/(365.25*86400000)):null;
+  const dn=p.dob?new Date(p.dob+'T12:00').toLocaleDateString('pt-PT'):'—';
+  const idade=p.dob?Math.floor((new Date()-new Date(p.dob))/(365.25*86400000)):null;
   doc.text(`Nascimento: ${dn}${idade?`  ·  ${idade} anos`:''}`,ML+4,y+15);
   doc.text(`Posição: ${p.position||'—'}  ·  Nº ${p.number||'—'}  ·  ${p.squad==='sub23'?'Sub-23':p.squad==='sub19'?'Sub-19':'Equipa A'}`,ML+4,y+21);
   doc.text(`Clube: SC Vianense SAD  ·  País: Portugal`,ML+4,y+27);
@@ -8051,11 +8059,19 @@ function exportClinicalFilePDF(){
   const today=new Date().toISOString().slice(0,10);
   const seasonStart='2026-07-01';
   const allEvs=DB.events(p.squad).filter(e=>e.type==='game'&&e.date>=seasonStart&&e.date<=today);
-  const jogados=allEvs.filter(e=>(e.lineup||[]).includes(p.id));
+  const jogados=allEvs.filter(e=>{
+    const mr=e.matchReport||{};
+    const isStarter=(mr.lineup||[]).includes(p.id);
+    const subbedIn=(mr.events||[]).some(ev=>ev.type==='sub'&&ev.playerInId===p.id);
+    return isStarter||subbedIn;
+  });
   const totalMins=jogados.reduce((s,e)=>{
-    const sub=e.substitutions?.find?.(x=>x.out===p.id||x.in===p.id);
-    if(sub?.in===p.id) return s+(90-(sub.minute||0));
-    if(sub?.out===p.id) return s+(sub.minute||0);
+    const mr=e.matchReport||{};
+    const evList=mr.events||[];
+    const subbedOff=evList.find(ev=>ev.type==='sub'&&ev.playerOutId===p.id);
+    const subbedIn=evList.find(ev=>ev.type==='sub'&&ev.playerInId===p.id);
+    if(subbedIn&&!subbedOff) return s+(90-(subbedIn.minute||0));
+    if(subbedOff) return s+(subbedOff.minute||0);
     return s+90;
   },0);
 
