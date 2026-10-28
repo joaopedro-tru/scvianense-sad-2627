@@ -2834,6 +2834,18 @@ const DB = {
   async updateOccurrenceRecord(id,data){ const arr=this._ocr().map(r=>r.id===id?{...r,...data}:r); this._socr(arr); if(this._focr()) await this._focr().doc(id).update(data).catch(e=>console.error('FS updateOcr:',e)); },
   async deleteOccurrenceRecord(id){ const arr=this._ocr().filter(r=>r.id!==id); this._socr(arr); if(this._focr()) await this._focr().doc(id).delete().catch(e=>console.error('FS delOcr:',e)); },
   async syncOcrFromFirestore(){ if(!this._focr()) return; try{ const snap=await this._focr().get(); const arr=[]; snap.forEach(d=>arr.push(d.data())); if(arr.length>0) this._socr(arr); }catch(e){ console.warn('syncOcr:',e); } },
+  // ── Fichas Clínicas ───────────────────────────────────────────────────────────
+  _ffcl(){ return firestoreDb?.collection('clinicalFiles') },
+  _fcl(){ try{ return JSON.parse(localStorage.getItem('scv_fcl')||'{}'); }catch{ return {}; } },
+  _sfcl(obj){ localStorage.setItem('scv_fcl',JSON.stringify(obj)); },
+  getClinicalFile(athleteId){ return this._fcl()[athleteId]||null; },
+  async saveClinicalFile(athleteId, data){
+    data.athleteId=athleteId; data.updatedAt=new Date().toISOString();
+    const all=this._fcl(); all[athleteId]=data; this._sfcl(all);
+    if(this._ffcl()) await this._ffcl().doc(athleteId).set(data).catch(e=>console.error('FS saveFcl:',e));
+    return data;
+  },
+  async syncClinicalFilesFromFirestore(){ if(!this._ffcl()) return; try{ const snap=await this._ffcl().get(); const obj=this._fcl(); snap.forEach(d=>{ const v=d.data(); if(v.athleteId) obj[v.athleteId]=v; }); this._sfcl(obj); }catch(e){ console.warn('syncFcl:',e); } },
   // ── Staff Profiles ────────────────────────────────────────────────────────────
   _fssp(){ return firestoreDb?.collection('staff_profiles') },
   _sp(){ try{ return JSON.parse(localStorage.getItem('scv_sp')||'[]'); }catch{ return []; } },
@@ -5377,6 +5389,7 @@ function renderPlayer(){
     ${playerWellnessHasData===true?`<button class="tab-btn${playerTab==='wellness'?' tab-active':''}" data-ptab="wellness" style="padding:10px 18px">💤 Wellness</button>`:''}
     ${isAdmin()?`<button class="tab-btn${playerTab==='coord'?' tab-active':''}" data-ptab="coord" style="padding:10px 18px">🔍 Coord.</button>`:''}
     ${canSeeEvals()?`<button class="tab-btn${playerTab==='eval'?' tab-active':''}" data-ptab="eval" style="padding:10px 18px">⭐ Avaliação</button>`:''}
+    ${(isAdmin()||isMedical())?`<button class="tab-btn${playerTab==='ficha_clinica'?' tab-active':''}" data-ptab="ficha_clinica" style="padding:10px 18px">🏥 Ficha Clínica</button>`:''}
   </div>`;
 
   const isInactive=p.status==='inactive';
@@ -5453,7 +5466,9 @@ function renderPlayer(){
           ?`<div>${coordTabHTML}</div>`
           :playerTab==='eval'
             ?`<div id="player-eval-tab"><div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">A carregar...</div></div>`
-            :dadosHTML}`;
+            :playerTab==='ficha_clinica'
+              ?`<div id="player-ficha-tab"><div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px">A carregar...</div></div>`
+              :dadosHTML}`;
 
   // Tab click handlers
   document.querySelectorAll('[data-ptab]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -5493,6 +5508,7 @@ function renderPlayer(){
   if(playerWellnessHasData===null) _checkPlayerWellnessData(p);
   if(playerTab==='wellness') _renderPlayerWellness(p);
   if(playerTab==='eval') _renderPlayerEval(p);
+  if(playerTab==='ficha_clinica') _renderPlayerClinicalFile(p);
 }
 
 // ── PLAYER EVALUATION TAB ────────────────────────────────────────────────────
@@ -5654,6 +5670,219 @@ async function deletePlayerEval(id){
   if(!confirm('Eliminar esta avaliação?')) return;
   await DB.deletePlayerEvaluation(id);
   _renderPlayerEval(player);
+}
+
+// ── FICHA CLÍNICA FPF ────────────────────────────────────────────────────────
+function _renderPlayerClinicalFile(p){
+  const el=document.getElementById('player-ficha-tab'); if(!el) return;
+  const fc=DB.getClinicalFile(p.id)||{};
+  const inp=(id,val='',ph='',extra='')=>`<input type="text" id="fcl-${id}" value="${(val||'').replace(/"/g,'&quot;')}" placeholder="${ph}" ${extra} style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;font-family:inherit">`;
+  const dat=(id,val='')=>`<input type="date" id="fcl-${id}" value="${val||''}" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text)">`;
+  const ta=(id,val='',rows=2,ph='')=>`<textarea id="fcl-${id}" rows="${rows}" placeholder="${ph}" style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical">${val||''}</textarea>`;
+  const chk=(id,val,label)=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="fcl-${id}" ${val?'checked':''} style="width:14px;height:14px;accent-color:var(--primary)"> ${label}</label>`;
+  const rad=(name,id,val,cur,label)=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="radio" name="fcl-${name}" id="fcl-${id}" value="${val}" ${cur===val?'checked':''} style="accent-color:var(--primary)"> ${label}</label>`;
+  const lbl=(text)=>`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${text}</div>`;
+  const sec=(title,content)=>`<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:12px"><div style="font-size:13px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--primary);padding-bottom:6px;margin-bottom:4px">${title}</div>${content}</div>`;
+  const row2=(a,b)=>`<div style="display:flex;gap:12px">${a}${b}</div>`;
+  const col=(content,flex='1')=>`<div style="flex:${flex};min-width:0">${content}</div>`;
+  const SINTOMAS=['Sintomas gripais','Infecções virais','Problemas calor','Alergias comida/insectos','Alergias medicamentos','Concussão','Palpitação','Arritmias','Síncopes','Tonturas','Dor tórax','Asma','Tosse e expetoração','Dispneia','Bronquite','Hipertensão','Murmúrio cardíaco','Perfil lipídico anormal','Convulsões','Diarreia','Problemas gástricos','Perda apetite','Perda peso','Alterações sono','Fadiga mais fácil','Diabetes','Hepatite'];
+  const fcs=fc.sintomas||[];
+  const sintomasHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px">${SINTOMAS.map(s=>`<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;cursor:pointer"><input type="checkbox" name="fcl-sint" value="${s}" ${fcs.includes(s)?'checked':''} style="accent-color:var(--primary)"> ${s}</label>`).join('')}</div>`;
+  const ME_ZONAS=['Coluna','Ombros','Cotovelo','Punho e mão','R. inguinal','Anca','Coxa','Joelho','Perna','Tornozelo','Pé'];
+  const fcms=fc.meSintZonas||[], fcmt=fc.meTestZonas||[];
+  const zonaChk=(prefix,arr)=>`<div style="display:flex;flex-wrap:wrap;gap:8px">${ME_ZONAS.map(z=>`<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;cursor:pointer"><input type="checkbox" name="${prefix}" value="${z}" ${arr.includes(z)?'checked':''} style="accent-color:var(--primary)"> ${z}</label>`).join('')}</div>`;
+  const EXAMES_SIS=['E. ectoscópico','E. oftalmológico','E. ORL','E. estomatológico','E. abdómen','E. neurológico','E. dermatológico'];
+  const fcex=fc.exameSistemas||[];
+  // Season stats
+  const today=new Date().toISOString().slice(0,10);
+  const seasonStart=today.slice(0,4)>='2026'?'2026-07-01':'2025-07-01';
+  const allEvs=DB.events(p.squad).filter(e=>e.type==='game'&&e.date>=seasonStart&&e.date<=today);
+  const jogados=allEvs.filter(e=>(e.lineup||[]).includes(p.id));
+  const totalMins=jogados.reduce((s,e)=>{
+    const sub=e.substitutions?.find?.(x=>x.out===p.id||x.in===p.id);
+    if(sub?.in===p.id) return s+(90-(sub.minute||0));
+    if(sub?.out===p.id) return s+(sub.minute||0);
+    return s+90;
+  },0);
+
+  el.innerHTML=`
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:15px;font-weight:700">📋 Ficha Clínica — ${p.name}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p btn-sm" onclick="saveClinicalFileForm('${p.id}')">💾 Guardar</button>
+        <button class="btn btn-g btn-sm" onclick="exportClinicalFilePDF()">📄 Exportar PDF</button>
+      </div>
+    </div>
+    ${fc.updatedAt?`<div style="font-size:11px;color:var(--muted)">Última actualização: ${new Date(fc.updatedAt).toLocaleDateString('pt-PT')}</div>`:''}
+
+    ${sec('0. Identificação & Contactos',`
+      ${row2(
+        col(`${lbl('Competição')}${inp('competicao',fc.competicao,'Ex: Campeonato MKA AFVC 2026/27')}`),
+        col(`${lbl('Data da avaliação')}${dat('dataAval',fc.dataAval)}`,'auto')
+      )}
+      ${lbl('Contactos clínico / fisioterapeuta')}${ta('contactos',fc.contactos,2,'Nome · Telemóvel · Email')}
+    `)}
+
+    ${sec('1. História Clínica',`
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div>${lbl('Queixas actuais (últimas 4 sem.)')}${chk('q4sem',fc.q4sem,'Sim')}</div>
+        <div>${lbl('Queixas actuais (há mais de 4 sem.)')}${chk('q4semMais',fc.q4semMais,'Sim')}</div>
+      </div>
+      ${lbl('Sintomas referidos')}${sintomasHtml}
+      ${row2(
+        col(`${lbl('Medicação actual')}${chk('medicacao',fc.medicacao,'Toma medicação')} ${chk('medicacaoTUE',fc.medicacaoTUE,'Sujeita TUE')}`),
+        col(`${lbl('Medicação — descrição')}${inp('medicacaoDesc',fc.medicacaoDesc,'Nome da medicação')}`)
+      )}
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${lbl('Vacinação')}
+        ${chk('vacTetano',fc.vacTetano,'Tétano')} ${chk('vacHepA',fc.vacHepA,'Hepatite A')} ${chk('vacHepB',fc.vacHepB,'Hepatite B')}
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${lbl('Suplementação')}
+        ${chk('suplementacao',fc.suplementacao,'Toma suplementação')}
+        ${chk('suplIndicado',fc.suplIndicado,'Indicado por fisiologista')}
+        ${chk('suplConhecimento',fc.suplConhecimento,'Do conhecimento do fisiologista')}
+      </div>
+      ${lbl('Antecedentes pessoais e familiares relevantes')}${chk('antecedentes',fc.antecedentes,'Sim — há antecedentes relevantes')}
+      ${ta('antecedentesDesc',fc.antecedentesDesc,2,'Descrição de antecedentes relevantes')}
+    `)}
+
+    ${sec('2. Exame Médico Objectivo — Geral',`
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${lbl('Resultado geral')}
+        ${rad('exameGeral','exameGeralSem','sem','sem'===fc.exameGeral,'Sem alterações relevantes')}
+        ${rad('exameGeral','exameGeralCom','com','com'===fc.exameGeral,'Com alterações')}
+      </div>
+      ${lbl('Sistemas com alterações')}
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${EXAMES_SIS.map(s=>`<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;cursor:pointer"><input type="checkbox" name="fcl-exsist" value="${s}" ${fcex.includes(s)?'checked':''} style="accent-color:var(--primary)"> ${s}</label>`).join('')}</div>
+      ${row2(
+        col(`${lbl('Ausc. Cardíaca')}${inp('auscCardiaca',fc.auscCardiaca,'Normal / Sopro...')}`),
+        col(`${lbl('Ausc. Pulmonar')}${inp('auscPulmonar',fc.auscPulmonar,'Normal / MV...')}`)
+      )}
+      ${row2(
+        col(`${lbl('Pulsos')}${inp('pulsos',fc.pulsos,'Simétricos / ...')}`,'1'),
+        col(`${lbl('Altura')}${inp('altura',fc.altura,'cm')}`,'1'),
+        )}
+      ${row2(
+        col(`${lbl('Peso')}${inp('peso',fc.peso,'kg')}`),
+        col(`${lbl('T.A.')}${inp('ta',fc.ta,'mmHg')}`)
+      )}
+      ${col(`${lbl('FC Repouso')}${inp('fcRepouso',fc.fcRepouso,'bpm')}`,'auto')}
+    `)}
+
+    ${sec('3. Exame Músculo-Esquelético / Ortopédico',`
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${lbl('Sintomatologia actual')}
+        ${rad('meSint','meSintSim','sim','sim'===fc.meSint,'Sim')}
+        ${rad('meSint','meSintNao','nao','nao'===fc.meSint,'Não')}
+      </div>
+      ${lbl('Zonas com sintomatologia')}${zonaChk('fcl-mesint',fcms)}
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${lbl('Testes ME positivos')}
+        ${rad('meTeste','meTesteSim','sim','sim'===fc.meTeste,'Sim')}
+        ${rad('meTeste','meTesteNao','nao','nao'===fc.meTeste,'Não')}
+      </div>
+      ${lbl('Zonas com testes positivos')}${zonaChk('fcl-meteste',fcmt)}
+    `)}
+
+    ${sec('4. ECG Repouso (5 min)',`
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${rad('ecg','ecgSim','sim','sim'===fc.ecg,'Realizado')}
+        ${rad('ecg','ecgNao','nao','nao'===fc.ecg,'Não realizado')}
+        ${col(`${lbl('Data')}${dat('ecgData',fc.ecgData)}`,'auto')}
+      </div>
+      ${row2(
+        col(`${lbl('Observado por')}${inp('ecgObs',fc.ecgObs,'Nome do médico')}`),
+        col(`${lbl('Resultado')}${inp('ecgResult',fc.ecgResult,'Normal / Alterações...')}`)
+      )}
+    `)}
+
+    ${sec('5. Ecocardiograma',`
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        ${rad('eco','ecoSim','sim','sim'===fc.eco,'Realizado')}
+        ${rad('eco','ecoNao','nao','nao'===fc.eco,'Não realizado')}
+        ${col(`${lbl('Data')}${dat('ecoData',fc.ecoData)}`,'auto')}
+      </div>
+      ${row2(
+        col(`${lbl('Realizado por')}${inp('ecoObs',fc.ecoObs,'Nome do médico')}`),
+        col(`${lbl('Resultado')}${inp('ecoResult',fc.ecoResult,'Normal / Alterações...')}`)
+      )}
+    `)}
+
+    ${sec('6. Análises Sangue e Urina',`
+      ${row2(
+        col(`${lbl('Data de recolha')}${dat('analisesData',fc.analisesData)}`,'auto'),
+        col(`${lbl('Laboratório')}${inp('analisesLab',fc.analisesLab,'Nome do laboratório')}`)
+      )}
+      ${lbl('Resultado')}${ta('analisesResult',fc.analisesResult,2,'Normal / Alterações...')}
+    `)}
+
+    ${sec('Sumário da Avaliação',`
+      ${['HC — História Clínica','Exame Objectivo Geral','ME / Ortopédico','ECG Repouso','Ecocardiograma','Análises Sangue e Urina'].map((title,i)=>{
+        const key=['sumHC','sumExObjGeral','sumME','sumECG','sumEco','sumAnalises'][i];
+        const nota=['sumHCNota','sumExGeralNota','sumMENota','sumECGNota','sumEcoNota','sumAnalisesNota'][i];
+        return `<div>
+          ${lbl(title)}
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+            ${rad(key,key+'N','normal','normal'===fc[key],'Normal')}
+            ${rad(key,key+'E','elegivel','elegivel'===fc[key],'Elegível com seguimento')}
+            ${rad(key,key+'R','nao_rec','nao_rec'===fc[key],'Não recomendável')}
+          </div>
+          ${inp(nota,fc[nota],'Notas / esclarecimento...')}
+        </div>`;
+      }).join('')}
+      ${lbl('Sumário Fisioterapia')}${ta('sumFisio',fc.sumFisio,2,'Observações...')}
+      ${lbl('Sumário Testes Específicos')}${ta('sumTestes',fc.sumTestes,2,'Observações...')}
+      ${row2(
+        col(`${lbl('Médico Responsável')}${inp('medicoResp',fc.medicoResp,'Nome do médico')}`),
+        col(`${lbl('Data do Parecer')}${dat('parecerData',fc.parecerData)}`,'auto')
+      )}
+      ${lbl('Parecer Final')}${ta('parecerFinal',fc.parecerFinal,2,'Observações finais...')}
+    `)}
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px">
+      <button class="btn btn-p" onclick="saveClinicalFileForm('${p.id}')">💾 Guardar Ficha</button>
+      <button class="btn btn-g" onclick="exportClinicalFilePDF()">📄 Exportar PDF</button>
+    </div>
+  </div>`;
+}
+
+async function saveClinicalFileForm(athleteId){
+  const g=(id)=>document.getElementById('fcl-'+id)?.value||'';
+  const gc=(id)=>document.getElementById('fcl-'+id)?.checked||false;
+  const gr=(name)=>document.querySelector(`input[name="fcl-${name}"]:checked`)?.value||'';
+  const gcbs=(name)=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(c=>c.value);
+  const data={
+    competicao:g('competicao'), dataAval:g('dataAval'), contactos:g('contactos'),
+    q4sem:gc('q4sem'), q4semMais:gc('q4semMais'),
+    sintomas:gcbs('fcl-sint'),
+    medicacao:gc('medicacao'), medicacaoTUE:gc('medicacaoTUE'), medicacaoDesc:g('medicacaoDesc'),
+    vacTetano:gc('vacTetano'), vacHepA:gc('vacHepA'), vacHepB:gc('vacHepB'),
+    suplementacao:gc('suplementacao'), suplIndicado:gc('suplIndicado'), suplConhecimento:gc('suplConhecimento'),
+    antecedentes:gc('antecedentes'), antecedentesDesc:g('antecedentesDesc'),
+    exameGeral:gr('exameGeral'), exameSistemas:gcbs('fcl-exsist'),
+    auscCardiaca:g('auscCardiaca'), auscPulmonar:g('auscPulmonar'), pulsos:g('pulsos'),
+    altura:g('altura'), peso:g('peso'), ta:g('ta'), fcRepouso:g('fcRepouso'),
+    meSint:gr('meSint'), meSintZonas:gcbs('fcl-mesint'),
+    meTeste:gr('meTeste'), meTestZonas:gcbs('fcl-meteste'),
+    ecg:gr('ecg'), ecgData:g('ecgData'), ecgObs:g('ecgObs'), ecgResult:g('ecgResult'),
+    eco:gr('eco'), ecoData:g('ecoData'), ecoObs:g('ecoObs'), ecoResult:g('ecoResult'),
+    analisesData:g('analisesData'), analisesLab:g('analisesLab'), analisesResult:g('analisesResult'),
+    sumHC:gr('sumHC'), sumHCNota:g('sumHCNota'),
+    sumExObjGeral:gr('sumExObjGeral'), sumExGeralNota:g('sumExGeralNota'),
+    sumME:gr('sumME'), sumMENota:g('sumMENota'),
+    sumECG:gr('sumECG'), sumECGNota:g('sumECGNota'),
+    sumEco:gr('sumEco'), sumEcoNota:g('sumEcoNota'),
+    sumAnalises:gr('sumAnalises'), sumAnalisesNota:g('sumAnalisesNota'),
+    sumFisio:g('sumFisio'), sumTestes:g('sumTestes'),
+    medicoResp:g('medicoResp'), parecerData:g('parecerData'), parecerFinal:g('parecerFinal'),
+  };
+  try{
+    await DB.saveClinicalFile(athleteId, data);
+    toast('✅ Ficha clínica guardada');
+    _renderPlayerClinicalFile(player);
+  }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
 }
 
 // ── AVALIAÇÃO EM MASSA ────────────────────────────────────────────────────────
@@ -7757,6 +7986,171 @@ async function deleteOccurrenceRecord(id){
   await DB.deleteOccurrenceRecord(id);
   renderClinicalMap();
   if(view==='player') renderPlayer();
+}
+
+function exportClinicalFilePDF(){
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('❌ jsPDF não carregado'); return; }
+  const p=player; if(!p){ toast('❌ Sem atleta seleccionado'); return; }
+  const fc=DB.getClinicalFile(p.id)||{};
+  const doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+  const W=210, ML=14, MR=196, CW=W-ML-14;
+  let y=16;
+  const azul=[26,58,110], cinzaClaro=[245,245,245], preto=[30,30,30];
+  const nl=(extra=8)=>{ y+=extra; if(y>272){ doc.addPage(); y=16; } };
+  const hline=(yy=y,c=cinzaClaro)=>{ doc.setDrawColor(...c); doc.line(ML,yy,MR,yy); };
+  const secTitle=(t)=>{
+    if(y>250){ doc.addPage(); y=16; }
+    doc.setFillColor(...azul); doc.roundedRect(ML,y,CW,7,1.5,1.5,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(t,ML+3,y+5); y+=10; doc.setTextColor(...preto);
+  };
+  const field=(label,val,w=CW,x=ML)=>{
+    if(y>270){ doc.addPage(); y=16; }
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100);
+    doc.text(label.toUpperCase(),x,y); y+=3.5;
+    doc.setFont('helvetica','normal'); doc.setTextColor(...preto); doc.setFontSize(9);
+    const lines=doc.splitTextToSize(val||'—',w-2);
+    doc.text(lines,x,y); y+=lines.length*4+3;
+  };
+  const fieldRow=(pairs)=>{
+    const fw=CW/pairs.length;
+    const startY=y;
+    pairs.forEach(([l,v],i)=>{ const x=ML+i*fw; field(l,v,fw-2,x); });
+    // align y to the max
+  };
+  const chkVal=(v)=>v?'✓ Sim':'✗ Não';
+  const fmtd=(d)=>d?new Date(d+'T12:00').toLocaleDateString('pt-PT'):'—';
+  const sumLabel=(v)=>v==='normal'?'Normal':v==='elegivel'?'Elegível com seguimento':v==='nao_rec'?'Não recomendável':'—';
+
+  // ── HEADER ──
+  doc.setFillColor(...azul); doc.rect(0,0,W,22,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('SC Vianense SAD — Ficha Clínica',ML,10);
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('Avaliação Médica Pré-Competição · FPF Unidade de Saúde e Performance',ML,16);
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-PT')}`,MR,16,{align:'right'});
+  y=28;
+
+  // ── IDENTIFICAÇÃO ──
+  doc.setFillColor(...cinzaClaro); doc.roundedRect(ML,y,CW,28,2,2,'F');
+  doc.setTextColor(...preto); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text(p.name,ML+4,y+8);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  const dn=p.birthDate?new Date(p.birthDate+'T12:00').toLocaleDateString('pt-PT'):'—';
+  const idade=p.birthDate?Math.floor((new Date()-new Date(p.birthDate))/(365.25*86400000)):null;
+  doc.text(`Nascimento: ${dn}${idade?`  ·  ${idade} anos`:''}`,ML+4,y+15);
+  doc.text(`Posição: ${p.position||'—'}  ·  Nº ${p.number||'—'}  ·  ${p.squad==='sub23'?'Sub-23':p.squad==='sub19'?'Sub-19':'Equipa A'}`,ML+4,y+21);
+  doc.text(`Clube: SC Vianense SAD  ·  País: Portugal`,ML+4,y+27);
+  y+=34;
+
+  // Season stats
+  const today=new Date().toISOString().slice(0,10);
+  const seasonStart='2026-07-01';
+  const allEvs=DB.events(p.squad).filter(e=>e.type==='game'&&e.date>=seasonStart&&e.date<=today);
+  const jogados=allEvs.filter(e=>(e.lineup||[]).includes(p.id));
+  const totalMins=jogados.reduce((s,e)=>{
+    const sub=e.substitutions?.find?.(x=>x.out===p.id||x.in===p.id);
+    if(sub?.in===p.id) return s+(90-(sub.minute||0));
+    if(sub?.out===p.id) return s+(sub.minute||0);
+    return s+90;
+  },0);
+
+  secTitle('Época 2026/2027 — Dados Desportivos');
+  fieldRow([['Competição',fc.competicao||'—'],['Data da Avaliação',fmtd(fc.dataAval)]]);
+  nl(-2);
+  fieldRow([['Jogos disputados na época',String(jogados.length)],['Minutos jogados',String(totalMins)],['Contactos clínicos',fc.contactos||'—']]);
+  nl(2);
+
+  secTitle('1. História Clínica');
+  fieldRow([['Queixas últimas 4 sem.',chkVal(fc.q4sem)],['Queixas há mais de 4 sem.',chkVal(fc.q4semMais)]]);
+  nl(-2);
+  if(fc.sintomas?.length){ field('Sintomas referidos',fc.sintomas.join(' · ')); }
+  fieldRow([['Medicação',chkVal(fc.medicacao)],['Sujeita TUE',chkVal(fc.medicacaoTUE)],['Medicação actual',fc.medicacaoDesc||'—']]);
+  nl(-2);
+  fieldRow([['Tétano',chkVal(fc.vacTetano)],['Hepatite A',chkVal(fc.vacHepA)],['Hepatite B',chkVal(fc.vacHepB)]]);
+  nl(-2);
+  fieldRow([['Suplementação',chkVal(fc.suplementacao)],['Indicado fisiologista',chkVal(fc.suplIndicado)],['Conhecimento fisiologista',chkVal(fc.suplConhecimento)]]);
+  nl(-2);
+  field('Antecedentes pessoais/familiares',fc.antecedentes?(fc.antecedentesDesc||'Sim — sem descrição'):'Sem antecedentes relevantes');
+
+  secTitle('2. Exame Médico Objectivo — Geral');
+  field('Resultado geral',fc.exameGeral==='sem'?'Sem alterações relevantes':fc.exameGeral==='com'?'Com alterações':'—');
+  if(fc.exameSistemas?.length) field('Sistemas com alterações',fc.exameSistemas.join(' · '));
+  fieldRow([['Ausc. Cardíaca',fc.auscCardiaca||'—'],['Ausc. Pulmonar',fc.auscPulmonar||'—'],['Pulsos',fc.pulsos||'—']]);
+  nl(-2);
+  fieldRow([['Altura',fc.altura?fc.altura+' cm':'—'],['Peso',fc.peso?fc.peso+' kg':'—'],['T.A.',fc.ta||'—'],['FC Repouso',fc.fcRepouso?fc.fcRepouso+' bpm':'—']]);
+  nl(2);
+
+  secTitle('3. Exame Músculo-Esquelético / Ortopédico');
+  field('Sintomatologia actual',fc.meSint==='sim'?`Sim — ${(fc.meSintZonas||[]).join(', ')||'sem zonas especificadas'}`:fc.meSint==='nao'?'Não':'—');
+  field('Testes ME positivos',fc.meTeste==='sim'?`Sim — ${(fc.meTestZonas||[]).join(', ')||'sem zonas especificadas'}`:fc.meTeste==='nao'?'Não':'—');
+
+  secTitle('4. ECG Repouso (5 min)');
+  fieldRow([['Realizado',fc.ecg==='sim'?'Sim':fc.ecg==='nao'?'Não':'—'],['Data',fmtd(fc.ecgData)],['Observado por',fc.ecgObs||'—']]);
+  nl(-2);
+  field('Resultado',fc.ecgResult||'—');
+
+  secTitle('5. Ecocardiograma');
+  fieldRow([['Realizado',fc.eco==='sim'?'Sim':fc.eco==='nao'?'Não':'—'],['Data',fmtd(fc.ecoData)],['Realizado por',fc.ecoObs||'—']]);
+  nl(-2);
+  field('Resultado',fc.ecoResult||'—');
+
+  secTitle('6. Análises Sangue e Urina');
+  fieldRow([['Data de recolha',fmtd(fc.analisesData)],['Laboratório',fc.analisesLab||'—']]);
+  nl(-2);
+  field('Resultado',fc.analisesResult||'—');
+
+  // ── HISTÓRIO LESIONAL DA ÉPOCA ──
+  const seasonCR=DB.getClinicalRecords(p.id).filter(r=>r.date>=seasonStart).sort((a,b)=>b.date.localeCompare(a.date));
+  if(seasonCR.length){
+    secTitle('Histórico Lesional — Presente Época (2026/2027)');
+    seasonCR.forEach(r=>{
+      if(y>265){ doc.addPage(); y=16; }
+      doc.setFillColor(248,250,255); doc.roundedRect(ML,y,CW,1,'F');
+      const typeLabel=CR_TYPES[r.type]||r.type||'—';
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...azul);
+      doc.text(`${typeLabel.replace(/^\S+\s/,'')} — ${fmtd(r.date)}`,ML+2,y+4);
+      doc.setFont('helvetica','normal'); doc.setTextColor(...preto); doc.setFontSize(8.5);
+      let rowH=6;
+      if(r.diagnostico){ doc.text(`Diagnóstico: ${r.diagnostico}`,ML+2,y+9); rowH+=4; }
+      if(r.treatment){ doc.text(`Tratamento: ${r.treatment}`,ML+2,y+rowH+5); rowH+=4; }
+      if(r.estimatedRecoveryDate||r.actualRecoveryDate){
+        doc.text(`Prev.: ${fmtd(r.estimatedRecoveryDate)}  ·  Efectiva: ${fmtd(r.actualRecoveryDate)||'Pendente'}`,ML+2,y+rowH+5); rowH+=4;
+      }
+      doc.setDrawColor(220,220,220); doc.line(ML,y+rowH+7,MR,y+rowH+7);
+      y+=rowH+10;
+    });
+  }
+
+  // ── SUMÁRIO ──
+  if(y>220){ doc.addPage(); y=16; }
+  secTitle('Sumário da Avaliação Médica');
+  [['História Clínica','sumHC','sumHCNota'],['Exame Objectivo Geral','sumExObjGeral','sumExGeralNota'],
+   ['ME / Ortopédico','sumME','sumMENota'],['ECG Repouso','sumECG','sumECGNota'],
+   ['Ecocardiograma','sumEco','sumEcoNota'],['Análises','sumAnalises','sumAnalisesNota']
+  ].forEach(([t,k,kn])=>{
+    fieldRow([[t,sumLabel(fc[k])+(fc[kn]?` — ${fc[kn]}`:'')]]);
+    nl(-4);
+  });
+  if(fc.sumFisio) field('Avaliação Fisioterapia',fc.sumFisio);
+  if(fc.sumTestes) field('Testes Específicos',fc.sumTestes);
+  nl(2);
+  fieldRow([['Médico Responsável',fc.medicoResp||'—'],['Data do Parecer',fmtd(fc.parecerData)]]);
+  nl(-2);
+  if(fc.parecerFinal) field('Parecer Final',fc.parecerFinal);
+
+  // footer
+  const pcount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pcount;i++){
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(160,160,160);
+    doc.text(`SC Vianense SAD · Ficha Clínica · ${p.name} · ${new Date().toLocaleDateString('pt-PT')}`,ML,290);
+    doc.text(`${i}/${pcount}`,MR,290,{align:'right'});
+  }
+
+  doc.save(`Ficha_Clinica_${p.name.replace(/\s+/g,'_')}.pdf`);
+  toast('✅ PDF exportado');
 }
 
 function exportOccurrencesPDF(){
