@@ -8018,10 +8018,11 @@ function exportClinicalFilePDF(){
   const fieldRow=(pairs)=>{
     const fw=CW/pairs.length;
     const startY=y;
-    pairs.forEach(([l,v],i)=>{ const x=ML+i*fw; field(l,v,fw-2,x); });
-    // align y to the max
+    let maxY=y;
+    pairs.forEach(([l,v],i)=>{ y=startY; const x=ML+i*fw; field(l,v,fw-2,x); if(y>maxY) maxY=y; });
+    y=maxY;
   };
-  const chkVal=(v)=>v?'✓ Sim':'✗ Não';
+  const chkVal=(v)=>v?'Sim':'Não';
   const fmtd=(d)=>d?new Date(d+'T12:00').toLocaleDateString('pt-PT'):'—';
   const sumLabel=(v)=>v==='normal'?'Normal':v==='elegivel'?'Elegível com seguimento':v==='nao_rec'?'Não recomendável':'—';
 
