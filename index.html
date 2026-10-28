@@ -5673,6 +5673,45 @@ async function deletePlayerEval(id){
 }
 
 // ── FICHA CLÍNICA FPF ────────────────────────────────────────────────────────
+async function bulkFillClinicalFiles(){
+  const allPlayers=DB.players(null).filter(p=>p.status!=='inactive');
+  let count=0;
+  for(const p of allPlayers){
+    const existing=DB.getClinicalFile(p.id)||{};
+    const defaults={
+      contactos:'Dr. Tiago Puga | CP 73854',
+      q4sem:false, q4semMais:false, sintomas:[],
+      medicacao:false, medicacaoTUE:false, medicacaoDesc:'',
+      vacTetano:true, vacHepA:true, vacHepB:true,
+      suplementacao:false, suplIndicado:false, suplConhecimento:false,
+      antecedentes:false, antecedentesDesc:'',
+      exameGeral:'sem', exameSistemas:[],
+      auscCardiaca:'Normal', auscPulmonar:'Normal', pulsos:'Simétricos',
+      altura:p.height?String(p.height):'', peso:p.weight?String(p.weight):'',
+      ta:'', fcRepouso:'',
+      meSint:'nao', meSintZonas:[], meTeste:'nao', meTestZonas:[],
+      ecg:'sim', ecgData:'', ecgObs:'Dr. Tiago Puga', ecgResult:'Sem alterações',
+      eco:'nao', ecoData:'', ecoObs:'', ecoResult:'',
+      analisesData:'', analisesLab:'', analisesResult:'',
+      sumHC:'normal', sumHCNota:'',
+      sumExObjGeral:'normal', sumExGeralNota:'',
+      sumME:'normal', sumMENota:'',
+      sumECG:'normal', sumECGNota:'',
+      sumEco:'normal', sumEcoNota:'',
+      sumAnalises:'normal', sumAnalisesNota:'',
+      sumFisio:'', sumTestes:'',
+      medicoResp:'Tiago Puga', parecerData:'',
+      parecerFinal:'Sem alterações. Apto para escalão superior.',
+    };
+    // Merge: existing values take priority over defaults (don't overwrite manually entered data)
+    const merged={...defaults, ...Object.fromEntries(Object.entries(existing).filter(([,v])=>v!==''&&v!==null&&v!==undefined&&!(Array.isArray(v)&&v.length===0)))};
+    await DB.saveClinicalFile(p.id, merged);
+    count++;
+  }
+  toast(`✅ Ficha clínica preenchida para ${count} atletas`);
+  if(view==='player') _renderPlayerClinicalFile(player);
+}
+
 function _renderPlayerClinicalFile(p){
   const el=document.getElementById('player-ficha-tab'); if(!el) return;
   const fc=DB.getClinicalFile(p.id)||{};
@@ -7676,6 +7715,8 @@ function renderClinicalMap(){
         <div style="margin-left:auto;display:flex;gap:8px">
           ${canEdit?`<button onclick="openOccurrenceModal()" class="btn btn-p" style="font-size:12px;padding:6px 14px">+ Nova Ocorrência</button>`:''}
           <button onclick="exportOccurrencesPDF()" class="btn btn-g" style="font-size:12px;padding:6px 14px">📥 Exportar PDF FPF</button>
+          ${isAdmin()?`<button onclick="bulkFillClinicalFiles()" class="btn btn-g" style="font-size:12px;padding:6px 14px;background:#e8f0fe;color:#1a56db">📋 Preencher Fichas Clínicas</button>`:''}
+
         </div>
       </div>
       <div style="overflow-x:auto">
