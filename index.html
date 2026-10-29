@@ -5723,7 +5723,7 @@ function _renderPlayerClinicalFile(p){
         <button class="btn btn-g btn-sm" onclick="exportClinicalFilePDF()">📄 Exportar PDF</button>
       </div>
     </div>
-    ${fc.updatedAt?`<div style="font-size:11px;color:var(--muted)">Última actualização: ${new Date(fc.updatedAt).toLocaleDateString('pt-PT')}</div>`:''}
+    <div id="fcl-updated-ts" style="font-size:11px;color:var(--muted)">${fc.updatedAt?`Última actualização: ${new Date(fc.updatedAt).toLocaleDateString('pt-PT')}`:''}</div>
 
     ${sec('0. Identificação & Contactos',`
       ${row2(
@@ -5890,7 +5890,9 @@ async function saveClinicalFileForm(athleteId){
   try{
     await DB.saveClinicalFile(athleteId, data);
     toast('✅ Ficha clínica guardada');
-    _renderPlayerClinicalFile(player);
+    // Actualizar só o timestamp sem re-renderizar o formulário (evita perda visual de checkboxes)
+    const tsEl=document.getElementById('fcl-updated-ts');
+    if(tsEl) tsEl.textContent=`Última actualização: ${new Date().toLocaleDateString('pt-PT')}`;
   }catch(e){ toast('❌ '+(e.message||'Erro ao guardar')); }
 }
 
@@ -18409,7 +18411,7 @@ function initCoordApp(){
     // ── Syncs estáticos e operações admin em background (não bloqueiam o arranque) ──
     // Só pedir coleções que o utilizador tem permissão de ler (evitar erros Firestore).
     const bgSyncs=[DB.syncStaffProfilesFromFirestore(), DB.syncAthleteDocsFromFirestore()];
-    if(canSeeClinical()) bgSyncs.push(DB.syncClinicalFromFirestore());
+    if(canSeeClinical()){ bgSyncs.push(DB.syncClinicalFromFirestore()); bgSyncs.push(DB.syncClinicalFilesFromFirestore()); }
     if(isAdmin()||isStaff()||currentUser()?.role==='coach') bgSyncs.push(DB.syncTrialFromFirestore());
     if(isAdmin()||currentUser()?.role==='coach'||isTeamManager()) bgSyncs.push(DB.syncScoutedFromFirestore());
     Promise.race([Promise.all(bgSyncs),new Promise(r=>setTimeout(r,8000))]).catch(()=>{});
