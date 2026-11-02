@@ -2014,6 +2014,10 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <label>Competição</label>
         <select id="e-comp"></select>
       </div>
+      <div class="fg" id="jornada-grp" style="display:none">
+        <label>Jornada <span style="font-size:10px;font-weight:400;color:var(--muted)">(opcional)</span></label>
+        <input type="number" id="e-jornada" min="1" max="40" placeholder="Ex: 5">
+      </div>
       <div class="fg" id="city-grp" style="display:none">
         <label>Localidade</label><input type="text" id="e-city" placeholder="Ex: Viana do Castelo">
       </div>
@@ -3327,8 +3331,9 @@ function evLabel(ev){
   if(ev.type==='game'){
     const icon=ev.homeAway==='away'?'✈️':'🏠';
     const opp=ev.opponent?` vs ${ev.opponent}`:'';
+    const jorn=ev.jornada?` · J${ev.jornada}`:'';
     const comp=ev.competition?` · ${ev.competition}`:'';
-    return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${comp}`;
+    return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${jorn}${comp}`;
   }
   if(ev.type==='gym') return ev.squad==='both'?'🏋️ Ginásio':`🏋️ Ginásio ${SQUADS[ev.squad]}`;
   return ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`;
@@ -4492,7 +4497,7 @@ function renderDash(){
           <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${ha} ${opponent}</div>
           ${badge}
         </div>
-        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${[ev.competition,ev.time].filter(Boolean).join(' · ')}</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${[ev.jornada?'J'+ev.jornada:null,ev.competition,ev.time].filter(Boolean).join(' · ')}</div>
       </div>
     </div>`;
   }
@@ -8750,6 +8755,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   const _defaultLoc=_effectiveType==='training'?(_sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2'):(_isHomeGame?'Estádio Dr. José de Matos':'');
   document.getElementById('e-loc').value=ev?.location||_defaultLoc;
   updateCompetitionOptions(ev?.squad||squad||'sub19', ev?.competition||'');
+  document.getElementById('e-jornada').value=ev?.jornada||'';
   document.getElementById('e-repeat').checked=false;
   document.getElementById('e-repeat-until').value='';
   document.getElementById('e-repeat-until-grp').style.display='none';
@@ -8822,6 +8828,7 @@ function toggleOpp(){
   document.getElementById('opp-grp').style.display=isGame?'block':'none';
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
+  document.getElementById('jornada-grp').style.display=isGame?'block':'none';
   document.getElementById('city-grp').style.display=isGame?'block':'none';
   document.getElementById('address-grp').style.display=away?'block':'none';
   document.getElementById('transport-grp').style.display=isGame?'block':'none';
@@ -8863,7 +8870,7 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):'', distanceKmReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-km-ret')?.value)||0):0, travelMinsReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):0};
+  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):'', distanceKmReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-km-ret')?.value)||0):0, travelMinsReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):0, jornada:f('e-type')==='game'?(parseInt(document.getElementById('e-jornada')?.value)||null):null};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -8911,6 +8918,7 @@ const SPC_INFRACTIONS=[
   {key:'absent_game',     label:'Falta a jogo sem aviso prévio',                     pts:12, unit:null,   ctx:['game']},
   {key:'no_return_bus',   label:'Ir na carrinha/autocarro do clube e não voltar',     pts:5,  unit:null,   ctx:['training','game','both']},
   {key:'no_bus_away',     label:'Jogo fora com autocarro — não ir com a equipa',      pts:10, unit:null,   ctx:['game']},
+  {key:'no_info_collab',  label:'Não colaboração com pedido de informação da estrutura', pts:8, unit:null, ctx:['both']},
 ];
 const SPC_THRESHOLDS=[
   {pts:20, label:'Suspensão 1 semana (treinos + jogo)', color:'#b71c1c', bg:'#ffebee'},
@@ -10895,7 +10903,7 @@ function renderSqGames(){
     const convCount=conv?Object.values(conv.players||{}).filter(v=>!!v).length:0;
     const hasConv=conv&&convCount>0;
     const haLabel=ev.homeAway==='away'?'✈️':'🏠';
-    const compMeta=ev.competition?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#e8eef7;color:var(--green-d);font-weight:600;flex-shrink:0">${ev.competition}</span>`:'';
+    const compMeta=(ev.competition||ev.jornada)?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#e8eef7;color:var(--green-d);font-weight:600;flex-shrink:0">${[ev.jornada?'J'+ev.jornada:null,ev.competition].filter(Boolean).join(' · ')}</span>`:'';
     const mr=ev.matchReport||{};
     const evList=mr.events||[];
     const gameWasPlayed=evList.length>0||(mr.matchClock?.phase==='finished');
@@ -13832,6 +13840,7 @@ function generateWeeklyPlan(){
     if(ev.type==='game'){
       const h=ev.homeAway!=='away';
       let v=h?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`;
+      if(ev.jornada) v=`J${ev.jornada} | `+v;
       if(ev.competition) v+=`\n${ev.competition}`;
       return v;
     }
@@ -16551,7 +16560,8 @@ function openConductModal(preselectedPlayerId){
   const today=new Date().toISOString().slice(0,10);
 
   // infraction options HTML — flat list
-  const infraOpts=SPC_INFRACTIONS.map(i=>`<option value="${i.key}" data-pts="${i.pts}" data-unit="${i.unit||''}">${i.label} (${i.pts} pts)</option>`).join('');
+  const infraOpts=SPC_INFRACTIONS.map(i=>`<option value="${i.key}" data-pts="${i.pts}" data-unit="${i.unit||''}">${i.label} (${i.pts} pts)</option>`).join('')
+    + `<option value="custom" data-pts="0" data-unit="">Personalizada (não listada)…</option>`;
 
   const mo=document.createElement('div');
   mo.className='mo open'; mo.id='mo-conduct';
@@ -16576,6 +16586,16 @@ function openConductModal(preselectedPlayerId){
           ${infraOpts}
         </select>
       </div>
+      <div id="cond-custom-wrap" style="display:none;display:flex;flex-direction:column;gap:8px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Descrição da infração</label>
+          <input type="text" id="cond-custom-label" placeholder="Ex: Comportamento desadequado…" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Pontos</label>
+          <input type="number" id="cond-custom-pts" min="1" max="100" value="1" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box" oninput="_conductUpdatePts()">
+        </div>
+      </div>
       <div id="cond-mult-wrap" style="display:none">
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px" id="cond-mult-label">Quantidade</label>
         <input type="number" id="cond-mult" min="1" max="30" value="1" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box" oninput="_conductUpdatePts()">
@@ -16596,13 +16616,23 @@ function openConductModal(preselectedPlayerId){
 
 function _conductUpdatePts(){
   const sel=document.getElementById('cond-type');
+  const type=sel.value;
   const opt=sel.options[sel.selectedIndex];
-  const pts=parseInt(opt?.dataset?.pts||'0');
-  const unit=opt?.dataset?.unit||'';
+  const customWrap=document.getElementById('cond-custom-wrap');
   const multWrap=document.getElementById('cond-mult-wrap');
   const preview=document.getElementById('cond-pts-preview');
   const multLbl=document.getElementById('cond-mult-label');
-  if(!pts){ multWrap.style.display='none'; preview.style.display='none'; return; }
+  // Show/hide custom fields
+  if(customWrap) customWrap.style.display=(type==='custom')?'flex':'none';
+  let pts, unit;
+  if(type==='custom'){
+    pts=parseInt(document.getElementById('cond-custom-pts')?.value||'1')||1;
+    unit='';
+  } else {
+    pts=parseInt(opt?.dataset?.pts||'0');
+    unit=opt?.dataset?.unit||'';
+  }
+  if(!pts&&type!=='custom'){ multWrap.style.display='none'; preview.style.display='none'; return; }
   if(unit==='5min'){ multWrap.style.display=''; multLbl.textContent='Blocos de 5 min (arredondado para cima)'; }
   else if(unit==='2min'){ multWrap.style.display=''; multLbl.textContent='Blocos de 2 min (arredondado para cima)'; }
   else if(unit==='per'){ multWrap.style.display=''; multLbl.textContent='Quantidade (artigos / ocorrências)'; }
@@ -16622,15 +16652,23 @@ async function saveConductRecord(){
   if(!pid){ toast('❌ Seleciona o atleta'); return; }
   if(!date){ toast('❌ Seleciona a data'); return; }
   if(!type){ toast('❌ Seleciona a infração'); return; }
-  const inf=SPC_INFRACTIONS.find(i=>i.key===type);
-  if(!inf) return;
+  let infLabel, infPts;
+  if(type==='custom'){
+    infLabel=(document.getElementById('cond-custom-label')?.value.trim()||'').replace(/</g,'&lt;');
+    infPts=parseInt(document.getElementById('cond-custom-pts')?.value||'1')||1;
+    if(!infLabel){ toast('❌ Descreve a infração personalizada'); return; }
+  } else {
+    const inf=SPC_INFRACTIONS.find(i=>i.key===type);
+    if(!inf) return;
+    infLabel=inf.label; infPts=inf.pts;
+  }
   const mult=parseInt(document.getElementById('cond-mult')?.value||'1')||1;
-  const totalPts=inf.pts*mult;
+  const totalPts=infPts*mult;
   const p=DB.getPlayer(pid);
   const rec={
     athleteId:pid, athleteName:p?dn(p):'', squad:p?.squad||'',
-    date, month:date.slice(0,7), type, label:inf.label,
-    pts:inf.pts, multiplier:mult, totalPts,
+    date, month:date.slice(0,7), type, label:infLabel,
+    pts:infPts, multiplier:mult, totalPts,
     notes, registeredBy:currentUser()?.user||''
   };
   try{
