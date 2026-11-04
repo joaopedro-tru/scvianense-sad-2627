@@ -17590,8 +17590,16 @@ async function renderMonDashboard(sq, since){
         <span>😴 ${as}</span><span>🧠 ${ast}</span><span>💪 ${am}</span>
       </div>`;
     }
-    return {name,jn:p.jn,avg,pt,sparkVals,respRate,wellDim,entries:p.entries.length};
-  }).sort((a,b)=>(b.avg||0)-(a.avg||0));
+    const pObj=sqPlayers.find(pl=>(pl.number||pl.jerseyNumber)==p.jn)||allActive.find(pl=>(pl.number||pl.jerseyNumber)==p.jn);
+    const pos=pObj?.position||'';
+    const num=parseInt(p.jn)||999;
+    return {name,jn:p.jn,avg,pt,sparkVals,respRate,wellDim,entries:p.entries.length,pos,num};
+  }).sort((a,b)=>{
+    const ai=POS_ORDER.indexOf(a.pos); const bi=POS_ORDER.indexOf(b.pos);
+    const pa=ai===-1?999:ai; const pb=bi===-1?999:bi;
+    if(pa!==pb) return pa-pb;
+    return a.num-b.num;
+  });
 
   // ── Render ────────────────────────────────────────────────────────────────
   const kpiCard=(val,label,sub,col)=>`
