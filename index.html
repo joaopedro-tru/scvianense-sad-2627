@@ -9855,9 +9855,18 @@ function liveEvLabel(e){
   if(e.type==='note') return `📝 ${e.text||'Nota'}`;
   if(e.type==='shot_off') return `💨 <strong>Remate Fora</strong> — ${pn(e.playerId)}`;
   if(e.type==='shot_on') return `🎯 <strong>Remate à Baliza</strong> — ${pn(e.playerId)}`;
-  if(e.type==='foul_committed') return `⚡ <strong>Falta</strong> — ${pn(e.playerId)}`;
+  if(e.type==='foul_committed') return `⚡ <strong>Falta Cometida</strong> — ${pn(e.playerId)}`;
+  if(e.type==='foul_suffered') return `⚡ <strong>Falta Sofrida</strong>${e.playerId?' — '+pn(e.playerId):''}`;
   if(e.type==='ball_lost') return `❌ <strong>Perda de Bola</strong> — ${pn(e.playerId)}`;
   if(e.type==='ball_won') return `✊ <strong>Recuperação</strong> — ${pn(e.playerId)}`;
+  if(e.type==='corner_for') return `🚩 <strong>Canto a Favor</strong>`;
+  if(e.type==='corner_against') return `🚩 <strong>Canto Contra</strong>`;
+  if(e.type==='chance_for') return `✅ <strong>Oportunidade Clara</strong>`;
+  if(e.type==='chance_against') return `⚠️ <strong>Oportunidade Clara Adversário</strong>`;
+  if(e.type==='opp_shot_on') return `🎯 <strong>Remate à Baliza (Adv.)</strong>`;
+  if(e.type==='opp_shot_off') return `💨 <strong>Remate Fora (Adv.)</strong>`;
+  if(e.type==='offside_against') return `⛳ <strong>Fora de Jogo Nosso</strong>`;
+  if(e.type==='offside_for') return `⛳ <strong>Fora de Jogo Adversário</strong>`;
   return `• ${e.type}`;
 }
 
@@ -10050,20 +10059,26 @@ function renderLiveRecording(ev){
     </div>`;
 
   // Clock button
-  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>{
+  function _advanceLiveClock(nextOverride){
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{}));
     const c=curMr.matchClock||{phase:'pre'};
     const now=new Date().toISOString();
     if(!c.phase||c.phase==='pre') curMr.matchClock={...c,phase:'1h',half1Start:now};
     else if(c.phase==='1h')       curMr.matchClock={...c,phase:'ht',half1End:now};
     else if(c.phase==='ht')       curMr.matchClock={...c,phase:'2h',half2Start:now};
+    else if(c.phase==='2h'&&nextOverride==='et1') curMr.matchClock={...c,phase:'et1',et1Start:now};
     else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
+    else if(c.phase==='et1')      curMr.matchClock={...c,phase:'eht',et1End:now};
+    else if(c.phase==='eht')      curMr.matchClock={...c,phase:'et2',et2Start:now};
+    else if(c.phase==='et2')      curMr.matchClock={...c,phase:'finished',et2End:now};
     DB.updateEvent(liveGameId,{matchReport:curMr});
     renderLiveRecording(DB.getEvent(liveGameId));
-  });
+  }
+  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>_advanceLiveClock());
+  document.getElementById('gm-clock-btn-et')?.addEventListener('click',()=>_advanceLiveClock('et1'));
 
   // Live clock tick
-  if(clock.phase==='1h'||clock.phase==='2h'){
+  if(clock.phase==='1h'||clock.phase==='2h'||clock.phase==='et1'||clock.phase==='et2'){
     clockInterval=setInterval(()=>{
       const c=DB.getEvent(liveGameId)?.matchReport?.matchClock;
       const minEl=document.getElementById('gm-clock-min');
@@ -10140,19 +10155,19 @@ function renderLiveGeralTab(ev){
       <div class="lv-btn" data-lv-type="ball_won"><span class="lv-icon">&#9994;</span>Recupera&#231;&#227;o</div>
       <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">&#10060;</span>Perda de Bola</div>
       <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">&#9889;</span>Falta Cometida</div>
-      ${ctr('chance_for','Oport. Clara a Favor','&#10003;')}
-      ${ctr('corners_for','Cantos a Favor','🚩')}
-      ${ctr('offsides_against','Foras de Jogo','⛳')}
+      <div class="lv-btn" data-lv-type="corner_for"><span class="lv-icon">🚩</span>Canto a Favor</div>
+      <div class="lv-btn" data-lv-type="chance_for"><span class="lv-icon">&#10003;</span>Oport. Clara</div>
+      <div class="lv-btn" data-lv-type="offside_against"><span class="lv-icon">⛳</span>Fora de Jogo</div>
     </div>
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Advers&#225;rio</div>
     <div class="lv-btns">
       <div class="lv-btn danger" data-lv-type="goal_conceded"><span class="lv-icon">&#127941;</span>Golo Sofrido</div>
-      ${ctr('opp_shot_on','Remates &#224; Baliza','&#127919;')}
-      ${ctr('opp_shot_off','Remates Fora','&#128168;')}
-      ${ctr('foul_suffered','Faltas Sofridas','&#9889;')}
-      ${ctr('chance_against','Oport. Clara Contra','&#9888;&#65039;')}
-      ${ctr('corners_against','Cantos Contra','🚩')}
-      ${ctr('offsides_for','Foras de Jogo','⛳')}
+      <div class="lv-btn" data-lv-type="foul_suffered"><span class="lv-icon">&#9889;</span>Falta Sofrida</div>
+      <div class="lv-btn" data-lv-type="corner_against"><span class="lv-icon">🚩</span>Canto Contra</div>
+      <div class="lv-btn" data-lv-type="opp_shot_on"><span class="lv-icon">&#127919;</span>Remate &#224; Baliza</div>
+      <div class="lv-btn" data-lv-type="opp_shot_off"><span class="lv-icon">&#128168;</span>Remate Fora</div>
+      <div class="lv-btn" data-lv-type="chance_against"><span class="lv-icon">&#9888;&#65039;</span>Oport. Clara</div>
+      <div class="lv-btn" data-lv-type="offside_for"><span class="lv-icon">⛳</span>Fora de Jogo</div>
     </div>
     <div class="lv-tl">
       <div class="lv-tl-head">
@@ -10519,14 +10534,33 @@ function getOffFieldPlayers(){
 }
 
 function openLivePicker(type){
-  const autoMin=getMatchMinute(DB.getEvent(liveGameId)?.matchReport?.matchClock)||0;
-  // Golo sofrido não precisa de mais dados — guarda diretamente
-  if(type==='goal_conceded'){
-    livePending={type,step:'done',data:{_minute:autoMin}};
+  const liveClock=DB.getEvent(liveGameId)?.matchReport?.matchClock;
+  const autoMin=getMatchMinute(liveClock)||0;
+  const livePhase=liveClock?.phase||'';
+  const autoPeriod=livePhase==='et1'?'et1':livePhase==='et2'?'et2':null;
+  const baseData={_minute:autoMin,...(autoPeriod?{_period:autoPeriod}:{})};
+  // Eventos simples sem player — guarda diretamente com minuto
+  if(['goal_conceded','corner_for','corner_against','chance_for','chance_against','opp_shot_on','opp_shot_off','offside_against','offside_for'].includes(type)){
+    livePending={type,step:'done',data:baseData};
     saveLiveEvent();
     return;
   }
-  livePending={type,step:type==='finish'?'motm':'init',data:{_minute:autoMin}};
+  // Falta sofrida — player opcional
+  if(type==='foul_suffered'){
+    livePending={type,step:'player',data:baseData};
+    const mo=document.getElementById('mo-live');
+    document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
+    const bodyEl=document.getElementById('mo-live-body');
+    document.getElementById('mo-live-title').textContent='⚡ Falta Sofrida — quem?';
+    const list=getCurrentPlayers();
+    const rows=list.map(p=>`<div class="pp-player" data-pp-pid="${p.id}"><span class="pp-num">${p.number||'—'}</span><span class="pp-name">${dn(p)}</span><span class="pp-pos">${POS[p.position]||''}</span></div>`).join('');
+    bodyEl.innerHTML=`<div class="pp-list">${rows}</div><button class="pp-skip" id="pp-skip">— Sem jogador específico</button>`;
+    bodyEl.querySelectorAll('[data-pp-pid]').forEach(el=>el.addEventListener('click',()=>{ livePending.data.playerId=el.dataset.ppPid; saveLiveEvent(); }));
+    document.getElementById('pp-skip').addEventListener('click',()=>saveLiveEvent());
+    mo.classList.add('open');
+    return;
+  }
+  livePending={type,step:type==='finish'?'motm':'init',data:baseData};
   const mo=document.getElementById('mo-live');
   document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
 
@@ -10716,7 +10750,7 @@ function saveLiveEvent(){
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
-  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','ball_lost':'❌','ball_won':'✊'};
+  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','foul_suffered':'⚡','ball_lost':'❌','ball_won':'✊','corner_for':'🚩','corner_against':'🚩','chance_for':'✅','chance_against':'⚠️','opp_shot_on':'🎯','opp_shot_off':'💨','offside_against':'⛳','offside_for':'⛳'};
   toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
   // Lesão com jogador identificado → oferecer registo clínico
@@ -11152,6 +11186,12 @@ function getMatchMinute(clock){
     return Math.max(45,Math.floor((new Date(clock.half1End)-new Date(clock.half1Start))/60000)+1);
   if(clock.phase==='2h'&&clock.half2Start)
     return 45+Math.floor((now-new Date(clock.half2Start).getTime())/60000)+1;
+  if(clock.phase==='et1'&&clock.et1Start)
+    return 90+Math.floor((now-new Date(clock.et1Start).getTime())/60000)+1;
+  if(clock.phase==='eht'&&clock.et1End)
+    return Math.max(105,90+Math.floor((new Date(clock.et1End)-new Date(clock.et1Start)).getTime()/60000)+1);
+  if(clock.phase==='et2'&&clock.et2Start)
+    return 105+Math.floor((now-new Date(clock.et2Start).getTime())/60000)+1;
   if(clock.phase==='finished'&&clock.half2Start&&clock.half2End)
     return Math.max(90,45+Math.floor((new Date(clock.half2End)-new Date(clock.half2Start))/60000)+1);
   return null;
@@ -11165,21 +11205,39 @@ function clockPhaseLabel(clock){
   if(clock.phase==='1h') return '1ª Parte';
   if(clock.phase==='ht') return 'Intervalo';
   if(clock.phase==='2h') return '2ª Parte';
+  if(clock.phase==='et1') return '1º Prolongamento';
+  if(clock.phase==='eht') return 'Intervalo — Prol.';
+  if(clock.phase==='et2') return '2º Prolongamento';
   if(clock.phase==='finished') return 'Terminado';
   return '';
 }
 function renderClockBar(clock){
   const phase=clock?.phase||'pre';
   const min=getMatchMinute(clock);
-  const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='finished'?'FIM':(min?min+"'":'—');
+  const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='eht'?'HT Prol.':phase==='finished'?'FIM':(min?min+"'":'—');
   const phaseLabel=clockPhaseLabel(clock);
-  const isRunning=(phase==='1h'||phase==='2h');
+  const isRunning=(phase==='1h'||phase==='2h'||phase==='et1'||phase==='et2');
   const clockColor=isRunning?'#2e7d32':(phase==='finished'?'var(--muted)':'var(--muted)');
+  // For 2h phase: show two buttons — end game or go to ET
+  if(phase==='2h'){
+    return `<div style="padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:32px;font-weight:900;color:#2e7d32;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1" id="gm-clock-min">${minDisplay}</div>
+          <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">${phaseLabel}</div>
+        </div>
+        <button id="gm-clock-btn" data-next="finished" style="padding:10px 16px;border:none;border-radius:9px;background:#c0392b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">⏸ Fim da 2ª Parte</button>
+      </div>
+      <button id="gm-clock-btn-et" data-next="et1" style="width:100%;padding:9px 16px;border:1.5px dashed #7c3aed;border-radius:9px;background:transparent;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏱ Ir para Prolongamento (Taça)</button>
+    </div>`;
+  }
   const btnMap={
     pre:{label:'▶ Iniciar 1ª Parte',bg:'#2e7d32',color:'#fff'},
     '1h':{label:'⏸ Fim da 1ª Parte',bg:'#c0392b',color:'#fff'},
     ht:{label:'▶ Iniciar 2ª Parte',bg:'#1565c0',color:'#fff'},
-    '2h':{label:'⏸ Fim da 2ª Parte',bg:'#c0392b',color:'#fff'},
+    et1:{label:'⏸ Fim do 1º Prol.',bg:'#c0392b',color:'#fff'},
+    eht:{label:'▶ Iniciar 2º Prol.',bg:'#7c3aed',color:'#fff'},
+    et2:{label:'⏸ Fim do 2º Prol.',bg:'#c0392b',color:'#fff'},
     finished:{label:null}
   };
   const btn=btnMap[phase]||btnMap.pre;
@@ -11223,20 +11281,27 @@ function renderGame(){
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{ gameTab=btn.dataset.tab; renderGame(); }));
 
   // Clock button handler
-  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>{
+  function _advanceClock(nextOverride){
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{}));
     const c=curMr.matchClock||{phase:'pre'};
     const now=new Date().toISOString();
+    const next=nextOverride||c.phase;
     if(!c.phase||c.phase==='pre') curMr.matchClock={...c,phase:'1h',half1Start:now};
     else if(c.phase==='1h')       curMr.matchClock={...c,phase:'ht',half1End:now};
     else if(c.phase==='ht')       curMr.matchClock={...c,phase:'2h',half2Start:now};
+    else if(c.phase==='2h'&&next==='et1') curMr.matchClock={...c,phase:'et1',et1Start:now};
     else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
+    else if(c.phase==='et1')      curMr.matchClock={...c,phase:'eht',et1End:now};
+    else if(c.phase==='eht')      curMr.matchClock={...c,phase:'et2',et2Start:now};
+    else if(c.phase==='et2')      curMr.matchClock={...c,phase:'finished',et2End:now};
     DB.updateEvent(gameEventId,{matchReport:curMr});
     renderGame();
-  });
+  }
+  document.getElementById('gm-clock-btn')?.addEventListener('click',()=>_advanceClock());
+  document.getElementById('gm-clock-btn-et')?.addEventListener('click',()=>_advanceClock('et1'));
 
   // Live clock tick (every 5s)
-  if(clock.phase==='1h'||clock.phase==='2h'){
+  if(clock.phase==='1h'||clock.phase==='2h'||clock.phase==='et1'||clock.phase==='et2'){
     clockInterval=setInterval(()=>{
       const c=DB.getEvent(gameEventId)?.matchReport?.matchClock;
       const minEl=document.getElementById('gm-clock-min');
@@ -11978,10 +12043,10 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
 
   function periodOf(e){
     if(e.period==='pen') return 'Grandes Penalidades';
-    if(e.period==='et2'||(e.minute>=106&&e.minute<=120)) return 'Prolongamento 2';
-    if(e.period==='et1'||(e.minute>=91&&e.minute<=105)) return 'Prolongamento 1';
+    if(e.period==='et2') return 'Prolongamento 2';
+    if(e.period==='et1') return 'Prolongamento 1';
     if(e.period==='p3') return '3ª Parte';
-    if(e.period==='p2'||e.minute>45) return '2ª Parte';
+    if(e.period==='p2'||(!e.period&&e.minute>45)) return '2ª Parte';
     return '1ª Parte';
   }
 
@@ -12569,9 +12634,9 @@ function exportGamePDF(){
   const sumEvs=evList.filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
   function periodOf(e){
     if(e.period==='pen') return 'Grandes Penalidades';
-    if(e.period==='et2'||(e.minute>=106)) return 'Prolongamento 2';
-    if(e.period==='et1'||(e.minute>=91&&e.minute<=105)) return 'Prolongamento 1';
-    if(e.period==='p2'||e.minute>45) return '2ª Parte';
+    if(e.period==='et2') return 'Prolongamento 2';
+    if(e.period==='et1') return 'Prolongamento 1';
+    if(e.period==='p2'||(!e.period&&e.minute>45)) return '2ª Parte';
     return '1ª Parte';
   }
   const PERIOD_ORDER=['1ª Parte','2ª Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
