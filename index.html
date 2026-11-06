@@ -7266,13 +7266,13 @@ async function _renderGameListPDF(selSquads, from, to){
   doc.text(`${evs.length} jogo${evs.length!==1?'s':''}  ·  Gerado em ${new Date().toLocaleDateString('pt-PT')}`,ML+W-2,MT+13,{align:'right'});
 
   // ── Colunas ──
-  const C_DATE=48, C_SQ=multiSq?25:0, C_HA=22, C_OPP=multiSq?60:72, C_TRANSP=42, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
+  const C_DATE=38, C_SQ=multiSq?20:0, C_HA=18, C_OPP=multiSq?58:76, C_TRANSP=52, C_LOC=W-C_DATE-C_SQ-C_HA-C_OPP-C_TRANSP;
   const xDate=ML, xSq=xDate+C_DATE, xHa=xSq+C_SQ, xOpp=xHa+C_HA, xTransp=xOpp+C_OPP, xLoc=xTransp+C_TRANSP;
 
   // ── Linhas ──
   const WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const ROW_H=16;
+  const ROW_H=26;
 
   // Função para desenhar cabeçalho de tabela (usado em cada página)
   function drawTableHeader(y){
@@ -7310,36 +7310,37 @@ async function _renderGameListPDF(selSquads, from, to){
 
     // Data + hora
     doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
-    doc.text(WD[d.getDay()],xDate+2,ry+4);
+    doc.text(WD[d.getDay()],xDate+2,ry+7);
     doc.setTextColor(14,36,68); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${d.getFullYear()}`,xDate+2,ry+8.5);
+    doc.text(`${String(d.getDate()).padStart(2,'0')} ${MN[d.getMonth()]} ${d.getFullYear()}`,xDate+2,ry+12);
     if(ev.time){
       doc.setTextColor(60,60,60); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
-      doc.text(ev.time,xDate+C_DATE-3,ry+5,{align:'right'});
+      doc.text(ev.time,xDate+2,ry+17.5);
     }
 
     // Escalão
     if(multiSq){
       const sqLbl={eqa:'Eq. A',sub23:'Sub-23',sub19:'Sub-19'}[ev.squad]||ev.squad||'';
       const sqC={eqa:[80,80,80],sub23:[26,61,110],sub19:[120,90,0]}[ev.squad]||[80,80,80];
-      doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+4,C_SQ-3,5,1,1,'F');
+      doc.setFillColor(...sqC); doc.roundedRect(xSq+1,ry+9,C_SQ-3,5,1,1,'F');
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
-      doc.text(sqLbl,xSq+1+(C_SQ-3)/2,ry+7.5,{align:'center'});
+      doc.text(sqLbl,xSq+1+(C_SQ-3)/2,ry+12.5,{align:'center'});
     }
 
     // Casa/Fora
     const haC=isAway?[183,28,28]:[22,101,52];
-    doc.setFillColor(...haC); doc.roundedRect(xHa+1,ry+4,C_HA-3,5,1,1,'F');
+    doc.setFillColor(...haC); doc.roundedRect(xHa+1,ry+9,C_HA-3,5,1,1,'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
-    doc.text(isAway?'FORA':'CASA',xHa+1+(C_HA-3)/2,ry+7.5,{align:'center'});
+    doc.text(isAway?'FORA':'CASA',xHa+1+(C_HA-3)/2,ry+12.5,{align:'center'});
 
     // Adversário + competição
     doc.setTextColor(17,17,17); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-    const oppLine=doc.splitTextToSize(ev.opponent||'—',C_OPP-3)[0]||'';
-    doc.text(oppLine,xOpp+2,ry+7);
+    const oppLines=doc.splitTextToSize(ev.opponent||'—',C_OPP-3);
+    doc.text(oppLines[0]||'',xOpp+2,ry+8);
+    if(oppLines[1]){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(oppLines[1],xOpp+2,ry+13); }
     if(ev.competition){
       doc.setTextColor(130,130,130); doc.setFont('helvetica','normal'); doc.setFontSize(5.5);
-      doc.text(ev.competition,xOpp+2,ry+11);
+      doc.text(ev.competition,xOpp+2,ry+17);
     }
 
     // Transporte + horários
@@ -7375,8 +7376,9 @@ async function _renderGameListPDF(selSquads, from, to){
     const loc=[ev.location,ev.city].filter(Boolean).join(', ')||'—';
     doc.setTextColor(60,60,60); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
     const locLines=doc.splitTextToSize(loc,C_LOC-3);
-    doc.text(locLines[0]||'',xLoc+2,ry+5.5);
-    if(locLines[1]) doc.text(locLines[1],xLoc+2,ry+9.5);
+    doc.text(locLines[0]||'',xLoc+2,ry+6);
+    if(locLines[1]) doc.text(locLines[1],xLoc+2,ry+10.5);
+    if(locLines[2]) doc.text(locLines[2],xLoc+2,ry+15);
 
     ry+=ROW_H;
   });
