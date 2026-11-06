@@ -13961,7 +13961,7 @@ function printWeeklyPlan(){
     const hora=ev?.time||'';
     const local=ev?.location||(ev?wpDefaultLoc:'');
     const obs=ev?.type==='game'
-      ?((ev.homeAway!=='away'?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`)+(ev.competition?'\n'+ev.competition:''))
+      ?((ev.jornada?`J${ev.jornada} | `:'')+  (ev.homeAway!=='away'?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`)+(ev.competition?'\n'+ev.competition:''))
       :(ev?.objectives||'');
     const isFolga=!ev;
     const isGame=ev?.type==='game';
