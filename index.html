@@ -3362,7 +3362,7 @@ function nav(v,opts={}){
   if(clockInterval){clearInterval(clockInterval);clockInterval=null;}
   // Utilizadores restritos só acedem aos seus escalões
   const _sqs=coachSquads();
-  if(_sqs.length>0 && opts.squad && !_sqs.includes(opts.squad) && opts.squad!=='both'){ return; }
+  if(_sqs.length>0 && !isMedical() && opts.squad && !_sqs.includes(opts.squad) && opts.squad!=='both'){ return; }
   // Push current state to nav stack (unless we're going back or staying on same view)
   if(!_navBack && v!==view){
     const curOpts={};
@@ -4966,7 +4966,10 @@ function buildPlayerClinicalCard(athleteId){
 
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
     <h3 style="margin:0">🏥 Histórico Clínico</h3>
-    ${activeInj?`<span style="font-size:11px;font-weight:700;color:#fff;background:#b71c1c;padding:3px 10px;border-radius:20px">🚨 Em Lesão${activeInj.diagnostico?' — '+activeInj.diagnostico:''}</span>`:''}
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${activeInj?`<span style="font-size:11px;font-weight:700;color:#fff;background:#b71c1c;padding:3px 10px;border-radius:20px">🚨 Em Lesão${activeInj.diagnostico?' — '+activeInj.diagnostico:''}</span>`:''}
+      ${canEdit?`<button class="btn btn-p btn-sm" onclick="openOccurrenceModal(null,'${athleteId}')">+ Nova Ocorrência</button>`:''}
+    </div>
   </div>`;
 
   if(recs.length===0) return `<div class="card">${header}<p style="color:var(--muted);font-size:13px">Sem registos clínicos.</p></div>`;
@@ -6963,13 +6966,15 @@ function buildUnavailabilityAlert(date, playerIds, squad){
 function buildPlayerUnavailCard(pid){
   if(!canManageUnavail()) return '';
   const canDel=canManageLesao(); // admin + medical can delete; others view-only on deletions
-  const canLesao=canManageLesao(); // only admin + medical can register lesão
   const recs=DB.getUnavailability(pid).sort((a,b)=>a.startDate.localeCompare(b.startDate));
   const rows=recs.length
     ?recs.map(r=>{
-      const isLesao=r.type!=='outro';
-      const badge=isLesao
+      const badge=r.type==='lesao'
         ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#dc2626;padding:1px 7px;border-radius:4px;white-space:nowrap">🤕 Lesão</span>`
+        :r.type==='ferias'
+        ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#0284c7;padding:1px 7px;border-radius:4px;white-space:nowrap">🏖️ Férias</span>`
+        :r.type==='escolar'
+        ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#7c3aed;padding:1px 7px;border-radius:4px;white-space:nowrap">📚 Escolar</span>`
         :`<span style="font-size:10px;font-weight:700;color:#fff;background:#d97706;padding:1px 7px;border-radius:4px;white-space:nowrap">📋 Outro</span>`;
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;font-size:13px">${badge} <strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
@@ -6977,7 +6982,6 @@ function buildPlayerUnavailCard(pid){
       </div>`;
     }).join('')
     :'<p style="color:var(--muted);font-size:13px;font-style:italic">Nenhum período declarado.</p>';
-  const lesaoOpt=canLesao?`<option value="lesao">🤕 Lesão</option>`:'';
   return `<div class="card"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📆 Indisponibilidades</h3>
     ${rows}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
@@ -6987,10 +6991,11 @@ function buildPlayerUnavailCard(pid){
           <div class="fg" style="margin:0"><input type="date" id="addunavail-from" placeholder="De"></div>
           <div class="fg" style="margin:0"><input type="date" id="addunavail-until" placeholder="Até"></div>
         </div>
-        <select id="addunavail-type" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)" onchange="document.getElementById('addunavail-reason').placeholder=this.value==='outro'?'Ex: férias, doença, obrigação escolar...':'Ex: rotura, entorse, fratura...'">
+        <select id="addunavail-type" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)" onchange="document.getElementById('addunavail-reason').placeholder=this.value==='ferias'?'Ex: férias de Natal, férias de verão...':this.value==='escolar'?'Ex: exames, visita de estudo...':'Ex: compromisso familiar, doença...'">
           <option value="">— Motivo —</option>
-          ${lesaoOpt}
-          <option value="outro">📋 Outro (férias, doença, escolar...)</option>
+          <option value="ferias">🏖️ Férias</option>
+          <option value="escolar">📚 Atividade Escolar</option>
+          <option value="outro">📋 Outro</option>
         </select>
         <input type="text" id="addunavail-reason" placeholder="Observações (opcional)" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none">
         <button class="btn btn-p btn-sm" id="btn-add-unavail" data-pid="${pid}" style="margin-top:8px">+ Adicionar</button>
@@ -7400,7 +7405,7 @@ let _cmTab='active';
 function openClinicalMap(){
   const sq=coachSquads();
   const sel=document.getElementById('cm-squad-filter');
-  if(sel&&sq.length===1) sel.value=sq[0]; // pré-filtrar para escalão do utilizador
+  if(sel&&sq.length===1&&!isMedical()) sel.value=sq[0]; // pré-filtrar para escalão do utilizador (não aplicar a médicos)
   // Para equipa técnica: bloquear filtro ao seu escalão e esconder tabs clínicas
   const coachOnly=!canSeeClinical()&&currentUser()?.role==='coach';
   if(sel) sel.style.display=coachOnly?'none':'';
@@ -7878,18 +7883,23 @@ function ocrUpdatePlayers(sq, selectedId=''){
     ps.map(p=>`<option value="${p.id}"${p.id===selectedId?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('');
 }
 
-function openOccurrenceModal(editId){
+function openOccurrenceModal(editId, prefillAthleteId){
   // editId can be an OCR id (legacy) or a CR id (new records)
   const existingOcr=editId?DB.getOccurrenceRecords().find(r=>r.id===editId):null;
   const existingCr=editId&&!existingOcr?DB.getClinicalRecords().find(r=>r.id===editId):null;
   const existing=existingOcr||existingCr||null;
   const cu=currentUser();
   const admin=isAdmin();
+  const medical=isMedical();
   const today=new Date().toISOString().slice(0,10);
   const userSquad=cu?.squad||(cu?.squads?.length===1?cu.squads[0]:null);
   const editSquad=existing?.squad||'';
-  const fixedSquad=!admin?userSquad:(editId?editSquad:null);
-  const squadSelectorHtml=admin&&!editId?`
+  // If a prefill athlete is provided (e.g. from player profile button), derive squad from them
+  const prefillPlayer=prefillAthleteId&&!editId?DB.getPlayer(prefillAthleteId):null;
+  const prefillSquad=prefillPlayer?.squad||null;
+  // Admin/medical see squad selector unless a prefill athlete was passed (squad implied) or editing
+  const fixedSquad=prefillSquad||((!admin&&!medical)?userSquad:(editId?editSquad:null));
+  const squadSelectorHtml=(admin||medical)&&!editId&&!prefillSquad?`
     <div>
       <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Plantel</label>
       <select id="ocr-squad" onchange="ocrUpdatePlayers(this.value)" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
@@ -7920,7 +7930,7 @@ function openOccurrenceModal(editId){
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Jogador</label>
         <select id="ocr-player" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">
           <option value="">— Selecionar atleta —</option>
-          ${initialPlayers.map(p=>`<option value="${p.id}"${p.id===existing?.athleteId?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('')}
+          ${initialPlayers.map(p=>`<option value="${p.id}"${(p.id===existing?.athleteId||p.id===prefillAthleteId)?' selected':''}>${p.name} (Nº${p.number||'—'})</option>`).join('')}
         </select>
       </div>
       <div style="display:flex;gap:10px">
@@ -9151,7 +9161,7 @@ function effectiveAtt(att, pid, date){
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   // Indisponibilidade tem prioridade sobre: sem registo, 'pp', 'true', 'ni'
   const overridable=explicit===undefined||explicit===null||explicit===true||explicit==='pp'||explicit==='ni';
-  if(unavail && overridable){ const t=unavail.type||'lesao'; return t==='outro'?'just':t; }
+  if(unavail && overridable){ const t=unavail.type||'lesao'; return (t==='outro'||t==='ferias'||t==='escolar')?'just':t; }
   // Lesão clínica activa tem prioridade (quando não há indisponibilidade manual e estado é overridable)
   if(!unavail && overridable && getActiveInjury(pid, date)) return 'lesao';
   // Qualquer outro valor explícito mantém-se (condicionado, just, injust, lesao — definidos manualmente)
