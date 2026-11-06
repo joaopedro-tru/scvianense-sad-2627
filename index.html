@@ -9867,6 +9867,11 @@ function liveEvLabel(e){
   if(e.type==='opp_shot_off') return `💨 <strong>Remate Fora (Adv.)</strong>`;
   if(e.type==='offside_against') return `⛳ <strong>Fora de Jogo</strong>${e.playerId?' — '+pn(e.playerId):''}`;
   if(e.type==='offside_for') return `⛳ <strong>Fora de Jogo Adversário</strong>`;
+  if(e.type==='penalty_shootout'){
+    const side=e.team==='home'?'Nós':'Adversário';
+    const res=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou/Fora';
+    return `⚽ <strong>GP — ${side}</strong>: ${res}${e.playerId?' ('+pn(e.playerId)+')':''}`;
+  }
   return `• ${e.type}`;
 }
 
@@ -10025,6 +10030,11 @@ function renderLiveRecording(ev){
   const scoreA=isHome?goals:conc, scoreB=isHome?conc:goals;
   const teamA=isHome?'SCV':(ev.opponent||'Adv.').substring(0,12);
   const teamB=isHome?(ev.opponent||'Adv.').substring(0,12):'SCV';
+  const penEvs=(mr.events||[]).filter(e=>e.type==='penalty_shootout');
+  const penGoalsHome=penEvs.filter(e=>e.team==='home'&&e.result==='goal').length;
+  const penGoalsAway=penEvs.filter(e=>e.team==='away'&&e.result==='goal').length;
+  const penA=isHome?penGoalsHome:penGoalsAway, penB=isHome?penGoalsAway:penGoalsHome;
+  const showPen=penEvs.length>0||clock.phase==='pen';
   const lineupStr=lineup.length>0?`${lineup.length} titular${lineup.length!==1?'es':''}`:' 11 não def.';
 
   document.getElementById('v-live-content').innerHTML=`
@@ -10032,6 +10042,7 @@ function renderLiveRecording(ev){
     <div class="lv-header">
       <div class="lv-teams"><span>${teamA}</span><span>${teamB}</span></div>
       <div class="lv-score">${scoreA}<span style="font-size:28px;letter-spacing:0;opacity:.45"> — </span>${scoreB}</div>
+      ${showPen?`<div style="font-size:14px;color:rgba(255,255,255,.75);margin-top:2px;font-weight:700">GP: ${penA} — ${penB}</div>`:''}
       <div class="lv-meta">${SQUADS[ev.squad]||''}${ev.competition?' · '+ev.competition:''}${ev.opponent?' · vs '+ev.opponent:''}</div>
       <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap">
         <button id="btn-edit-lineup" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">✏️ ${lineupStr}</button>
@@ -10070,12 +10081,15 @@ function renderLiveRecording(ev){
     else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
     else if(c.phase==='et1')      curMr.matchClock={...c,phase:'eht',et1End:now};
     else if(c.phase==='eht')      curMr.matchClock={...c,phase:'et2',et2Start:now};
+    else if(c.phase==='et2'&&nextOverride==='pen') curMr.matchClock={...c,phase:'pen',penStart:now};
     else if(c.phase==='et2')      curMr.matchClock={...c,phase:'finished',et2End:now};
+    else if(c.phase==='pen')      curMr.matchClock={...c,phase:'finished',penEnd:now};
     DB.updateEvent(liveGameId,{matchReport:curMr});
     renderLiveRecording(DB.getEvent(liveGameId));
   }
   document.getElementById('gm-clock-btn')?.addEventListener('click',()=>_advanceLiveClock());
   document.getElementById('gm-clock-btn-et')?.addEventListener('click',()=>_advanceLiveClock('et1'));
+  document.getElementById('gm-clock-btn-pen')?.addEventListener('click',()=>_advanceLiveClock('pen'));
 
   // Live clock tick
   if(clock.phase==='1h'||clock.phase==='2h'||clock.phase==='et1'||clock.phase==='et2'){
@@ -10122,11 +10136,77 @@ function renderLiveRecording(ev){
 
 function renderLiveGeralTab(ev){
   const mr=ev.matchReport||{events:[]};
+  const clock=mr.matchClock||{phase:'pre'};
+  const inPenPhase=clock.phase==='pen';
   const evs=(mr.events||[]).sort((a,b)=>sortMin(b)-sortMin(a));
   const ctrs=mr.counters||{};
+  const isHome=ev.homeAway!=='away';
+  const teamA=isHome?'SCV':(ev.opponent||'Adversário').substring(0,14);
+  const teamB=isHome?(ev.opponent||'Adversário').substring(0,14):'SCV';
+
+  // GP tally
+  const penEvs=(mr.events||[]).filter(e=>e.type==='penalty_shootout');
+  const penGoalsHome=penEvs.filter(e=>e.team==='home'&&e.result==='goal').length;
+  const penGoalsAway=penEvs.filter(e=>e.team==='away'&&e.result==='goal').length;
+  const penTotalHome=penEvs.filter(e=>e.team==='home').length;
+  const penTotalAway=penEvs.filter(e=>e.team==='away').length;
+  const penA=isHome?penGoalsHome:penGoalsAway, penB=isHome?penGoalsAway:penGoalsHome;
+  const penTA=isHome?penTotalHome:penTotalAway, penTB=isHome?penTotalAway:penTotalHome;
+
   const timeline=evs.length===0
     ?'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Sem eventos registados</div>'
     :evs.map(e=>`<div class="lv-ev"><span class="lv-ev-min">${fmtMin(e)}${e.period==='pen'?'':"'"}</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('');
+
+  // ── Penalty shootout UI ──────────────────────────────────────────────────────
+  if(inPenPhase){
+    document.getElementById('live-tab-content').innerHTML=`
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#991b1b;text-align:center;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">⚽ Grandes Penalidades</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
+          <div style="text-align:center">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">${teamA}</div>
+            <div style="font-size:36px;font-weight:900;color:#991b1b;line-height:1">${penA}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${penTA} cobrado${penTA!==1?'s':''}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px">${teamB}</div>
+            <div style="font-size:36px;font-weight:900;color:#991b1b;line-height:1">${penB}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${penTB} cobrado${penTB!==1?'s':''}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button class="lv-btn" data-lv-type="pen_home" style="background:#1e40af;color:#fff;border-color:#1e40af;min-height:60px;flex-direction:column;gap:4px">
+            <span style="font-size:20px">⚽</span>
+            <span style="font-size:12px;font-weight:700">${teamA}</span>
+            <span style="font-size:10px;opacity:.8">Registar penálti</span>
+          </button>
+          <button class="lv-btn danger" data-lv-type="pen_away" style="min-height:60px;flex-direction:column;gap:4px">
+            <span style="font-size:20px">⚽</span>
+            <span style="font-size:12px;font-weight:700">${teamB}</span>
+            <span style="font-size:10px;opacity:.8">Registar penálti</span>
+          </button>
+        </div>
+      </div>
+      <div class="lv-tl">
+        <div class="lv-tl-head">
+          <span>Penáltis registados</span>
+          <span style="font-weight:400">${penEvs.length} cobrado${penEvs.length!==1?'s':''}</span>
+        </div>
+        ${penEvs.length===0
+          ?'<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">Nenhum penálti registado ainda</div>'
+          :penEvs.slice().reverse().map(e=>`<div class="lv-ev"><span class="lv-ev-min">GP</span><span class="lv-ev-desc">${liveEvLabel(e)}</span><button class="lv-ev-del" data-del-lv="${e.id}">✕</button></div>`).join('')
+        }
+      </div>`;
+    document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>openLivePicker(btn.dataset.lvType)));
+    document.querySelectorAll('[data-del-lv]').forEach(btn=>btn.addEventListener('click',()=>{
+      if(!confirm('Remover este evento?')) return;
+      const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
+      cur.events=(cur.events||[]).filter(e=>e.id!==btn.dataset.delLv);
+      DB.updateEvent(liveGameId,{matchReport:cur});
+      renderLiveGeralTab(DB.getEvent(liveGameId));
+    }));
+    return;
+  }
 
   function ctr(key,label,icon){
     const v=ctrs[key]||0;
@@ -10537,12 +10617,55 @@ function openLivePicker(type){
   const liveClock=DB.getEvent(liveGameId)?.matchReport?.matchClock;
   const autoMin=getMatchMinute(liveClock)||0;
   const livePhase=liveClock?.phase||'';
-  const autoPeriod=livePhase==='et1'?'et1':livePhase==='et2'?'et2':null;
+  const autoPeriod=livePhase==='et1'?'et1':livePhase==='et2'?'et2':livePhase==='pen'?'pen':null;
   const baseData={_minute:autoMin,...(autoPeriod?{_period:autoPeriod}:{})};
   // Eventos simples sem player — guarda diretamente com minuto
   if(['goal_conceded','corner_for','corner_against','chance_for','chance_against','opp_shot_on','opp_shot_off','offside_for'].includes(type)){
     livePending={type,step:'done',data:baseData};
     saveLiveEvent();
+    return;
+  }
+  // Penálti GP — pen_home (com player opcional) ou pen_away (sem player)
+  if(type==='pen_home'||type==='pen_away'){
+    const team=type==='pen_home'?'home':'away';
+    const isHomeTeam=team==='home';
+    const ev2=DB.getEvent(liveGameId);
+    const isHome2=ev2?.homeAway!=='away';
+    const teamLabel=isHomeTeam?(isHome2?'SCV':(ev2?.opponent||'Adversário')):(isHome2?(ev2?.opponent||'Adversário'):'SCV');
+    livePending={type:'penalty_shootout',step:'pen-result',data:{...baseData,_period:'pen',team,minute:120}};
+
+    const mo=document.getElementById('mo-live');
+    document.getElementById('mo-live-close').onclick=()=>{ mo.classList.remove('open'); livePending=null; };
+    const bodyEl=document.getElementById('mo-live-body');
+    document.getElementById('mo-live-title').textContent=`⚽ Penálti — ${teamLabel}`;
+
+    function showPenResult(playerId){
+      if(playerId) livePending.data.playerId=playerId;
+      bodyEl.innerHTML=`
+        <div style="padding:8px 4px">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:16px;font-weight:600">Resultado do penálti${playerId?` (${dn(DB.getPlayer(playerId)||{name:'—'})})`:''}</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button id="pen-goal" class="btn btn-p" style="padding:16px;font-size:15px;justify-content:center;background:#16a34a;border-color:#16a34a">✅ Golo</button>
+            <button id="pen-missed" class="btn btn-o" style="padding:16px;font-size:15px;justify-content:center">❌ Falhou / Fora</button>
+            <button id="pen-saved" class="btn btn-o" style="padding:16px;font-size:15px;justify-content:center;border-color:#2563eb;color:#2563eb">🧤 Defendido</button>
+          </div>
+        </div>`;
+      document.getElementById('pen-goal').addEventListener('click',()=>{ livePending.data.result='goal'; saveLiveEvent(); });
+      document.getElementById('pen-missed').addEventListener('click',()=>{ livePending.data.result='missed'; saveLiveEvent(); });
+      document.getElementById('pen-saved').addEventListener('click',()=>{ livePending.data.result='saved'; saveLiveEvent(); });
+    }
+
+    if(isHomeTeam){
+      // Pick player (optional) then result
+      const list=getCurrentPlayers();
+      const rows=list.map(p=>`<div class="pp-player" data-pp-pid="${p.id}"><span class="pp-num">${p.number||'—'}</span><span class="pp-name">${dn(p)}</span><span class="pp-pos">${POS[p.position]||''}</span></div>`).join('');
+      bodyEl.innerHTML=`<div class="pp-list">${rows}</div><button class="pp-skip" id="pp-skip">— Sem jogador específico</button>`;
+      bodyEl.querySelectorAll('[data-pp-pid]').forEach(el=>el.addEventListener('click',()=>showPenResult(el.dataset.ppPid)));
+      document.getElementById('pp-skip').addEventListener('click',()=>showPenResult(null));
+    } else {
+      showPenResult(null);
+    }
+    mo.classList.add('open');
     return;
   }
   // Fora de jogo nosso / falta sofrida — player opcional
@@ -10752,7 +10875,7 @@ function saveLiveEvent(){
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
-  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','foul_suffered':'⚡','ball_lost':'❌','ball_won':'✊','corner_for':'🚩','corner_against':'🚩','chance_for':'✅','chance_against':'⚠️','opp_shot_on':'🎯','opp_shot_off':'💨','offside_against':'⛳','offside_for':'⛳'};
+  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','foul_suffered':'⚡','ball_lost':'❌','ball_won':'✊','corner_for':'🚩','corner_against':'🚩','chance_for':'✅','chance_against':'⚠️','opp_shot_on':'🎯','opp_shot_off':'💨','offside_against':'⛳','offside_for':'⛳','penalty_shootout':'⚽'};
   toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
   // Lesão com jogador identificado → oferecer registo clínico
@@ -11210,16 +11333,17 @@ function clockPhaseLabel(clock){
   if(clock.phase==='et1') return '1º Prolongamento';
   if(clock.phase==='eht') return 'Intervalo — Prol.';
   if(clock.phase==='et2') return '2º Prolongamento';
+  if(clock.phase==='pen') return 'Grandes Penalidades';
   if(clock.phase==='finished') return 'Terminado';
   return '';
 }
 function renderClockBar(clock){
   const phase=clock?.phase||'pre';
   const min=getMatchMinute(clock);
-  const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='eht'?'HT Prol.':phase==='finished'?'FIM':(min?min+"'":'—');
+  const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='eht'?'HT Prol.':phase==='finished'?'FIM':phase==='pen'?'GP':(min?min+"'":'—');
   const phaseLabel=clockPhaseLabel(clock);
   const isRunning=(phase==='1h'||phase==='2h'||phase==='et1'||phase==='et2');
-  const clockColor=isRunning?'#2e7d32':(phase==='finished'?'var(--muted)':'var(--muted)');
+  const clockColor=isRunning?'#2e7d32':(phase==='pen'?'#c0392b':(phase==='finished'?'var(--muted)':'var(--muted)'));
   // For 2h phase: show two buttons — end game or go to ET
   if(phase==='2h'){
     return `<div style="padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
@@ -11233,13 +11357,26 @@ function renderClockBar(clock){
       <button id="gm-clock-btn-et" data-next="et1" style="width:100%;padding:9px 16px;border:1.5px dashed #7c3aed;border-radius:9px;background:transparent;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏱ Ir para Prolongamento (Taça)</button>
     </div>`;
   }
+  // For et2 phase: show two buttons — end or go to GP
+  if(phase==='et2'){
+    return `<div style="padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:32px;font-weight:900;color:#2e7d32;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1" id="gm-clock-min">${minDisplay}</div>
+          <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">${phaseLabel}</div>
+        </div>
+        <button id="gm-clock-btn" data-next="finished" style="padding:10px 16px;border:none;border-radius:9px;background:#c0392b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">⏸ Fim do 2º Prol.</button>
+      </div>
+      <button id="gm-clock-btn-pen" data-next="pen" style="width:100%;padding:9px 16px;border:1.5px dashed #c0392b;border-radius:9px;background:transparent;color:#c0392b;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⚽ Ir para Grandes Penalidades (GP)</button>
+    </div>`;
+  }
   const btnMap={
     pre:{label:'▶ Iniciar 1ª Parte',bg:'#2e7d32',color:'#fff'},
     '1h':{label:'⏸ Fim da 1ª Parte',bg:'#c0392b',color:'#fff'},
     ht:{label:'▶ Iniciar 2ª Parte',bg:'#1565c0',color:'#fff'},
     et1:{label:'⏸ Fim do 1º Prol.',bg:'#c0392b',color:'#fff'},
     eht:{label:'▶ Iniciar 2º Prol.',bg:'#7c3aed',color:'#fff'},
-    et2:{label:'⏸ Fim do 2º Prol.',bg:'#c0392b',color:'#fff'},
+    pen:{label:'⏸ Fim das Grandes Penalidades',bg:'#c0392b',color:'#fff'},
     finished:{label:null}
   };
   const btn=btnMap[phase]||btnMap.pre;
@@ -11295,12 +11432,15 @@ function renderGame(){
     else if(c.phase==='2h')       curMr.matchClock={...c,phase:'finished',half2End:now};
     else if(c.phase==='et1')      curMr.matchClock={...c,phase:'eht',et1End:now};
     else if(c.phase==='eht')      curMr.matchClock={...c,phase:'et2',et2Start:now};
+    else if(c.phase==='et2'&&next==='pen') curMr.matchClock={...c,phase:'pen',penStart:now};
     else if(c.phase==='et2')      curMr.matchClock={...c,phase:'finished',et2End:now};
+    else if(c.phase==='pen')      curMr.matchClock={...c,phase:'finished',penEnd:now};
     DB.updateEvent(gameEventId,{matchReport:curMr});
     renderGame();
   }
   document.getElementById('gm-clock-btn')?.addEventListener('click',()=>_advanceClock());
   document.getElementById('gm-clock-btn-et')?.addEventListener('click',()=>_advanceClock('et1'));
+  document.getElementById('gm-clock-btn-pen')?.addEventListener('click',()=>_advanceClock('pen'));
 
   // Live clock tick (every 5s)
   if(clock.phase==='1h'||clock.phase==='2h'||clock.phase==='et1'||clock.phase==='et2'){
@@ -12038,7 +12178,7 @@ function renderGamePre(ev,sqPlayers,conv){
 
 // ── SUMÁRIO ───────────────────────────────────────────────────────────────────
 function renderGameSumario(ev,sqPlayers,conv,mr){
-  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub']);
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
   const evs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>sortMin(a)-sortMin(b));
   const isHome=ev.homeAway!=='away';
   function pn(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
@@ -12075,11 +12215,25 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
       else if(e.type==='sub') desc=`🔄 <span style="color:var(--muted)">${pn(e.playerOutId)}</span> → <strong>${pn(e.playerInId)}</strong>`;
       else if(e.type==='injury') desc=`🩺 ${pn(e.playerId)||'—'}`;
       else if(e.type==='medical'){ desc=`🏥 ${e.playerId?pn(e.playerId):'—'}${e.playerInId?` → <strong>${pn(e.playerInId)}</strong>`:''}`; }
+      else if(e.type==='penalty_shootout'){
+        const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
+        const pRes=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou';
+        desc=`⚽ <strong>GP ${pSide}</strong>: ${pRes}${e.playerId?` <span style="color:var(--muted);font-size:11px">(${pn(e.playerId)})</span>`:''}`;
+      }
       if(!desc && !scoreBadge) return '';
       return `<div class="sum-ev"><span class="sum-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="sum-desc">${desc}</span>${scoreBadge}</div>`;
     }).join('');
-    const pOur=ourG-start[0], pTheir=theirG-start[1];
-    const pA=isHome?pOur:pTheir, pB=isHome?pTheir:pOur;
+    // For GP period, show penalty goals instead of regular goals
+    let pA, pB;
+    if(period==='Grandes Penalidades'){
+      const gpEvs=byPeriod[period]||[];
+      const gpHome=gpEvs.filter(e=>e.team==='home'&&e.result==='goal').length;
+      const gpAway=gpEvs.filter(e=>e.team==='away'&&e.result==='goal').length;
+      pA=isHome?gpHome:gpAway; pB=isHome?gpAway:gpHome;
+    } else {
+      const pOur=ourG-start[0], pTheir=theirG-start[1];
+      pA=isHome?pOur:pTheir; pB=isHome?pTheir:pOur;
+    }
     return `<div class="sum-period"><div class="sum-period-hdr"><span>${period}</span><span>${pA} — ${pB}</span></div>${rows}</div>`;
   }).join('');
 
@@ -12632,7 +12786,7 @@ function exportGamePDF(){
   }).join('');
 
   // ── 2. Sumário por período ──
-  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub']);
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
   const sumEvs=evList.filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
   function periodOf(e){
     if(e.period==='pen') return 'Grandes Penalidades';
@@ -12656,7 +12810,12 @@ function exportGamePDF(){
       else if(e.type==='yellow2') { icon='🟡🔴'; desc=`${pn(e.playerId)} (2º amarelo)`; }
       else if(e.type==='red') { icon='🔴'; desc=`${pn(e.playerId)} (direto)`; }
       else if(e.type==='sub') { icon='🔄'; desc=`${pn(e.playerOutId)} → <b>${pn(e.playerInId)}</b>`; }
-      sumHtml+=`<div style="padding:3px 0;display:flex;gap:8px;align-items:baseline"><span style="min-width:36px;font-size:11px;color:#6b7280">${e.minute?e.minute+"'":'—'}</span><span>${icon}</span><span style="font-size:12px">${desc}</span></div>`;
+      else if(e.type==='penalty_shootout'){
+        const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
+        const pRes=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou';
+        icon='⚽'; desc=`<b>GP ${pSide}</b>: ${pRes}${e.playerId?` (${pn(e.playerId)})`:''}`;
+      }
+      sumHtml+=`<div style="padding:3px 0;display:flex;gap:8px;align-items:baseline"><span style="min-width:36px;font-size:11px;color:#6b7280">${e.period==='pen'?'GP':(e.minute?e.minute+"'":'—')}</span><span>${icon}</span><span style="font-size:12px">${desc}</span></div>`;
     });
   });
   if(!sumHtml) sumHtml='<p style="color:#9ca3af;font-size:12px">Sem eventos registados.</p>';
