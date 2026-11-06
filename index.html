@@ -7350,8 +7350,8 @@ async function _renderGameListPDF(selSquads, from, to){
     let transpY=ry+3.5;
     if(transport.length){
       doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
-      if(transport.includes('van')){ doc.text('🚐 Carrinha',xTransp+2,transpY); transpY+=3.8; }
-      if(transport.includes('bus')){ doc.text('🚌 Autocarro',xTransp+2,transpY); transpY+=3.8; }
+      if(transport.includes('van')){ doc.text('Carrinha',xTransp+2,transpY); transpY+=3.8; }
+      if(transport.includes('bus')){ doc.text('Autocarro',xTransp+2,transpY); transpY+=3.8; }
     }
     if(ev.distanceKm) { doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(100,100,100); doc.text(`${ev.distanceKm} km`,xTransp+2,transpY); transpY+=3.2; }
     if(tt&&ev.time&&transport.length){
