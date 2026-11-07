@@ -10434,15 +10434,15 @@ function renderLiveStatsTab(ev){
   const yellows=evs.filter(e=>e.type==='yellow'||e.type==='yellow2').length;
   const reds=evs.filter(e=>e.type==='red'||e.type==='yellow2').length;
   const total_shots=goalsRegular+shots_on+shots_off;
-  const opp_shot_on=ctrs.opp_shot_on||0;
-  const opp_shot_off=ctrs.opp_shot_off||0;
-  const foul_suffered=ctrs.foul_suffered||0;
-  const chance_for=ctrs.chance_for||0;
-  const chance_against=ctrs.chance_against||0;
-  const corners_for=ctrs.corners_for||0;
-  const corners_against=ctrs.corners_against||0;
-  const offsides_for=ctrs.offsides_for||0;
-  const offsides_against=ctrs.offsides_against||0;
+  const opp_shot_on=evs.filter(e=>e.type==='opp_shot_on').length;
+  const opp_shot_off=evs.filter(e=>e.type==='opp_shot_off').length;
+  const foul_suffered=evs.filter(e=>e.type==='foul_suffered').length;
+  const chance_for=evs.filter(e=>e.type==='chance_for').length;
+  const chance_against=evs.filter(e=>e.type==='chance_against').length;
+  const corners_for=evs.filter(e=>e.type==='corner_for').length;
+  const corners_against=evs.filter(e=>e.type==='corner_against').length;
+  const offsides_for=evs.filter(e=>e.type==='offside_for').length;
+  const offsides_against=evs.filter(e=>e.type==='offside_against').length;
   const opp_total_shots=conceded+opp_shot_on+opp_shot_off;
   const tc=document.getElementById('live-tab-content');
   tc.innerHTML=`
