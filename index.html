@@ -12347,17 +12347,16 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const nYel2=evs.filter(e=>e.type==='yellow2').length;
   const nRed=evs.filter(e=>e.type==='red').length;
   const nSub=evs.filter(e=>e.type==='sub').length;
-  const ctrs=mr.counters||{};
   const nShotOn=evs.filter(e=>e.type==='shot_on').length;
   const nShotOff=evs.filter(e=>e.type==='shot_off').length;
   const nFoulC=evs.filter(e=>e.type==='foul_committed').length;
-  const nFoulS=ctrs.foul_suffered||0;  // armazenado em counters, não em events
+  const nFoulS=evs.filter(e=>e.type==='foul_suffered').length;
   const nBallWon=evs.filter(e=>e.type==='ball_won').length;
   const nBallLost=evs.filter(e=>e.type==='ball_lost').length;
-  const nCornersFor=ctrs.corners_for||0;
-  const nCornersAgainst=ctrs.corners_against||0;
-  const nOffsidesFor=ctrs.offsides_for||0;   // foras a favor (adv. em fora)
-  const nOffsidesAgainst=ctrs.offsides_against||0; // foras contra (nós em fora)
+  const nCornersFor=evs.filter(e=>e.type==='corner_for').length;
+  const nCornersAgainst=evs.filter(e=>e.type==='corner_against').length;
+  const nOffsidesFor=evs.filter(e=>e.type==='offside_for').length;
+  const nOffsidesAgainst=evs.filter(e=>e.type==='offside_against').length;
   function relStatCell(icon,label,val){
     return `<div style="text-align:center;padding:10px 6px;background:var(--bg);border-radius:8px;min-width:75px;flex:1">
       <div style="font-size:18px;line-height:1.4">${icon}</div>
@@ -13087,22 +13086,22 @@ function renderGamePos(ev,sqPlayers,conv,mr){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📊 Estatísticas</h3>
         ${(()=>{
           const posEvs=mr.events||[];
-          const posCtrs=mr.counters||{};
           const pgGoals=posEvs.filter(e=>e.type==='goal'&&!e.ownGoal).length;
           const pgShots_on=posEvs.filter(e=>e.type==='shot_on').length;
           const pgShots_off=posEvs.filter(e=>e.type==='shot_off').length;
           const pgTotal=pgGoals+pgShots_on+pgShots_off;
           const pgFouls=posEvs.filter(e=>e.type==='foul_committed').length;
+          const pgFoulS=posEvs.filter(e=>e.type==='foul_suffered').length;
           const pgYellows=posEvs.filter(e=>e.type==='yellow'||e.type==='yellow2').length;
           const pgReds=posEvs.filter(e=>e.type==='red'||e.type==='yellow2').length;
-          const pgCorF=posCtrs.corners_for||0;
-          const pgCorA=posCtrs.corners_against||0;
-          const pgOffF=posCtrs.offsides_for||0;
-          const pgOffA=posCtrs.offsides_against||0;
-          const pgChF=posCtrs.chance_for||0;
-          const pgChA=posCtrs.chance_against||0;
-          const pgOppSOn=posCtrs.opp_shot_on||0;
-          const pgOppSOff=posCtrs.opp_shot_off||0;
+          const pgCorF=posEvs.filter(e=>e.type==='corner_for').length;
+          const pgCorA=posEvs.filter(e=>e.type==='corner_against').length;
+          const pgOffF=posEvs.filter(e=>e.type==='offside_for').length;
+          const pgOffA=posEvs.filter(e=>e.type==='offside_against').length;
+          const pgChF=posEvs.filter(e=>e.type==='chance_for').length;
+          const pgChA=posEvs.filter(e=>e.type==='chance_against').length;
+          const pgOppSOn=posEvs.filter(e=>e.type==='opp_shot_on').length;
+          const pgOppSOff=posEvs.filter(e=>e.type==='opp_shot_off').length;
           const pgOppTotal=goalsConceded+pgOppSOn+pgOppSOff;
           const statRow=(label,us,them)=>`<div style="display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:4px;margin:5px 0">
             <span style="text-align:center;font-size:15px;font-weight:800;color:var(--primary)">${us}</span>
@@ -13120,7 +13119,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
             ${statRow('Cantos',pgCorF,pgCorA)}
             ${statRow('Foras de Jogo',pgOffA,pgOffF)}
             ${statRow('Oportunidades',pgChF,pgChA)}
-            ${statRow('Faltas',pgFouls,posCtrs.foul_suffered||0)}
+            ${statRow('Faltas',pgFouls,pgFoulS)}
             ${statRow('Amarelos',pgYellows,'—')}
             ${statRow('Vermelhos',pgReds,'—')}
           </div>`;
