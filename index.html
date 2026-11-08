@@ -13029,6 +13029,15 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(e.type==='foul_suffered'){ icon='🤕'; desc=`Falta sofrida — ${pName(e.playerId)}` }
     else if(e.type==='ball_won'){ icon='💪'; desc=`Bola recuperada — ${pName(e.playerId)}` }
     else if(e.type==='ball_lost'){ icon='❌'; desc=`Bola perdida — ${pName(e.playerId)}` }
+    else if(e.type==='corner_for'){ icon='🚩'; desc='Canto a Favor' }
+    else if(e.type==='corner_against'){ icon='🚩'; desc='Canto Contra' }
+    else if(e.type==='offside_against'){ icon='⛳'; desc=`Fora de Jogo${e.playerId?` — ${pName(e.playerId)}`:''}` }
+    else if(e.type==='offside_for'){ icon='⛳'; desc='Fora de Jogo (Adversário)' }
+    else if(e.type==='chance_for'){ icon='✅'; desc='Oportunidade Clara' }
+    else if(e.type==='chance_against'){ icon='⚠️'; desc='Oportunidade Clara (Adversário)' }
+    else if(e.type==='opp_shot_on'){ icon='🎯'; desc='Remate à Baliza (Adversário)' }
+    else if(e.type==='opp_shot_off'){ icon='💨'; desc='Remate Fora (Adversário)' }
+    else if(e.type==='penalty_shootout'){ icon='⚽'; const ps=e.team==='home'?'Nós':'Adv.'; const pr=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou'; desc=`GP ${ps}: ${pr}${e.playerId?` — ${pName(e.playerId)}`:''}` }
     if(!icon) return '';
     return `<div class="mev"><span class="mev-min">${fmtEvMin(e.minute)}</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
   }).join('');
@@ -13136,13 +13145,31 @@ function renderGamePos(ev,sqPlayers,conv,mr){
               <div style="flex:0 0 72px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Minuto</label><input type="number" id="me-min" min="0" max="200" placeholder="45" style="${iStyle}"></div>
               <div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label>
                 <select id="me-type" style="${iStyle};cursor:pointer">
-                  <option value="goal">⚽ Golo</option>
-                  <option value="own_goal">🔄 Autogolo (adv.)</option>
-                  <option value="goal_conceded">🥅 Golo Sofrido</option>
-                  <option value="yellow">🟡 Cartão Amarelo</option>
-                  <option value="red">🔴 Cartão Vermelho</option>
-                  <option value="sub">🔄 Substituição</option>
-                  <option value="injury">🩺 Lesão</option>
+                  <optgroup label="— Nós —">
+                    <option value="goal">⚽ Golo</option>
+                    <option value="own_goal">🔄 Autogolo (adv.)</option>
+                    <option value="yellow">🟡 Cartão Amarelo</option>
+                    <option value="red">🔴 Cartão Vermelho</option>
+                    <option value="sub">🔄 Substituição</option>
+                    <option value="injury">🩺 Lesão</option>
+                    <option value="shot_on">🎯 Remate à Baliza</option>
+                    <option value="shot_off">💨 Remate Fora</option>
+                    <option value="corner_for">🚩 Canto a Favor</option>
+                    <option value="offside_against">⛳ Fora de Jogo</option>
+                    <option value="chance_for">✅ Oportunidade Clara</option>
+                    <option value="foul_committed">⚡ Falta Cometida</option>
+                    <option value="foul_suffered">⚡ Falta Sofrida</option>
+                    <option value="ball_won">✊ Recuperação</option>
+                    <option value="ball_lost">❌ Perda de Bola</option>
+                  </optgroup>
+                  <optgroup label="— Adversário —">
+                    <option value="goal_conceded">🥅 Golo Sofrido</option>
+                    <option value="opp_shot_on">🎯 Remate à Baliza (Adv.)</option>
+                    <option value="opp_shot_off">💨 Remate Fora (Adv.)</option>
+                    <option value="corner_against">🚩 Canto Contra</option>
+                    <option value="offside_for">⛳ Fora de Jogo (Adv.)</option>
+                    <option value="chance_against">⚠️ Oportunidade Clara (Adv.)</option>
+                  </optgroup>
                 </select>
               </div>
               <div id="me-extra" style="display:flex;gap:8px;flex:2;min-width:200px;flex-wrap:wrap;align-items:flex-end"></div>
@@ -13232,6 +13259,8 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(t==='red') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Tipo</label><select id="me-red-type" ${sel}><option value="direct">Direto</option><option value="double_yellow">Duplo Amarelo</option></select></div>`;
     else if(t==='sub') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Sai</label><select id="me-p-out" ${sel}>${pOpt(subOut,'Jogador...')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Entra</label><select id="me-p-in" ${sel}>${pOpt(subIn,'Jogador...')}</select></div>`;
     else if(t==='injury') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
+    else if(['shot_on','shot_off','foul_committed','foul_suffered','ball_won','ball_lost','offside_against'].includes(t))
+      meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador (opc.)</label><select id="me-p1" ${sel}>${pOpt(convocados,'Nenhum')}</select></div>`;
     else meExtra.innerHTML='';
   }
   updExtra(); meType.addEventListener('change',updExtra);
@@ -13260,7 +13289,10 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     } else if(t==='injury'){
       const p1=document.getElementById('me-p1')?.value; if(!p1){ toast('❌ Seleciona o jogador'); return; }
       ne.playerId=p1;
+    } else if(['shot_on','shot_off','foul_committed','foul_suffered','ball_won','ball_lost','offside_against'].includes(t)){
+      const p1=document.getElementById('me-p1')?.value; if(p1) ne.playerId=p1;
     }
+    // Tipos sem campos extra: goal_conceded, corner_for/against, offside_for, chance_for/against, opp_shot_on/off
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
     curMr.events.push(ne); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
     // Após registar lesão, oferecer criação de registo clínico
