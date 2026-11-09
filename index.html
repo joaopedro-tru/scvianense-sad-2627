@@ -1126,6 +1126,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <button class="tm-tab" data-tab="transp" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">🚌 Transporte</button>
       <button class="tm-tab" data-tab="fines" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⏱ Atrasos / Multas</button>
       <button class="tm-tab" data-tab="conduct" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⚠️ Conduta</button>
+      <button class="tm-tab" data-tab="sched" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);margin-bottom:-1px">⏱️ Horários</button>
     </div>
     <!-- kit panel -->
     <div id="tm-panel-kit">
@@ -1214,6 +1215,10 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
         <button class="btn btn-p" onclick="openConductModal()" style="margin-left:auto">+ Registar Infração</button>
       </div>
       <div id="tm-conduct-content"></div>
+    </div>
+    <!-- HORÁRIOS PADRÃO PANEL -->
+    <div id="tm-panel-sched" style="display:none">
+      <div id="tm-sched-content"></div>
     </div>
   </div>
 
@@ -12265,18 +12270,7 @@ function renderGamePre(ev,sqPlayers,conv){
     {key:'warmupOffset',label:'Aquecimento'},
     {key:'dressingOffset',label:'Recolha ao balneário'},
   ];
-  const tplConfigHtml=isTMorAdmin?`
-    <details style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-      <summary style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;user-select:none">⚙️ Configurar horários padrão</summary>
-      <p style="font-size:11px;color:var(--muted);margin:8px 0 10px">Minutos em relação ao início do jogo (negativo = antes, positivo = depois).</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
-        ${tplFields.map(f=>`<div class="fg" style="margin-bottom:0">
-          <label style="font-size:11px">${f.label}</label>
-          <input type="number" data-tpl-key="${f.key}" value="${tplVal(f.key)}" placeholder="ex: -60" style="padding:5px 8px;font-size:12px">
-        </div>`).join('')}
-      </div>
-      <button class="btn btn-o btn-sm" id="btn-save-tpl" style="margin-top:10px;width:100%">💾 Guardar padrões</button>
-    </details>`:'';
+  const tplConfigHtml='';
 
   document.getElementById('gm-tab-content').innerHTML=`
   <div class="gm-detail-grid" style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
@@ -12419,17 +12413,8 @@ function renderGamePre(ev,sqPlayers,conv){
     toast('✅ Horários preenchidos. Guarda para confirmar.');
   });
 
-  // Save TM template
-  document.getElementById('btn-save-tpl')?.addEventListener('click',()=>{
-    const newTpl={};
-    document.querySelectorAll('[data-tpl-key]').forEach(inp=>{
-      const v=inp.value.trim();
-      newTpl[inp.dataset.tplKey]=v===''?'':parseInt(v);
-    });
-    localStorage.setItem(TPL_KEY,JSON.stringify(newTpl));
-    toast('✅ Padrão guardado!');
-  });
 }
+
 
 // ── SUMÁRIO ───────────────────────────────────────────────────────────────────
 function renderGameSumario(ev,sqPlayers,conv,mr){
@@ -16321,6 +16306,8 @@ function renderTM(){
       document.getElementById('tm-panel-transp').style.display=tab==='transp'?'':'none';
       document.getElementById('tm-panel-fines').style.display=tab==='fines'?'':'none';
       document.getElementById('tm-panel-conduct').style.display=tab==='conduct'?'':'none';
+      document.getElementById('tm-panel-sched').style.display=tab==='sched'?'':'none';
+      if(tab==='sched') renderTMSched();
       if(tab==='conduct'){ DB.syncConductFromFirestore().then(()=>renderTMConduct()).catch(()=>renderTMConduct()); }
       if(tab==='kit'){
         // Always re-sync athlete_docs before rendering kit tab
@@ -16798,6 +16785,106 @@ function renderTransportTab(){
   // Driver + Notes input handlers (save on blur / Enter)
 }
 
+
+function renderTMSched(){
+  const el=document.getElementById('tm-sched-content');
+  if(!el) return;
+
+  const SQUADS_LIST=isAdmin()?['eqa','sub23','sub19']:coachSquads().filter(s=>['eqa','sub23','sub19'].includes(s));
+  const today=new Date().toISOString().slice(0,10);
+
+  function tplKey(sq){ return `scv_sched_tpl_${sq}`; }
+  function getTpl(sq){ try{ return JSON.parse(localStorage.getItem(tplKey(sq))||'{}'); }catch{return {};} }
+
+  function calcTime(gameMins, offset){
+    if(offset===''||offset===null||offset===undefined) return '';
+    const n=parseInt(offset); if(isNaN(n)) return '';
+    const total=gameMins+n;
+    if(total<0||total>=1440) return '';
+    return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+  }
+
+  function fieldsFor(sq){
+    const base=[
+      {key:'concentrationOffset',label:'Concentração'},
+      {key:'lunchOffset',label:'Almoço (tarde, antes do jogo)'},
+      {key:'lunchOffsetMorning',label:'Almoço (manhã, após jogo)'},
+      {key:'arrivalOffset',label:'Chegada ao local'},
+      {key:'palestraOffset',label:'Palestra pré-jogo'},
+      {key:'gkWarmupOffset',label:'Aquecimento GR'},
+      {key:'warmupOffset',label:'Aquecimento'},
+      {key:'dressingOffset',label:'Recolha ao balneário'},
+    ];
+    if(sq==='eqa') return [{key:'breakfastOffset',label:'Pequeno-almoço'},...base];
+    return base;
+  }
+
+  const cards=SQUADS_LIST.map(sq=>{
+    const tpl=getTpl(sq);
+    const fields=fieldsFor(sq);
+    const rows=fields.map(f=>`<div class="fg" style="margin-bottom:0">
+      <label style="font-size:11px">${f.label}</label>
+      <input type="number" data-sq="${sq}" data-tpl-key="${f.key}" value="${tpl[f.key]!==undefined&&tpl[f.key]!==''?tpl[f.key]:''}" placeholder="ex: -60"
+        style="padding:5px 8px;font-size:12px;width:100%;border:1.5px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
+    </div>`).join('');
+    return `<div class="card" style="margin-bottom:14px">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">${SQUADS[sq]||sq}</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px">Minutos em relação ao início do jogo (negativo = antes, positivo = depois).</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px">${rows}</div>
+      <button class="btn btn-p btn-sm" data-save-sq="${sq}" style="width:100%">💾 Guardar e aplicar aos jogos futuros</button>
+      <div id="sched-result-${sq}" style="font-size:12px;color:var(--ok);margin-top:6px;display:none"></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div style="padding:16px 0;max-width:720px">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 16px">Define os horários padrão para a convocatória de cada escalão. Ao guardar, os horários são automaticamente calculados e aplicados a todos os jogos futuros que tenham hora definida.</p>
+    ${cards||'<p style="color:var(--muted)">Sem escalões disponíveis.</p>'}
+  </div>`;
+
+  // Listeners
+  el.querySelectorAll('[data-save-sq]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const sq=btn.dataset.saveSq;
+      const newTpl={};
+      el.querySelectorAll(`[data-tpl-key][data-sq="${sq}"]`).forEach(inp=>{
+        const v=inp.value.trim();
+        newTpl[inp.dataset.tplKey]=v===''?'':parseInt(v);
+      });
+      localStorage.setItem(tplKey(sq), JSON.stringify(newTpl));
+
+      // Apply to all future games for this squad
+      const futureGames=DB.events(sq).filter(e=>e.type==='game'&&e.squad===sq&&e.date>=today&&e.time);
+      let applied=0;
+      futureGames.forEach(ev=>{
+        const gTime=ev.time||'15:00';
+        const [gh,gm]=gTime.split(':').map(Number);
+        const gameMins=gh*60+gm;
+        const isMorning=gameMins<780;
+        const c=JSON.parse(JSON.stringify(ev.convocatoria||{}));
+        if(sq==='eqa'&&newTpl.breakfastOffset!==undefined&&newTpl.breakfastOffset!=='') c.scheduleBreakfast=calcTime(gameMins,newTpl.breakfastOffset);
+        if(newTpl.concentrationOffset!==undefined&&newTpl.concentrationOffset!=='') c.concentrationTime=calcTime(gameMins,newTpl.concentrationOffset);
+        if(isMorning){ if(newTpl.lunchOffsetMorning!==undefined&&newTpl.lunchOffsetMorning!=='') c.scheduleLunch=calcTime(gameMins,newTpl.lunchOffsetMorning); }
+        else { if(newTpl.lunchOffset!==undefined&&newTpl.lunchOffset!=='') c.scheduleLunch=calcTime(gameMins,newTpl.lunchOffset); }
+        if(newTpl.arrivalOffset!==undefined&&newTpl.arrivalOffset!=='') c.scheduleArrival=calcTime(gameMins,newTpl.arrivalOffset);
+        if(newTpl.palestraOffset!==undefined&&newTpl.palestraOffset!=='') c.schedulePalestra=calcTime(gameMins,newTpl.palestraOffset);
+        if(newTpl.gkWarmupOffset!==undefined&&newTpl.gkWarmupOffset!=='') c.scheduleGkWarmup=calcTime(gameMins,newTpl.gkWarmupOffset);
+        if(newTpl.warmupOffset!==undefined&&newTpl.warmupOffset!=='') c.scheduleWarmup=calcTime(gameMins,newTpl.warmupOffset);
+        if(newTpl.dressingOffset!==undefined&&newTpl.dressingOffset!=='') c.scheduleDressing=calcTime(gameMins,newTpl.dressingOffset);
+        DB.updateEvent(ev.id,{convocatoria:c});
+        applied++;
+      });
+
+      const res=el.querySelector(`#sched-result-${sq}`);
+      if(res){
+        res.style.display='';
+        res.textContent=applied>0
+          ?`✅ Padrão guardado. Horários aplicados a ${applied} jogo${applied!==1?'s':''} futuros.`
+          :'✅ Padrão guardado. Sem jogos futuros com hora definida para aplicar.';
+        setTimeout(()=>res.style.display='none',4000);
+      }
+    });
+  });
+}
 
 function renderTMFines(){
   const container=document.getElementById('tm-fines-content');
