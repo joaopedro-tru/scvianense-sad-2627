@@ -2459,6 +2459,8 @@ function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)|
 function isAdmin(){ return currentUser()?.role==='admin'; }
 function coachSquads(){
   const u=currentUser(); if(!u) return [];
+  // Admin sem squads definidos → acesso a todos
+  if(u.role==='admin'&&(!u.squads||!u.squads.length)&&!u.squad) return ['eqa','sub23','sub19'];
   // Preferir campo squads (array nativo)
   if(u.squads&&Array.isArray(u.squads)&&u.squads.length) return u.squads;
   // Suporte a squad como array nativo (Firestore array type)
@@ -19333,7 +19335,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         const profile=await resolveProfile(fbUser);
         if(profile){
           sessionStorage.setItem(AUTH_KEY, JSON.stringify({
-            role:profile.role, squad:profile.squad||null, user:profile.user,
+            role:profile.role, squad:profile.squad||null, squads:profile.squads||null, user:profile.user,
             staffRole:profile.staffRole||null, email:fbUser.email, uid:fbUser.uid
           }));
           // Forçar refresh do JWT para carregar custom claims (role, squad)
