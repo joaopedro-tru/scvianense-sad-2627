@@ -19308,7 +19308,9 @@ document.addEventListener('DOMContentLoaded',()=>{
         }catch(e){ console.warn('resolveProfile fresh fetch:',e); }
       }
       if(!u||u.disabled===true) return null;
-      const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
+      // Admin sem squad definido → acesso a todos (squad primário = eqa)
+      const isAdminRole=u.role==='admin';
+      const profile={user:u.user, role:u.role, squad:u.squad||(isAdminRole?'eqa':null), squads:u.squads||(isAdminRole?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
       // Guardar no Firestore para que o próximo login já não precise do email.
       // A Cloud Function setUserClaims dispara após este set() e define
       // role+squad como custom claims no JWT. O getIdToken(true) a seguir
@@ -19439,7 +19441,8 @@ document.addEventListener('DOMContentLoaded',()=>{
           // para que resolveProfile encontre o utilizador imediatamente no login
           const newUid=data.localId;
           if(newUid && firestoreDb){
-            const profile={user:u.user, role:u.role, squad:u.squad||null, staffRole:u.staffRole||null};
+            const isAdminRole2=u.role==='admin';
+            const profile={user:u.user, role:u.role, squad:u.squad||(isAdminRole2?'eqa':null), squads:u.squads||(isAdminRole2?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
             await firestoreDb.collection('userProfiles').doc(newUid).set(profile).catch(()=>{});
           }
           setupWrap.style.display='none';
