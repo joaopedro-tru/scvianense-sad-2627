@@ -4662,18 +4662,23 @@ function renderDash(){
   const pickerEl=document.getElementById('d-admin-staff-picker');
   if(pickerEl){
     const staffUsers=getAppUsers().filter(u=>u.role!=='admin'&&(u.squad||u.squads?.length));
-    const bySquad={};
-    staffUsers.forEach(u=>{
-      const uSqs=u.squads&&Array.isArray(u.squads)?u.squads:(u.squad?[u.squad]:[]);
-      uSqs.forEach(s=>{ if(!bySquad[s]) bySquad[s]=[]; if(!bySquad[s].find(x=>x.user===u.user)) bySquad[s].push(u); });
-    });
     const squadMeta={eqa:{icon:'⚫',color:'#444',label:SQUADS.eqa},sub23:{icon:'🔵',color:'var(--blue)',label:SQUADS.sub23},sub19:{icon:'🟡',color:'#b8860b',label:SQUADS.sub19}};
     const roleIcon={coach:'🎯',staff:'👤',medical:'🩺',teammanager:'📋'};
     const roleName={coach:'Treinador',medical:'Clínica',teammanager:'Team Manager'};
-    const sections=Object.entries(bySquad).map(([sq,users])=>{
-      const m=squadMeta[sq]||{icon:'⚪',color:'#888',label:sq};
-      const chips=users.map(u=>{
-        const sp=DB.staffProfiles(sq).find(p=>p.username===u.user)||{};
+
+    window._apState={sq:'',role:''};
+    window._apRender=function(){
+      const {sq,role}=window._apState;
+      const filtered=staffUsers.filter(u=>{
+        const uSqs=u.squads&&Array.isArray(u.squads)?u.squads:(u.squad?[u.squad]:[]);
+        const sqOk=!sq||uSqs.includes(sq);
+        const roleOk=!role||u.role===role;
+        return sqOk&&roleOk;
+      });
+      const chipsHtml=filtered.map(u=>{
+        const sq0=u.squad||(u.squads&&u.squads[0])||'eqa';
+        const m=squadMeta[sq0]||{icon:'⚪',color:'#888'};
+        const sp=DB.staffProfiles(sq0).find(p=>p.username===u.user)||{};
         const name=sp.name||u.user;
         const initials=name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
         const roleLabel=u.role==='staff'?(STAFF_ROLES_LABEL[u.staffRole]||'Staff'):roleName[u.role]||u.role;
@@ -4684,19 +4689,58 @@ function renderDash(){
           <div style="width:30px;height:30px;border-radius:50%;background:${m.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div>
           <div style="min-width:0">
             <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${name.split(' ')[0]}</div>
-            <div style="font-size:10px;color:var(--muted)">${ic} ${roleLabel}</div>
+            <div style="font-size:10px;color:var(--muted)">${m.icon} ${ic} ${roleLabel}</div>
           </div>
         </button>`;
       }).join('');
-      return `<div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${m.color};margin-bottom:8px">${m.icon} ${m.label}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
-      </div>`;
-    }).join('<div style="height:1px;background:var(--border);margin:4px 0"></div>');
+      const chipsEl=document.getElementById('ap-chips');
+      if(chipsEl) chipsEl.innerHTML=filtered.length
+        ?`<div style="display:flex;gap:8px;flex-wrap:wrap">${chipsHtml}</div>`
+        :`<p style="color:var(--muted);font-size:13px;margin:4px 0">Nenhum utilizador encontrado.</p>`;
+      // update sq filter styles
+      document.querySelectorAll('[data-ap-sq]').forEach(b=>{
+        const on=b.dataset.apSq===sq;
+        b.style.background=on?'var(--blue)':'var(--card)';
+        b.style.color=on?'#fff':'var(--text)';
+        b.style.borderColor=on?'var(--blue)':'var(--border)';
+      });
+      // update role filter styles
+      document.querySelectorAll('[data-ap-role]').forEach(b=>{
+        const on=b.dataset.apRole===role;
+        b.style.background=on?'var(--blue)':'var(--card)';
+        b.style.color=on?'#fff':'var(--text)';
+        b.style.borderColor=on?'var(--blue)':'var(--border)';
+      });
+    };
+
+    const filterBtn=(label,onclick,extra='')=>`<button ${extra} onclick="${onclick}" style="padding:5px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);cursor:pointer;font-family:inherit;font-size:12px;transition:all .15s;white-space:nowrap">${label}</button>`;
+    const sqBtns=[
+      filterBtn('Todos',"window._apState.sq='';window._apRender()","data-ap-sq=''"),
+      filterBtn('⚫ Eq. A',"window._apState.sq='eqa';window._apRender()","data-ap-sq='eqa'"),
+      filterBtn('🔵 Sub-23',"window._apState.sq='sub23';window._apRender()","data-ap-sq='sub23'"),
+      filterBtn('🟡 Sub-19',"window._apState.sq='sub19';window._apRender()","data-ap-sq='sub19'"),
+    ].join('');
+    const roleBtns=[
+      filterBtn('Todos',"window._apState.role='';window._apRender()","data-ap-role=''"),
+      filterBtn('🎯 Treinador',"window._apState.role='coach';window._apRender()","data-ap-role='coach'"),
+      filterBtn('👤 Staff',"window._apState.role='staff';window._apRender()","data-ap-role='staff'"),
+      filterBtn('🩺 Clínica',"window._apState.role='medical';window._apRender()","data-ap-role='medical'"),
+      filterBtn('📋 Team Mgr',"window._apState.role='teammanager';window._apRender()","data-ap-role='teammanager'"),
+    ].join('');
+
     pickerEl.innerHTML=`<div class="card" style="margin:0">
-      <div style="font-size:14px;font-weight:700;margin-bottom:14px">👁️ Ver Dashboard Como…</div>
-      <div style="display:flex;flex-direction:column;gap:14px">${sections}</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px">👁️ Ver Dashboard Como…</div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Escalão</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${sqBtns}</div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Função</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${roleBtns}</div>
+      </div>
+      <div id="ap-chips"></div>
     </div>`;
+    window._apRender();
   }
 }
 
@@ -4770,6 +4814,7 @@ function renderAdminStaffView(userKey){
     </div>
     ${statsHtml}
     <div id="d-admin-sv-load" style="margin-bottom:16px"></div>
+    <div id="d-admin-sv-sqstats" style="margin-bottom:16px"></div>
     <div class="g2col">
       <div class="card" style="margin:0">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px">📅 Próximos Eventos</div>
@@ -4794,6 +4839,8 @@ function renderAdminStaffView(userKey){
     attachObjChartListeners(cs,sfx);
   }
   bdayCards(ps,document.getElementById('d-admin-sv-bday'),DB.staffProfiles(cs));
+  const sqStatsEl=document.getElementById('d-admin-sv-sqstats');
+  if(sqStatsEl){const h=buildSqStatsHTML(cs,es,ps);sqStatsEl.innerHTML=h;sqStatsEl.style.display=h?'':'none';}
   viewEl.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
