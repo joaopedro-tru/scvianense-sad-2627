@@ -1189,10 +1189,6 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">C/F</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Transporte</th>
               <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Horários</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Pedido</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:center">Aprovado</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Condutor</th>
-              <th style="padding:11px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Observações</th>
             </tr>
           </thead>
           <tbody id="tm-transp-body"></tbody>
@@ -16744,28 +16740,6 @@ function renderTransportTab(){
           }
         </div>`;
       })()}</td>
-      <td style="padding:10px;text-align:center">
-        <button class="transp-toggle" data-id="${ev.id}" data-field="requested" data-val="${isRequested?'1':'0'}"
-          style="background:${isRequested?'#e8f5e9':'#fafafa'};border:1.5px solid ${isRequested?'#66bb6a':'var(--border)'};border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">
-          ${isRequested?'✅':'⏳'}
-        </button>
-      </td>
-      <td style="padding:10px;text-align:center">
-        <button class="transp-toggle" data-id="${ev.id}" data-field="approved" data-val="${isApproved?'1':'0'}"
-          style="background:${isApproved?'#e3f2fd':'#fafafa'};border:1.5px solid ${isApproved?'#1976d2':'var(--border)'};border-radius:6px;padding:4px 12px;cursor:pointer;font-size:14px">
-          ${isApproved?'✅':'⏳'}
-        </button>
-      </td>
-      <td style="padding:8px 10px">
-        <input type="text" class="si transp-driver" data-id="${ev.id}" value="${driver.replace(/"/g,'&quot;')}"
-          placeholder="Nome do condutor…"
-          style="width:100%;min-width:130px;padding:6px 8px;font-size:12px">
-      </td>
-      <td style="padding:8px 10px">
-        <input type="text" class="si transp-notes" data-id="${ev.id}" value="${notes.replace(/"/g,'&quot;')}"
-          placeholder="Observações…"
-          style="width:100%;min-width:140px;padding:6px 8px;font-size:12px">
-      </td>
     </tr>`;
   }).join('');
 
@@ -16787,16 +16761,6 @@ function renderTransportTab(){
   });
 
   // Driver + Notes input handlers (save on blur / Enter)
-  body.querySelectorAll('.transp-driver').forEach(inp=>{
-    const save=()=>setTransportMeta(inp.dataset.id,{driver:inp.value.trim()});
-    inp.onblur=save;
-    inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); inp.blur(); } };
-  });
-  body.querySelectorAll('.transp-notes').forEach(inp=>{
-    const save=()=>setTransportMeta(inp.dataset.id,{notes:inp.value.trim()});
-    inp.onblur=save;
-    inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); inp.blur(); } };
-  });
 }
 
 
