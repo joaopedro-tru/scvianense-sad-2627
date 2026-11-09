@@ -674,15 +674,12 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="nsl">Plantéis</div>
     <div class="nl" data-view="squad" data-squad="eqa"><span class="ic">⚫</span> Equipa A</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="eqa"><span class="ic">📋</span> Treinos</div>
-    <div class="nl nl-sub" data-view="sq-gym" data-squad="eqa"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="eqa"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub23"><span class="ic">🔵</span> Sub-23</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub23"><span class="ic">📋</span> Treinos</div>
-    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub23"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub23"><span class="ic">⚽</span> Jogos</div>
     <div class="nl" data-view="squad" data-squad="sub19"><span class="ic">🟡</span> Sub-19</div>
     <div class="nl nl-sub" data-view="sq-trainings" data-squad="sub19"><span class="ic">📋</span> Treinos</div>
-    <div class="nl nl-sub" data-view="sq-gym" data-squad="sub19"><span class="ic">🏋️</span> Ginásio</div>
     <div class="nl nl-sub" data-view="sq-games" data-squad="sub19"><span class="ic">⚽</span> Jogos</div>
     <hr class="nd">
     <div class="nsl">Agenda</div>
@@ -1989,7 +1986,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <input type="hidden" id="e-id">
       <div class="fr">
         <div class="fg"><label>Tipo *</label>
-          <select id="e-type" required><option value="training">Treino</option><option value="gym">Ginásio</option><option value="game">Jogo</option></select>
+          <select id="e-type" required><option value="training">Treino</option><option value="game">Jogo</option></select>
         </div>
         <div class="fg"><label>Escalão *</label>
           <select id="e-squad" required>
@@ -3712,17 +3709,7 @@ function _squadLoadCards(cs, sfx=''){
   </div>`:'';
   const secondaryPlaceholder=_showObjChart?`<div id="obj-secondary-card${sfx}" style="display:none"></div>`:'';
 
-  const noGymData=`<p style="font-size:12px;color:var(--muted);margin:0">Sem dados para este período.</p>`;
-  const gymCard=(g5||gS)?`<div class="card" style="margin:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700">🏋️ Ginásio</div>
-      ${tglBtns('g')}
-    </div>
-    <div id="lc-g-5w${sfx}">${g5||noGymData}</div>
-    <div id="lc-g-ep${sfx}" style="display:none">${gS||noGymData}</div>
-  </div>`:'';
-
-  return (primaryCard||gymCard)?`<div style="display:flex;flex-direction:column;gap:10px">${primaryCard}${secondaryPlaceholder}${gymCard}</div>`:'';
+  return primaryCard?`<div style="display:flex;flex-direction:column;gap:10px">${primaryCard}${secondaryPlaceholder}</div>`:'';
 }
 
 // Global toggle handler for period buttons in load cards
