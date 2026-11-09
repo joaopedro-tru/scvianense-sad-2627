@@ -11711,14 +11711,20 @@ function renderGame(){
     },5000);
   }
 
-  if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
-  else if(gameTab==='gr') renderGameGR(ev,sqPlayers,conv,mr);
-  else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
-  else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
-  else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
-  else if(gameTab==='tm') renderGameTM(ev,mr);
-  else if(gameTab==='coord') renderGameCoord(ev,sqPlayers,conv,mr);
-  else renderGamePos(ev,sqPlayers,conv,mr);
+  try{
+    if(gameTab==='pre') renderGamePre(ev,sqPlayers,conv);
+    else if(gameTab==='gr') renderGameGR(ev,sqPlayers,conv,mr);
+    else if(gameTab==='adj') renderGameAdjunto(ev,sqPlayers,conv,mr);
+    else if(gameTab==='sumario') renderGameSumario(ev,sqPlayers,conv,mr);
+    else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
+    else if(gameTab==='tm') renderGameTM(ev,mr);
+    else if(gameTab==='coord') renderGameCoord(ev,sqPlayers,conv,mr);
+    else renderGamePos(ev,sqPlayers,conv,mr);
+  }catch(e){
+    console.error('renderGame tab error:',e);
+    const tc=document.getElementById('gm-tab-content');
+    if(tc) tc.innerHTML=`<div style="padding:20px;background:#fde8e8;border:1px solid #f5c6c6;border-radius:8px;color:#b71c1c;font-family:monospace;font-size:12px"><strong>Erro ao renderizar aba:</strong><br>${e.message}<br><br><small>${e.stack||''}</small></div>`;
+  }
 
   // Prefetch cross-squad convocados missing from local cache.
   // Firestore "get by doc ID" may be allowed even when collection queries are restricted.
