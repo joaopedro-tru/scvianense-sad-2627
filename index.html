@@ -767,6 +767,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <div class="sg" id="d-coach-stats"></div>
       <div id="d-perf-coach" style="margin-bottom:14px"></div>
       <div id="d-moments-coach" style="margin-bottom:14px"></div>
+      <div id="d-coach-sqstats" style="margin-bottom:14px"></div>
       <div id="d-staff-load"></div>
       <div class="g2col">
         <div class="card">
@@ -4352,6 +4353,80 @@ function buildTeamMomentsHTML(squads, events, today){
   return `<div style="display:flex;flex-direction:column;gap:14px">${blocks}</div>`;
 }
 
+// ── SQUAD STATS HTML BUILDER (shared by coach dashboard + stats tab) ──────────
+function buildSqStatsHTML(cs, events, players){
+  const today=new Date().toISOString().split('T')[0];
+  const allGames=events.filter(e=>e.type==='game').sort((a,b)=>a.date.localeCompare(b.date));
+  const pastGames=allGames.filter(g=>g.date<today);
+
+  // Aggregate per player
+  const pStats={};
+  const pidMap={};
+  players.forEach(p=>{ pStats[p.id]={goals:0,assists:0,ball_won:0,shot_on:0,shot_off:0,yellow:0,red:0,ball_lost:0,offside:0}; pidMap[p.id]=p; });
+  pastGames.forEach(g=>{
+    const evs=(g.matchReport||{}).events||[];
+    evs.forEach(e=>{
+      if(e.type==='goal'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].goals++;
+      if(e.type==='goal'&&e.assistId&&pStats[e.assistId]) pStats[e.assistId].assists++;
+      if(e.type==='ball_won'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].ball_won++;
+      if(e.type==='shot_on'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].shot_on++;
+      if(e.type==='shot_off'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].shot_off++;
+      if(e.type==='yellow'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].yellow++;
+      if(e.type==='yellow2'&&e.playerId&&pStats[e.playerId]){ pStats[e.playerId].yellow++; pStats[e.playerId].red++; }
+      if(e.type==='red'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].red++;
+      if(e.type==='ball_lost'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].ball_lost++;
+      if(e.type==='offside_against'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].offside++;
+    });
+  });
+
+  function top5Block(key,label,color){
+    const sorted=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]).slice(0,5);
+    if(!sorted.length) return `<div style="color:var(--muted);font-size:12px;padding:4px 0">Sem dados</div>`;
+    return sorted.map(([pid,s],i)=>{
+      const p=pidMap[pid]; const name=p?dn(p):'?'; const val=s[key];
+      const max=sorted[0][1][key]; const pct=max>0?Math.round(val/max*100):0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:14px">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+            <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+          </div>
+          <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function card(label,key,color){
+    return `<div class="card" style="margin:0">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${label}</div>
+      ${top5Block(key,label,color)}
+    </div>`;
+  }
+
+  const hasAnyData=Object.values(pStats).some(s=>Object.values(s).some(v=>v>0));
+  if(!hasAnyData) return '';
+
+  return `<div>
+    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Top 5 — Positivos</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px">
+      ${card('⚽ Golos','goals','#2e7d32')}
+      ${card('🎯 Assistências','assists','#1565c0')}
+      ${card('💪 Recuperações','ball_won','#00695c')}
+      ${card('🎯 Remates à Baliza','shot_on','#6a1b9a')}
+      ${card('💨 Remates Fora','shot_off','#4527a0')}
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📉 Top 5 — Negativos</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+      ${card('🟨 Amarelos','yellow','#f39c12')}
+      ${card('🟥 Vermelhos','red','#c0392b')}
+      ${card('❌ Perdas de Bola','ball_lost','#b71c1c')}
+      ${card('⛳ Foras de Jogo','offside','#e65100')}
+    </div>
+  </div>`;
+}
+
 // squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
 function buildSquadPerfHTML(squads, events, today){
   const SQ_COLOR={eqa:'#444',sub23:'var(--blue)',sub19:'#b8860b'};
@@ -4457,6 +4532,8 @@ function renderDash(){
     if(perfCoachEl) perfCoachEl.innerHTML=buildSquadPerfHTML([{cs,label:SQUADS[cs],color:sqColor,icon:sqIcon}],es,today);
     const momCoachEl=document.getElementById('d-moments-coach');
     if(momCoachEl) momCoachEl.innerHTML=buildTeamMomentsHTML([{cs,label:SQUADS[cs],color:sqColor,icon:sqIcon}],es,today);
+    const sqStatsEl=document.getElementById('d-coach-sqstats');
+    if(sqStatsEl) sqStatsEl.innerHTML=buildSqStatsHTML(cs,es,ps);
     return;
   }
 
@@ -4894,55 +4971,6 @@ function renderSqStats(){
   const last3Html=last3.length===0?'<p style="color:var(--muted);font-size:13px">Sem jogos anteriores.</p>':last3.map(g=>gameRow(g,true)).join('');
   const next3Html=next3.length===0?'<p style="color:var(--muted);font-size:13px">Sem jogos agendados.</p>':next3.map(g=>gameRow(g,false)).join('');
 
-  // ── 3. PLAYER STATS ─────────────────────────────────────────────────────────
-  // Aggregate per player across all past games
-  const pStats={};
-  const pidMap={};
-  ps.forEach(p=>{ pStats[p.id]={goals:0,assists:0,ball_won:0,shot_on:0,shot_off:0,yellow:0,red:0,ball_lost:0,offside:0}; pidMap[p.id]=p; });
-
-  pastGames.forEach(g=>{
-    const evs=(g.matchReport||{}).events||[];
-    evs.forEach(e=>{
-      if(e.type==='goal'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].goals++;
-      if(e.type==='goal'&&e.assistId&&pStats[e.assistId]) pStats[e.assistId].assists++;
-      if(e.type==='ball_won'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].ball_won++;
-      if(e.type==='shot_on'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].shot_on++;
-      if(e.type==='shot_off'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].shot_off++;
-      if(e.type==='yellow'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].yellow++;
-      if(e.type==='yellow2'&&e.playerId&&pStats[e.playerId]){ pStats[e.playerId].yellow++; pStats[e.playerId].red++; }
-      if(e.type==='red'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].red++;
-      if(e.type==='ball_lost'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].ball_lost++;
-      if(e.type==='offside_against'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].offside++;
-    });
-  });
-
-  function top5(key,icon,label,color){
-    const sorted=Object.entries(pStats)
-      .filter(([,s])=>s[key]>0)
-      .sort((a,b)=>b[1][key]-a[1][key])
-      .slice(0,5);
-    if(!sorted.length) return `<div style="color:var(--muted);font-size:12px;padding:6px 0">Sem dados</div>`;
-    return sorted.map(([pid,s],i)=>{
-      const p=pidMap[pid];
-      const name=p?dn(p):'?';
-      const val=s[key];
-      const max=sorted[0][1][key];
-      const pct=max>0?Math.round(val/max*100):0;
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:14px">${i+1}</div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
-            <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
-          </div>
-          <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${color};border-radius:2px;transition:width .3s"></div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
   // ── RENDER ───────────────────────────────────────────────────────────────────
   el.innerHTML=`
     <div style="padding:0 0 20px">
@@ -4963,49 +4991,7 @@ function renderSqStats(){
         </div>
       </div>
 
-      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Top 5 — Positivos</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px">
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">⚽ Golos</div>
-          ${top5('goals','⚽','Golos','#2e7d32')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🎯 Assistências</div>
-          ${top5('assists','🎯','Assistências','#1565c0')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">💪 Recuperações</div>
-          ${top5('ball_won','💪','Recuperações','#00695c')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🎯 Remates à Baliza</div>
-          ${top5('shot_on','🎯','Rem. à Baliza','#6a1b9a')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">💨 Remates Fora</div>
-          ${top5('shot_off','💨','Rem. Fora','#4527a0')}
-        </div>
-      </div>
-
-      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📉 Top 5 — Negativos</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px">
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🟨 Cartões</div>
-          ${top5('yellow','🟨','Amarelos','#f39c12')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🟥 Vermelhos</div>
-          ${top5('red','🟥','Vermelhos','#c0392b')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">❌ Perdas de Bola</div>
-          ${top5('ball_lost','❌','Perdas','#b71c1c')}
-        </div>
-        <div class="card" style="margin:0">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">⛳ Foras de Jogo</div>
-          ${top5('offside','⛳','Foras de Jogo','#e65100')}
-        </div>
-      </div>
+      ${buildSqStatsHTML(squad, es, ps)}
 
     </div>
   `;
@@ -19285,9 +19271,13 @@ document.addEventListener('DOMContentLoaded',()=>{
             const data=doc.data();
             // Conta desativada pelo admin — bloquear acesso
             if(data.disabled===true) return null;
+            // Admin sem squads → corrigir automaticamente
+            if(data.role==='admin'&&(!data.squads||!data.squads.length)){
+              data.squads=['eqa','sub23','sub19'];
+              data.squad=data.squad||'eqa';
+              firestoreDb.collection('userProfiles').doc(fbUser.uid).set(data).catch(()=>{});
+            }
             // Re-escrever silenciosamente para disparar a Cloud Function setUserClaims
-            // e garantir que os JWT custom claims (role, squad) estão sempre frescos.
-            // A função verifica internamente se houve mudança; se não houve, não faz nada.
             firestoreDb.collection('userProfiles').doc(fbUser.uid).set(data)
               .then(()=>setTimeout(()=>fbUser.getIdToken(true).catch(()=>{}), 2500))
               .catch(()=>{});
