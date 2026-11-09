@@ -19056,14 +19056,15 @@ async function openAccountsModal(){
       </div>
       <div>
         <label style="font-size:11px;color:var(--muted)">Função</label>
-        <select id="nc-role" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
+        <select id="nc-role" onchange="(function(){const isAdm=this.value==='admin';document.getElementById('nc-squads-row').style.display=isAdm?'none':'';}).call(this)" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);box-sizing:border-box;margin-top:3px">
           <option value="coach">Treinador</option>
           <option value="staff" selected>Staff</option>
           <option value="medical">Clínica</option>
           <option value="teammanager">Team Manager</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
-      <div>
+      <div id="nc-squads-row">
         <label style="font-size:11px;color:var(--muted)">Escalão(ões)</label>
         <div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:5px">
@@ -19124,8 +19125,8 @@ async function createAccount(btn){
   const userId=(document.getElementById('nc-user')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
   const email=(document.getElementById('nc-email')?.value||'').trim().toLowerCase();
   const role=document.getElementById('nc-role')?.value||'staff';
-  const squads=[...document.querySelectorAll('[name="nc-squad"]:checked')].map(c=>c.value);
-  if(!squads.length){ toast('❌ Seleciona pelo menos um escalão'); return; }
+  const squads=role==='admin'?['eqa','sub23','sub19']:[...document.querySelectorAll('[name="nc-squad"]:checked')].map(c=>c.value);
+  if(role!=='admin'&&!squads.length){ toast('❌ Seleciona pelo menos um escalão'); return; }
   const squad=squads[0]; // escalão primário (retrocompatibilidade)
   const staffRole=document.getElementById('nc-staffrole')?.value||'';
   if(!userId){ toast('❌ Username obrigatório'); return; }
