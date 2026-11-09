@@ -2305,6 +2305,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
           <option value="grcoach">Treinador de GR</option>
           <option value="analista">Treinador Analista</option>
           <option value="condicionamento">Preparador Físico</option>
+          <option value="fisiologista">Fisiologista</option>
           <option value="fisio">Fisioterapeuta</option>
           <option value="enfermeiro">Enfermeiro</option>
           <option value="massagista">Massagista</option>
@@ -6616,8 +6617,8 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   const sel=document.getElementById('sf-user');
   if(!sel) return;
 
-  const ROLE_ORDER=['headcoach','adjunto','estagiario','grcoach','condicionamento','analista','fisio','enfermeiro','massagista','delegado','teammanager','outro','medical'];
-  const ROLE_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',analista:'Analista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',medical:'Clínica / Saúde',outro:'Outro'};
+  const ROLE_ORDER=['headcoach','adjunto','estagiario','grcoach','condicionamento','fisiologista','analista','fisio','enfermeiro','massagista','delegado','teammanager','outro','medical'];
+  const ROLE_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',condicionamento:'Preparador Físico',fisiologista:'Fisiologista',analista:'Analista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'Delegado',teammanager:'Team Manager',medical:'Clínica / Saúde',outro:'Outro'};
   const SQUAD_ORDER=['eqa','sub19','sub23'];
   const SQUAD_LABEL={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23'};
   function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':u.role==='medical'?'medical':null); }
@@ -6830,7 +6831,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
 })();
 
 // ── STAFF MANAGEMENT VIEW ─────────────────────────────────────────────────────
-const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',analista:'Treinador Analista',condicionamento:'Preparador Físico',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'1º Delegado',delegado2:'2º Delegado',teammanager:'Team Manager',outro:'Outro'};
+const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estagiario:'Estagiário',grcoach:'Treinador de GR',analista:'Treinador Analista',condicionamento:'Preparador Físico',fisiologista:'Fisiologista',fisio:'Fisioterapeuta',enfermeiro:'Enfermeiro',massagista:'Massagista',delegado:'1º Delegado',delegado2:'2º Delegado',teammanager:'Team Manager',outro:'Outro'};
 const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario'];
 // Funções dinâmicas — usam getAppUsers() (Firestore) em vez do USERS estático vazio
 function getStaffAccounts(){ return getAppUsers().filter(u=>u.role==='staff'||u.role==='medical'); }
@@ -6890,7 +6891,7 @@ async function renderStaff(){
     const members=bySquad[sq]||[];
     const rows=members.map(u=>{
       const profile=DB.getStaffProfile(u.user);
-      const role=userStaffRole(u);
+      const role=profile?.staffRole||userStaffRole(u);
       const isMed=MEDICAL_ROLES.includes(role);
       const isDisabled=u.disabled===true;
       const av=profile?.photoUrl
@@ -19065,6 +19066,7 @@ async function openAccountsModal(){
           <option value="grcoach">Treinador de GR</option>
           <option value="analista">Analista</option>
           <option value="condicionamento">Preparador Físico</option>
+          <option value="fisiologista">Fisiologista</option>
           <option value="fisio">Fisioterapeuta</option>
           <option value="enfermeiro">Enfermeiro</option>
           <option value="massagista">Massagista</option>
