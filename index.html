@@ -2607,10 +2607,6 @@ const DB = {
   async addBilhete(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
     if(firestoreDb){
-      // Formulário público — garante auth anónima para satisfazer regras Firestore
-      if(firebaseAuth && !firebaseAuth.currentUser){
-        try{ await firebaseAuth.signInAnonymously(); }catch(ae){ console.warn('anon auth:',ae); }
-      }
       await firestoreDb.collection('bilhetes_requests').doc(entry.id).set(entry).catch(e=>{
         console.error('FS addBilhete:',e);
         throw e; // propaga para o submitBilhetes mostrar o erro
@@ -2633,10 +2629,6 @@ const DB = {
   async addBilheteEqb(entry){
     entry.id=uid(); entry.createdAt=new Date().toISOString();
     if(firestoreDb){
-      // Formulário público — garante auth anónima para satisfazer regras Firestore
-      if(firebaseAuth && !firebaseAuth.currentUser){
-        try{ await firebaseAuth.signInAnonymously(); }catch(ae){ console.warn('anon auth:',ae); }
-      }
       await firestoreDb.collection('bilhetes_eqb_requests').doc(entry.id).set(entry).catch(e=>{
         console.error('FS addBilheteEqb:',e);
         throw e;
@@ -19395,17 +19387,19 @@ document.addEventListener('DOMContentLoaded',()=>{
         await firebaseAuth.signInWithEmailAndPassword(email, password);
         // onAuthStateChanged tratará do resto
       }catch(err){
-        let msg='Credenciais incorretas.';
-        if(err.code==='auth/too-many-requests') msg='Demasiadas tentativas. Tenta mais tarde.';
-        if(err.code==='auth/user-not-found'||err.code==='auth/invalid-credential'){
-          // Conta não existe ainda — mostrar secção de criação
+        const c=err.code||'';
+        if(c==='auth/too-many-requests'){ errEl.textContent='Demasiadas tentativas. Tenta mais tarde.'; loginBtn.disabled=false; loginBtn.textContent='Entrar'; return; }
+        // Conta inexistente — vários SDKs usam códigos diferentes
+        const isNoAccount=c==='auth/user-not-found'||c==='auth/invalid-credential'||c==='auth/invalid-login-credentials';
+        if(isNoAccount){
+          // Mostrar secção de criação de password
           setupWrap.style.display='';
           errEl.textContent='';
           document.getElementById('setup-pw').focus();
           loginBtn.disabled=false; loginBtn.textContent='Entrar';
           return;
         }
-        if(err.code==='auth/wrong-password') msg='Password incorreta.';
+        const msg=c==='auth/wrong-password'?'Password incorreta.':'Credenciais incorretas.';
         errEl.textContent=msg;
         pwIn.value=''; pwIn.focus();
         setTimeout(()=>errEl.textContent='',4000);
@@ -19414,11 +19408,21 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
 
     setupBtn.addEventListener('click',async()=>{
-      const u=resolveUser(userIn.value); if(!u) return;
       const pw=document.getElementById('setup-pw').value;
       const pw2=document.getElementById('setup-pw2').value;
       if(pw.length<6){ errEl.textContent='Mínimo 6 caracteres.'; return; }
       if(pw!==pw2){ errEl.textContent='As passwords não coincidem.'; return; }
+      // Resolver utilizador — tentar cache local primeiro; se falhar, buscar do Firestore por email
+      let u=resolveUser(userIn.value);
+      const inputEmail=userIn.value.trim().toLowerCase();
+      if(!u && firestoreDb && inputEmail.includes('@')){
+        setupBtn.disabled=true; setupBtn.textContent='A verificar…';
+        try{
+          const snap=await firestoreDb.collection('app_users').where('email','==',inputEmail).limit(1).get();
+          if(!snap.empty){ const d=snap.docs[0].data(); _appUsers=[...getAppUsers(),d]; u=d; }
+        }catch(e){}
+      }
+      if(!u){ errEl.textContent='Utilizador não encontrado na base de dados.'; setupBtn.disabled=false; setupBtn.textContent='Criar Conta'; return; }
       setupBtn.disabled=true; setupBtn.textContent='A criar…';
       try{
         // Criar conta via REST API (não interrompe sessão)
