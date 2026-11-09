@@ -19273,6 +19273,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   const resetWrap=document.getElementById('login-reset-wrap');
   const resetLink=document.getElementById('login-reset-link');
 
+  // Nota: loadAppUsers() não é chamado aqui intencionalmente.
+  // Carregar app_users antes de autenticação exporia emails e roles publicamente.
+
   // ── Firebase Auth disponível ─────────────────────────────
   if(firebaseAuth){
     // ── Lookup de perfil: Firestore (por UID) com fallback para USERS (por email) ──
@@ -19383,6 +19386,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       const input=userIn.value.trim();
       // Tenta lookup username→email; se falhar e o input for email, usa diretamente
       const u=resolveUser(input);
+      // Se input contém @ é um email direto — aceitar sem lookup (funciona sempre,
+      // inclusive para novos utilizadores que ainda não estão na cache local)
       const email=u?.email||(input.includes('@')?input.toLowerCase():null);
       if(!email){ errEl.textContent='Utilizador ou email não encontrado.'; pwIn.value=''; return; }
       loginBtn.disabled=true; loginBtn.textContent='A entrar…';
