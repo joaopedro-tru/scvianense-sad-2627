@@ -5258,12 +5258,12 @@ function buildPlayerClinicalCard(athleteId){
     const evLabel=ev?`${ev.type==='game'?'Jogo vs '+ev.opponent:'Treino'} · `:'';
     const isInjury=CR_HAS_INJURY_FIELDS(r.type);
     const injExtra=isInjury?`
-      <div style="padding:8px 10px;background:${r.type==='minor_injury'?'#fff8e1':r.actualRecoveryDate?'#f1f8e9':'#fff3f3'};border-radius:6px;margin-top:6px;font-size:12px">
+      <div style="padding:8px 10px;background:${r.type==='minor_injury'?'#fff8e1':(r.actualRecoveryDate||(r.estimatedRecoveryDate&&r.estimatedRecoveryDate<today))?'#f1f8e9':'#fff3f3'};border-radius:6px;margin-top:6px;font-size:12px">
         ${r.diagnostico?`<div><span style="color:var(--muted)">Diagnóstico:</span> <strong>${r.diagnostico}</strong></div>`:''}
         ${r.treatment?`<div style="margin-top:2px"><span style="color:var(--muted)">Tratamento:</span> ${r.treatment}</div>`:''}
         ${r.type==='minor_injury'?`<div style="font-size:11px;color:#e65100;font-weight:600;margin-top:4px">⚠️ Em vigilância — apto para treinar</div>`:`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
           ${r.estimatedRecoveryDate?`<span><span style="color:var(--muted)">Prev.:</span> ${fmtDate(r.estimatedRecoveryDate)}</span>`:''}
-          ${r.actualRecoveryDate?`<span style="color:#2e7d32;font-weight:600">✅ Recuperado em ${fmtDate(r.actualRecoveryDate)}</span>`:`<span style="color:#b71c1c;font-weight:600">🚨 A recuperar</span>`}
+          ${r.actualRecoveryDate?`<span style="color:#2e7d32;font-weight:600">✅ Recuperado em ${fmtDate(r.actualRecoveryDate)}</span>`:(r.estimatedRecoveryDate&&r.estimatedRecoveryDate<today)?`<span style="color:#2e7d32;font-weight:600">✅ Recuperado (data prev. ${fmtDate(r.estimatedRecoveryDate)})</span>`:`<span style="color:#b71c1c;font-weight:600">🚨 A recuperar</span>`}
         </div>`}
       </div>`:'';
     const editForm=canEdit&&isInjury?`
@@ -9404,13 +9404,26 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
 // ── Attendance helpers ────────────────────────────────────────────────────────
 
 // Returns the active injury clinical record for a player on a given date, or null.
-// Active = injury date <= check date AND (no actualRecoveryDate OR actualRecoveryDate > check date).
+// Active = injury date <= check date AND not yet recovered.
+// Recovery is determined by: actualRecoveryDate (if set), else linked unavailability endDate, else estimatedRecoveryDate.
 function getActiveInjury(pid, date){
   const recs=DB.getClinicalRecords(pid).filter(r=>r.type==='injury'&&r.athleteId===pid&&r.date<=date);
   if(!recs.length) return null;
   // Sort by date desc — most recent first
   recs.sort((a,b)=>b.date.localeCompare(a.date));
-  return recs.find(r=>!r.actualRecoveryDate||r.actualRecoveryDate>date)||null;
+  return recs.find(r=>{
+    // Explicitly recovered — use actual date
+    if(r.actualRecoveryDate) return r.actualRecoveryDate>date;
+    // Check linked unavailability endDate (source of truth for lesão unavailability)
+    if(r.unavailId){
+      const unavail=DB.getUnavailability().find(u=>u.id===r.unavailId);
+      if(unavail?.endDate) return unavail.endDate>=date;
+    }
+    // Fall back to estimatedRecoveryDate
+    if(r.estimatedRecoveryDate) return r.estimatedRecoveryDate>=date;
+    // No recovery date at all — still active
+    return true;
+  })||null;
 }
 
 // Returns effective attendance value for a player on a given training date.
