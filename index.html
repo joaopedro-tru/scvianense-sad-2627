@@ -10830,7 +10830,8 @@ function renderLiveStatsTab(ev){
 // ── LIVE PLAYER PICKER ────────────────────────────────────────────────────────
 function getConvocados(){
   const ev=DB.getEvent(liveGameId); if(!ev) return [];
-  const conv=ev.convocatoria||{players:{}};
+  const _cr0=ev.convocatoria||{};
+  const conv={..._cr0,players:_cr0.players||{}};
   // Procura em todos os jogadores para incluir atletas de outros escalões
   const allPlayers=DB.players();
   const convs=allPlayers.filter(p=>!!conv.players[p.id]);
@@ -12321,7 +12322,8 @@ function renderGamePre(ev,sqPlayers,conv){
   // ── event listeners ──────────────────────────────────────────────────────
   document.querySelectorAll('[data-gconv]').forEach(btn=>btn.addEventListener('click',()=>{
     const pid=btn.dataset.gconv;
-    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{}));
+    c.players=c.players||{};
     if(c.players[pid]){ delete c.players[pid]; if(c.traveling) delete c.traveling[pid]; }
     else c.players[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
@@ -12338,14 +12340,16 @@ function renderGamePre(ev,sqPlayers,conv){
   document.querySelectorAll('[data-gtrav]').forEach(btn=>btn.addEventListener('click',()=>{
     if(btn.disabled) return;
     const pid=btn.dataset.gtrav;
-    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{}));
+    c.players=c.players||{};
     if(!c.players[pid]) return;
     c.traveling=c.traveling||{};
     if(c.traveling[pid]) delete c.traveling[pid]; else c.traveling[pid]=true;
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   }));
   document.getElementById('btn-conv-all').addEventListener('click',()=>{
-    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{}));
+    c.players=c.players||{};
     const available=sqPlayers.filter(p=>!getActiveInjury(p.id,ev.date));
     const allConved=available.every(p=>!!c.players[p.id]);
     if(allConved){ available.forEach(p=>delete c.players[p.id]); }
@@ -12353,7 +12357,8 @@ function renderGamePre(ev,sqPlayers,conv){
     DB.updateEvent(gameEventId,{convocatoria:c}); renderGame();
   });
   document.getElementById('btn-save-conv').addEventListener('click',()=>{
-    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{players:{}}));
+    const c=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).convocatoria||{}));
+    c.players=c.players||{};
     c.concentrationTime=document.getElementById('gm-conc-time').value;
     c.concentrationPlace=document.getElementById('gm-conc-place').value;
     if(isEqa) c.scheduleBreakfast=document.getElementById('gm-sch-breakfast')?.value||'';
@@ -12970,7 +12975,8 @@ function exportGamePDF(){
   const mr=ev.matchReport||{};
   const evList=mr.events||[];
   const allPlayers=DB.players();
-  const conv=ev.convocatoria||{players:{}};
+  const _cr1=ev.convocatoria||{};
+  const conv={..._cr1,players:_cr1.players||{}};
   const convocados=sortByPos(allPlayers.filter(p=>!!conv.players[p.id]));
   const lineup=mr.lineup||[];
   const ratings=mr.ratings||{};
@@ -13707,7 +13713,8 @@ function saveTokEdit(){
 // ── CONVOCATÓRIA PDF ──────────────────────────────────────────────────────────
 function generateConvocatoriaPDF(evId){
   const ev=DB.getEvent(evId); if(!ev)return;
-  const conv=ev.convocatoria||{players:{},notes:'',concentrationTime:'',concentrationPlace:'',scheduleArrival:'',schedulePalestra:'',scheduleGkWarmup:'',scheduleWarmup:'',scheduleDressing:''};
+  const _cr2=ev.convocatoria||{};
+  const conv={players:{},notes:'',concentrationTime:'',concentrationPlace:'',scheduleArrival:'',schedulePalestra:'',scheduleGkWarmup:'',scheduleWarmup:'',scheduleDressing:'',..._cr2,players:_cr2.players||{}};
   // Busca todos os jogadores (não só do escalão do jogo) para incluir
   // atletas de outros escalões que possam estar na convocatória.
   const allPlayers=DB.players();
@@ -17728,7 +17735,8 @@ function addExtraStaff(gameId){
   const name=(document.getElementById('extra-staff-name')?.value||'').trim();
   const role=(document.getElementById('extra-staff-role')?.value||'').trim();
   if(!name){ toast('Indica o nome do staff.'); return; }
-  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{players:{}}));
+  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{}));
+  c.players=c.players||{};
   c.staffExtra=c.staffExtra||[];
   c.staffExtra.push({name,role,id:uid()});
   DB.updateEvent(gameId,{convocatoria:c});
@@ -17737,7 +17745,8 @@ function addExtraStaff(gameId){
 
 function removeExtraStaff(idx,gameId){
   if(!confirm('Remover este membro do staff?')) return;
-  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{players:{}}));
+  const c=JSON.parse(JSON.stringify(DB.getEvent(gameId)?.convocatoria||{}));
+  c.players=c.players||{};
   c.staffExtra=c.staffExtra||[];
   c.staffExtra.splice(idx,1);
   DB.updateEvent(gameId,{convocatoria:c});
