@@ -13291,69 +13291,82 @@ function _fpfDateLabel(dateStr){
   return `${parseInt(d)} ${months[parseInt(m)-1]}`;
 }
 
-// Auto-lookup: scan fixture pages to find the matchId for ev
+// Auto-lookup: scan match pages starting from firstMatchId to find the game
 async function _fpfAutoLookup(ev){
   const container=document.getElementById('fpf-data-container');
   if(!container) return;
   const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
   const cfg=_getFPFCfg(sq);
 
-  if(!cfg.firstFixtureId||!cfg.teamName){
+  if(!cfg.firstMatchId||!cfg.teamName){
     container.innerHTML=_fpfConfigForm(sq,ev,'⚠️ Configura os dados FPF do escalão para activar a pesquisa automática.');
     _bindFPFConfigForm(sq,ev);
     return;
   }
 
-  const totalRounds=Number(cfg.totalJornadas)||18;
-  const firstFid=Number(cfg.firstFixtureId);
-  const lastFid=firstFid+(totalRounds-1);
-  const dateLabel=ev.date?_fpfDateLabel(ev.date):'';
+  const firstMid=Number(cfg.firstMatchId);
+  const maxScan=Number(cfg.maxScan)||200; // scan up to 200 matchIds (covers full season)
   const normOpp=_normTeam(ev.opponent||'');
   const normUs=_normTeam(cfg.teamName);
+  const targetDate=ev.date||''; // YYYY-MM-DD
 
-  const total=totalRounds;
-  for(let idx=0;idx<total;idx++){
-    const i=lastFid-idx; // latest-first
+  // Parse date + teams from a match page HTML
+  function _parseMatchMeta(html){
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const home=_normTeam(doc.querySelector('.col-md-3.text-left strong')?.textContent||'');
+    const away=_normTeam(doc.querySelector('.col-md-3.text-right strong')?.textContent||'');
+    // Date is in .info-time-place, e.g. "07/11/2026 15:00 | Estádio..."
+    const info=doc.querySelector('.info-time-place')?.textContent||'';
+    const dateMatch=info.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const date=dateMatch?`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`:''; // → YYYY-MM-DD
+    return {home,away,date};
+  }
+
+  let found=0, checked=0;
+  container.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar (0/${maxScan})...</p>`;
+
+  for(let mid=firstMid; mid<firstMid+maxScan; mid++){
+    checked++;
     const pctEl=document.getElementById('fpf-data-container');
-    if(pctEl) pctEl.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (${idx+1}/${total})...</p>`;
+    if(pctEl) pctEl.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar (${checked}/${maxScan})...</p>`;
+
     try{
-      const r=await fetch(`/api/fpf?fixtureId=${i}`);
+      const r=await fetch(`/api/fpf?matchId=${mid}`);
+      if(r.status===429){ await new Promise(res=>setTimeout(res,1000)); continue; }
       if(!r.ok) continue;
       const html=await r.text();
-      const doc=new DOMParser().parseFromString(html,'text/html');
-      const links=[...doc.querySelectorAll('a.game-link[href*="matchId"]')];
-      for(const link of links){
-        const href=link.getAttribute('href')||'';
-        const mid=href.match(/matchId=(\d+)/)?.[1];
-        if(!mid) continue;
-        const home=_normTeam(link.querySelector('.home-team')?.textContent||'');
-        const away=_normTeam(link.querySelector('.away-team')?.textContent||'');
-        const sched=(link.querySelector('.game-schedule')?.textContent||'').toLowerCase().trim();
-        const usInGame=(home.includes(normUs)||normUs.includes(home))||
-                       (away.includes(normUs)||normUs.includes(away));
-        if(!usInGame) continue;
-        const other=home.includes(normUs)?away:home;
-        const oppMatch=normOpp&&other&&(other.includes(normOpp)||normOpp.includes(other)||
-          other.split(' ').some(w=>w.length>3&&normOpp.includes(w)));
-        const dateMatch=dateLabel&&sched.includes(dateLabel);
-        if(!normOpp&&!dateLabel) continue;
-        if(oppMatch||dateMatch){
-          await DB.updateEvent(gameEventId,{fpfMatchId:mid});
-          if(document.getElementById('fpf-data-container')){
-            document.getElementById('fpf-data-container').innerHTML=
-              '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">✅ Jogo encontrado! A carregar...</p>';
-          }
-          _loadFPFData(mid);
-          return;
-        }
+      const meta=_parseMatchMeta(html);
+      // Check our team is in this game
+      const usInGame=(meta.home.includes(normUs)||normUs.includes(meta.home))||
+                     (meta.away.includes(normUs)||normUs.includes(meta.away));
+      if(!usInGame) continue;
+      // Check date
+      const dateOk=!targetDate||meta.date===targetDate;
+      if(!dateOk) continue;
+      // Check opponent
+      const other=meta.home.includes(normUs)?meta.away:meta.home;
+      const oppOk=!normOpp||(other.includes(normOpp)||normOpp.includes(other)||
+        other.split(' ').some(w=>w.length>3&&normOpp.includes(w)));
+      if(!oppOk) continue;
+
+      // Found it
+      await DB.updateEvent(gameEventId,{fpfMatchId:String(mid)});
+      if(document.getElementById('fpf-data-container')){
+        document.getElementById('fpf-data-container').innerHTML=
+          '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">✅ Jogo encontrado! A carregar...</p>';
       }
-    }catch(e){ /* skip fixture */ }
+      _loadFPFData(String(mid));
+      return;
+    }catch(e){ /* skip */ }
+
+    // Small delay to avoid rate-limiting
+    if(checked%10===0) await new Promise(res=>setTimeout(res,200));
   }
 
   if(document.getElementById('fpf-data-container')){
     document.getElementById('fpf-data-container').innerHTML=`
       <div style="text-align:center;padding:16px 0">
-        <p style="color:#b71c1c;font-size:13px;margin-bottom:12px">⚠️ Jogo não encontrado automaticamente. Introduz o ID manualmente.</p>
+        <p style="color:#b71c1c;font-size:13px;margin-bottom:12px">⚠️ Jogo não encontrado. Introduz o ID manualmente.</p>
         ${_fpfManualInputHtml('')}
       </div>`;
     _bindFPFManualInput(ev);
@@ -13362,10 +13375,10 @@ async function _fpfAutoLookup(ev){
 
 function _fpfConfigForm(sq,ev,msg){
   const cfg=_getFPFCfg(sq);
-  // Liga 3 Série A defaults for eqa (652229 = jornada 1, 18 rondas)
-  const DEFAULTS={eqa:{firstFixtureId:'652229',totalJornadas:'18',teamName:'Sc Vianense Sad'},
-                  sub23:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'},
-                  sub19:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'}};
+  // Liga 3 Série A defaults for eqa — jornada 1 matchId confirmed: 2577971
+  const DEFAULTS={eqa:{firstMatchId:'2577971',teamName:'Sc Vianense Sad'},
+                  sub23:{firstMatchId:'',teamName:'Sc Vianense Sad'},
+                  sub19:{firstMatchId:'',teamName:'Sc Vianense Sad'}};
   const def=DEFAULTS[sq]||{};
   return `<div style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;margin-bottom:10px">⚙️ Configuração FPF — ${sq.toUpperCase()}</div>
@@ -13374,11 +13387,8 @@ function _fpfConfigForm(sq,ev,msg){
       <label style="font-size:12px;color:var(--muted)">Nome do clube na FPF (ex: Sc Vianense Sad)</label>
       <input id="fpf-cfg-team" placeholder="${def.teamName||''}" value="${cfg.teamName||def.teamName||''}"
         style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
-      <label style="font-size:12px;color:var(--muted)">ID da 1.ª jornada — visível no URL de qualquer jornada em <a href="https://resultados.fpf.pt/Competition" target="_blank" style="color:#1a56db">resultados.fpf.pt</a></label>
-      <input id="fpf-cfg-fid" type="number" placeholder="${def.firstFixtureId||''}" value="${cfg.firstFixtureId||def.firstFixtureId||''}"
-        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
-      <label style="font-size:12px;color:var(--muted)">Número de jornadas</label>
-      <input id="fpf-cfg-rounds" type="number" placeholder="${def.totalJornadas||18}" value="${cfg.totalJornadas||def.totalJornadas||18}"
+      <label style="font-size:12px;color:var(--muted)">ID do 1.º jogo da época — URL do 1.º jogo em <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=2577971" target="_blank" style="color:#1a56db">resultados.fpf.pt</a></label>
+      <input id="fpf-cfg-fmid" type="number" placeholder="${def.firstMatchId||''}" value="${cfg.firstMatchId||def.firstMatchId||''}"
         style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -13390,10 +13400,9 @@ function _fpfConfigForm(sq,ev,msg){
 function _bindFPFConfigForm(sq,ev){
   document.getElementById('fpf-cfg-save')?.addEventListener('click',async()=>{
     const teamName=document.getElementById('fpf-cfg-team')?.value?.trim();
-    const firstFixtureId=document.getElementById('fpf-cfg-fid')?.value?.trim();
-    const totalJornadas=parseInt(document.getElementById('fpf-cfg-rounds')?.value)||18;
-    if(!teamName||!firstFixtureId){ toast('⚠️ Preenche todos os campos'); return; }
-    _saveFPFCfg(sq,{teamName,firstFixtureId:Number(firstFixtureId),totalJornadas});
+    const firstMatchId=document.getElementById('fpf-cfg-fmid')?.value?.trim();
+    if(!teamName||!firstMatchId){ toast('⚠️ Preenche todos os campos'); return; }
+    _saveFPFCfg(sq,{teamName,firstMatchId:Number(firstMatchId)});
     toast('✅ Configuração FPF guardada');
     document.getElementById('fpf-data-container').innerHTML=
       '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A iniciar pesquisa...</p>';
@@ -13422,7 +13431,7 @@ function renderGameFPF(ev){
   const matchId=ev.fpfMatchId||'';
   const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
   const cfg=_getFPFCfg(sq);
-  const hasConfig=!!(cfg.firstFixtureId&&cfg.teamName);
+  const hasConfig=!!(cfg.firstMatchId&&cfg.teamName);
 
   document.getElementById('gm-tab-content').innerHTML=`
     <div style="padding:4px 0">
