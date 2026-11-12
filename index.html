@@ -4499,14 +4499,17 @@ function renderDash(){
       const ga=evList.filter(e=>e.type==='goal_conceded').length;
       const score=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
       const resColor=gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100';
+      const dest=isFinished?`nav('game',{id:'${ev.id}'})`:`nav('matchday')`;
       let rightHtml='';
       if(isFinished){
         const resL=gf>ga?'V':gf<ga?'D':'E';
         rightHtml=`<div style="text-align:center;flex-shrink:0"><div style="font-size:26px;font-weight:800;color:${resColor}">${score}</div><div style="font-size:11px;font-weight:700;color:${resColor}">${resL}</div></div>`;
       } else {
-        rightHtml=`<div style="font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0">Ver Jogo →</div>`;
+        const hasStarted=(mr.matchClock?.phase&&mr.matchClock.phase!=='pre')||(evList.length>0);
+        const ctaLabel=hasStarted?'▶ Continuar':'▶ Iniciar';
+        rightHtml=`<div style="font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0">${ctaLabel}</div>`;
       }
-      return `<div onclick="nav('game',{id:'${ev.id}'})" style="cursor:pointer;border:2px solid var(--primary);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.06)">
+      return `<div onclick="${dest}" style="cursor:pointer;border:2px solid var(--primary);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.06)">
         <div style="font-size:28px;flex-shrink:0">⚽</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:10px;font-weight:700;color:var(--primary);letter-spacing:.6px;margin-bottom:3px">JOGO HOJE · ${ha.toUpperCase()} · ${squadLabel.toUpperCase()}</div>
