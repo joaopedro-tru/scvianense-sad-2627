@@ -13733,21 +13733,28 @@ function _parseFPFHtml(html){
   const homeBench=parseLineup(homeLineupEls[1]);
   const awayBench=parseLineup(awayLineupEls[1]);
 
-  // Staff sections — each is a <section> with .title-bar + .player elements
-  // (same structure as lineup; bold span = cargo, normal span = nome)
-  // "Confrontos Anteriores" is intentionally excluded
+  // Staff sections — each is a <section> with .title-bar + .lineup-team .player elements
+  // Role: <span style*="bold"> or <strong>; name: <span style*="normal">
+  // Both teams use .home-team class; 1st lineup-team = home, 2nd = away
+  // "Confrontos Anteriores" intentionally excluded
   const STAFF_SHOW=new Set(['Treinadores','Dirigentes','Banco Suplementar','Equipa de arbitragem']);
   const staffSections={};
   doc.querySelectorAll('section').forEach(sec=>{
     const title=sec.querySelector('.title-bar')?.textContent?.trim();
     if(!title||!STAFF_SHOW.has(title)) return;
-    staffSections[title]=[...sec.querySelectorAll('.player')].map(p=>{
-      const boldSpan=p.querySelector('span[style*="bold"]');
-      const normalSpan=p.querySelector('span[style*="normal"]');
-      const role=boldSpan?.textContent?.trim()||'';
-      const name=normalSpan?.textContent?.trim()||'';
-      return {role,name};
-    }).filter(e=>e.name);
+    const lineupTeams=[...sec.querySelectorAll('.lineup-team')];
+    const entries=[];
+    lineupTeams.forEach((lt,idx)=>{
+      const team=lineupTeams.length>1?(idx===0?'home':'away'):null;
+      [...lt.querySelectorAll('.player')].forEach(p=>{
+        const boldEl=p.querySelector('span[style*="bold"],strong');
+        const normalSpan=p.querySelector('span[style*="normal"]');
+        const role=boldEl?.textContent?.trim()||'';
+        const name=normalSpan?.textContent?.trim()||'';
+        if(name) entries.push({role,name,team});
+      });
+    });
+    if(entries.length) staffSections[title]=entries;
   });
 
   return {infoText,homeTeamName,awayTeamName,scoreText,events,homeXI,awayXI,homeBench,awayBench,staffSections};
@@ -13819,15 +13826,36 @@ function _renderFPFData(d,matchId){
     }).join('')
     :'<p style="color:var(--muted);font-size:13px;padding:8px 0">Sem eventos registados</p>';
 
-  const staffHtml=Object.entries(d.staffSections).filter(([,v])=>v.length).map(([section,entries])=>`
-    <div style="margin-top:14px">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${section}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">
-        ${entries.map(e=>`<div style="font-size:12px;padding:6px 8px;background:var(--bg-2,#f5f7fa);border-radius:6px">
+  const _staffGroup=(entries,homeLabel,awayLabel)=>{
+    const hasTeams=entries.some(e=>e.team);
+    if(!hasTeams){
+      // No team split (e.g. arbitragem) — just list all
+      return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:5px">
+        ${entries.map(e=>`<div style="font-size:12px;padding:5px 8px;background:var(--bg-2,#f5f7fa);border-radius:6px">
           ${e.role?`<div style="font-size:10px;color:var(--muted);margin-bottom:1px">${e.role}</div>`:''}
           <div style="font-weight:600">${e.name}</div>
         </div>`).join('')}
-      </div>
+      </div>`;
+    }
+    const home=entries.filter(e=>e.team==='home');
+    const away=entries.filter(e=>e.team==='away');
+    const col=(label,items)=>items.length?`
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;border-bottom:1px solid var(--border);padding-bottom:3px">${label}</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${items.map(e=>`<div style="font-size:12px;padding:4px 7px;background:var(--bg-2,#f5f7fa);border-radius:6px">
+            ${e.role?`<div style="font-size:10px;color:var(--muted);margin-bottom:1px">${e.role}</div>`:''}
+            <div style="font-weight:600">${e.name}</div>
+          </div>`).join('')}
+        </div>
+      </div>`:'';
+    return `<div style="display:flex;gap:12px">${col(homeLabel,home)}${home.length&&away.length?'<div style="width:1px;background:var(--border);flex-shrink:0"></div>':''}${col(awayLabel,away)}</div>`;
+  };
+
+  const staffHtml=Object.entries(d.staffSections).filter(([,v])=>v.length).map(([section,entries])=>`
+    <div style="margin-top:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${section}</div>
+      ${_staffGroup(entries,d.homeTeamName||'Casa',d.awayTeamName||'Fora')}
     </div>`).join('');
 
   return `
