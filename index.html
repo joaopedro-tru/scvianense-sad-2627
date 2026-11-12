@@ -736,6 +736,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <div class="fb-banner" id="fb-banner">
       <strong>⚠️ Firebase não configurado.</strong> Os ficheiros (foto, documentos) estão a ser guardados como base64 no browser. Para produção com Vercel, preenche <code>FB_CONFIG</code> no início do script com as tuas credenciais Firebase.
     </div>
+    <div id="d-today-highlight"></div>
     <!-- ADMIN DASHBOARD -->
     <div id="d-admin-content">
       <div id="d-admin-cols"></div>
@@ -4094,7 +4095,7 @@ function retroAddShotOnForGoals(){
     const evs=mr.events||[];
     // IDs de golos que já têm shot_on gerado automaticamente
     const coveredGoalIds=new Set(evs.filter(e=>e.fromGoal&&e.goalId).map(e=>e.goalId));
-    const goals=evs.filter(e=>e.type==='goal'&&!e.ownGoal&&e.playerId);
+    const goals=evs.filter(e=>e.type==='goal'&&!e.ownGoal&&e.playerId&&!e.fromPenalty);
     const toAdd=goals.filter(g=>!coveredGoalIds.has(g.id));
     if(!toAdd.length) return;
     toAdd.forEach(g=>{
@@ -4435,7 +4436,7 @@ function buildSquadPerfHTML(squads, events, today){
       const evs=mr.events||[];
       const hasResult=evs.length>0||(mr.matchClock&&mr.matchClock.phase==='finished');
       if(!hasResult) return;
-      const scored=evs.filter(me=>me.type==='goal').length;
+      const scored=evs.filter(me=>me.type==='goal'&&!me.fromPenalty).length;
       const conceded=evs.filter(me=>me.type==='goal_conceded').length;
       byComp[key].gf+=scored; byComp[key].ga+=conceded;
       if(scored>conceded) byComp[key].v++;
@@ -4479,6 +4480,44 @@ function renderDash(){
   document.getElementById('d-date').textContent=`${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
   if(!FB_READY) document.getElementById('fb-banner').classList.add('show');
 
+  // ── TODAY'S GAME HIGHLIGHT ──
+  (function(){
+    const tEl=document.getElementById('d-today-highlight');
+    if(!tEl) return;
+    const _today=now.toISOString().split('T')[0];
+    const allEs=DB.events();
+    const tGames=allEs.filter(e=>e.type==='game'&&e.date===_today&&(isAdmin()||e.squad===coachSquad()));
+    if(!tGames.length){ tEl.innerHTML=''; return; }
+    tEl.innerHTML=tGames.map(ev=>{
+      const mr=ev.matchReport||{};
+      const evList=mr.events||[];
+      const isFinished=mr.matchClock?.phase==='finished';
+      const ha=ev.homeAway==='away'?'✈️ Fora':'🏠 Casa';
+      const opponent=ev.opponent||'Adversário';
+      const squadLabel=SQUADS[ev.squad]||ev.squad||'';
+      const gf=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
+      const ga=evList.filter(e=>e.type==='goal_conceded').length;
+      const score=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
+      const resColor=gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100';
+      let rightHtml='';
+      if(isFinished){
+        const resL=gf>ga?'V':gf<ga?'D':'E';
+        rightHtml=`<div style="text-align:center;flex-shrink:0"><div style="font-size:26px;font-weight:800;color:${resColor}">${score}</div><div style="font-size:11px;font-weight:700;color:${resColor}">${resL}</div></div>`;
+      } else {
+        rightHtml=`<div style="font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0">Ver Jogo →</div>`;
+      }
+      return `<div onclick="nav('game',{id:'${ev.id}'})" style="cursor:pointer;border:2px solid var(--primary);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;background:rgba(37,99,235,.06)">
+        <div style="font-size:28px;flex-shrink:0">⚽</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:700;color:var(--primary);letter-spacing:.6px;margin-bottom:3px">JOGO HOJE · ${ha.toUpperCase()} · ${squadLabel.toUpperCase()}</div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${opponent}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${[ev.competition,ev.time,ev.location].filter(Boolean).join(' · ')}</div>
+        </div>
+        ${rightHtml}
+      </div>`;
+    }).join('');
+  })();
+
   if(!isAdmin()){
     // ── COACH DASHBOARD ──
     document.getElementById('d-admin-content').style.display='none';
@@ -4493,7 +4532,7 @@ function renderDash(){
       let v=0,e=0,d=0;
       games.forEach(g=>{
         const mr=g.matchReport||{events:[]};
-        const gf=(mr.events||[]).filter(me=>me.type==='goal').length;
+        const gf=(mr.events||[]).filter(me=>me.type==='goal'&&!me.fromPenalty).length;
         const ga=(mr.events||[]).filter(me=>me.type==='goal_conceded').length;
         if(gf>ga) v++; else if(gf<ga) d++; else if((mr.events||[]).length>0) e++;
       });
@@ -4545,7 +4584,7 @@ function renderDash(){
     const gameClosed=mr.matchClock?.phase==='finished';
     let badge='';
     if(isPast||(isToday&&gameClosed)){
-      const gf=evList.filter(e=>e.type==='goal').length;
+      const gf=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
       const ga=evList.filter(e=>e.type==='goal_conceded').length;
       const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
       const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
@@ -4775,7 +4814,7 @@ function renderAdminStaffView(userKey){
   const pastTrains=es.filter(e=>e.type==='training'&&e.date<today);
   const wins=pastOfficialGames.filter(g=>{
     const mr=g.matchReport||{events:[]};
-    const gf=(mr.events||[]).filter(e=>e.type==='goal').length;
+    const gf=(mr.events||[]).filter(e=>e.type==='goal'&&!e.fromPenalty).length;
     const ga=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
     return gf>ga;
   }).length;
@@ -4978,7 +5017,7 @@ function renderSqStats(){
     const evs=mr.events||[];
     const hasResult=evs.length>0||(mr.matchClock&&mr.matchClock.phase==='finished');
     if(!hasResult) return;
-    const scored=evs.filter(me=>me.type==='goal').length;
+    const scored=evs.filter(me=>me.type==='goal'&&!me.fromPenalty).length;
     const conceded=evs.filter(me=>me.type==='goal_conceded').length;
     byComp[key].gf+=scored; byComp[key].ga+=conceded; byComp[key].played++;
     if(scored>conceded) byComp[key].v++;
@@ -5019,7 +5058,7 @@ function renderSqStats(){
       const mr=g.matchReport||{};
       const evs=mr.events||[];
       if(evs.length>0||(mr.matchClock&&mr.matchClock.phase==='finished')){
-        const gf=evs.filter(me=>me.type==='goal').length;
+        const gf=evs.filter(me=>me.type==='goal'&&!me.fromPenalty).length;
         const ga=evs.filter(me=>me.type==='goal_conceded').length;
         const res=gf>ga?'V':gf<ga?'D':'E';
         const rc=res==='V'?'#2e7d32':res==='D'?'#c0392b':'#e65100';
@@ -5423,7 +5462,7 @@ function renderPlayer(){
     const gls=goalEvs.length,ast=assistEvs.length,ylw=yellowEvs.length,red=redEv?1:0;
     const sOn=shotOnEvs.length,sOff=shotOffEvs.length,fouls=foulEvs.length;
     if(!conv&&!played&&!gls&&!ast&&!ylw&&!red&&!hasRating&&!sOn&&!sOff&&!fouls) return;
-    const gf=evList.filter(e=>e.type==='goal').length;
+    const gf=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
     const ga=evList.filter(e=>e.type==='goal_conceded').length;
     const hasScore=evList.some(e=>e.type==='goal'||e.type==='goal_conceded');
     const scoreStr=hasScore?`${gf}–${ga}`:'—';
@@ -8661,7 +8700,7 @@ function renderCal(){
       const opponent=ev.opponent||'Adversário';
       let badge='';
       if(showResult){
-        const gf=evList.filter(me=>me.type==='goal').length;
+        const gf=evList.filter(me=>me.type==='goal'&&!me.fromPenalty).length;
         const ga=evList.filter(me=>me.type==='goal_conceded').length;
         const scoreStr=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
         const res=gf>ga?{l:'V',c:'#2e7d32'}:gf<ga?{l:'D',c:'#c0392b'}:{l:'E',c:'#e65100'};
@@ -10048,7 +10087,7 @@ function renderMatchDay(){
   el.innerHTML=games.map(g=>{
     const mr=g.matchReport||{events:[]};
     const evs=mr.events||[];
-    const goals=evs.filter(e=>e.type==='goal').length;
+    const goals=evs.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
     const conc=evs.filter(e=>e.type==='goal_conceded').length;
     const hasEvs=evs.length>0;
     const isFinished=mr.matchClock?.phase==='finished';
@@ -10295,7 +10334,7 @@ function renderLiveRecording(ev){
   const mr=ev.matchReport||{events:[]};
   const clock=mr.matchClock||{phase:'pre'};
   const lineup=mr.lineup||[];
-  const goals=(mr.events||[]).filter(e=>e.type==='goal').length;
+  const goals=(mr.events||[]).filter(e=>e.type==='goal'&&!e.fromPenalty).length;
   const conc=(mr.events||[]).filter(e=>e.type==='goal_conceded').length;
   const isHome=ev.homeAway!=='away';
   const scoreA=isHome?goals:conc, scoreB=isHome?conc:goals;
@@ -10473,7 +10512,7 @@ function renderLiveGeralTab(ev){
       if(!confirm('Remover este evento?')) return;
       const eid=btn.dataset.delLv;
       const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
-      cur.events=(cur.events||[]).filter(e=>e.id!==eid&&!(e.fromPenalty&&e.penaltyId===eid));
+      cur.events=(cur.events||[]).filter(e=>e.id!==eid&&e.penaltyId!==eid&&e.goalId!==eid);
       DB.updateEvent(liveGameId,{matchReport:cur});
       renderLiveGeralTab(DB.getEvent(liveGameId));
     }));
@@ -10696,8 +10735,8 @@ function renderLiveStatsTab(ev){
       </div>`).join('')}
     </div>`;
   }
-  const goals=evs.filter(e=>e.type==='goal').length;
-  const goalsRegular=evs.filter(e=>e.type==='goal'&&!e.ownGoal).length; // autogolos não contam como remate
+  const goals=evs.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
+  const goalsRegular=evs.filter(e=>e.type==='goal'&&!e.ownGoal&&!e.fromPenalty).length; // autogolos não contam como remate
   const conceded=evs.filter(e=>e.type==='goal_conceded').length;
   const shots_on=evs.filter(e=>e.type==='shot_on').length;
   const shots_off=evs.filter(e=>e.type==='shot_off').length;
@@ -11399,7 +11438,7 @@ function renderSqGames(){
     const gameWasPlayed=evList.length>0||(mr.matchClock?.phase==='finished');
     let resultBadge='';
     if((isPast||ev.date===today)&&gameWasPlayed){
-      const gf=evList.filter(e=>e.type==='goal').length;
+      const gf=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
       const ga=evList.filter(e=>e.type==='goal_conceded').length;
       const score=ev.homeAway!=='away'?`${gf}–${ga}`:`${ga}–${gf}`;
       const col=gf>ga?'#2e7d32':gf<ga?'#c0392b':'#e65100';
@@ -11572,7 +11611,7 @@ tbody td{border-bottom:1px solid #d8e2f0;vertical-align:middle}
       const loc=[ev.location,ev.city].filter(Boolean).join(' · ')||'—';
       const mr=ev.matchReport||{};
       const evList=mr.events||[];
-      const goals=evList.filter(e=>e.type==='goal').length;
+      const goals=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
       const conc=evList.filter(e=>e.type==='goal_conceded').length;
       const hasResult=isPast&&evList.length>0;
       const isHome=ev.homeAway!=='away';
@@ -12677,7 +12716,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     </div>${rBadge(motmPlayer.id)}</div>`:'';
 
   // Stats totals
-  const nGoals=evs.filter(e=>e.type==='goal').length;
+  const nGoals=evs.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
   const nGC=evs.filter(e=>e.type==='goal_conceded').length;
   const nYel=evs.filter(e=>e.type==='yellow').length;
   const nYel2=evs.filter(e=>e.type==='yellow2').length;
@@ -13188,7 +13227,7 @@ function exportGamePDF(){
   function fullName(id){ const p=DB.getPlayer(id)||allPlayers.find(x=>x.id===id); return p?p.name:'—'; }
 
   // ── Score ──
-  const goals=evList.filter(e=>e.type==='goal').length;
+  const goals=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
   const goalsCon=evList.filter(e=>e.type==='goal_conceded').length;
   const scoreUs=isHome?goals:goalsCon, scoreAdv=isHome?goalsCon:goals;
   const teamName=isHome?'SC Vianense SAD':(ev.opponent||'Adversário');
@@ -13683,7 +13722,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const titulares=convocados.filter(p=>lineup.includes(p.id));
   const suplentes=convocados.filter(p=>!lineup.includes(p.id));
   const evs=(mr.events||[]).sort((a,b)=>a.minute-b.minute);
-  const goals=evs.filter(e=>e.type==='goal').length;
+  const goals=evs.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
   const goalsConceded=evs.filter(e=>e.type==='goal_conceded').length;
   function pName(id){ const p=DB.getPlayer(id); return p?dn(p):'—'; }
   function fmtEvMin(m){ const n=m||0; return n>90?`90+${n-90}'`:`${n}'`; }
@@ -13773,7 +13812,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
         <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📊 Estatísticas</h3>
         ${(()=>{
           const posEvs=mr.events||[];
-          const pgGoals=posEvs.filter(e=>e.type==='goal'&&!e.ownGoal).length;
+          const pgGoals=posEvs.filter(e=>e.type==='goal'&&!e.ownGoal&&!e.fromPenalty).length;
           const pgShots_on=posEvs.filter(e=>e.type==='shot_on').length;
           const pgShots_off=posEvs.filter(e=>e.type==='shot_off').length;
           const pgTotal=pgGoals+pgShots_on+pgShots_off;
@@ -13998,8 +14037,8 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   document.querySelectorAll('[data-del-me]').forEach(btn=>btn.addEventListener('click',()=>{
     const eid=btn.dataset.delMe;
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
-    // Also remove linked fromPenalty goal when deleting a penalty_in_play event
-    curMr.events=curMr.events.filter(e=>e.id!==eid&&!(e.fromPenalty&&e.penaltyId===eid));
+    // Remove event and all shadow events linked to it (penaltyId or goalId)
+    curMr.events=curMr.events.filter(e=>e.id!==eid&&e.penaltyId!==eid&&e.goalId!==eid);
     DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
   }));
   // Ratings
