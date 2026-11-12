@@ -11183,6 +11183,11 @@ function saveLiveEvent(){
     const takerId=ne.takerId||null;
     cur.events.push({id:uid(),minute:ne.minute,...(ne.period?{period:ne.period}:{}),type:'goal',playerId:takerId,fromPenalty:true,penaltyId:ne.id});
   }
+  // Grande penalidade: convertido/defendido → remate enquadrado; falhado → remate fora
+  if(type==='penalty_in_play'){
+    const shotType=ne.result==='missed'?'shot_off':'shot_on';
+    cur.events.push({id:uid(),minute:ne.minute,...(ne.period?{period:ne.period}:{}),type:shotType,playerId:ne.takerId||null,fromPenalty:true,penaltyId:ne.id});
+  }
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
@@ -13977,6 +13982,11 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     // Grande penalidade com golo → gera evento goal com fromPenalty:true
     if(t==='penalty_in_play'&&ne.result==='goal'){
       curMr.events.push({id:uid(),minute:ne.minute,type:'goal',playerId:ne.takerId||null,fromPenalty:true,penaltyId:ne.id});
+    }
+    // Grande penalidade: convertido/defendido → remate enquadrado; falhado → remate fora
+    if(t==='penalty_in_play'){
+      const shotType=ne.result==='missed'?'shot_off':'shot_on';
+      curMr.events.push({id:uid(),minute:ne.minute,type:shotType,playerId:ne.takerId||null,fromPenalty:true,penaltyId:ne.id});
     }
     DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
     // Após registar lesão, oferecer criação de registo clínico
