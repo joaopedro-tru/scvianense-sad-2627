@@ -11698,7 +11698,7 @@ function renderGame(){
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
       <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
-      <button class="tab-btn${gameTab==='fpf'?' tab-active':''}" data-tab="fpf">🇵🇹 FPF</button>
+      ${isAdmin()?`<button class="tab-btn${gameTab==='fpf'?' tab-active':''}" data-tab="fpf">🇵🇹 FPF</button>`:''}
       ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
       <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
@@ -12600,9 +12600,14 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     `<div class="card" style="margin-top:12px">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;font-weight:600">Banco de Suplentes</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${sups.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
-          <span style="font-weight:700;color:var(--green);min-width:18px;text-align:right;font-size:13px">${p.number||'—'}</span>
-          <span style="font-size:12px">${pAbbr(p)}</span>${rBadge(p.id,true)}</div>`).join('')}
+        ${sups.map(p=>{
+          const entered=subbedIn.has(p.id);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1.5px solid ${entered?'#21d07a':'var(--border)'};border-radius:8px">
+            <span style="font-weight:700;color:var(--green);min-width:18px;text-align:right;font-size:13px">${p.number||'—'}</span>
+            <span style="font-size:12px">${pAbbr(p)}</span>
+            ${entered?`<span style="width:16px;height:16px;border-radius:50%;background:#21d07a;color:#fff;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">↑</span>`:''}
+            ${rBadge(p.id,true)}</div>`;
+        }).join('')}
       </div>
     </div>`;
 
@@ -12645,10 +12650,14 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       <div style="font-size:11px;color:var(--muted);margin-top:3px;font-weight:600">${label}</div>
     </div>`;
   }
+  const fpfMatchId=ev.fpfMatchId||'';
   const statsHtml=`<div class="card" style="margin-top:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">📊 Totais do Jogo</h3>
-      <button id="btn-rel-pdf" class="btn btn-sm" style="font-size:11px;padding:5px 12px">📄 PDF</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${fpfMatchId?`<a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${fpfMatchId}" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db;font-weight:600">🇵🇹 FPF</a>`:''}
+        <button id="btn-rel-pdf" class="btn btn-sm" style="font-size:11px;padding:5px 12px">📄 PDF</button>
+      </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:10px">
       ${relHeroCell('⚽','Golos Marcados',nGoals,'var(--ok)')}
@@ -12763,7 +12772,46 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     doc.text(sc, W/2, y+13, {align:'center'}); y+=24;
     // Separator
     doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
-    // Stats
+    // ── Lineup section ──────────────────────────────────────────────────────
+    if(tits.length>0){
+      doc.setFontSize(13); doc.setFont('helvetica','bold');
+      const formLabel=formation?` (${formation})`:'';
+      doc.text(`Onze inicial${formLabel}`, 15, y); y+=8;
+      doc.setFontSize(10);
+      tits.forEach(p=>{
+        const wasOut=subbedOut.has(p.id);
+        const posLabel=igPos[p.id]||p.position||'';
+        const name=p.alcunha?.trim()||p.name;
+        const num=p.number?`${p.number}. `:'';
+        const pos=posLabel?` [${posLabel}]`:'';
+        const sub=wasOut?' ↓':'';//↓
+        doc.setFont('helvetica', wasOut?'italic':'normal');
+        doc.text(`${num}${name}${pos}${sub}`, 20, y);
+        y+=6.5;
+        if(y>270){ doc.addPage(); y=20; }
+      });
+      y+=4;
+    }
+    // ── Suplentes section ───────────────────────────────────────────────────
+    if(sups.length>0){
+      doc.setDrawColor(220,220,220); doc.line(15, y, W-15, y); y+=8;
+      doc.setFontSize(13); doc.setFont('helvetica','bold');
+      doc.text('Banco de Suplentes', 15, y); y+=8;
+      doc.setFontSize(10);
+      sups.forEach(p=>{
+        const entered=subbedIn.has(p.id);
+        const name=p.alcunha?.trim()||p.name;
+        const num=p.number?`${p.number}. `:'';
+        const sub=entered?' ↑':'';//↑
+        doc.setFont('helvetica', entered?'bold':'normal');
+        doc.text(`${num}${name}${sub}`, 20, y);
+        y+=6.5;
+        if(y>270){ doc.addPage(); y=20; }
+      });
+      y+=4;
+    }
+    // ── Stats ───────────────────────────────────────────────────────────────
+    doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
     doc.setFontSize(13); doc.setFont('helvetica','bold');
     doc.text('Estatisticas', 15, y); y+=9;
     doc.setFontSize(11);
@@ -12781,12 +12829,67 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
       ...(nOffsidesAgainst||nOffsidesFor?[['Foras de jogo (nossos)', nOffsidesAgainst],['Foras de jogo (adversario)', nOffsidesFor]]:[]),
     ];
     statRows.forEach(([label,val])=>{
+      if(y>275){ doc.addPage(); y=20; }
       doc.setFont('helvetica','normal'); doc.text(label, 20, y);
       doc.setFont('helvetica','bold'); doc.text(String(val), W-20, y, {align:'right'});
       doc.setDrawColor(220,220,220); doc.line(20, y+2.5, W-20, y+2.5);
       doc.setFont('helvetica','normal');
       y+=9;
     });
+    // ── Sumário ─────────────────────────────────────────────────────────────
+    const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
+    const sumEvs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>sortMin(a)-sortMin(b));
+    if(sumEvs.length>0){
+      if(y>260){ doc.addPage(); y=20; }
+      doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
+      doc.setFontSize(13); doc.setFont('helvetica','bold');
+      doc.text('Sumário', 15, y); y+=9;
+      function pnPDF(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+      function periodOfPDF(e){
+        if(e.period==='pen') return 'Grandes Penalidades';
+        if(e.period==='et2') return 'Prolongamento 2';
+        if(e.period==='et1') return 'Prolongamento 1';
+        if(e.period==='p3') return '3ª Parte';
+        if(e.period==='p2'||(!e.period&&e.minute>45)) return '2ª Parte';
+        return '1ª Parte';
+      }
+      const PERIOD_ORDER=['1ª Parte','2ª Parte','3ª Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
+      const byPeriod={};
+      sumEvs.forEach(e=>{ const p=periodOfPDF(e); if(!byPeriod[p])byPeriod[p]=[]; byPeriod[p].push(e); });
+      const periods=PERIOD_ORDER.filter(p=>byPeriod[p]);
+      doc.setFontSize(10);
+      periods.forEach(period=>{
+        if(y>270){ doc.addPage(); y=20; }
+        doc.setFont('helvetica','bold');
+        doc.setFillColor(240,240,240); doc.rect(15, y-4, W-30, 7, 'F');
+        doc.text(period, 17, y); y+=8;
+        doc.setFont('helvetica','normal');
+        byPeriod[period].forEach(e=>{
+          if(y>272){ doc.addPage(); y=20; }
+          const min=e.period==='pen'?fmtMin(e):`${fmtMin(e)}'`;
+          let desc='';
+          if(e.type==='goal'){
+            if(e.ownGoal) desc=`Autogolo${e.opponentName?` (${e.opponentName})`:''}`;
+            else desc=`Golo: ${pnPDF(e.playerId)}${e.assistId?` (assist: ${pnPDF(e.assistId)})`:''}`;
+          } else if(e.type==='goal_conceded') desc='Golo sofrido';
+          else if(e.type==='yellow') desc=`Amarelo: ${pnPDF(e.playerId)}`;
+          else if(e.type==='yellow2') desc=`2º Amarelo/Vermelho: ${pnPDF(e.playerId)}`;
+          else if(e.type==='red') desc=`Vermelho direto: ${pnPDF(e.playerId)}`;
+          else if(e.type==='sub') desc=`Substituição: ${pnPDF(e.playerOutId)} → ${pnPDF(e.playerInId)}`;
+          else if(e.type==='penalty_shootout'){
+            const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
+            const pRes=e.result==='goal'?'Golo':e.result==='saved'?'Defendido':'Falhou';
+            desc=`GP ${pSide}: ${pRes}${e.playerId?` (${pnPDF(e.playerId)})`:''}`;
+          }
+          if(desc){
+            doc.setFont('helvetica','bold'); doc.text(min, 20, y);
+            doc.setFont('helvetica','normal'); doc.text(desc, 36, y);
+            y+=6;
+          }
+        });
+        y+=2;
+      });
+    }
     doc.save(`Relatorio_${opp.replace(/\s+/g,'_')}_${ev.date||'jogo'}.pdf`);
   });
 }
@@ -13326,10 +13429,9 @@ async function _loadFPFData(matchId){
     container.innerHTML=_renderFPFData(data,matchId);
   }catch(e){
     container.innerHTML=`<div style="text-align:center;padding:20px 0">
-      <p style="color:#b71c1c;font-size:13px;margin-bottom:8px">⚠️ Não foi possível carregar os dados (${e.message}).</p>
+      <p style="color:#b71c1c;font-size:13px;margin-bottom:8px">⚠️ Não foi possível carregar os dados. Tenta novamente mais tarde.</p>
       <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener"
         style="font-size:13px;color:#1a56db">↗ Ver directamente na FPF</a>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px">Certifica-te que o ficheiro <code>api/fpf.js</code> está na pasta api/ do teu projecto Vercel e que fizeste redeploy.</p>
     </div>`;
   }
 }
