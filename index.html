@@ -11686,6 +11686,7 @@ function renderGame(){
   const gameFinished=(clock.phase==='finished');
   // GR e Adjunto só ficam visíveis após o jogo terminar
   if(!gameFinished && (gameTab==='gr'||gameTab==='adj'||gameTab==='tm'||gameTab==='coord')) gameTab='pre';
+  // FPF tab: guard only against missing matchId losing state on re-render
   const pdfBtn=document.getElementById('btn-export-game-pdf');
   if(pdfBtn) pdfBtn.style.display=gameFinished?'':'none';
   document.getElementById('gm-title').textContent=evLabel(ev);
@@ -11697,6 +11698,7 @@ function renderGame(){
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
       <button class="tab-btn${gameTab==='relatorio'?' tab-active':''}" data-tab="relatorio">🏟️ Relatório</button>
       <button class="tab-btn${gameTab==='pos'?' tab-active':''}" data-tab="pos">✏️ Registo/Avaliação</button>
+      <button class="tab-btn${gameTab==='fpf'?' tab-active':''}" data-tab="fpf">🇵🇹 FPF</button>
       ${gameFinished?`
       <button class="tab-btn${gameTab==='gr'?' tab-active':''}" data-tab="gr">🥅 GR</button>
       <button class="tab-btn${gameTab==='adj'?' tab-active':''}" data-tab="adj">📝 Adjunto</button>
@@ -11745,6 +11747,7 @@ function renderGame(){
   else if(gameTab==='relatorio') renderGameRelatorio(ev,sqPlayers,conv,mr);
   else if(gameTab==='tm') renderGameTM(ev,mr);
   else if(gameTab==='coord') renderGameCoord(ev,sqPlayers,conv,mr);
+  else if(gameTab==='fpf') renderGameFPF(ev);
   else renderGamePos(ev,sqPlayers,conv,mr);
 
   // Prefetch cross-squad convocados missing from local cache.
@@ -13258,6 +13261,403 @@ function saveCoordReport(gameId){
   if(btn){btn.textContent='✅ Guardado';setTimeout(()=>{const b=document.getElementById('btn-save-coord');if(b)b.textContent='💾 Guardar Relatório';},2000);}
   toast('Relatório de coordenação guardado.');
 }
+
+// ── TAB FPF ───────────────────────────────────────────────────────────────────
+
+// ── FPF CONFIG per squad ─────────────────────────────────────────────────────
+function _getFPFCfg(sq){
+  try{ return JSON.parse(localStorage.getItem('scv_fpf_cfg')||'{}')[sq]||{}; }catch{ return {}; }
+}
+function _saveFPFCfg(sq,cfg){
+  try{
+    const all=JSON.parse(localStorage.getItem('scv_fpf_cfg')||'{}');
+    all[sq]={...all[sq],...cfg};
+    localStorage.setItem('scv_fpf_cfg',JSON.stringify(all));
+  }catch(e){}
+}
+
+// Normalize team name for fuzzy matching: lowercase, remove accents, remove legal suffixes
+function _normTeam(s){
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\b(sad|fc|cf|sc|cp|afc|sfc|adc|gd|cd|ud|ad|gr|ar|or|sr)\b/g,'')
+    .replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+}
+
+// Convert game date YYYY-MM-DD to Portuguese short format "7 nov"
+function _fpfDateLabel(dateStr){
+  const months=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const [,m,d]=dateStr.split('-');
+  return `${parseInt(d)} ${months[parseInt(m)-1]}`;
+}
+
+// Auto-lookup: scan fixture pages to find the matchId for ev
+async function _fpfAutoLookup(ev){
+  const container=document.getElementById('fpf-data-container');
+  if(!container) return;
+  const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
+  const cfg=_getFPFCfg(sq);
+
+  if(!cfg.firstFixtureId||!cfg.teamName){
+    container.innerHTML=_fpfConfigForm(sq,ev,'⚠️ Configura os dados FPF do escalão para activar a pesquisa automática.');
+    _bindFPFConfigForm(sq,ev);
+    return;
+  }
+
+  const totalRounds=cfg.totalJornadas||18;
+  const lastFixtureId=Number(cfg.firstFixtureId)+(totalRounds-1);
+  const dateLabel=ev.date?_fpfDateLabel(ev.date):'';
+  const normOpp=_normTeam(ev.opponent||'');
+  const normUs=_normTeam(cfg.teamName);
+
+  container.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (0/${totalRounds})...</p>`;
+
+  for(let i=lastFixtureId;i>=Number(cfg.firstFixtureId);i--){
+    const pct=lastFixtureId-i+1;
+    const pctEl=document.getElementById('fpf-data-container');
+    if(pctEl) pctEl.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (${pct}/${totalRounds})...</p>`;
+    try{
+      const r=await fetch(`/api/fpf?fixtureId=${i}`);
+      if(!r.ok) continue;
+      const html=await r.text();
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      // Each past game: <a class="game-link" href="/Match/GetMatchInformation?matchId=XXXXX">
+      const links=[...doc.querySelectorAll('a.game-link[href*="matchId"]')];
+      for(const link of links){
+        const href=link.getAttribute('href')||'';
+        const mid=href.match(/matchId=(\d+)/)?.[1];
+        if(!mid) continue;
+        const home=_normTeam(link.querySelector('.home-team')?.textContent||'');
+        const away=_normTeam(link.querySelector('.away-team')?.textContent||'');
+        const sched=(link.querySelector('.game-schedule')?.textContent||'').toLowerCase().trim();
+        // Check our team is in this game
+        const usInGame=(home.includes(normUs)||normUs.includes(home.replace(/\s+/g,' ').trim()))||
+                       (away.includes(normUs)||normUs.includes(away.replace(/\s+/g,' ').trim()));
+        if(!usInGame) continue;
+        // Check opponent
+        const other=home.includes(normUs)?away:home;
+        const oppMatch=normOpp&&other&&(other.includes(normOpp)||normOpp.includes(other)||
+          other.split(' ').some(w=>w.length>3&&normOpp.includes(w)));
+        // Check date (only relevant if dateLabel exists)
+        const dateMatch=dateLabel&&sched.includes(dateLabel);
+        // Need at least one signal to confirm
+        if(!normOpp&&!dateLabel) continue;
+        if(oppMatch||dateMatch){
+          // Save and load
+          await DB.updateEvent(gameEventId,{fpfMatchId:mid});
+          if(document.getElementById('fpf-data-container')){
+            document.getElementById('fpf-data-container').innerHTML=
+              '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">✅ Jogo encontrado! A carregar...</p>';
+          }
+          _loadFPFData(mid);
+          return;
+        }
+      }
+    }catch(e){ /* skip fixture */ }
+  }
+
+  if(document.getElementById('fpf-data-container')){
+    document.getElementById('fpf-data-container').innerHTML=`
+      <div style="text-align:center;padding:16px 0">
+        <p style="color:#b71c1c;font-size:13px;margin-bottom:12px">⚠️ Jogo não encontrado automaticamente. Introduz o ID manualmente.</p>
+        ${_fpfManualInputHtml('')}
+      </div>`;
+    _bindFPFManualInput(ev);
+  }
+}
+
+function _fpfConfigForm(sq,ev,msg){
+  const cfg=_getFPFCfg(sq);
+  const DEFAULTS={eqa:{firstFixtureId:'652229',totalJornadas:'18',teamName:'Sc Vianense Sad'},
+                  sub23:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'},
+                  sub19:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'}};
+  const def=DEFAULTS[sq]||{};
+  return `<div style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">⚙️ Configuração FPF — ${sq.toUpperCase()}</div>
+    ${msg?`<p style="font-size:12px;color:#b71c1c;margin-bottom:10px">${msg}</p>`:''}
+    <div style="display:grid;gap:8px">
+      <label style="font-size:12px;color:var(--muted)">Nome do clube na FPF (ex: Sc Vianense Sad)</label>
+      <input id="fpf-cfg-team" placeholder="${def.teamName||''}" value="${cfg.teamName||def.teamName||''}"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+      <label style="font-size:12px;color:var(--muted)">ID da 1.ª jornada (ex: 652229)</label>
+      <input id="fpf-cfg-fid" type="number" placeholder="${def.firstFixtureId||''}" value="${cfg.firstFixtureId||def.firstFixtureId||''}"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+      <label style="font-size:12px;color:var(--muted)">Número de jornadas</label>
+      <input id="fpf-cfg-rounds" type="number" placeholder="${def.totalJornadas||18}" value="${cfg.totalJornadas||def.totalJornadas||18}"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" id="fpf-cfg-save">💾 Guardar config</button>
+      <a href="https://resultados.fpf.pt" target="_blank" rel="noopener" style="font-size:12px;color:#1a56db;line-height:30px">↗ Ajuda a encontrar o ID da jornada</a>
+    </div>
+  </div>`;
+}
+
+function _bindFPFConfigForm(sq,ev){
+  document.getElementById('fpf-cfg-save')?.addEventListener('click',async()=>{
+    const teamName=document.getElementById('fpf-cfg-team')?.value?.trim();
+    const firstFixtureId=document.getElementById('fpf-cfg-fid')?.value?.trim();
+    const totalJornadas=parseInt(document.getElementById('fpf-cfg-rounds')?.value)||18;
+    if(!teamName||!firstFixtureId){ toast('⚠️ Preenche todos os campos'); return; }
+    _saveFPFCfg(sq,{teamName,firstFixtureId:Number(firstFixtureId),totalJornadas});
+    toast('✅ Configuração FPF guardada');
+    document.getElementById('fpf-data-container').innerHTML=
+      '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A iniciar pesquisa...</p>';
+    await _fpfAutoLookup(ev);
+  });
+}
+
+function _fpfManualInputHtml(matchId){
+  return `<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+    <input type="number" id="fpf-match-id-manual" placeholder="ID do jogo FPF" value="${matchId||''}"
+      style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);max-width:200px">
+    <button class="btn btn-g btn-sm" id="btn-fpf-manual-load">🔄 Carregar</button>
+  </div>`;
+}
+
+function _bindFPFManualInput(ev){
+  document.getElementById('btn-fpf-manual-load')?.addEventListener('click',async()=>{
+    const id=document.getElementById('fpf-match-id-manual')?.value?.trim();
+    if(!id){ toast('⚠️ Introduz o ID do jogo'); return; }
+    await DB.updateEvent(gameEventId,{fpfMatchId:id});
+    renderGame();
+  });
+}
+
+function renderGameFPF(ev){
+  const matchId=ev.fpfMatchId||'';
+  const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
+  const cfg=_getFPFCfg(sq);
+  const hasConfig=!!(cfg.firstFixtureId&&cfg.teamName);
+
+  document.getElementById('gm-tab-content').innerHTML=`
+    <div style="padding:4px 0">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        ${matchId
+          ?`<input type="number" id="fpf-match-id" placeholder="ID do jogo na FPF" value="${matchId}"
+              style="flex:1;min-width:140px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
+            <button class="btn btn-p btn-sm" id="btn-fpf-save">💾 Guardar</button>
+            <button class="btn btn-g btn-sm" id="btn-fpf-load">🔄 Recarregar</button>
+            <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener" style="font-size:12px;color:#1a56db">↗ FPF</a>
+            <button class="btn btn-sm" id="btn-fpf-clear" style="background:#fde8e8;color:#b02020;border:none">✕ Limpar</button>`
+          :`<span style="font-size:13px;color:var(--muted);flex:1">🔍 Sem ID FPF guardado</span>
+            <button class="btn btn-g btn-sm" id="btn-fpf-search">🔍 Procurar automaticamente</button>
+            <button class="btn btn-sm" id="btn-fpf-manual-toggle" style="background:var(--card);border:1.5px solid var(--border)">✏️ Inserir ID</button>
+            <button class="btn btn-sm" id="btn-fpf-cfg-toggle" style="background:var(--card);border:1.5px solid var(--border)">${hasConfig?'⚙️ Configuração':'⚙️ Configurar FPF'}</button>`}
+      </div>
+      <div id="fpf-data-container">
+        ${matchId
+          ? '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A carregar dados da FPF...</p>'
+          : (hasConfig
+              ? '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Clica em "Procurar automaticamente" para localizar o jogo na FPF.</p>'
+              : _fpfConfigForm(sq,ev,''))}
+      </div>
+    </div>`;
+
+  document.getElementById('btn-fpf-save')?.addEventListener('click',async()=>{
+    const id=document.getElementById('fpf-match-id')?.value?.trim();
+    await DB.updateEvent(gameEventId,{fpfMatchId:id||''});
+    toast('✅ ID FPF guardado'); renderGame();
+  });
+
+  document.getElementById('btn-fpf-load')?.addEventListener('click',()=>{
+    const id=document.getElementById('fpf-match-id')?.value?.trim()||matchId;
+    if(id) _loadFPFData(id); else toast('⚠️ Introduz o ID do jogo');
+  });
+
+  document.getElementById('btn-fpf-clear')?.addEventListener('click',async()=>{
+    if(!confirm('Remover ID FPF guardado?')) return;
+    await DB.updateEvent(gameEventId,{fpfMatchId:''});
+    renderGame();
+  });
+
+  document.getElementById('btn-fpf-search')?.addEventListener('click',()=>{
+    _fpfAutoLookup(ev);
+  });
+
+  document.getElementById('btn-fpf-manual-toggle')?.addEventListener('click',()=>{
+    const container=document.getElementById('fpf-data-container');
+    container.innerHTML=`<div style="padding:8px 0">${_fpfManualInputHtml('')}</div>`;
+    _bindFPFManualInput(ev);
+  });
+
+  document.getElementById('btn-fpf-cfg-toggle')?.addEventListener('click',()=>{
+    const container=document.getElementById('fpf-data-container');
+    container.innerHTML=_fpfConfigForm(sq,ev,'');
+    _bindFPFConfigForm(sq,ev);
+  });
+
+  // Bind config form if shown on initial render (no config yet)
+  if(!matchId&&!hasConfig) _bindFPFConfigForm(sq,ev);
+
+  if(matchId) _loadFPFData(matchId);
+}
+
+async function _loadFPFData(matchId){
+  const container=document.getElementById('fpf-data-container');
+  if(!container) return;
+  container.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A carregar...</p>';
+  try{
+    const r=await fetch(`/api/fpf?matchId=${encodeURIComponent(matchId)}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const html=await r.text();
+    const data=_parseFPFHtml(html);
+    container.innerHTML=_renderFPFData(data,matchId);
+  }catch(e){
+    container.innerHTML=`<div style="text-align:center;padding:20px 0">
+      <p style="color:#b71c1c;font-size:13px;margin-bottom:8px">⚠️ Não foi possível carregar os dados (${e.message}).</p>
+      <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener"
+        style="font-size:13px;color:#1a56db">↗ Ver directamente na FPF</a>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">Certifica-te que o ficheiro <code>api/fpf.js</code> está na pasta api/ do teu projecto Vercel e que fizeste redeploy.</p>
+    </div>`;
+  }
+}
+
+function _parseFPFHtml(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+
+  // Date / time / stadium
+  const infoText=doc.querySelector('.info-time-place')?.textContent?.trim()||'';
+
+  // Teams + score
+  const homeTeamName=doc.querySelector('.col-md-3.text-left strong')?.textContent?.trim()||'';
+  const awayTeamName=doc.querySelector('.col-md-3.text-right strong')?.textContent?.trim()||'';
+  const scoreText=doc.querySelector('.col-md-4.text-center strong, .score-text')?.textContent?.trim()||
+    doc.querySelectorAll('[class*="col-md-4"]')?.[1]?.querySelector('strong')?.textContent?.trim()||'';
+
+  // Events
+  const iconMap={
+    'icon-goal':       {emoji:'⚽',label:'Golo'},
+    'icon-own-goal':   {emoji:'⚽',label:'Golo (AG)'},
+    'icon-yellow-card':{emoji:'🟨',label:'Cartão Amarelo'},
+    'icon-red-card':   {emoji:'🟥',label:'Cartão Vermelho'},
+    'icon-yellow-red-card':{emoji:'🟨🟥',label:'2.º Amarelo'},
+    'icon-substitution':{emoji:'🔄',label:'Substituição'},
+    'icon-penalty':    {emoji:'⚽',label:'Grande Penalidade'},
+  };
+
+  const events=[...doc.querySelectorAll('.timeline-item')].map(el=>{
+    const minute=el.querySelector('.tag')?.textContent?.trim()||'';
+    const imgSrc=el.querySelector('img')?.getAttribute('src')||'';
+    const iconKey=Object.keys(iconMap).find(k=>imgSrc.includes(k));
+    if(!iconKey) return null;
+    const info=iconMap[iconKey];
+    // Extract player names from spans: filter noise, deduplicate concatenated versions
+    const spans=[...el.querySelectorAll('span')].map(s=>s.textContent.trim())
+      .filter(t=>t.length>2&&t.length<60&&!/^\d/.test(t)&&!t.includes("'"));
+    // Remove concatenated "Name1Name2" when both "Name1" and "Name2" exist as shorter strings
+    const names=spans.filter(n=>!spans.some(o=>o!==n&&o.includes(n)&&o.length>n.length));
+    return {minute,emoji:info.emoji,label:info.label,names:[...new Set(names)]};
+  }).filter(Boolean);
+
+  // Lineup helper
+  const parseLineup=el=>!el?[]:
+    [...el.querySelectorAll('.player')].map(p=>{
+      const num=p.querySelector('strong')?.textContent?.trim()||'';
+      const clone=p.cloneNode(true);
+      clone.querySelector('.photo')?.remove();
+      const name=clone.textContent.replace(num,'').replace('(GR)','').trim().split('\n')[0].trim();
+      return {number:num,name,gk:p.textContent.includes('(GR)')};
+    });
+
+  const homeLineupEls=[...doc.querySelectorAll('.lineup-team.home-team')];
+  const awayLineupEls=[...doc.querySelectorAll('.lineup-team.away-team')];
+  const homeXI=parseLineup(homeLineupEls[0]);
+  const awayXI=parseLineup(awayLineupEls[0]);
+  const homeBench=parseLineup(homeLineupEls[1]);
+  const awayBench=parseLineup(awayLineupEls[1]);
+
+  // Staff sections — walk col-md-12 section headers + collect player entries that follow
+  const STAFF_HEADERS=['Treinadores','Dirigentes','Banco Suplementar','Equipa de arbitragem'];
+  const staffSections={};
+  let curHeader=null;
+  [...doc.querySelectorAll('.col-md-12,.col-sm-12')].forEach(el=>{
+    const txt=el.textContent.trim();
+    if(STAFF_HEADERS.includes(txt)){curHeader=txt;staffSections[txt]=[];}
+    else if(curHeader){
+      // A staff entry has: role title + person name
+      const rows=[...el.querySelectorAll('.col-md-6,.col-sm-6')];
+      if(rows.length>=2){
+        for(let i=0;i<rows.length;i+=2){
+          const role=rows[i]?.textContent?.trim();
+          const name=rows[i+1]?.textContent?.trim();
+          if(role&&name) staffSections[curHeader].push({role,name});
+        }
+      } else if(txt&&txt.length>3&&txt.length<80&&!STAFF_HEADERS.includes(txt)){
+        staffSections[curHeader].push({role:'',name:txt});
+      }
+    }
+  });
+
+  return {infoText,homeTeamName,awayTeamName,scoreText,events,homeXI,awayXI,homeBench,awayBench,staffSections};
+}
+
+function _renderFPFData(d,matchId){
+  const playerRow=(p,side='')=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+      ${p.gk?'<span style="font-size:9px;background:#e3f2fd;color:#1565c0;padding:1px 4px;border-radius:3px;font-weight:700">GR</span>':''}
+      <span style="font-size:12px;color:var(--muted);min-width:20px;text-align:right">${p.number}</span>
+      <span style="font-size:13px;flex:1">${p.name}</span>
+    </div>`;
+
+  const lineupCol=(xi,bench,title)=>`
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${title}</div>
+      ${xi.length?xi.map(p=>playerRow(p)).join(''):'<p style="color:var(--muted);font-size:12px">—</p>'}
+      ${bench.length?`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px">Suplentes</div>
+        ${bench.map(p=>playerRow(p)).join('')}`:''}
+    </div>`;
+
+  const eventsHtml=d.events.length
+    ?d.events.map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--muted);min-width:38px;text-align:right;font-variant-numeric:tabular-nums">${e.minute}</span>
+        <span style="font-size:16px">${e.emoji}</span>
+        <div style="flex:1;font-size:13px">
+          ${e.names.length===2&&e.label==='Substituição'
+            ?`<span style="color:#2e7d32">▲ ${e.names[0]}</span> <span style="color:#b71c1c">▼ ${e.names[1]}</span>`
+            :e.names.join(' · ')||'—'}
+        </div>
+      </div>`).join('')
+    :'<p style="color:var(--muted);font-size:13px;padding:8px 0">Sem eventos registados</p>';
+
+  const staffHtml=Object.entries(d.staffSections).filter(([,v])=>v.length).map(([section,entries])=>`
+    <div style="margin-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${section}</div>
+      ${entries.map(e=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">${e.role||''}</span>${e.role?' — ':''}<strong>${e.name}</strong></div>`).join('')}
+    </div>`).join('');
+
+  return `
+    <div style="border:2px solid #1a56db;border-radius:8px;padding:12px;margin-bottom:12px;background:var(--bg)">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${d.infoText}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-size:14px;font-weight:700;flex:1">${d.homeTeamName||'—'}</span>
+        <span style="font-size:22px;font-weight:800;color:#1a56db;min-width:60px;text-align:center">${d.scoreText||'vs'}</span>
+        <span style="font-size:14px;font-weight:700;flex:1;text-align:right">${d.awayTeamName||'—'}</span>
+      </div>
+      <div style="text-align:center;margin-top:4px">
+        <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db">↗ resultados.fpf.pt</a>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</h3>
+      ${eventsHtml}
+    </div>
+
+    <div class="card" style="margin-bottom:10px">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">👥 Equipas</h3>
+      <div style="display:flex;gap:16px">
+        ${lineupCol(d.homeXI,d.homeBench,d.homeTeamName||'Casa')}
+        <div style="width:1px;background:var(--border);flex-shrink:0"></div>
+        ${lineupCol(d.awayXI,d.awayBench,d.awayTeamName||'Fora')}
+      </div>
+    </div>
+
+    ${staffHtml?`<div class="card">${staffHtml}</div>`:''}`;
+}
+
+// ── FIM TAB FPF ───────────────────────────────────────────────────────────────
 
 function renderGamePos(ev,sqPlayers,conv,mr){
   // Staff observations helpers
