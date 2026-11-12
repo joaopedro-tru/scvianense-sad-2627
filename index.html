@@ -13733,26 +13733,21 @@ function _parseFPFHtml(html){
   const homeBench=parseLineup(homeLineupEls[1]);
   const awayBench=parseLineup(awayLineupEls[1]);
 
-  // Staff sections — walk col-md-12 section headers + collect player entries that follow
-  const STAFF_HEADERS=['Treinadores','Dirigentes','Banco Suplementar','Equipa de arbitragem'];
+  // Staff sections — each is a <section> with .title-bar + .player elements
+  // (same structure as lineup; bold span = cargo, normal span = nome)
+  // "Confrontos Anteriores" is intentionally excluded
+  const STAFF_SHOW=new Set(['Treinadores','Dirigentes','Banco Suplementar','Equipa de arbitragem']);
   const staffSections={};
-  let curHeader=null;
-  [...doc.querySelectorAll('.col-md-12,.col-sm-12')].forEach(el=>{
-    const txt=el.textContent.trim();
-    if(STAFF_HEADERS.includes(txt)){curHeader=txt;staffSections[txt]=[];}
-    else if(curHeader){
-      // A staff entry has: role title + person name
-      const rows=[...el.querySelectorAll('.col-md-6,.col-sm-6')];
-      if(rows.length>=2){
-        for(let i=0;i<rows.length;i+=2){
-          const role=rows[i]?.textContent?.trim();
-          const name=rows[i+1]?.textContent?.trim();
-          if(role&&name) staffSections[curHeader].push({role,name});
-        }
-      } else if(txt&&txt.length>3&&txt.length<80&&!STAFF_HEADERS.includes(txt)){
-        staffSections[curHeader].push({role:'',name:txt});
-      }
-    }
+  doc.querySelectorAll('section').forEach(sec=>{
+    const title=sec.querySelector('.title-bar')?.textContent?.trim();
+    if(!title||!STAFF_SHOW.has(title)) return;
+    staffSections[title]=[...sec.querySelectorAll('.player')].map(p=>{
+      const boldSpan=p.querySelector('span[style*="bold"]');
+      const normalSpan=p.querySelector('span[style*="normal"]');
+      const role=boldSpan?.textContent?.trim()||'';
+      const name=normalSpan?.textContent?.trim()||'';
+      return {role,name};
+    }).filter(e=>e.name);
   });
 
   return {infoText,homeTeamName,awayTeamName,scoreText,events,homeXI,awayXI,homeBench,awayBench,staffSections};
