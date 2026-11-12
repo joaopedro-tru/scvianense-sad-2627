@@ -13679,11 +13679,15 @@ function _parseFPFHtml(html){
     const iconKey=Object.keys(iconMap).find(k=>imgSrc.includes(k));
     if(!iconKey) return null;
     const info=iconMap[iconKey];
-    // Extract player names from spans: filter noise, remove concatenated versions
-    const spans=[...el.querySelectorAll('span')].map(s=>s.textContent.trim())
-      .filter(t=>t.length>2&&t.length<60&&!/^\d/.test(t)&&!t.includes("'"));
-    // Remove "Name1Name2" concatenations — keep n only if n does NOT contain another span as substring
-    const names=spans.filter(n=>!spans.some(o=>o!==n&&n.includes(o)&&n.length>o.length));
+    // Extract player names from spans AND anchor tags (goal scorers use <a> links)
+    const rawTexts=[...el.querySelectorAll('span,a')].filter(node=>{
+      const href=node.getAttribute?.('href')||'';
+      return !href||href.includes('Player')||href.includes('player')||!href.includes('http');
+    }).map(s=>s.textContent.trim())
+      .filter(t=>t.length>2&&t.length<60&&!/^\d/.test(t)&&!t.includes("'")&&t!==info.label);
+    const unique=[...new Set(rawTexts)];
+    // Remove "Name1Name2" concatenations — keep n only if n does NOT contain another entry as substring
+    const names=unique.filter(n=>!unique.some(o=>o!==n&&n.includes(o)&&n.length>o.length));
     return {minute,emoji:info.emoji,label:info.label,names:[...new Set(names)]};
   }).filter(Boolean);
 
@@ -13730,21 +13734,40 @@ function _parseFPFHtml(html){
 }
 
 function _renderFPFData(d,matchId){
-  const playerRow=p=>`
-    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:11px;color:var(--muted);min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${p.number}</span>
-      ${p.gk?'<span style="font-size:9px;background:#1565c0;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0">GR</span>':'<span style="width:21px;flex-shrink:0"></span>'}
-      <span style="font-size:13px;flex:1">${p.name}</span>
-    </div>`;
+  // Build lookup: normalised name → list of events
+  function _eventsFor(name, evs){
+    const n=_fpfNorm(name);
+    return evs.filter(e=>e.names&&e.names.some(en=>_fpfNorm(en)===n||_fpfNameMatch(name,en)));
+  }
 
-  const lineupCol=(xi,bench,title)=>`
+  const playerRow=(p,evs)=>{
+    const pEvs=_eventsFor(p.name,evs);
+    const goals=pEvs.filter(e=>e.label==='Golo'||e.label==='Grande Penalidade'||e.label==='Golo (AG)');
+    const cards=pEvs.filter(e=>e.label.includes('Cartão')||e.label.includes('Amarelo'));
+    // Substitution out: player is names[1]; substitution in: player is names[0]
+    const subOut=evs.find(e=>e.label==='Substituição'&&e.names.length>=2&&_fpfNameMatch(p.name,e.names[1]));
+    const subIn =evs.find(e=>e.label==='Substituição'&&e.names.length>=2&&_fpfNameMatch(p.name,e.names[0]));
+    const badges=[];
+    goals.forEach(e=>badges.push(`<span title="${e.label}" style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.label==='Golo (AG)'?'⚽AG':'⚽'} ${e.minute}</span>`));
+    cards.forEach(e=>badges.push(`<span style="font-size:10px;background:#fff8e1;color:#e65100;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.emoji} ${e.minute}</span>`));
+    if(subOut) badges.push(`<span style="font-size:10px;background:#fce4ec;color:#b71c1c;padding:1px 4px;border-radius:4px;white-space:nowrap">↓ ${subOut.minute}</span>`);
+    if(subIn)  badges.push(`<span style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">↑ ${subIn.minute}</span>`);
+    return `<div style="display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--muted);min-width:22px;text-align:right;flex-shrink:0">${p.number}</span>
+      ${p.gk?'<span style="font-size:9px;background:#1565c0;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0">GR</span>':'<span style="width:21px;flex-shrink:0"></span>'}
+      <span style="font-size:12px;flex:1;min-width:0">${p.name}</span>
+      ${badges.length?`<div style="display:flex;gap:2px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">${badges.join('')}</div>`:''}
+    </div>`;
+  };
+
+  const lineupCol=(xi,bench,title,evs)=>`
     <div style="flex:1;min-width:0">
       <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--primary)">${title}</div>
       <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Titulares</div>
-      ${xi.length?xi.map(playerRow).join(''):'<p style="color:var(--muted);font-size:12px">—</p>'}
+      ${xi.length?xi.map(p=>playerRow(p,evs)).join(''):'<p style="color:var(--muted);font-size:12px">—</p>'}
       ${bench.length?`
         <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px;padding-top:8px;border-top:1px dashed var(--border)">Suplentes</div>
-        ${bench.map(playerRow).join('')}`:''}
+        ${bench.map(p=>playerRow(p,evs)).join('')}`:''}
     </div>`;
 
   const eventsHtml=d.events.length
@@ -13798,17 +13821,17 @@ function _renderFPFData(d,matchId){
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</div>
-      ${eventsHtml}
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">👥 Equipas</div>
+      <div style="display:flex;gap:16px">
+        ${lineupCol(d.homeXI,d.homeBench,d.homeTeamName||'Casa',d.events)}
+        <div style="width:1px;background:var(--border);flex-shrink:0"></div>
+        ${lineupCol(d.awayXI,d.awayBench,d.awayTeamName||'Fora',d.events)}
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">👥 Equipas</div>
-      <div style="display:flex;gap:16px">
-        ${lineupCol(d.homeXI,d.homeBench,d.homeTeamName||'Casa')}
-        <div style="width:1px;background:var(--border);flex-shrink:0"></div>
-        ${lineupCol(d.awayXI,d.awayBench,d.awayTeamName||'Fora')}
-      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</div>
+      ${eventsHtml}
     </div>
 
     ${staffHtml?`<div class="card">${staffHtml}</div>`:''}`;
