@@ -11325,12 +11325,14 @@ function renderSqGames(){
   document.getElementById('sqgm-sub').textContent=`${evs.length} jogo${evs.length!==1?'s':''}`;
   const lEl=document.getElementById('sqgm-list');
   if(evs.length===0){ lEl.innerHTML='<div class="es"><div class="ei2">⚽</div><h3>Sem jogos registados</h3><p>Adiciona jogos no Calendário.</p></div>'; return; }
-  let sepInserted=false;
-  lEl.innerHTML=evs.map(ev=>{
+
+  const past=evs.filter(ev=>ev.date<today);
+  const future=evs.filter(ev=>ev.date>=today);
+  const hiddenPast=past.length>2?past.slice(0,past.length-2):[];
+  const visiblePast=past.slice(Math.max(0,past.length-2));
+
+  function gameRow(ev){
     const isPast=ev.date<today;
-    const isNext=!isPast&&!sepInserted;
-    let sep='';
-    if(isNext){ sepInserted=true; sep='<div class="ev-sep">Próximos</div>'; }
     const conv=ev.convocatoria;
     const convCount=conv?Object.values(conv.players||{}).filter(v=>!!v).length:0;
     const hasConv=conv&&convCount>0;
@@ -11350,7 +11352,7 @@ function renderSqGames(){
     } else if(!isPast&&ev.date!==today){
       resultBadge=`<span style="font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600;background:#e8eef7;color:var(--muted)">📋 ${hasConv?convCount:'✗'}</span>`;
     }
-    return sep+`<div class="ei${isPast||ev.date===today?' past':''}" style="cursor:pointer" data-gm-id="${ev.id}">
+    return `<div class="ei${isPast||ev.date===today?' past':''}" style="cursor:pointer" data-gm-id="${ev.id}">
       <div class="etd gm"></div>
       <div class="einfo" style="min-width:0">
         <div class="etitle">${haLabel} ${fmtDate(ev.date)} · vs ${ev.opponent||'—'}</div>
@@ -11361,8 +11363,26 @@ function renderSqGames(){
         ${resultBadge}
       </div>
     </div>`;
-  }).join('');
+  }
+
+  const hiddenRows=hiddenPast.map(gameRow).join('');
+  const showMoreBtn=hiddenPast.length?`<div id="sqgm-show-more" style="text-align:center;padding:6px 0;margin-bottom:4px">
+    <button style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);text-decoration:underline">Ver ${hiddenPast.length} jogo${hiddenPast.length!==1?'s':''} anterior${hiddenPast.length!==1?'es':''}</button>
+  </div>`:'';
+  const hiddenSection=hiddenPast.length?`<div id="sqgm-hidden-past" style="display:none">${hiddenRows}</div>`:'';
+
+  lEl.innerHTML=
+    hiddenSection+
+    showMoreBtn+
+    visiblePast.map(gameRow).join('')+
+    (future.length?'<div class="ev-sep">Próximos</div>':'')+
+    future.map(gameRow).join('');
+
   lEl.querySelectorAll('[data-gm-id]').forEach(el=>el.addEventListener('click',()=>nav('game',{id:el.dataset.gmId})));
+  document.getElementById('sqgm-show-more')?.querySelector('button')?.addEventListener('click',()=>{
+    document.getElementById('sqgm-hidden-past').style.display='';
+    document.getElementById('sqgm-show-more').style.display='none';
+  });
 
   // ── PDF calendar popover wiring ────────────────────────────────────────────
   const pdfBtn=document.getElementById('btn-gcal-pdf');
