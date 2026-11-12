@@ -13767,11 +13767,14 @@ function _renderFPFData(d,matchId){
     // Substitution out: player is names[1]; substitution in: player is names[0]
     const subOut=evs.find(e=>e.label==='Substituição'&&e.names.length>=2&&_fpfNameMatch(p.name,e.names[1]));
     const subIn =evs.find(e=>e.label==='Substituição'&&e.names.length>=2&&_fpfNameMatch(p.name,e.names[0]));
-    const badges=[];
-    goals.forEach(e=>badges.push(`<span title="${e.label}" style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.label==='Golo (AG)'?'⚽AG':'⚽'} ${e.minute}</span>`));
-    cards.forEach(e=>badges.push(`<span style="font-size:10px;background:#fff8e1;color:#e65100;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.emoji} ${e.minute}</span>`));
-    if(subOut) badges.push(`<span style="font-size:10px;background:#fce4ec;color:#b71c1c;padding:1px 4px;border-radius:4px;white-space:nowrap">↓ ${subOut.minute}</span>`);
-    if(subIn)  badges.push(`<span style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">↑ ${subIn.minute}</span>`);
+    const _bmin=s=>parseInt(s)||0;
+    const badgeItems=[];
+    goals.forEach(e=>badgeItems.push({min:_bmin(e.minute),html:`<span title="${e.label}" style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.label==='Golo (AG)'?'⚽AG':'⚽'} ${e.minute}</span>`}));
+    cards.forEach(e=>badgeItems.push({min:_bmin(e.minute),html:`<span style="font-size:10px;background:#fff8e1;color:#e65100;padding:1px 4px;border-radius:4px;white-space:nowrap">${e.emoji} ${e.minute}</span>`}));
+    if(subOut) badgeItems.push({min:_bmin(subOut.minute),html:`<span style="font-size:10px;background:#fce4ec;color:#b71c1c;padding:1px 4px;border-radius:4px;white-space:nowrap">↓ ${subOut.minute}</span>`});
+    if(subIn)  badgeItems.push({min:_bmin(subIn.minute),html:`<span style="font-size:10px;background:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:4px;white-space:nowrap">↑ ${subIn.minute}</span>`});
+    badgeItems.sort((a,b)=>a.min-b.min);
+    const badges=badgeItems.map(x=>x.html);
     return `<div style="display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:11px;color:var(--muted);min-width:22px;text-align:right;flex-shrink:0">${p.number}</span>
       ${p.gk?'<span style="font-size:9px;background:#1565c0;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0">GR</span>':'<span style="width:21px;flex-shrink:0"></span>'}
@@ -13847,11 +13850,6 @@ function _renderFPFData(d,matchId){
         <div style="width:1px;background:var(--border);flex-shrink:0"></div>
         ${lineupCol(d.awayXI,d.awayBench,d.awayTeamName||'Fora',d.events)}
       </div>
-    </div>
-
-    <div class="card" style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</div>
-      ${eventsHtml}
     </div>
 
     ${staffHtml?`<div class="card">${staffHtml}</div>`:''}`;
