@@ -13579,11 +13579,11 @@ function _parseFPFHtml(html){
     const iconKey=Object.keys(iconMap).find(k=>imgSrc.includes(k));
     if(!iconKey) return null;
     const info=iconMap[iconKey];
-    // Extract player names from spans: filter noise, deduplicate concatenated versions
+    // Extract player names from spans: filter noise, remove concatenated versions
     const spans=[...el.querySelectorAll('span')].map(s=>s.textContent.trim())
       .filter(t=>t.length>2&&t.length<60&&!/^\d/.test(t)&&!t.includes("'"));
-    // Remove concatenated "Name1Name2" when both "Name1" and "Name2" exist as shorter strings
-    const names=spans.filter(n=>!spans.some(o=>o!==n&&o.includes(n)&&o.length>n.length));
+    // Remove "Name1Name2" concatenations — keep n only if n does NOT contain another span as substring
+    const names=spans.filter(n=>!spans.some(o=>o!==n&&n.includes(o)&&n.length>o.length));
     return {minute,emoji:info.emoji,label:info.label,names:[...new Set(names)]};
   }).filter(Boolean);
 
@@ -13630,60 +13630,80 @@ function _parseFPFHtml(html){
 }
 
 function _renderFPFData(d,matchId){
-  const playerRow=(p,side='')=>`
-    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      ${p.gk?'<span style="font-size:9px;background:#e3f2fd;color:#1565c0;padding:1px 4px;border-radius:3px;font-weight:700">GR</span>':''}
-      <span style="font-size:12px;color:var(--muted);min-width:20px;text-align:right">${p.number}</span>
+  const playerRow=p=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--muted);min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${p.number}</span>
+      ${p.gk?'<span style="font-size:9px;background:#1565c0;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0">GR</span>':'<span style="width:21px;flex-shrink:0"></span>'}
       <span style="font-size:13px;flex:1">${p.name}</span>
     </div>`;
 
   const lineupCol=(xi,bench,title)=>`
     <div style="flex:1;min-width:0">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${title}</div>
-      ${xi.length?xi.map(p=>playerRow(p)).join(''):'<p style="color:var(--muted);font-size:12px">—</p>'}
-      ${bench.length?`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px">Suplentes</div>
-        ${bench.map(p=>playerRow(p)).join('')}`:''}
+      <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--primary)">${title}</div>
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Titulares</div>
+      ${xi.length?xi.map(playerRow).join(''):'<p style="color:var(--muted);font-size:12px">—</p>'}
+      ${bench.length?`
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px;padding-top:8px;border-top:1px dashed var(--border)">Suplentes</div>
+        ${bench.map(playerRow).join('')}`:''}
     </div>`;
 
   const eventsHtml=d.events.length
-    ?d.events.map(e=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:12px;color:var(--muted);min-width:38px;text-align:right;font-variant-numeric:tabular-nums">${e.minute}</span>
-        <span style="font-size:16px">${e.emoji}</span>
-        <div style="flex:1;font-size:13px">
-          ${e.names.length===2&&e.label==='Substituição'
-            ?`<span style="color:#2e7d32">▲ ${e.names[0]}</span> <span style="color:#b71c1c">▼ ${e.names[1]}</span>`
-            :e.names.join(' · ')||'—'}
-        </div>
-      </div>`).join('')
+    ?d.events.map(e=>{
+      const isSub=e.label==='Substituição';
+      const isGoal=e.label==='Golo'||e.label==='Grande Penalidade';
+      const isOwnGoal=e.label==='Golo (AG)';
+      const isCard=e.label.includes('Cartão')||e.label.includes('Amarelo');
+      let playerHtml='';
+      if(isSub&&e.names.length>=2){
+        playerHtml=`<span style="color:#2e7d32;font-weight:600">↑ ${e.names[0]}</span><span style="color:var(--muted);margin:0 5px">·</span><span style="color:#c0392b;font-weight:600">↓ ${e.names[1]}</span>`;
+      } else if(isSub&&e.names.length===1){
+        playerHtml=`<span style="font-weight:600">${e.names[0]}</span>`;
+      } else if((isGoal||isOwnGoal)&&e.names.length){
+        playerHtml=`<span style="font-weight:700">${e.names[0]}</span>${isOwnGoal?' <span style="font-size:10px;color:var(--muted)">(AG)</span>':''}${e.names[1]?` <span style="font-size:11px;color:var(--muted)">assist. ${e.names[1]}</span>`:''}`;
+      } else {
+        playerHtml=`<span>${e.names.join(', ')||'—'}</span>`;
+      }
+      const minBg=isGoal||isOwnGoal?'#e8f5e9':isCard?'#fff8e1':'var(--bg-2,#f5f7fa)';
+      const minCol=isGoal||isOwnGoal?'#2e7d32':isCard?'#e65100':'var(--muted)';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:700;background:${minBg};color:${minCol};border-radius:5px;padding:2px 7px;min-width:40px;text-align:center;flex-shrink:0">${e.minute}</span>
+        <span style="font-size:15px;flex-shrink:0">${e.emoji}</span>
+        <div style="flex:1;font-size:13px;line-height:1.5">${playerHtml}</div>
+      </div>`;
+    }).join('')
     :'<p style="color:var(--muted);font-size:13px;padding:8px 0">Sem eventos registados</p>';
 
   const staffHtml=Object.entries(d.staffSections).filter(([,v])=>v.length).map(([section,entries])=>`
-    <div style="margin-top:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${section}</div>
-      ${entries.map(e=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">${e.role||''}</span>${e.role?' — ':''}<strong>${e.name}</strong></div>`).join('')}
+    <div style="margin-top:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${section}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">
+        ${entries.map(e=>`<div style="font-size:12px;padding:6px 8px;background:var(--bg-2,#f5f7fa);border-radius:6px">
+          ${e.role?`<div style="font-size:10px;color:var(--muted);margin-bottom:1px">${e.role}</div>`:''}
+          <div style="font-weight:600">${e.name}</div>
+        </div>`).join('')}
+      </div>
     </div>`).join('');
 
   return `
-    <div style="border:2px solid #1a56db;border-radius:8px;padding:12px;margin-bottom:12px;background:var(--bg)">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${d.infoText}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span style="font-size:14px;font-weight:700;flex:1">${d.homeTeamName||'—'}</span>
-        <span style="font-size:22px;font-weight:800;color:#1a56db;min-width:60px;text-align:center">${d.scoreText||'vs'}</span>
-        <span style="font-size:14px;font-weight:700;flex:1;text-align:right">${d.awayTeamName||'—'}</span>
+    <div style="border:2px solid #1a56db;border-radius:10px;padding:14px 16px;margin-bottom:12px;background:linear-gradient(135deg,rgba(26,86,219,.06),rgba(26,86,219,.02))">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-align:center">${d.infoText}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:700;flex:1;text-align:right;line-height:1.3">${d.homeTeamName||'—'}</span>
+        <span style="font-size:28px;font-weight:900;color:#1a56db;min-width:70px;text-align:center;letter-spacing:-1px">${d.scoreText||'vs'}</span>
+        <span style="font-size:13px;font-weight:700;flex:1;text-align:left;line-height:1.3">${d.awayTeamName||'—'}</span>
       </div>
-      <div style="text-align:center;margin-top:4px">
-        <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db">↗ resultados.fpf.pt</a>
+      <div style="text-align:center;margin-top:8px">
+        <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db;opacity:.8">↗ resultados.fpf.pt</a>
       </div>
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</h3>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">⚡ Eventos</div>
       ${eventsHtml}
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">👥 Equipas</h3>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">👥 Equipas</div>
       <div style="display:flex;gap:16px">
         ${lineupCol(d.homeXI,d.homeBench,d.homeTeamName||'Casa')}
         <div style="width:1px;background:var(--border);flex-shrink:0"></div>
