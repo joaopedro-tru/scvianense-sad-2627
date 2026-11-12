@@ -13673,23 +13673,48 @@ function _parseFPFHtml(html){
     'icon-penalty':    {emoji:'⚽',label:'Grande Penalidade'},
   };
 
-  const events=[...doc.querySelectorAll('.timeline-item')].map(el=>{
+  // Goals: parse from .info-goals (reliable names + minutes)
+  // Left col (.text-right) = home, right col (.text-left) = away
+  const goalEvents=[];
+  doc.querySelectorAll('.row.info-goals').forEach(row=>{
+    row.querySelectorAll('.col-md-6,.col-sm-6,.col-xs-6').forEach(col=>{
+      const side=col.classList.contains('text-right')?'home':'away';
+      [...col.querySelectorAll('span')].forEach(span=>{
+        const text=span.textContent.trim();
+        const m=text.match(/^(\d+)['’]\s*(.+)$/);
+        if(!m) return;
+        const minute=m[1]+"'";
+        const rawName=m[2].trim();
+        const isOG=/\(AG\)/i.test(rawName);
+        const name=rawName.replace(/\(AG\)/i,'').replace(/\(.*\)/,'').trim();
+        if(name.length>1) goalEvents.push({
+          minute,emoji:'⚽',label:isOG?'Golo (AG)':'Golo',names:[name],side
+        });
+      });
+    });
+  });
+
+  // Non-goal events: parse timeline (cards + substitutions only — skip goals/penalties)
+  const SKIP_GOALS=new Set(['icon-goal','icon-own-goal','icon-penalty']);
+  const timelineEvents=[...doc.querySelectorAll('.timeline-item')].map(el=>{
     const minute=el.querySelector('.tag')?.textContent?.trim()||'';
     const imgSrc=el.querySelector('img')?.getAttribute('src')||'';
     const iconKey=Object.keys(iconMap).find(k=>imgSrc.includes(k));
-    if(!iconKey) return null;
+    if(!iconKey||SKIP_GOALS.has(iconKey)) return null;
     const info=iconMap[iconKey];
-    // Extract player names from spans AND anchor tags (goal scorers use <a> links)
     const rawTexts=[...el.querySelectorAll('span,a')].filter(node=>{
       const href=node.getAttribute?.('href')||'';
       return !href||href.includes('Player')||href.includes('player')||!href.includes('http');
     }).map(s=>s.textContent.trim())
       .filter(t=>t.length>2&&t.length<60&&!/^\d/.test(t)&&!t.includes("'")&&t!==info.label);
     const unique=[...new Set(rawTexts)];
-    // Remove "Name1Name2" concatenations — keep n only if n does NOT contain another entry as substring
     const names=unique.filter(n=>!unique.some(o=>o!==n&&n.includes(o)&&n.length>o.length));
     return {minute,emoji:info.emoji,label:info.label,names:[...new Set(names)]};
   }).filter(Boolean);
+
+  // Merge: goals first (sorted by minute), then timeline events
+  const toMin=s=>parseInt(s)||0;
+  const events=[...goalEvents,...timelineEvents].sort((a,b)=>toMin(a.minute)-toMin(b.minute));
 
   // Lineup helper
   const parseLineup=el=>!el?[]:
