@@ -13291,6 +13291,32 @@ function _fpfDateLabel(dateStr){
   return `${parseInt(d)} ${months[parseInt(m)-1]}`;
 }
 
+// Fetch fixture IDs from a competition page; returns sorted array of fixtureIds (all rounds)
+async function _fpfGetFixtureIds(competitionId, seasonId){
+  const r=await fetch(`/api/fpf?competitionId=${competitionId}&seasonId=${seasonId}`);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const html=await r.text();
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  // Links like <a href="/Competition/GetClassificationAndMatchesByFixture?fixtureId=XXXXX">N</a>
+  const pairs=[];
+  doc.querySelectorAll('a[href*="fixtureId="]').forEach(a=>{
+    const fid=Number(a.getAttribute('href').match(/fixtureId=(\d+)/)?.[1]);
+    const num=parseInt(a.textContent.trim());
+    if(fid&&num) pairs.push({fid,num});
+  });
+  if(!pairs.length) return [];
+  // Infer full range from visible labels + IDs (IDs are consecutive)
+  const minNum=Math.min(...pairs.map(p=>p.num));
+  const maxNum=Math.max(...pairs.map(p=>p.num));
+  // Pick any anchor point to compute offset
+  const anchor=pairs[0];
+  const firstFid=anchor.fid-(anchor.num-minNum);
+  const lastFid=anchor.fid+(maxNum-anchor.num);
+  const ids=[];
+  for(let i=lastFid;i>=firstFid;i--) ids.push(i); // latest-first
+  return ids;
+}
+
 // Auto-lookup: scan fixture pages to find the matchId for ev
 async function _fpfAutoLookup(ev){
   const container=document.getElementById('fpf-data-container');
@@ -13298,30 +13324,49 @@ async function _fpfAutoLookup(ev){
   const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
   const cfg=_getFPFCfg(sq);
 
-  if(!cfg.firstFixtureId||!cfg.teamName){
+  if(!cfg.competitionId||!cfg.seasonId||!cfg.teamName){
     container.innerHTML=_fpfConfigForm(sq,ev,'⚠️ Configura os dados FPF do escalão para activar a pesquisa automática.');
     _bindFPFConfigForm(sq,ev);
     return;
   }
 
-  const totalRounds=cfg.totalJornadas||18;
-  const lastFixtureId=Number(cfg.firstFixtureId)+(totalRounds-1);
   const dateLabel=ev.date?_fpfDateLabel(ev.date):'';
   const normOpp=_normTeam(ev.opponent||'');
   const normUs=_normTeam(cfg.teamName);
 
-  container.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (0/${totalRounds})...</p>`;
+  container.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A obter calendário da competição...</p>';
 
-  for(let i=lastFixtureId;i>=Number(cfg.firstFixtureId);i--){
-    const pct=lastFixtureId-i+1;
+  let fixtureIds;
+  try{
+    fixtureIds=await _fpfGetFixtureIds(cfg.competitionId,cfg.seasonId);
+  }catch(e){
+    container.innerHTML=`<div style="text-align:center;padding:16px 0">
+      <p style="color:#b71c1c;font-size:13px;margin-bottom:12px">⚠️ Não foi possível obter o calendário da FPF (${e.message}).</p>
+      ${_fpfManualInputHtml('')}
+    </div>`;
+    _bindFPFManualInput(ev);
+    return;
+  }
+
+  if(!fixtureIds.length){
+    container.innerHTML=`<div style="text-align:center;padding:16px 0">
+      <p style="color:#b71c1c;font-size:13px;margin-bottom:12px">⚠️ Nenhuma jornada encontrada para esta competição.</p>
+      ${_fpfManualInputHtml('')}
+    </div>`;
+    _bindFPFManualInput(ev);
+    return;
+  }
+
+  const total=fixtureIds.length;
+  for(let idx=0;idx<total;idx++){
+    const i=fixtureIds[idx];
     const pctEl=document.getElementById('fpf-data-container');
-    if(pctEl) pctEl.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (${pct}/${totalRounds})...</p>`;
+    if(pctEl) pctEl.innerHTML=`<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A procurar na FPF (${idx+1}/${total})...</p>`;
     try{
       const r=await fetch(`/api/fpf?fixtureId=${i}`);
       if(!r.ok) continue;
       const html=await r.text();
       const doc=new DOMParser().parseFromString(html,'text/html');
-      // Each past game: <a class="game-link" href="/Match/GetMatchInformation?matchId=XXXXX">
       const links=[...doc.querySelectorAll('a.game-link[href*="matchId"]')];
       for(const link of links){
         const href=link.getAttribute('href')||'';
@@ -13330,20 +13375,15 @@ async function _fpfAutoLookup(ev){
         const home=_normTeam(link.querySelector('.home-team')?.textContent||'');
         const away=_normTeam(link.querySelector('.away-team')?.textContent||'');
         const sched=(link.querySelector('.game-schedule')?.textContent||'').toLowerCase().trim();
-        // Check our team is in this game
-        const usInGame=(home.includes(normUs)||normUs.includes(home.replace(/\s+/g,' ').trim()))||
-                       (away.includes(normUs)||normUs.includes(away.replace(/\s+/g,' ').trim()));
+        const usInGame=(home.includes(normUs)||normUs.includes(home))||
+                       (away.includes(normUs)||normUs.includes(away));
         if(!usInGame) continue;
-        // Check opponent
         const other=home.includes(normUs)?away:home;
         const oppMatch=normOpp&&other&&(other.includes(normOpp)||normOpp.includes(other)||
           other.split(' ').some(w=>w.length>3&&normOpp.includes(w)));
-        // Check date (only relevant if dateLabel exists)
         const dateMatch=dateLabel&&sched.includes(dateLabel);
-        // Need at least one signal to confirm
         if(!normOpp&&!dateLabel) continue;
         if(oppMatch||dateMatch){
-          // Save and load
           await DB.updateEvent(gameEventId,{fpfMatchId:mid});
           if(document.getElementById('fpf-data-container')){
             document.getElementById('fpf-data-container').innerHTML=
@@ -13368,9 +13408,10 @@ async function _fpfAutoLookup(ev){
 
 function _fpfConfigForm(sq,ev,msg){
   const cfg=_getFPFCfg(sq);
-  const DEFAULTS={eqa:{firstFixtureId:'652229',totalJornadas:'18',teamName:'Sc Vianense Sad'},
-                  sub23:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'},
-                  sub19:{firstFixtureId:'',totalJornadas:'26',teamName:'Sc Vianense Sad'}};
+  // Liga 3 Série A defaults for eqa; sub23/sub19 left blank
+  const DEFAULTS={eqa:{competitionId:'29442',seasonId:'106',teamName:'Sc Vianense Sad'},
+                  sub23:{competitionId:'',seasonId:'106',teamName:'Sc Vianense Sad'},
+                  sub19:{competitionId:'',seasonId:'106',teamName:'Sc Vianense Sad'}};
   const def=DEFAULTS[sq]||{};
   return `<div style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;margin-bottom:10px">⚙️ Configuração FPF — ${sq.toUpperCase()}</div>
@@ -13379,16 +13420,15 @@ function _fpfConfigForm(sq,ev,msg){
       <label style="font-size:12px;color:var(--muted)">Nome do clube na FPF (ex: Sc Vianense Sad)</label>
       <input id="fpf-cfg-team" placeholder="${def.teamName||''}" value="${cfg.teamName||def.teamName||''}"
         style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
-      <label style="font-size:12px;color:var(--muted)">ID da 1.ª jornada (ex: 652229)</label>
-      <input id="fpf-cfg-fid" type="number" placeholder="${def.firstFixtureId||''}" value="${cfg.firstFixtureId||def.firstFixtureId||''}"
+      <label style="font-size:12px;color:var(--muted)">ID da competição — visível no URL de <a href="https://resultados.fpf.pt/Competition" target="_blank" style="color:#1a56db">resultados.fpf.pt/Competition</a></label>
+      <input id="fpf-cfg-cid" type="number" placeholder="${def.competitionId||''}" value="${cfg.competitionId||def.competitionId||''}"
         style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
-      <label style="font-size:12px;color:var(--muted)">Número de jornadas</label>
-      <input id="fpf-cfg-rounds" type="number" placeholder="${def.totalJornadas||18}" value="${cfg.totalJornadas||def.totalJornadas||18}"
+      <label style="font-size:12px;color:var(--muted)">ID da época (seasonId)</label>
+      <input id="fpf-cfg-sid" type="number" placeholder="${def.seasonId||''}" value="${cfg.seasonId||def.seasonId||''}"
         style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" id="fpf-cfg-save">💾 Guardar config</button>
-      <a href="https://resultados.fpf.pt" target="_blank" rel="noopener" style="font-size:12px;color:#1a56db;line-height:30px">↗ Ajuda a encontrar o ID da jornada</a>
+      <button class="btn btn-p btn-sm" id="fpf-cfg-save">💾 Guardar e procurar</button>
     </div>
   </div>`;
 }
@@ -13396,13 +13436,13 @@ function _fpfConfigForm(sq,ev,msg){
 function _bindFPFConfigForm(sq,ev){
   document.getElementById('fpf-cfg-save')?.addEventListener('click',async()=>{
     const teamName=document.getElementById('fpf-cfg-team')?.value?.trim();
-    const firstFixtureId=document.getElementById('fpf-cfg-fid')?.value?.trim();
-    const totalJornadas=parseInt(document.getElementById('fpf-cfg-rounds')?.value)||18;
-    if(!teamName||!firstFixtureId){ toast('⚠️ Preenche todos os campos'); return; }
-    _saveFPFCfg(sq,{teamName,firstFixtureId:Number(firstFixtureId),totalJornadas});
+    const competitionId=document.getElementById('fpf-cfg-cid')?.value?.trim();
+    const seasonId=document.getElementById('fpf-cfg-sid')?.value?.trim();
+    if(!teamName||!competitionId||!seasonId){ toast('⚠️ Preenche todos os campos'); return; }
+    _saveFPFCfg(sq,{teamName,competitionId,seasonId});
     toast('✅ Configuração FPF guardada');
     document.getElementById('fpf-data-container').innerHTML=
-      '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">🔍 A iniciar pesquisa...</p>';
+      '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A obter calendário...</p>';
     await _fpfAutoLookup(ev);
   });
 }
@@ -13428,7 +13468,7 @@ function renderGameFPF(ev){
   const matchId=ev.fpfMatchId||'';
   const sq=ev.squad==='both'?'eqa':ev.squad||'eqa';
   const cfg=_getFPFCfg(sq);
-  const hasConfig=!!(cfg.firstFixtureId&&cfg.teamName);
+  const hasConfig=!!(cfg.competitionId&&cfg.seasonId&&cfg.teamName);
 
   document.getElementById('gm-tab-content').innerHTML=`
     <div style="padding:4px 0">
