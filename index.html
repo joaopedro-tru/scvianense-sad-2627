@@ -10137,6 +10137,12 @@ function liveEvLabel(e){
     const res=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou/Fora';
     return `⚽ <strong>GP — ${side}</strong>: ${res}${e.playerId?' ('+pn(e.playerId)+')':''}`;
   }
+  if(e.type==='penalty_in_play'){
+    const resL=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':e.result==='missed'?'❌ Falhou':'—';
+    const fouledStr=e.fouledId?` sofrida por ${pn(e.fouledId)}`:'';
+    const takerStr=e.takerId?` · ${pn(e.takerId)} bate`:'';
+    return `⚽ <strong>Grande Penalidade</strong>${fouledStr}${takerStr} — ${resL}`;
+  }
   return `• ${e.type}`;
 }
 
@@ -10316,7 +10322,7 @@ function renderLiveRecording(ev){
     </div>
 
     <!-- Clock bar -->
-    ${renderClockBar(clock)}
+    ${renderClockBar(clock, getGameType(ev)==='cup')}
 
     <!-- Tabs -->
     <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
@@ -10403,7 +10409,7 @@ function renderLiveGeralTab(ev){
   const mr=ev.matchReport||{events:[]};
   const clock=mr.matchClock||{phase:'pre'};
   const inPenPhase=clock.phase==='pen';
-  const evs=(mr.events||[]).sort((a,b)=>sortMin(b)-sortMin(a));
+  const evs=(mr.events||[]).filter(e=>!e.fromPenalty).sort((a,b)=>sortMin(b)-sortMin(a));
   const ctrs=mr.counters||{};
   const isHome=ev.homeAway!=='away';
   const teamA=isHome?'SCV':(ev.opponent||'Adversário').substring(0,14);
@@ -10465,8 +10471,9 @@ function renderLiveGeralTab(ev){
     document.querySelectorAll('[data-lv-type]').forEach(btn=>btn.addEventListener('click',()=>openLivePicker(btn.dataset.lvType)));
     document.querySelectorAll('[data-del-lv]').forEach(btn=>btn.addEventListener('click',()=>{
       if(!confirm('Remover este evento?')) return;
+      const eid=btn.dataset.delLv;
       const cur=JSON.parse(JSON.stringify(DB.getEvent(liveGameId).matchReport||{events:[]}));
-      cur.events=(cur.events||[]).filter(e=>e.id!==btn.dataset.delLv);
+      cur.events=(cur.events||[]).filter(e=>e.id!==eid&&!(e.fromPenalty&&e.penaltyId===eid));
       DB.updateEvent(liveGameId,{matchReport:cur});
       renderLiveGeralTab(DB.getEvent(liveGameId));
     }));
@@ -10500,6 +10507,7 @@ function renderLiveGeralTab(ev){
       <div class="lv-btn" data-lv-type="ball_won"><span class="lv-icon">&#9994;</span>Recupera&#231;&#227;o</div>
       <div class="lv-btn" data-lv-type="ball_lost"><span class="lv-icon">&#10060;</span>Perda de Bola</div>
       <div class="lv-btn" data-lv-type="foul_committed"><span class="lv-icon">&#9889;</span>Falta Cometida</div>
+      <div class="lv-btn" data-lv-type="penalty_in_play"><span class="lv-icon">⚽</span>Grande Penalidade</div>
       <div class="lv-btn" data-lv-type="corner_for"><span class="lv-icon">🚩</span>Canto a Favor</div>
       <div class="lv-btn" data-lv-type="chance_for"><span class="lv-icon">&#10003;</span>Oport. Clara</div>
       <div class="lv-btn" data-lv-type="offside_against"><span class="lv-icon">⛳</span>Fora de Jogo</div>
@@ -11096,6 +11104,38 @@ function openLivePicker(type){
         );
       }
 
+    // ── GRANDE PENALIDADE (in play) ────────────────────────────────────────────
+    } else if(type==='penalty_in_play'){
+      if(step==='init'){
+        livePending.step='fouled';
+        playerList('⚽ Penálti — quem sofreu?',
+          pid=>{ livePending.data.fouledId=pid; livePending.step='taker'; showStep(); },
+          '— Sem jogador específico', ()=>{ livePending.step='taker'; showStep(); }
+        );
+      } else if(step==='taker'){
+        playerList('⚽ Quem bateu?',
+          pid=>{ livePending.data.takerId=pid; livePending.step='pen-result'; showStep(); },
+          '— Sem jogador específico', ()=>{ livePending.step='pen-result'; showStep(); }
+        );
+      } else if(step==='pen-result'){
+        const fouledP=livePending.data.fouledId?DB.getPlayer(livePending.data.fouledId):null;
+        const takerP=livePending.data.takerId?DB.getPlayer(livePending.data.takerId):null;
+        const sub=`${fouledP?dn(fouledP)+' sofreu':''} ${takerP?'· '+dn(takerP)+' bate':''}`.trim()||'Grande penalidade';
+        titleEl.textContent='⚽ Resultado';
+        bodyEl.innerHTML=`
+          <div style="padding:8px 4px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:16px;font-weight:600">${sub}</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button id="pen-ip-goal" class="btn btn-p" style="padding:16px;font-size:15px;justify-content:center;background:#16a34a;border-color:#16a34a">✅ Golo</button>
+              <button id="pen-ip-missed" class="btn btn-o" style="padding:16px;font-size:15px;justify-content:center">❌ Falhou / Fora</button>
+              <button id="pen-ip-saved" class="btn btn-o" style="padding:16px;font-size:15px;justify-content:center;border-color:#2563eb;color:#2563eb">🧤 Defendido</button>
+            </div>
+          </div>`;
+        document.getElementById('pen-ip-goal').addEventListener('click',()=>{ livePending.data.result='goal'; saveLiveEvent(); });
+        document.getElementById('pen-ip-missed').addEventListener('click',()=>{ livePending.data.result='missed'; saveLiveEvent(); });
+        document.getElementById('pen-ip-saved').addEventListener('click',()=>{ livePending.data.result='saved'; saveLiveEvent(); });
+      }
+
     // ── FINISH GAME ────────────────────────────────────────────────────────────
     } else if(type==='finish'){
       titleEl.textContent='🏆 Melhor em Campo';
@@ -11138,11 +11178,17 @@ function saveLiveEvent(){
   if(type==='goal'&&!ne.ownGoal&&ne.playerId){
     cur.events.push({id:uid(),minute:ne.minute,...(ne.period?{period:ne.period}:{}),type:'shot_on',playerId:ne.playerId,fromGoal:true,goalId:ne.id});
   }
+  // Grande penalidade com golo → gera evento goal com fromPenalty:true
+  if(type==='penalty_in_play'&&ne.result==='goal'){
+    const takerId=ne.takerId||null;
+    cur.events.push({id:uid(),minute:ne.minute,...(ne.period?{period:ne.period}:{}),type:'goal',playerId:takerId,fromPenalty:true,penaltyId:ne.id});
+  }
   DB.updateEvent(liveGameId,{matchReport:cur});
   document.getElementById('mo-live').classList.remove('open');
   livePending=null;
-  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','foul_suffered':'⚡','ball_lost':'❌','ball_won':'✊','corner_for':'🚩','corner_against':'🚩','chance_for':'✅','chance_against':'⚠️','opp_shot_on':'🎯','opp_shot_off':'💨','offside_against':'⛳','offside_for':'⛳','penalty_shootout':'⚽'};
-  toast(`${icons[type]||'✅'} Evento registado! (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
+  const icons={'goal':'⚽','goal_conceded':'🥅','yellow':'🟡','yellow2':'🟡🔴','red':'🔴','sub':'🔄','injury':'🩺','medical':'🏥','shot_off':'💨','shot_on':'🎯','foul_committed':'⚡','foul_suffered':'⚡','ball_lost':'❌','ball_won':'✊','corner_for':'🚩','corner_against':'🚩','chance_for':'✅','chance_against':'⚠️','opp_shot_on':'🎯','opp_shot_off':'💨','offside_against':'⛳','offside_for':'⛳','penalty_shootout':'⚽','penalty_in_play':'⚽'};
+  const penResultLabel=type==='penalty_in_play'?({goal:' ✅ Golo',missed:' ❌ Falhou',saved:' 🧤 Defendido'}[ne.result]||''):'';
+  toast(`${icons[type]||'✅'} Evento registado!${penResultLabel} (${fmtMin(ne)}${ne.period==='pen'?'':'\''})`);
   renderLive();
   // Lesão com jogador identificado → oferecer registo clínico
   if(type==='injury' && ne.playerId){
@@ -11623,7 +11669,7 @@ function clockPhaseLabel(clock){
   if(clock.phase==='finished') return 'Terminado';
   return '';
 }
-function renderClockBar(clock){
+function renderClockBar(clock, isCup=false){
   const phase=clock?.phase||'pre';
   const min=getMatchMinute(clock);
   const minDisplay=phase==='pre'?'—':phase==='ht'?'HT':phase==='eht'?'HT Prol.':phase==='finished'?'FIM':phase==='pen'?'GP':(min?min+"'":'—');
@@ -11640,7 +11686,7 @@ function renderClockBar(clock){
         </div>
         <button id="gm-clock-btn" data-next="finished" style="padding:10px 16px;border:none;border-radius:9px;background:#c0392b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">⏸ Fim da 2ª Parte</button>
       </div>
-      <button id="gm-clock-btn-et" data-next="et1" style="width:100%;padding:9px 16px;border:1.5px dashed #7c3aed;border-radius:9px;background:transparent;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏱ Ir para Prolongamento (Taça)</button>
+      ${isCup?`<button id="gm-clock-btn-et" data-next="et1" style="width:100%;padding:9px 16px;border:1.5px dashed #7c3aed;border-radius:9px;background:transparent;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏱ Ir para Prolongamento (Taça)</button>`:''}
     </div>`;
   }
   // For et2 phase: show two buttons — end or go to GP
@@ -11653,7 +11699,7 @@ function renderClockBar(clock){
         </div>
         <button id="gm-clock-btn" data-next="finished" style="padding:10px 16px;border:none;border-radius:9px;background:#c0392b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">⏸ Fim do 2º Prol.</button>
       </div>
-      <button id="gm-clock-btn-pen" data-next="pen" style="width:100%;padding:9px 16px;border:1.5px dashed #c0392b;border-radius:9px;background:transparent;color:#c0392b;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⚽ Ir para Grandes Penalidades (GP)</button>
+      ${isCup?`<button id="gm-clock-btn-pen" data-next="pen" style="width:100%;padding:9px 16px;border:1.5px dashed #c0392b;border-radius:9px;background:transparent;color:#c0392b;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⚽ Ir para Grandes Penalidades (GP)</button>`:''}
     </div>`;
   }
   const btnMap={
@@ -11692,7 +11738,7 @@ function renderGame(){
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
-    ${renderClockBar(clock)}
+    ${renderClockBar(clock, getGameType(ev)==='cup')}
     <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
       <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
@@ -12452,8 +12498,8 @@ function renderGamePre(ev,sqPlayers,conv){
 
 // ── SUMÁRIO ───────────────────────────────────────────────────────────────────
 function renderGameSumario(ev,sqPlayers,conv,mr){
-  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
-  const evs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>sortMin(a)-sortMin(b));
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout','penalty_in_play']);
+  const evs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)&&!e.fromPenalty).sort((a,b)=>sortMin(a)-sortMin(b));
   const isHome=ev.homeAway!=='away';
   function pn(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
 
@@ -12493,6 +12539,12 @@ function renderGameSumario(ev,sqPlayers,conv,mr){
         const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
         const pRes=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou';
         desc=`⚽ <strong>GP ${pSide}</strong>: ${pRes}${e.playerId?` <span style="color:var(--muted);font-size:11px">(${pn(e.playerId)})</span>`:''}`;
+      } else if(e.type==='penalty_in_play'){
+        if(e.result==='goal'){ ourG++; const a=isHome?ourG:theirG,b=isHome?theirG:ourG; scoreBadge=`<span class="sum-score-badge">${a} — ${b}</span>`; }
+        const pResL=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':e.result==='missed'?'❌ Falhou':'—';
+        const takerStr=e.takerId?`<strong>${pn(e.takerId)}</strong>`:null;
+        const fouledStr=e.fouledId?`<span style="color:var(--muted);font-size:11px">sof. ${pn(e.fouledId)}</span>`:null;
+        desc=`⚽ GP ${takerStr||''}${fouledStr?' '+fouledStr:''} ${pResL}`.trim();
       }
       if(!desc && !scoreBadge) return '';
       return `<div class="sum-ev"><span class="sum-min">${fmtMin(e)}${e.period==='pen'?'':'\''}</span><span class="sum-desc">${desc}</span>${scoreBadge}</div>`;
@@ -12756,136 +12808,148 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const W=doc.internal.pageSize.getWidth();
-    let y=22;
+    let y=18;
     const isHome=ev.homeAway!=='away';
     const opp=ev.opponent||'Adversario';
-    // Header
-    doc.setFontSize(18); doc.setFont('helvetica','bold');
-    doc.text('SC Vianense SAD', W/2, y, {align:'center'}); y+=9;
-    doc.setFontSize(13); doc.setFont('helvetica','normal');
-    doc.text(isHome?`vs ${opp}`:`em ${opp}`, W/2, y, {align:'center'}); y+=7;
-    if(ev.competition){ doc.setFontSize(10); doc.text(ev.competition, W/2, y, {align:'center'}); y+=6; }
-    if(ev.date){ doc.setFontSize(10); doc.text(fmtDate(ev.date)+(ev.time?' | '+ev.time:''), W/2, y, {align:'center'}); y+=6; }
-    // Score
+
+    // ── Header ─────────────────────────────────────────────────────────────
+    doc.setFontSize(16); doc.setFont('helvetica','bold');
+    doc.text('SC Vianense SAD', W/2, y, {align:'center'}); y+=8;
+    doc.setFontSize(11); doc.setFont('helvetica','normal');
+    doc.text(isHome?`vs ${opp}`:`em ${opp}`, W/2, y, {align:'center'}); y+=6;
+    if(ev.competition){ doc.setFontSize(9); doc.text(ev.competition, W/2, y, {align:'center'}); y+=5; }
+    if(ev.date){ doc.setFontSize(9); doc.text(fmtDate(ev.date)+(ev.time?' | '+ev.time:''), W/2, y, {align:'center'}); y+=5; }
     const sc=isHome?`${nGoals} - ${nGC}`:`${nGC} - ${nGoals}`;
-    doc.setFontSize(36); doc.setFont('helvetica','bold');
-    doc.text(sc, W/2, y+13, {align:'center'}); y+=24;
-    // Separator
-    doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
-    // ── Lineup section ──────────────────────────────────────────────────────
+    doc.setFontSize(28); doc.setFont('helvetica','bold');
+    doc.text(sc, W/2, y+10, {align:'center'}); y+=20;
+
+    // ── Campo ──────────────────────────────────────────────────────────────
     if(tits.length>0){
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
-      const formLabel=formation?` (${formation})`:'';
-      doc.text(`Onze inicial${formLabel}`, 15, y); y+=8;
-      doc.setFontSize(10);
+      const pX=25, pW=W-50, pH=108, pY=y;
+      // Green stripes
+      for(let i=0;i<6;i++){
+        doc.setFillColor(i%2===0?34:40,i%2===0?105:112,i%2===0?34:40);
+        doc.rect(pX,pY+i*(pH/6),pW,pH/6,'F');
+      }
+      // Pitch lines
+      doc.setDrawColor(255,255,255); doc.setLineWidth(0.4);
+      doc.rect(pX,pY,pW,pH);
+      doc.line(pX,pY+pH/2,pX+pW,pY+pH/2);
+      doc.circle(pX+pW/2,pY+pH/2,pH*0.11);
+      doc.setFillColor(255,255,255); doc.circle(pX+pW/2,pY+pH/2,0.9,'F');
+      const paW=pW*0.44, paH=pH*0.17;
+      doc.rect(pX+(pW-paW)/2,pY,paW,paH);
+      doc.rect(pX+(pW-paW)/2,pY+pH-paH,paW,paH);
+      const gaW=pW*0.22, gaH=pH*0.08;
+      doc.rect(pX+(pW-gaW)/2,pY,gaW,gaH);
+      doc.rect(pX+(pW-gaW)/2,pY+pH-gaH,gaW,gaH);
+      doc.circle(pX+pW/2,pY+paH*0.68,0.9,'F');
+      doc.circle(pX+pW/2,pY+pH-paH*0.68,0.9,'F');
+      // Formation label
+      if(formation){
+        doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
+        doc.text(formation, pX+pW-2, pY+3.5, {align:'right'});
+      }
+      // Players
       tits.forEach(p=>{
+        const pos=getPPos(p);
+        const px=pX+(pos.x/100)*pW;
+        const py=pY+(pos.y/100)*pH;
         const wasOut=subbedOut.has(p.id);
-        const posLabel=igPos[p.id]||p.position||'';
-        const name=p.alcunha?.trim()||p.name;
-        const num=p.number?`${p.number}. `:'';
-        const pos=posLabel?` [${posLabel}]`:'';
-        const sub=wasOut?' ↓':'';//↓
-        doc.setFont('helvetica', wasOut?'italic':'normal');
-        doc.text(`${num}${name}${pos}${sub}`, 20, y);
-        y+=6.5;
-        if(y>270){ doc.addPage(); y=20; }
+        doc.setFillColor(wasOut?205:255,wasOut?205:255,wasOut?205:255);
+        doc.setDrawColor(0,30,80); doc.setLineWidth(0.3);
+        doc.circle(px,py,4.2,'FD');
+        doc.setTextColor(0,30,80); doc.setFontSize(7); doc.setFont('helvetica','bold');
+        doc.text(String(p.number||''),px,py+1.3,{align:'center'});
+        doc.setTextColor(255,255,255); doc.setFontSize(5.5); doc.setFont('helvetica','normal');
+        doc.text(pAbbr(p),px,py+7.5,{align:'center'});
+        if(wasOut){
+          doc.setFillColor(220,40,40); doc.setDrawColor(255,255,255); doc.setLineWidth(0.2);
+          doc.circle(px+3.2,py-3.2,2.2,'F');
+          doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+          doc.text('x',px+3.2,py-2.4,{align:'center'});
+        }
       });
-      y+=4;
+      doc.setTextColor(0,0,0); doc.setDrawColor(0,0,0); doc.setLineWidth(0.2);
+      y=pY+pH+8;
     }
-    // ── Suplentes section ───────────────────────────────────────────────────
+
+    // ── Suplentes ──────────────────────────────────────────────────────────
     if(sups.length>0){
-      doc.setDrawColor(220,220,220); doc.line(15, y, W-15, y); y+=8;
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
-      doc.text('Banco de Suplentes', 15, y); y+=8;
-      doc.setFontSize(10);
-      sups.forEach(p=>{
-        const entered=subbedIn.has(p.id);
-        const name=p.alcunha?.trim()||p.name;
-        const num=p.number?`${p.number}. `:'';
-        const sub=entered?' ↑':'';//↑
-        doc.setFont('helvetica', entered?'bold':'normal');
-        doc.text(`${num}${name}${sub}`, 20, y);
-        y+=6.5;
-        if(y>270){ doc.addPage(); y=20; }
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80);
+      doc.text('SUPLENTES', 25, y); y+=5;
+      const cols=4, colW=(W-50)/cols;
+      sups.forEach((p,i)=>{
+        const col=i%cols, row=Math.floor(i/cols);
+        const sx=25+col*colW, sy=y+row*7;
+        const ent=subbedIn.has(p.id);
+        if(ent){ doc.setFillColor(220,245,220); doc.setDrawColor(100,180,100); doc.setLineWidth(0.2); doc.rect(sx-1,sy-4,colW-1,6,'FD'); }
+        doc.setFont('helvetica',ent?'bold':'normal'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+        doc.text(`${p.number||'-'} ${pAbbr(p)}${ent?' (ent.)':''}`, sx+1, sy);
       });
-      y+=4;
+      y+=Math.ceil(sups.length/cols)*7+8;
     }
-    // ── Stats ───────────────────────────────────────────────────────────────
-    doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
-    doc.setFontSize(13); doc.setFont('helvetica','bold');
-    doc.text('Estatisticas', 15, y); y+=9;
-    doc.setFontSize(11);
-    const statRows=[
-      ['Golos marcados', nGoals],
-      ['Golos sofridos', nGC],
-      ['Cartoes amarelos', nYel],
-      ...(nYel2?[['Duplos amarelos (2x amarelo)', nYel2]]:[]),
-      ['Cartoes vermelhos', nRed],
-      ['Substituicoes', nSub],
-      ...(nShotOn||nShotOff?[['Remates enquadrados', nShotOn],['Remates fora', nShotOff]]:[]),
-      ...(nFoulC||nFoulS?[['Faltas cometidas', nFoulC],['Faltas sofridas', nFoulS]]:[]),
-      ...(nBallWon||nBallLost?[['Recuperacoes de bola', nBallWon],['Perdas de bola', nBallLost]]:[]),
-      ...(nCornersFor||nCornersAgainst?[['Cantos a favor', nCornersFor],['Cantos adversario', nCornersAgainst]]:[]),
-      ...(nOffsidesAgainst||nOffsidesFor?[['Foras de jogo (nossos)', nOffsidesAgainst],['Foras de jogo (adversario)', nOffsidesFor]]:[]),
-    ];
-    statRows.forEach(([label,val])=>{
-      if(y>275){ doc.addPage(); y=20; }
-      doc.setFont('helvetica','normal'); doc.text(label, 20, y);
-      doc.setFont('helvetica','bold'); doc.text(String(val), W-20, y, {align:'right'});
-      doc.setDrawColor(220,220,220); doc.line(20, y+2.5, W-20, y+2.5);
-      doc.setFont('helvetica','normal');
-      y+=9;
-    });
-    // ── Sumário ─────────────────────────────────────────────────────────────
-    const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
-    const sumEvs=(mr.events||[]).filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>sortMin(a)-sortMin(b));
-    if(sumEvs.length>0){
-      if(y>260){ doc.addPage(); y=20; }
-      doc.setDrawColor(180,180,180); doc.line(15, y, W-15, y); y+=10;
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
-      doc.text('Sumário', 15, y); y+=9;
-      function pnPDF(id){ const p=DB.getPlayer(id); if(!p)return '—'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
-      function periodOfPDF(e){
+
+    // ── Eventos ────────────────────────────────────────────────────────────
+    const EV_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout','penalty_in_play','shot_on','shot_off','corner_for','offside']);
+    const allEvs=(mr.events||[]).filter(e=>EV_TYPES.has(e.type)&&!e.fromPenalty).sort((a,b)=>sortMin(a)-sortMin(b));
+    if(allEvs.length>0){
+      doc.setDrawColor(180,180,180); doc.setLineWidth(0.3); doc.line(25,y,W-25,y); y+=7;
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+      doc.text('Eventos', 25, y); y+=7;
+      function pnPDF(id){ const p=DB.getPlayer(id); if(!p)return '-'; if(p.alcunha?.trim())return p.alcunha.trim(); const pt=p.name.trim().split(/\s+/); return pt.length===1?pt[0]:`${pt[0]} ${pt[pt.length-1][0]}.`; }
+      function pOf(e){
         if(e.period==='pen') return 'Grandes Penalidades';
         if(e.period==='et2') return 'Prolongamento 2';
         if(e.period==='et1') return 'Prolongamento 1';
-        if(e.period==='p3') return '3ª Parte';
-        if(e.period==='p2'||(!e.period&&e.minute>45)) return '2ª Parte';
-        return '1ª Parte';
+        if(e.period==='p3') return '3a Parte';
+        if(e.period==='p2'||(!e.period&&e.minute>45)) return '2a Parte';
+        return '1a Parte';
       }
-      const PERIOD_ORDER=['1ª Parte','2ª Parte','3ª Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
-      const byPeriod={};
-      sumEvs.forEach(e=>{ const p=periodOfPDF(e); if(!byPeriod[p])byPeriod[p]=[]; byPeriod[p].push(e); });
-      const periods=PERIOD_ORDER.filter(p=>byPeriod[p]);
-      doc.setFontSize(10);
-      periods.forEach(period=>{
+      const PORDER=['1a Parte','2a Parte','3a Parte','Prolongamento 1','Prolongamento 2','Grandes Penalidades'];
+      const byP={};
+      allEvs.forEach(e=>{ const p=pOf(e); if(!byP[p])byP[p]=[]; byP[p].push(e); });
+      const perds=PORDER.filter(p=>byP[p]);
+      const BADGE={goal:[20,130,20],goal_conceded:[160,30,30],yellow:[190,150,0],yellow2:[180,80,0],red:[180,20,20],sub:[20,90,180],shot_on:[60,60,180],shot_off:[100,100,180],corner_for:[80,80,80],offside:[80,80,80],penalty_shootout:[120,0,120],penalty_in_play:[20,100,160]};
+      const BLABEL={goal:'GOL',goal_conceded:'GC',yellow:'AM',yellow2:'2AM',red:'VM',sub:'SUB',shot_on:'REM',shot_off:'REM',corner_for:'CNT',offside:'FDJ',penalty_shootout:'GP',penalty_in_play:'PEN'};
+      perds.forEach(period=>{
         if(y>270){ doc.addPage(); y=20; }
-        doc.setFont('helvetica','bold');
-        doc.setFillColor(240,240,240); doc.rect(15, y-4, W-30, 7, 'F');
-        doc.text(period, 17, y); y+=8;
-        doc.setFont('helvetica','normal');
-        byPeriod[period].forEach(e=>{
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(50,50,50);
+        doc.setFillColor(240,240,240); doc.rect(25,y-4,W-50,6.5,'F');
+        doc.text(period.replace('a ','ª '), 27, y); y+=8;
+        byP[period].forEach(e=>{
           if(y>272){ doc.addPage(); y=20; }
           const min=e.period==='pen'?fmtMin(e):`${fmtMin(e)}'`;
           let desc='';
-          if(e.type==='goal'){
-            if(e.ownGoal) desc=`Autogolo${e.opponentName?` (${e.opponentName})`:''}`;
-            else desc=`Golo: ${pnPDF(e.playerId)}${e.assistId?` (assist: ${pnPDF(e.assistId)})`:''}`;
-          } else if(e.type==='goal_conceded') desc='Golo sofrido';
-          else if(e.type==='yellow') desc=`Amarelo: ${pnPDF(e.playerId)}`;
-          else if(e.type==='yellow2') desc=`2º Amarelo/Vermelho: ${pnPDF(e.playerId)}`;
-          else if(e.type==='red') desc=`Vermelho direto: ${pnPDF(e.playerId)}`;
-          else if(e.type==='sub') desc=`Substituição: ${pnPDF(e.playerOutId)} → ${pnPDF(e.playerInId)}`;
+          if(e.type==='goal') desc=e.ownGoal?`Autogolo${e.opponentName?' ('+e.opponentName+')':''}`:`${pnPDF(e.playerId)}${e.assistId?' ('+pnPDF(e.assistId)+')':''}`;
+          else if(e.type==='goal_conceded') desc='Golo sofrido';
+          else if(e.type==='yellow') desc=pnPDF(e.playerId);
+          else if(e.type==='yellow2') desc=`${pnPDF(e.playerId)} (2. amarelo)`;
+          else if(e.type==='red') desc=`${pnPDF(e.playerId)} (direto)`;
+          else if(e.type==='sub') desc=`${pnPDF(e.playerOutId)} > ${pnPDF(e.playerInId)}`;
+          else if(e.type==='shot_on') desc=`Enquadrado${e.playerId?' ('+pnPDF(e.playerId)+')':''}`;
+          else if(e.type==='shot_off') desc=`Fora${e.playerId?' ('+pnPDF(e.playerId)+')':''}`;
+          else if(e.type==='corner_for') desc=`Canto${e.playerId?' ('+pnPDF(e.playerId)+')':''}`;
+          else if(e.type==='offside') desc=`Fora de jogo${e.playerId?' ('+pnPDF(e.playerId)+')':''}`;
           else if(e.type==='penalty_shootout'){
-            const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
-            const pRes=e.result==='goal'?'Golo':e.result==='saved'?'Defendido':'Falhou';
-            desc=`GP ${pSide}: ${pRes}${e.playerId?` (${pnPDF(e.playerId)})`:''}`;
+            const side=e.team==='home'?(isHome?'Nos':'Adv.'):(isHome?'Adv.':'Nos');
+            const res=e.result==='goal'?'Golo':e.result==='saved'?'Defendido':'Falhou';
+            desc=`${side}: ${res}${e.playerId?' ('+pnPDF(e.playerId)+')':''}`;
+          } else if(e.type==='penalty_in_play'){
+            const res=e.result==='goal'?'Golo':e.result==='saved'?'Defendido':e.result==='missed'?'Falhou':'—';
+            const taker=e.takerId?pnPDF(e.takerId):'';
+            const fouled=e.fouledId?` sof. ${pnPDF(e.fouledId)}`:'';
+            desc=`${taker}${fouled}: ${res}`;
           }
-          if(desc){
-            doc.setFont('helvetica','bold'); doc.text(min, 20, y);
-            doc.setFont('helvetica','normal'); doc.text(desc, 36, y);
-            y+=6;
-          }
+          const [r,g,b]=BADGE[e.type]||[80,80,80];
+          doc.setFillColor(r,g,b); doc.rect(25,y-3.8,9,5,'F');
+          doc.setTextColor(255,255,255); doc.setFontSize(5.8); doc.setFont('helvetica','bold');
+          doc.text(BLABEL[e.type]||'', 29.5, y-0.3, {align:'center'});
+          doc.setTextColor(60,60,60); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+          doc.text(min, 36, y);
+          doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0); doc.setFontSize(8.5);
+          doc.text(desc, 50, y);
+          y+=6.5;
         });
         y+=2;
       });
@@ -13172,8 +13236,8 @@ function exportGamePDF(){
   }).join('');
 
   // ── 2. Sumário por período ──
-  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout']);
-  const sumEvs=evList.filter(e=>SUMARIO_TYPES.has(e.type)).sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
+  const SUMARIO_TYPES=new Set(['goal','goal_conceded','yellow','yellow2','red','sub','penalty_shootout','penalty_in_play']);
+  const sumEvs=evList.filter(e=>SUMARIO_TYPES.has(e.type)&&!e.fromPenalty).sort((a,b)=>((a.half||1)*100+(a.minute||0))-((b.half||1)*100+(b.minute||0)));
   function periodOf(e){
     if(e.period==='pen') return 'Grandes Penalidades';
     if(e.period==='et2') return 'Prolongamento 2';
@@ -13200,6 +13264,9 @@ function exportGamePDF(){
         const pSide=e.team==='home'?(isHome?'Nós':'Adv.'):(isHome?'Adv.':'Nós');
         const pRes=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou';
         icon='⚽'; desc=`<b>GP ${pSide}</b>: ${pRes}${e.playerId?` (${pn(e.playerId)})`:''}`;
+      } else if(e.type==='penalty_in_play'){
+        if(e.result==='goal'){ og++; const a=isHome?og:ag,b=isHome?ag:og; icon='⚽'; desc=`<b>${e.takerId?pn(e.takerId):'Grande Penalidade'}</b> (GP)${e.fouledId?` sof. ${pn(e.fouledId)}`:''} <span style="font-weight:700;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px">${a}–${b}</span>`; }
+        else { icon='⚽'; const pResL=e.result==='saved'?'🧤 Defendido':'❌ Falhou'; desc=`<b>GP</b>${e.takerId?' — '+pn(e.takerId):''}${e.fouledId?' sof. '+pn(e.fouledId):''}: ${pResL}`; }
       }
       sumHtml+=`<div style="padding:3px 0;display:flex;gap:8px;align-items:baseline"><span style="min-width:36px;font-size:11px;color:#6b7280">${e.period==='pen'?'GP':(e.minute?e.minute+"'":'—')}</span><span>${icon}</span><span style="font-size:12px">${desc}</span></div>`;
     });
@@ -13618,6 +13685,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   const iStyle='width:100%;padding:7px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;outline:none;font-family:inherit';
   function pOpt(arr,label){ return `<option value="">${label}</option>`+arr.map(p=>`<option value="${p.id}">${p.number?'#'+p.number+' ':''}${dn(p)}</option>`).join(''); }
   const evTimeline=evs.map(e=>{
+    if(e.fromPenalty) return ''; // skip shadow goal from penalty_in_play
     let icon='', desc='';
     if(e.type==='goal'){ icon='⚽'; desc=`Golo — ${pName(e.playerId)}${e.assistId?` <span style="color:var(--muted);font-size:11px">(assist: ${pName(e.assistId)})</span>`:''}` }
     else if(e.type==='goal_conceded'){ icon='🥅'; desc='Golo Sofrido' }
@@ -13642,6 +13710,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(e.type==='opp_shot_on'){ icon='🎯'; desc='Remate à Baliza (Adversário)' }
     else if(e.type==='opp_shot_off'){ icon='💨'; desc='Remate Fora (Adversário)' }
     else if(e.type==='penalty_shootout'){ icon='⚽'; const ps=e.team==='home'?'Nós':'Adv.'; const pr=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':'❌ Falhou'; desc=`GP ${ps}: ${pr}${e.playerId?` — ${pName(e.playerId)}`:''}` }
+    else if(e.type==='penalty_in_play'){ icon='⚽'; const pr=e.result==='goal'?'✅ Golo':e.result==='saved'?'🧤 Defendido':e.result==='missed'?'❌ Falhou':'—'; desc=`Grande Penalidade${e.takerId?' — '+pName(e.takerId):''}${e.fouledId?' <span style="color:var(--muted);font-size:11px">sof. '+pName(e.fouledId)+'</span>':''} ${pr}`; }
     if(!icon) return '';
     return `<div class="mev"><span class="mev-min">${fmtEvMin(e.minute)}</span><span class="mev-icon">${icon}</span><span class="mev-desc">${desc}</span><button style="padding:2px 7px;background:#fde8e8;color:#b02020;border:none;border-radius:4px;cursor:pointer;font-size:11px;flex-shrink:0" data-del-me="${e.id}">✕</button></div>`;
   }).join('');
@@ -13763,6 +13832,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
                     <option value="chance_for">✅ Oportunidade Clara</option>
                     <option value="foul_committed">⚡ Falta Cometida</option>
                     <option value="foul_suffered">⚡ Falta Sofrida</option>
+                    <option value="penalty_in_play">⚽ Grande Penalidade</option>
                     <option value="ball_won">✊ Recuperação</option>
                     <option value="ball_lost">❌ Perda de Bola</option>
                   </optgroup>
@@ -13865,6 +13935,7 @@ function renderGamePos(ev,sqPlayers,conv,mr){
     else if(t==='injury') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador</label><select id="me-p1" ${sel}>${pOpt(convocados,'Jogador...')}</select></div>`;
     else if(['shot_on','shot_off','foul_committed','foul_suffered','ball_won','ball_lost','offside_against'].includes(t))
       meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Jogador (opc.)</label><select id="me-p1" ${sel}>${pOpt(convocados,'Nenhum')}</select></div>`;
+    else if(t==='penalty_in_play') meExtra.innerHTML=`<div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Sofreu (opc.)</label><select id="me-fouled" ${sel}>${pOpt(convocados,'Nenhum')}</select></div><div style="flex:1;min-width:130px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Batedor (opc.)</label><select id="me-taker" ${sel}>${pOpt(convocados,'Nenhum')}</select></div><div style="flex:1;min-width:110px"><label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Resultado</label><select id="me-pen-result" ${sel}><option value="goal">✅ Golo</option><option value="missed">❌ Falhou</option><option value="saved">🧤 Defendido</option></select></div>`;
     else meExtra.innerHTML='';
   }
   updExtra(); meType.addEventListener('change',updExtra);
@@ -13895,10 +13966,19 @@ function renderGamePos(ev,sqPlayers,conv,mr){
       ne.playerId=p1;
     } else if(['shot_on','shot_off','foul_committed','foul_suffered','ball_won','ball_lost','offside_against'].includes(t)){
       const p1=document.getElementById('me-p1')?.value; if(p1) ne.playerId=p1;
+    } else if(t==='penalty_in_play'){
+      const fouled=document.getElementById('me-fouled')?.value; if(fouled) ne.fouledId=fouled;
+      const taker=document.getElementById('me-taker')?.value; if(taker) ne.takerId=taker;
+      ne.result=document.getElementById('me-pen-result')?.value||'goal';
     }
     // Tipos sem campos extra: goal_conceded, corner_for/against, offside_for, chance_for/against, opp_shot_on/off
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
-    curMr.events.push(ne); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+    curMr.events.push(ne);
+    // Grande penalidade com golo → gera evento goal com fromPenalty:true
+    if(t==='penalty_in_play'&&ne.result==='goal'){
+      curMr.events.push({id:uid(),minute:ne.minute,type:'goal',playerId:ne.takerId||null,fromPenalty:true,penaltyId:ne.id});
+    }
+    DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
     // Após registar lesão, oferecer criação de registo clínico
     if(t==='injury' && ne.playerId){
       const ev=DB.getEvent(gameEventId);
@@ -13908,7 +13988,9 @@ function renderGamePos(ev,sqPlayers,conv,mr){
   document.querySelectorAll('[data-del-me]').forEach(btn=>btn.addEventListener('click',()=>{
     const eid=btn.dataset.delMe;
     const curMr=JSON.parse(JSON.stringify(DB.getEvent(gameEventId).matchReport||{events:[]}));
-    curMr.events=curMr.events.filter(e=>e.id!==eid); DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
+    // Also remove linked fromPenalty goal when deleting a penalty_in_play event
+    curMr.events=curMr.events.filter(e=>e.id!==eid&&!(e.fromPenalty&&e.penaltyId===eid));
+    DB.updateEvent(gameEventId,{matchReport:curMr}); renderGame();
   }));
   // Ratings
   document.querySelectorAll('[data-rating-pid]').forEach(input=>input.addEventListener('change',()=>{
