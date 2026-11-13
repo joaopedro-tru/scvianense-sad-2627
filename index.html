@@ -2975,6 +2975,31 @@ const MONTHS_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov
 const POS={GR:'Guarda-Redes',DC:'Defesa Central',LD:'Lateral Direito',LE:'Lateral Esquerdo',ALD:'Ala Direito',ALE:'Ala Esquerdo',MC:'Médio Centro',MD:'Médio Defensivo',MO:'Médio Ofensivo',ED:'Extremo Direito',EE:'Extremo Esquerdo',PL:'Ponta-de-Lança',AV:'Avançado'};
 const FEET={right:'Direito',left:'Esquerdo',both:'Ambos'};
 const SQUADS={eqa:'Equipa A',sub19:'Sub-19',sub23:'Sub-23',both:'Ambos'};
+
+// ── FPF PROXY URL ─────────────────────────────────────────────────────────────
+// Se o proxy Vercel (/api/fpf) der 403, deploy o Cloudflare Worker
+// (cloudflare-worker/fpf-proxy.js) e mete o URL aqui.
+// Ex: 'https://fpf-proxy.USERNAME.workers.dev'
+// Deixa em '' para usar apenas o proxy Vercel.
+const FPF_CF_WORKER_URL = localStorage.getItem('scv_fpf_worker_url') || '';
+
+// Faz o fetch FPF tentando primeiro o Worker (se configurado), depois o proxy Vercel
+async function _fpfFetch(params){
+  const qs = new URLSearchParams(params).toString();
+  const urls = [];
+  if(FPF_CF_WORKER_URL) urls.push(`${FPF_CF_WORKER_URL.replace(/\/$/,'')}?${qs}`);
+  urls.push(`/api/fpf?${qs}`);
+  let lastErr;
+  for(const url of urls){
+    try{
+      const r = await fetch(url);
+      if(r.ok) return r;
+      lastErr = new Error(`HTTP ${r.status} (${url.includes('workers.dev')?'Worker':'Vercel'})`);
+      if(r.status !== 403 && r.status !== 503) throw lastErr; // only retry on bot-block codes
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('Proxy indisponível');
+}
 const COMPETITIONS={
   eqa:  ['Liga 3 Placard Série A 26/27','Taça de Portugal','Jogo de Preparação'],
   sub23:['Campeonato MKA - AFVC','Taça Distrital SUB-23 AFVC','Jogo de Preparação'],
@@ -13528,6 +13553,16 @@ function renderGameFPF(ev){
             <p style="font-size:11px;color:var(--muted);margin:0">Abre a competição na FPF, clica em J1 e copia o número do URL: <code>?fixtureId=XXXXX</code></p>
           </div>
         </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;margin-bottom:4px">Cloudflare Worker URL (opcional)</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="fpf-cfg-worker" placeholder="https://fpf-proxy.USERNAME.workers.dev" type="url"
+              value="${localStorage.getItem('scv_fpf_worker_url')||''}"
+              style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;background:var(--bg);color:var(--text)">
+            <button class="btn btn-p btn-sm" id="btn-fpf-worker-save" style="white-space:nowrap">Guardar</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:4px">Se o proxy der 403, usa um Cloudflare Worker. Ver <code>cloudflare-worker/fpf-proxy.js</code>.</p>
+        </div>
       </div>`;
   }
 
@@ -13584,6 +13619,14 @@ function renderGameFPF(ev){
     DB.addFpfComp(squad,label,fid1);
     toast('✅ Competição FPF adicionada');
     renderGame();
+  });
+
+  // Wire Worker URL save
+  document.getElementById('btn-fpf-worker-save')?.addEventListener('click',()=>{
+    const val=(document.getElementById('fpf-cfg-worker')?.value||'').trim();
+    if(val) localStorage.setItem('scv_fpf_worker_url',val);
+    else localStorage.removeItem('scv_fpf_worker_url');
+    toast(val?`✅ Worker URL guardado — recarrega a app`:'Worker URL removido — recarrega a app');
   });
 
   // Wire delete competition buttons
@@ -13658,7 +13701,7 @@ async function _loadFPFData(matchId){
   if(!container) return;
   container.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A carregar...</p>';
   try{
-    const r=await fetch(`/api/fpf?matchId=${encodeURIComponent(matchId)}`);
+    const r=await _fpfFetch({matchId});
     if(!r.ok){
       const status=r.status;
       let hint='';
@@ -13996,7 +14039,7 @@ async function _autoFindFPFMatchId(ev){
   const fixtureId=startFid+(jornada-1);
 
   // Fetch fixture games via proxy
-  const fixtureR=await fetch(`/api/fpf?fixtureId=${fixtureId}`);
+  const fixtureR=await _fpfFetch({fixtureId});
   if(!fixtureR.ok){
     const fpfUrl=`https://resultados.fpf.pt/Competition/GetClassificationAndMatchesByFixture?fixtureId=${fixtureId}`;
     throw new Error(`O proxy não conseguiu carregar a jornada ${jornada} (HTTP ${fixtureR.status}).\n\nAbre manualmente: ${fpfUrl}\nEncontra o jogo do Vianense e copia o matchId do URL (ex: matchId=XXXXXXX).`);
