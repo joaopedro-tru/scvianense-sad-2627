@@ -13257,9 +13257,8 @@ function exportGamePDF(){
   // ── Score ──
   const goals=evList.filter(e=>e.type==='goal'&&!e.fromPenalty).length;
   const goalsCon=evList.filter(e=>e.type==='goal_conceded').length;
-  const scoreUs=isHome?goals:goalsCon, scoreAdv=isHome?goalsCon:goals;
-  const teamName=isHome?'SC Vianense SAD':(ev.opponent||'Adversário');
-  const advName=isHome?(ev.opponent||'Adversário'):'SC Vianense SAD';
+  // scoreUs/scoreAdv are always from Vianense's perspective (goals = ours, goalsCon = theirs)
+  const scoreUs=goals, scoreAdv=goalsCon;
   const resultLabel=scoreUs>scoreAdv?'Vitória':scoreUs<scoreAdv?'Derrota':'Empate';
   const resultColor=scoreUs>scoreAdv?'#16a34a':scoreUs<scoreAdv?'#dc2626':'#d97706';
 
@@ -13436,7 +13435,7 @@ function exportGamePDF(){
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #1a56db">
     <div>
       <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">SC Vianense SAD · ${squad}</div>
-      <h1>${isHome?'SC Vianense SAD':ev.opponent||'Adversário'} <span style="color:${resultColor}">${scoreUs} — ${scoreAdv}</span> ${isHome?ev.opponent||'Adversário':'SC Vianense SAD'}</h1>
+      <h1>${isHome?'SC Vianense SAD':ev.opponent||'Adversário'} <span style="color:${resultColor}">${isHome?scoreUs:scoreAdv} — ${isHome?scoreAdv:scoreUs}</span> ${isHome?ev.opponent||'Adversário':'SC Vianense SAD'}</h1>
       <div style="font-size:12px;color:#6b7280;margin-top:4px">${ev.competition||''}${ev.competition?' · ':''}${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}</div>
     </div>
     <div style="text-align:right">
