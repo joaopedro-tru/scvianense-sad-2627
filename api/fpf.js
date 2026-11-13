@@ -1,10 +1,11 @@
 // api/fpf.js — Vercel Edge Function proxy para resultados.fpf.pt
 // Edge runtime: corre na rede Cloudflare, menos bloqueado que IPs de data center.
-// Suporta: ?matchId=XXX | ?fixtureId=XXX | ?competitionId=X&seasonId=Y
+// Suporta: ?matchId=XXX | ?fixtureId=XXX
 
 export const config = { runtime: 'edge' };
 
-const BROWSER_HEADERS = {
+// Headers para pedidos de página completa (matchId)
+const NAV_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
   'Accept-Language': 'pt-PT,pt;q=0.9,en-GB;q=0.8,en;q=0.7',
@@ -21,8 +22,24 @@ const BROWSER_HEADERS = {
   'Upgrade-Insecure-Requests': '1',
 };
 
+// Headers para pedidos AJAX (fixtureId — carregado via jQuery AJAX dentro da página)
+const AJAX_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': '*/*',
+  'Accept-Language': 'pt-PT,pt;q=0.9,en-GB;q=0.8,en;q=0.7',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+  'X-Requested-With': 'XMLHttpRequest',
+  'Referer': 'https://resultados.fpf.pt/Competition/Details',
+  'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-origin',
+};
+
 export default async function handler(req) {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
@@ -31,43 +48,35 @@ export default async function handler(req) {
   }
 
   const { searchParams } = new URL(req.url);
-  const matchId       = searchParams.get('matchId');
-  const fixtureId     = searchParams.get('fixtureId');
-  const competitionId = searchParams.get('competitionId');
-  const seasonId      = searchParams.get('seasonId');
+  const matchId   = searchParams.get('matchId');
+  const fixtureId = searchParams.get('fixtureId');
 
   const CORS = { 'Access-Control-Allow-Origin': '*' };
 
-  let url;
+  let url, headers;
   if (matchId) {
     if (!/^\d{1,10}$/.test(matchId))
       return new Response(JSON.stringify({ error: 'matchId inválido' }), { status: 400, headers: CORS });
     url = `https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}`;
+    headers = NAV_HEADERS;
   } else if (fixtureId) {
     if (!/^\d{1,10}$/.test(fixtureId))
       return new Response(JSON.stringify({ error: 'fixtureId inválido' }), { status: 400, headers: CORS });
     url = `https://resultados.fpf.pt/Competition/GetClassificationAndMatchesByFixture?fixtureId=${fixtureId}`;
-  } else if (competitionId && seasonId) {
-    if (!/^\d{1,10}$/.test(competitionId) || !/^\d{1,10}$/.test(seasonId))
-      return new Response(JSON.stringify({ error: 'competitionId/seasonId inválido' }), { status: 400, headers: CORS });
-    url = `https://resultados.fpf.pt/Competition/Details?competitionId=${competitionId}&seasonId=${seasonId}`;
+    headers = AJAX_HEADERS;
   } else {
     return new Response(
-      JSON.stringify({ error: 'Parâmetro em falta: matchId, fixtureId, ou competitionId+seasonId' }),
+      JSON.stringify({ error: 'Parâmetro em falta: matchId ou fixtureId' }),
       { status: 400, headers: CORS }
     );
   }
 
   try {
-    const response = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'follow' });
+    const response = await fetch(url, { headers, redirect: 'follow' });
 
     if (!response.ok) {
       return new Response(
-        JSON.stringify({
-          error: `FPF devolveu ${response.status}`,
-          url,
-          hint: response.status === 403 ? 'Edge runtime ainda bloqueado — experimenta Cloudflare Workers.' : undefined,
-        }),
+        JSON.stringify({ error: `FPF devolveu ${response.status}`, url }),
         { status: response.status, headers: { ...CORS, 'Content-Type': 'application/json' } }
       );
     }

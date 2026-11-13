@@ -2958,10 +2958,9 @@ const DB = {
   _fpfComps(){ try{ return JSON.parse(localStorage.getItem('scv_fpf_comps')||'[]'); }catch{ return []; } },
   _sfpfComps(arr){ localStorage.setItem('scv_fpf_comps',JSON.stringify(arr)); },
   fpfComps(squad){ const c=this._fpfComps(); return squad?c.filter(x=>x.squad===squad):c; },
-  addFpfComp(squad,label,fid1,fid2){
+  addFpfComp(squad,label,fid1){
     const arr=this._fpfComps();
-    const step=fid2?(parseInt(fid2)-parseInt(fid1)):1;
-    arr.push({id:uid(),squad,label,startFixtureId:String(fid1),fixtureStep:step});
+    arr.push({id:uid(),squad,label,startFixtureId:String(fid1)});
     this._sfpfComps(arr);
   },
   deleteFpfComp(id){ this._sfpfComps(this._fpfComps().filter(c=>c.id!==id)); },
@@ -13509,7 +13508,7 @@ function renderGameFPF(ev){
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600">${c.label}</div>
-          <div style="font-size:11px;color:var(--muted)">${c.startFixtureId?`J1: ${c.startFixtureId} · passo: ${c.fixtureStep||1}`:(c.competitionId?`compId: ${c.competitionId} ⚠️ reconfigura`:'⚠️ sem fixtureId')}</div>
+          <div style="font-size:11px;color:var(--muted)">${c.startFixtureId?`fixtureId J1: ${c.startFixtureId}`:(c.competitionId?`compId: ${c.competitionId} ⚠️ reconfigura`:'⚠️ sem fixtureId')}</div>
         </div>
         <button class="btn btn-sm fpf-comp-del" data-id="${c.id}" style="background:#fde8e8;color:#b02020;border:none;padding:3px 8px">✕</button>
       </div>`).join('');
@@ -13521,15 +13520,12 @@ function renderGameFPF(ev){
           <div style="font-size:11px;font-weight:600;margin-bottom:6px">Adicionar competição</div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <input id="fpf-cfg-label" placeholder="Nome (ex: Camp. Dist. Juniores)" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
-            <div style="display:flex;gap:6px">
-              <input id="fpf-cfg-fid1" placeholder="fixtureId da J1" type="number" style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
-              <input id="fpf-cfg-fid2" placeholder="fixtureId da J2" type="number" style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
-            </div>
+            <input id="fpf-cfg-fid1" placeholder="fixtureId da Jornada 1" type="number" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
             <div style="display:flex;align-items:center;gap:8px">
               <button class="btn btn-p btn-sm" id="btn-fpf-cfg-add">+ Adicionar</button>
               <a href="https://resultados.fpf.pt" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db">↗ Abrir FPF</a>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin:0">Na FPF: clica em J1 e J2 da competição e copia o número <code>?fixtureId=XXXXX</code> de cada URL</p>
+            <p style="font-size:11px;color:var(--muted);margin:0">Abre a competição na FPF, clica em J1 e copia o número do URL: <code>?fixtureId=XXXXX</code></p>
           </div>
         </div>
       </div>`;
@@ -13580,9 +13576,8 @@ function renderGameFPF(ev){
   document.getElementById('btn-fpf-cfg-add')?.addEventListener('click',()=>{
     const label=document.getElementById('fpf-cfg-label')?.value?.trim();
     const fid1=document.getElementById('fpf-cfg-fid1')?.value?.trim();
-    const fid2=document.getElementById('fpf-cfg-fid2')?.value?.trim();
     if(!label||!fid1){ toast('⚠️ Preenche o nome e o fixtureId da J1'); return; }
-    DB.addFpfComp(squad,label,fid1,fid2||null);
+    DB.addFpfComp(squad,label,fid1);
     toast('✅ Competição FPF adicionada');
     renderGame();
   });
@@ -13625,7 +13620,12 @@ function renderGameFPF(ev){
     }catch(e){
       if(btn){ btn.disabled=false; btn.textContent=`🔍 Pesquisar automaticamente (J${ev.jornada} · ${ev.competition||'—'})`; }
       const c=document.getElementById('fpf-data-container');
-      if(c) c.innerHTML=`<div style="padding:10px;background:#fde8e8;border-radius:8px;font-size:13px;color:#b02020">⚠️ ${e.message}</div>`;
+      if(c){
+        // Extract URL from error message if present, render as clickable link
+        const urlMatch=e.message.match(/https?:\/\/[^\s]+/);
+        const msgHtml=e.message.replace(/https?:\/\/[^\s]+/g,u=>`<a href="${u}" target="_blank" rel="noopener" style="color:#1a56db;word-break:break-all">${u}</a>`);
+        c.innerHTML=`<div style="padding:10px;background:#fde8e8;border-radius:8px;font-size:13px;color:#b02020;line-height:1.6"><strong>⚠️ Pesquisa automática falhou</strong><br>${msgHtml.replace(/\n/g,'<br>')}</div>`;
+      }
     }
   });
 
@@ -13964,12 +13964,14 @@ async function _autoFindFPFMatchId(ev){
   // Fixture IDs are sequential: fixtureId(Jn) = startFixtureId + (n-1) * step
   const startFid=parseInt(cfg.startFixtureId);
   if(!startFid) throw new Error('Competição sem fixtureId da J1 configurado. Remove e volta a adicionar com o novo formato.');
-  const step=cfg.fixtureStep||1;
-  const fixtureId=startFid+(jornada-1)*step;
+  const fixtureId=startFid+(jornada-1);
 
   // Fetch fixture games via proxy
   const fixtureR=await fetch(`/api/fpf?fixtureId=${fixtureId}`);
-  if(!fixtureR.ok) throw new Error(`Erro ao carregar a jornada ${jornada} (fixtureId ${fixtureId}): HTTP ${fixtureR.status}.`);
+  if(!fixtureR.ok){
+    const fpfUrl=`https://resultados.fpf.pt/Competition/GetClassificationAndMatchesByFixture?fixtureId=${fixtureId}`;
+    throw new Error(`O proxy não conseguiu carregar a jornada ${jornada} (HTTP ${fixtureR.status}).\n\nAbre manualmente: ${fpfUrl}\nEncontra o jogo do Vianense e copia o matchId do URL (ex: matchId=XXXXXXX).`);
+  }
   const fixtureHtml=await fixtureR.text();
   const games=_parseFPFFixtureGames(fixtureHtml);
   if(!games.length) throw new Error('Não foi possível encontrar jogos na jornada.');
