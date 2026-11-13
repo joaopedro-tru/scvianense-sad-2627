@@ -13535,18 +13535,22 @@ function renderGameFPF(ev){
     <div style="padding:4px 0">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
         ${matchId
-          ?`<input type="number" id="fpf-match-id" value="${matchId}"
+          ?`<input type="text" id="fpf-match-id" value="${matchId}"
               style="flex:1;min-width:140px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
             <button class="btn btn-p btn-sm" id="btn-fpf-save">💾 Guardar</button>
             <button class="btn btn-g btn-sm" id="btn-fpf-load">🔄 Recarregar</button>
             <a href="${fpfUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#1a56db">↗ FPF</a>
             <button class="btn btn-sm" id="btn-fpf-clear" style="background:#fde8e8;color:#b02020;border:none">✕ Limpar</button>`
-          :`<input type="number" id="fpf-match-id" placeholder="ID do jogo (ex: 2578010)"
+          :`<input type="text" id="fpf-match-id" placeholder="ID ou URL completo do jogo FPF"
               style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)">
             <button class="btn btn-p btn-sm" id="btn-fpf-save">💾 Guardar e carregar</button>
             <a href="${fpfUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#1a56db;white-space:nowrap">↗ Abrir FPF</a>`}
       </div>
 
+      ${!matchId?`<p style="font-size:11px;color:var(--muted);margin-bottom:6px">
+        Cola aqui o ID (ex: <code>2581068</code>) ou o URL completo do jogo na FPF.<br>
+        Para encontrar: abre a jornada na FPF, clica no jogo do Vianense, e copia o URL do browser.
+      </p>`:''}
       ${!matchId&&canAutoSearch?`
         <button class="btn btn-g btn-sm" id="btn-fpf-auto" style="margin-bottom:10px;width:100%">
           🔍 Pesquisar automaticamente (J${ev.jornada} · ${ev.competition||'—'})
@@ -13591,15 +13595,32 @@ function renderGameFPF(ev){
     });
   });
 
+  // Helper: extract numeric matchId from either a bare number or a full FPF URL
+  function _extractMatchIdFromInput(raw){
+    if(!raw) return '';
+    // Try to extract from URL: ?matchId=XXXXX or /matchId/XXXXX
+    const m=raw.match(/[?&/]matchId[=\/](\d+)/i);
+    if(m) return m[1];
+    // If it's purely numeric, use as-is
+    if(/^\d+$/.test(raw)) return raw;
+    return '';
+  }
+
   // Wire save/reload/clear
   document.getElementById('btn-fpf-save')?.addEventListener('click',async()=>{
-    const id=document.getElementById('fpf-match-id')?.value?.trim();
-    if(!id){ toast('⚠️ Introduz o ID do jogo'); return; }
+    const raw=document.getElementById('fpf-match-id')?.value?.trim();
+    const id=_extractMatchIdFromInput(raw);
+    if(!id){ toast('⚠️ Introduz o ID do jogo (número) ou cola o URL completo da FPF'); return; }
+    if(id!==raw){ // show extracted value feedback
+      const inp=document.getElementById('fpf-match-id');
+      if(inp) inp.value=id;
+    }
     await DB.updateEvent(gameEventId,{fpfMatchId:id});
     toast('✅ ID FPF guardado'); renderGame();
   });
   document.getElementById('btn-fpf-load')?.addEventListener('click',()=>{
-    const id=document.getElementById('fpf-match-id')?.value?.trim()||matchId;
+    const raw=document.getElementById('fpf-match-id')?.value?.trim();
+    const id=_extractMatchIdFromInput(raw)||matchId;
     if(id) _loadFPFData(id); else toast('⚠️ Introduz o ID do jogo');
   });
   document.getElementById('btn-fpf-clear')?.addEventListener('click',async()=>{
@@ -13638,15 +13659,23 @@ async function _loadFPFData(matchId){
   container.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A carregar...</p>';
   try{
     const r=await fetch(`/api/fpf?matchId=${encodeURIComponent(matchId)}`);
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(!r.ok){
+      const status=r.status;
+      let hint='';
+      if(status===403) hint='O proxy foi bloqueado pela FPF. ';
+      else if(status===404) hint='ID do jogo não encontrado — confirma o número. ';
+      else if(status>=500) hint='Erro no servidor proxy. ';
+      throw new Error(`HTTP ${status}. ${hint}`);
+    }
     const html=await r.text();
     const data=_parseFPFHtml(html);
     container.innerHTML=_renderFPFData(data,matchId);
   }catch(e){
-    container.innerHTML=`<div style="text-align:center;padding:20px 0">
-      <p style="color:#b71c1c;font-size:13px;margin-bottom:8px">⚠️ Não foi possível carregar os dados. Tenta novamente mais tarde.</p>
-      <a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}" target="_blank" rel="noopener"
-        style="font-size:13px;color:#1a56db">↗ Ver directamente na FPF</a>
+    const fpfLink=`https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${matchId}`;
+    container.innerHTML=`<div style="padding:12px;background:#fde8e8;border-radius:8px;font-size:13px;color:#b02020;line-height:1.6">
+      <strong>⚠️ Não foi possível carregar (matchId: ${matchId})</strong><br>
+      ${e.message.replace(/</g,'&lt;')}<br>
+      <a href="${fpfLink}" target="_blank" rel="noopener" style="color:#1a56db;font-size:12px">↗ Ver directamente na FPF</a>
     </div>`;
   }
 }
