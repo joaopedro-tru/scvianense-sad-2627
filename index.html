@@ -12789,10 +12789,6 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
   const statsHtml=`<div class="card" style="margin-top:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0">📊 Totais do Jogo</h3>
-      <div style="display:flex;gap:8px;align-items:center">
-        ${fpfMatchId?`<a href="https://resultados.fpf.pt/Match/GetMatchInformation?matchId=${fpfMatchId}" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db;font-weight:600">🇵🇹 FPF</a>`:''}
-        <button id="btn-rel-pdf" class="btn btn-sm" style="font-size:11px;padding:5px 12px">📄 PDF</button>
-      </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:10px">
       ${relHeroCell('⚽','Golos Marcados',nGoals,'var(--ok)')}
@@ -12881,17 +12877,9 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
     });
   }
 
-  // ── PDF EXPORT ───────────────────────────────────────────────────────────────
-  document.getElementById('btn-rel-pdf')?.addEventListener('click', async()=>{
-    if(!window.jspdf) await new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      document.head.appendChild(s); s.onload=res; s.onerror=()=>rej(new Error('jsPDF load failed'));
-    });
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=doc.internal.pageSize.getWidth();
-    let y=18;
+  // ── PDF EXPORT (movido para exportGamePDF no header) ─────────────────────────
+  if(false){
+    const doc=null, W=0, y=0;
     const isHome=ev.homeAway!=='away';
     const opp=ev.opponent||'Adversario';
 
@@ -13037,8 +13025,7 @@ function renderGameRelatorio(ev,sqPlayers,conv,mr){
         y+=2;
       });
     }
-    doc.save(`Relatorio_${opp.replace(/\s+/g,'_')}_${ev.date||'jogo'}.pdf`);
-  });
+  }
 }
 
 // ── RELATÓRIO TM (upload PDF) ─────────────────────────────────────────────────
@@ -13297,6 +13284,18 @@ function exportGamePDF(){
     return 0;
   }
 
+  // Dynamic stat columns — only include if at least one player has data
+  const dynStatDefs=[
+    {key:'shotOn',  label:'🎯',  title:'Rem. Baliza', fn:(p)=>evList.filter(e=>e.type==='shot_on'&&e.playerId===p.id).length},
+    {key:'shotOff', label:'💨',  title:'Rem. Fora',   fn:(p)=>evList.filter(e=>e.type==='shot_off'&&e.playerId===p.id).length},
+    {key:'foulC',   label:'⚡',  title:'F.Com.',      fn:(p)=>evList.filter(e=>e.type==='foul_committed'&&e.playerId===p.id).length},
+    {key:'foulS',   label:'🤕',  title:'F.Sof.',      fn:(p)=>evList.filter(e=>e.type==='foul_suffered'&&e.playerId===p.id).length},
+    {key:'bWon',    label:'✊',  title:'Recup.',      fn:(p)=>evList.filter(e=>e.type==='ball_won'&&e.playerId===p.id).length},
+    {key:'bLost',   label:'❌',  title:'Perd.',       fn:(p)=>evList.filter(e=>e.type==='ball_lost'&&e.playerId===p.id).length},
+    {key:'corner',  label:'🚩',  title:'Cantos',      fn:(p)=>evList.filter(e=>e.type==='corner_for'&&e.playerId===p.id).length},
+    {key:'offside', label:'⛳',  title:'FdJ',         fn:(p)=>evList.filter(e=>e.type==='offside_for'&&e.playerId===p.id).length},
+  ].filter(d=>toEval.some(p=>d.fn(p)>0));
+
   const teamRows=toEval.map(p=>{
     const mins=playerMins(p);
     const gls=evList.filter(e=>e.type==='goal'&&e.playerId===p.id).length;
@@ -13304,17 +13303,19 @@ function exportGamePDF(){
     const ylw=evList.filter(e=>(e.type==='yellow'||e.type==='yellow2')&&e.playerId===p.id).length;
     const red=evList.filter(e=>e.type==='red'&&e.playerId===p.id).length;
     const r=ratings[p.id]; const rv=r!=null?(typeof r==='object'?r.rating:r):null;
+    const dynCells=dynStatDefs.map(d=>{const v=d.fn(p);return `<td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${v||'—'}</td>`;}).join('');
     return `<tr>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#6b7280;text-align:center">${p.number||'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:600">${fullName(p.id)}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:11px">${p.position||'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${lineup.includes(p.id)?'Titular':'Sub.'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700">${mins}'</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${gls||'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${ast||'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${ylw?'🟡'.repeat(ylw):'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">${red?'🔴':'—'}</td>
-      <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;color:${rv!=null?'#1a56db':'#9ca3af'}">${rv!=null?parseFloat(rv).toFixed(1):'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#6b7280;text-align:center;font-size:11px">${p.number||'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;font-weight:600;font-size:11px">${fullName(p.id)}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:10px">${p.position||'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${lineup.includes(p.id)?'Tit.':'Sub.'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;font-size:11px">${mins}'</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${gls||'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${ast||'—'}</td>
+      ${dynCells}
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${ylw?'🟡'.repeat(Math.min(ylw,2)):'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:11px">${red?'🔴':'—'}</td>
+      <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;font-size:11px;color:${rv!=null?'#1a56db':'#9ca3af'}">${rv!=null?parseFloat(rv).toFixed(1):'—'}</td>
     </tr>`;
   }).join('');
 
@@ -13356,32 +13357,39 @@ function exportGamePDF(){
   });
   if(!sumHtml) sumHtml='<p style="color:#9ca3af;font-size:12px">Sem eventos registados.</p>';
 
-  // ── 3. Estatísticas gerais ──
-  const statDefs=[
-    {label:'Golos Marcados',val:goals},
-    {label:'Golos Sofridos',val:goalsCon},
-    {label:'Remates Enquad.',val:evList.filter(e=>e.type==='shot_on').length},
-    {label:'Remates Fora',val:evList.filter(e=>e.type==='shot_off').length},
-    {label:'Faltas Cometidas',val:evList.filter(e=>e.type==='foul_committed').length},
-    {label:'Cartões Amarelos',val:evList.filter(e=>e.type==='yellow'||e.type==='yellow2').length},
-    {label:'Cartões Vermelhos',val:evList.filter(e=>e.type==='red').length},
-    {label:'Substituições',val:evList.filter(e=>e.type==='sub').length},
-    {label:'Bolas Recuperadas',val:evList.filter(e=>e.type==='ball_won').length},
-    {label:'Bolas Perdidas',val:evList.filter(e=>e.type==='ball_lost').length},
+  // ── 3. Totais do Jogo ──
+  const totaisDefs=[
+    {label:'Golos Marcados',   icon:'⚽', val:goals,                                                              color:'#16a34a'},
+    {label:'Golos Sofridos',   icon:'🥅', val:goalsCon,                                                           color:'#dc2626'},
+    {label:'Remates Enquad.',  icon:'🎯', val:evList.filter(e=>e.type==='shot_on').length,                        color:'#1a56db'},
+    {label:'Remates Fora',     icon:'💨', val:evList.filter(e=>e.type==='shot_off').length,                       color:'#6b7280'},
+    {label:'Faltas Com.',      icon:'⚡', val:evList.filter(e=>e.type==='foul_committed').length,                 color:'#d97706'},
+    {label:'Faltas Sof.',      icon:'🤕', val:evList.filter(e=>e.type==='foul_suffered').length,                  color:'#d97706'},
+    {label:'Cantos',           icon:'🚩', val:evList.filter(e=>e.type==='corner_for').length,                     color:'#6b7280'},
+    {label:'Cantos Adv.',      icon:'🚩', val:evList.filter(e=>e.type==='corner_against').length,                 color:'#6b7280'},
+    {label:'Foras de Jogo',    icon:'⛳', val:evList.filter(e=>e.type==='offside_against').length,                color:'#6b7280'},
+    {label:'Foras Adv.',       icon:'⛳', val:evList.filter(e=>e.type==='offside_for').length,                    color:'#6b7280'},
+    {label:'Bolas Recup.',     icon:'✊', val:evList.filter(e=>e.type==='ball_won').length,                       color:'#16a34a'},
+    {label:'Bolas Perdidas',   icon:'❌', val:evList.filter(e=>e.type==='ball_lost').length,                      color:'#dc2626'},
+    {label:'Amarelos',         icon:'🟡', val:evList.filter(e=>e.type==='yellow'||e.type==='yellow2').length,     color:'#d97706'},
+    {label:'Vermelhos',        icon:'🔴', val:evList.filter(e=>e.type==='red').length,                            color:'#dc2626'},
+    {label:'Substituições',    icon:'🔄', val:evList.filter(e=>e.type==='sub').length,                            color:'#6b7280'},
   ].filter(s=>s.val>0);
-  const statsHtml=statDefs.length
-    ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${statDefs.map(s=>`<div style="background:#f9fafb;border-radius:6px;padding:8px 10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#1a56db">${s.val}</div><div style="font-size:10px;color:#6b7280">${s.label}</div></div>`).join('')}</div>`
+  const statsHtml=totaisDefs.length
+    ? `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${totaisDefs.map(s=>`<div style="background:#f9fafb;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:11px;line-height:1.3">${s.icon}</div><div style="font-size:18px;font-weight:800;color:${s.color};line-height:1.2">${s.val}</div><div style="font-size:9px;color:#6b7280;margin-top:1px">${s.label}</div></div>`).join('')}</div>`
     : '<p style="color:#9ca3af;font-size:12px">Sem estatísticas registadas.</p>';
 
-  // ── 4. Momentos de jogo ──
-  const momentsHtml=TEAM_MOMENTS.map(m=>{
+  // ── 4. Momentos de jogo (só se tiver dados) ──
+  const hasTeamEval=Object.keys(teamEval).some(k=>k!=='comment'&&teamEval[k]>0)||!!(teamEval.comment?.trim());
+  const momentsHtml=hasTeamEval?(TEAM_MOMENTS.map(m=>{
     const val=teamEval[m.key]||0;
+    if(!val) return '';
     const stars='★★★★★'.split('').map((s,i)=>`<span style="color:${val>i?'#f59e0b':'#d1d5db'}">${s}</span>`).join('');
     return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f3f4f6">
       <span style="flex:1;font-size:12px;font-weight:600">${m.label}</span>
       <span style="font-size:16px;letter-spacing:1px">${stars}</span>
     </div>`;
-  }).join('')+(teamEval.comment?`<div style="margin-top:8px;padding:8px;background:#f9fafb;border-radius:6px;font-size:12px;color:#374151;white-space:pre-wrap">${teamEval.comment}</div>`:'');
+  }).join('')+(teamEval.comment?`<div style="margin-top:8px;padding:8px;background:#f9fafb;border-radius:6px;font-size:12px;color:#374151;white-space:pre-wrap">${teamEval.comment}</div>`:'')):'';
 
   // ── 5. Avaliação individual ──
   const evalRows=toEval.map(p=>{
@@ -13395,15 +13403,16 @@ function exportGamePDF(){
     </tr>`;
   }).join('');
 
-  // ── 6. Observações técnicas ──
-  const obsHtml=Object.entries(staffObs).map(([usr,obs])=>{
+  // ── 6. Observações técnicas (só se tiver dados) ──
+  const obsEntries=Object.entries(staffObs).filter(([,obs])=>obs.text?.trim());
+  const obsHtml=obsEntries.map(([usr,obs])=>{
     const u=getAppUsers().find(x=>x.user===usr);
     const label=u?(STAFF_ROLES_LABEL[u.staffRole]||u.staffRole||'Staff')+(u.squad?' — '+u.squad.toUpperCase():''):usr;
     return `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e5e7eb">
       <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>
-      <div style="font-size:12px;color:#374151;white-space:pre-wrap;line-height:1.6">${obs.text||'—'}</div>
+      <div style="font-size:12px;color:#374151;white-space:pre-wrap;line-height:1.6">${obs.text}</div>
     </div>`;
-  }).join('') || '<p style="color:#9ca3af;font-size:12px">Sem observações registadas.</p>';
+  }).join('');
 
   // ── Build HTML ──
   const squad=SQUADS[ev.squad]||ev.squad||'';
@@ -13419,7 +13428,7 @@ function exportGamePDF(){
   h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e5e7eb}
   table{width:100%;border-collapse:collapse}
   th{padding:5px 8px;text-align:left;font-size:11px;color:#6b7280;background:#f9fafb;font-weight:700;border-bottom:2px solid #e5e7eb}
-  @media print{body{padding:12px 18px}h2{page-break-after:avoid}section{page-break-inside:avoid}}
+  @media print{body{padding:12px 18px}h2{page-break-after:avoid}section{page-break-inside:avoid}@page{size:A4 landscape}}
 </style>
 </head>
 <body>
@@ -13439,13 +13448,16 @@ function exportGamePDF(){
 
   <section>
     <h2>Equipa — Minutos Realizados</h2>
-    <table>
+    <table style="font-size:11px">
       <thead><tr>
-        <th style="text-align:center;width:36px">#</th>
-        <th>Nome</th><th>Posição</th><th>Tipo</th>
+        <th style="text-align:center;width:28px">#</th>
+        <th>Nome</th><th>Pos.</th><th>Tipo</th>
         <th style="text-align:center">Min.</th>
-        <th style="text-align:center">⚽</th><th style="text-align:center">Ass.</th>
-        <th style="text-align:center">Cart.</th><th style="text-align:center">🔴</th>
+        <th style="text-align:center" title="Golos">⚽</th>
+        <th style="text-align:center" title="Assistências">Ass.</th>
+        ${dynStatDefs.map(d=>`<th style="text-align:center" title="${d.title}">${d.label}</th>`).join('')}
+        <th style="text-align:center" title="Cartões amarelos">🟡</th>
+        <th style="text-align:center" title="Cartão vermelho">🔴</th>
         <th style="text-align:center">Nota</th>
       </tr></thead>
       <tbody>${teamRows}</tbody>
@@ -13453,24 +13465,24 @@ function exportGamePDF(){
   </section>
 
   <section>
-    <h2>Sumário</h2>
-    ${sumHtml}
-  </section>
-
-  <section>
-    <h2>Estatísticas Gerais</h2>
+    <h2>Totais do Jogo</h2>
     ${statsHtml}
   </section>
 
   <section>
-    <h2>Momentos de Jogo</h2>
-    ${momentsHtml}
+    <h2>Sumário</h2>
+    ${sumHtml}
   </section>
 
-  <section>
+  ${hasTeamEval?`<section>
+    <h2>Momentos de Jogo</h2>
+    ${momentsHtml}
+  </section>`:''}
+
+  ${obsEntries.length?`<section>
     <h2>Observações da Equipa Técnica</h2>
     ${obsHtml}
-  </section>
+  </section>`:''}
 </body>
 </html>`;
 
