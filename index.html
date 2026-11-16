@@ -711,6 +711,9 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
     <hr class="nd">
     <div class="nsl" id="nsl-staff">Equipa Técnica</div>
     <div class="nl" id="nl-staff" data-view="staff"><span class="ic">👥</span> Gestão de Staff</div>
+    <hr class="nd" id="nd-settings" style="display:none">
+    <div class="nsl" id="nsl-settings" style="display:none">Configurações</div>
+    <div class="nl" id="nl-settings" data-view="settings" style="display:none"><span class="ic">⚙️</span> Definições</div>
   </nav>
   <div class="nl" id="nl-help" data-view="help" style="color:rgba(255,255,255,.55)"><span class="ic">💡</span> Ajuda</div>
   <div class="nl" id="nl-accounts" style="display:none;color:rgba(255,255,255,.55)"><span class="ic">⚙️</span> Gerir Contas</div>
@@ -1250,6 +1253,14 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <button class="btn btn-o btn-sm" id="btn-copy-stafflink">🔗 Copiar Link do Formulário</button>
     </div>
     <div id="staff-content"></div>
+  </div>
+
+  <!-- DEFINIÇÕES (admin) -->
+  <div class="view" id="v-settings">
+    <div class="tb">
+      <div><h1>Definições</h1><div class="sub">Configurações globais da app</div></div>
+    </div>
+    <div id="settings-content" style="padding-bottom:60px"></div>
   </div>
 
   <!-- WEEKLY PLAN -->
@@ -3460,6 +3471,7 @@ function nav(v,opts={}){
   else if(v==='tm'){ show('v-tm'); setActive('[data-view="tm"]'); renderTM() }
   else if(v==='unavailabilities'){ show('v-unavailabilities'); setActive('[data-view="unavailabilities"]'); renderUnavailabilities() }
   else if(v==='staff'){ show('v-staff'); setActive('[data-view="staff"]'); renderStaff() }
+  else if(v==='settings'){ if(!isAdmin()) return; show('v-settings'); setActive('[data-view="settings"]'); renderSettings() }
   else if(v==='staff-form'){ show('v-sf') }
   else if(v==='live'){
     if(opts.id){ liveGameId=opts.id; }
@@ -13539,45 +13551,6 @@ function renderGameFPF(ev){
   const hasJornada=!!(ev.jornada);
   const canAutoSearch=comps.length>0&&hasJornada;
 
-  // Build competition config section HTML
-  function _fpfConfigHtml(){
-    const rows=comps.map(c=>`
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600">${c.label}</div>
-          <div style="font-size:11px;color:var(--muted)">${c.startFixtureId?`fixtureId J1: ${c.startFixtureId}`:(c.competitionId?`compId: ${c.competitionId} ⚠️ reconfigura`:'⚠️ sem fixtureId')}</div>
-        </div>
-        <button class="btn btn-sm fpf-comp-del" data-id="${c.id}" style="background:#fde8e8;color:#b02020;border:none;padding:3px 8px">✕</button>
-      </div>`).join('');
-    return `
-      <div id="fpf-config-panel" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚙️ Competições FPF — ${SQUADS[squad]||squad}</div>
-        ${rows||'<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Sem competições configuradas.</p>'}
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;margin-bottom:6px">Adicionar competição</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <input id="fpf-cfg-label" placeholder="Nome (ex: Camp. Dist. Juniores)" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
-            <input id="fpf-cfg-fid1" placeholder="fixtureId da Jornada 1" type="number" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
-            <div style="display:flex;align-items:center;gap:8px">
-              <button class="btn btn-p btn-sm" id="btn-fpf-cfg-add">+ Adicionar</button>
-              <a href="https://resultados.fpf.pt" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db">↗ Abrir FPF</a>
-            </div>
-            <p style="font-size:11px;color:var(--muted);margin:0">Abre a competição na FPF, clica em J1 e copia o número do URL: <code>?fixtureId=XXXXX</code></p>
-          </div>
-        </div>
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;margin-bottom:4px">Cloudflare Worker URL (opcional)</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input id="fpf-cfg-worker" placeholder="https://fpf-proxy.USERNAME.workers.dev" type="url"
-              value="${localStorage.getItem('scv_fpf_worker_url')||''}"
-              style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;background:var(--bg);color:var(--text)">
-            <button class="btn btn-p btn-sm" id="btn-fpf-worker-save" style="white-space:nowrap">Guardar</button>
-          </div>
-          <p style="font-size:11px;color:var(--muted);margin-top:4px">Se o proxy der 403, usa um Cloudflare Worker. Ver <code>cloudflare-worker/fpf-proxy.js</code>.</p>
-        </div>
-      </div>`;
-  }
-
   document.getElementById('gm-tab-content').innerHTML=`
     <div style="padding:4px 0">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -13604,51 +13577,13 @@ function renderGameFPF(ev){
         </button>`:''}
       ${!matchId&&!canAutoSearch?`
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <p style="font-size:12px;color:var(--muted);margin:0">Introduz o ID manualmente ou ${!hasJornada?'<strong>define a jornada do jogo</strong> e ':''}configura as competições FPF abaixo.</p>
+          <p style="font-size:12px;color:var(--muted);margin:0">Introduz o ID manualmente ou ${!hasJornada?'<strong>define a jornada do jogo</strong> e ':''}configura as competições em <strong>Definições → FPF</strong>.</p>
         </div>`:''}
-
-      <div style="text-align:right;margin-bottom:8px">
-        <button id="btn-fpf-cfg-toggle" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;padding:0">⚙️ Competições FPF</button>
-      </div>
-      <div id="fpf-config-wrapper" style="display:none">${_fpfConfigHtml()}</div>
 
       <div id="fpf-data-container">
         ${matchId?'<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">⏳ A carregar dados da FPF...</p>':''}
       </div>
     </div>`;
-
-  // Wire config toggle
-  document.getElementById('btn-fpf-cfg-toggle').addEventListener('click',()=>{
-    const w=document.getElementById('fpf-config-wrapper');
-    w.style.display=w.style.display==='none'?'':'none';
-  });
-
-  // Wire add competition
-  document.getElementById('btn-fpf-cfg-add')?.addEventListener('click',()=>{
-    const label=document.getElementById('fpf-cfg-label')?.value?.trim();
-    const fid1=document.getElementById('fpf-cfg-fid1')?.value?.trim();
-    if(!label||!fid1){ toast('⚠️ Preenche o nome e o fixtureId da J1'); return; }
-    DB.addFpfComp(squad,label,fid1);
-    toast('✅ Competição FPF adicionada');
-    renderGame();
-  });
-
-  // Wire Worker URL save
-  document.getElementById('btn-fpf-worker-save')?.addEventListener('click',()=>{
-    const val=(document.getElementById('fpf-cfg-worker')?.value||'').trim();
-    if(val) localStorage.setItem('scv_fpf_worker_url',val);
-    else localStorage.removeItem('scv_fpf_worker_url');
-    toast(val?`✅ Worker URL guardado — recarrega a app`:'Worker URL removido — recarrega a app');
-  });
-
-  // Wire delete competition buttons
-  document.querySelectorAll('.fpf-comp-del').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      if(!confirm('Remover esta competição FPF?')) return;
-      DB.deleteFpfComp(btn.dataset.id);
-      toast('Competição removida'); renderGame();
-    });
-  });
 
   // Helper: extract numeric matchId from either a bare number or a full FPF URL
   function _extractMatchIdFromInput(raw){
@@ -14824,6 +14759,7 @@ document.getElementById('btn-new-game').addEventListener('click',()=>openEventMo
 
 // ── SIDEBAR NAV ───────────────────────────────────────────────────────────────
 document.getElementById('nl-staff').addEventListener('click',()=>nav('staff'));
+document.getElementById('nl-settings').addEventListener('click',()=>nav('settings'));
 document.getElementById('nl-accounts').addEventListener('click',()=>openAccountsModal());
 document.getElementById('mo-accounts-close').addEventListener('click',closeAccountsModal);
 document.getElementById('mo-accounts-cancel').addEventListener('click',closeAccountsModal);
@@ -19619,6 +19555,109 @@ function renderHelp(){
     </div>`;
 }
 
+// ── DEFINIÇÕES (ADMIN) ────────────────────────────────────────────────────────
+function renderSettings(){
+  if(!isAdmin()) return;
+  const el=document.getElementById('settings-content');
+  if(!el) return;
+
+  const SQUAD_KEYS=['eqa','sub23','sub19'];
+
+  function buildSettingsHtml(){
+    // ── FPF Competições por equipa ──────────────────────────────────────────
+    const compSections=SQUAD_KEYS.map(sq=>{
+      const comps=DB.fpfComps(sq);
+      const rows=comps.map(c=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${c.label}</div>
+            <div style="font-size:11px;color:var(--muted)">${c.startFixtureId?`fixtureId J1: ${c.startFixtureId}`:'⚠️ sem fixtureId — edita e remove'}</div>
+          </div>
+          <button class="btn btn-sm stg-fpf-del" data-id="${c.id}"
+            style="background:#fde8e8;color:#b02020;border:none;padding:3px 8px;flex-shrink:0">✕</button>
+        </div>`).join('');
+      return `
+        <div style="margin-bottom:20px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+            ${SQUADS[sq]||sq}
+          </div>
+          ${rows||'<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Sem competições configuradas.</p>'}
+          <div style="margin-top:8px;padding:10px;background:var(--bg-alt,var(--bg));border:1px solid var(--border);border-radius:8px">
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px">➕ Nova competição — ${SQUADS[sq]||sq}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <input class="stg-fpf-label" data-squad="${sq}" placeholder="Nome (ex: Camp. Dist. Juniores)"
+                style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
+              <input class="stg-fpf-fid1" data-squad="${sq}" placeholder="fixtureId da Jornada 1" type="number"
+                style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn btn-p btn-sm stg-fpf-add" data-squad="${sq}">+ Adicionar</button>
+                <a href="https://resultados.fpf.pt" target="_blank" rel="noopener" style="font-size:11px;color:#1a56db">↗ Abrir FPF</a>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin:0">Abre a competição na FPF, clica em J1 e copia o número do URL: <code>?fixtureId=XXXXX</code></p>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // ── Cloudflare Worker ───────────────────────────────────────────────────
+    const workerUrl=localStorage.getItem('scv_fpf_worker_url')||'';
+    const workerSection=`
+      <div style="margin-top:8px">
+        <div style="font-size:11px;font-weight:600;margin-bottom:4px">Cloudflare Worker URL (opcional)</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="stg-worker-url" placeholder="https://fpf-proxy.USERNAME.workers.dev" type="url"
+            value="${workerUrl}"
+            style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text)">
+          <button class="btn btn-p btn-sm" id="stg-worker-save" style="white-space:nowrap">Guardar</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">Se o proxy Vercel der 403, faz deploy do Cloudflare Worker (<code>cloudflare-worker/fpf-proxy.js</code>) e cola o URL aqui.</p>
+      </div>`;
+
+    return `
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">🏆 FPF — Competições</div>
+        ${compSections}
+      </div>
+      <div class="card">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">🌐 FPF — Proxy</div>
+        ${workerSection}
+      </div>`;
+  }
+
+  el.innerHTML=buildSettingsHtml();
+
+  // Wire: add competition
+  el.querySelectorAll('.stg-fpf-add').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const sq=btn.dataset.squad;
+      const label=el.querySelector(`.stg-fpf-label[data-squad="${sq}"]`)?.value?.trim();
+      const fid1=el.querySelector(`.stg-fpf-fid1[data-squad="${sq}"]`)?.value?.trim();
+      if(!label||!fid1){ toast('⚠️ Preenche o nome e o fixtureId da J1'); return; }
+      DB.addFpfComp(sq,label,fid1);
+      toast(`✅ Competição adicionada — ${SQUADS[sq]||sq}`);
+      renderSettings();
+    });
+  });
+
+  // Wire: delete competition
+  el.querySelectorAll('.stg-fpf-del').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(!confirm('Remover esta competição FPF?')) return;
+      DB.deleteFpfComp(btn.dataset.id);
+      toast('Competição removida'); renderSettings();
+    });
+  });
+
+  // Wire: save worker URL
+  document.getElementById('stg-worker-save')?.addEventListener('click',()=>{
+    const val=(document.getElementById('stg-worker-url')?.value||'').trim();
+    if(val) localStorage.setItem('scv_fpf_worker_url',val);
+    else localStorage.removeItem('scv_fpf_worker_url');
+    // Also update the in-memory constant fallback for this session
+    toast(val?'✅ Worker URL guardado. Recarrega a app para activar.':'Worker URL removido.');
+  });
+}
+
 // ── UNAVAILABILITIES VIEW ─────────────────────────────────────────────────────
 function renderUnavailabilities(){
   const u=currentUser();
@@ -19822,6 +19861,10 @@ function applyRoleUI(){
     if(nlBilhetesEqb) nlBilhetesEqb.style.display='';
     const nlClinical=document.getElementById('nl-clinical-map');
     if(nlClinical) nlClinical.style.display='';
+    // Definições visível apenas para admin
+    ['nd-settings','nsl-settings','nl-settings'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='';
+    });
   }
   // Mapa Clínico visível para médicos e equipa técnica (coaches)
   if(u.role==='medical'||u.role==='coach'){
