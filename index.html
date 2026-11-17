@@ -11880,7 +11880,7 @@ function renderGame(){
   document.getElementById('gm-title').textContent=evLabel(ev);
   document.getElementById('gm-sub').textContent=`${fmtDate(ev.date)}${ev.time?' · '+ev.time:''}${ev.location?' · '+ev.location:''}`;
   document.getElementById('gm-content').innerHTML=`
-    ${renderClockBar(clock, getGameType(ev)==='cup')}
+    ${clock.phase&&clock.phase!=='pre'?renderClockBar(clock, getGameType(ev)==='cup'):''}
     <div style="display:flex;gap:0;margin-bottom:22px;border-bottom:2px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
       <button class="tab-btn${gameTab==='pre'?' tab-active':''}" data-tab="pre">⚡ Pré-Jogo</button>
       <button class="tab-btn${gameTab==='sumario'?' tab-active':''}" data-tab="sumario">📋 Sumário</button>
