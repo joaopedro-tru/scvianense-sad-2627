@@ -11867,7 +11867,8 @@ function renderGame(){
   const ev=DB.getEvent(gameEventId); if(!ev){ nav('sq-games',{squad}); return; }
   const sqPlayers=DB.players(ev.squad==='both'?null:ev.squad);
   const _convRaw=ev.convocatoria||{};
-  const conv={players:{},formation:'',notes:'',concentrationTime:'',concentrationPlace:'',..._convRaw};
+  const _tplNotes=(()=>{ try{ return JSON.parse(localStorage.getItem(`scv_sched_tpl_${ev.squad||'eqa'}`)||'{}').defaultNotes||''; }catch{return '';} })();
+  const conv={players:{},formation:'',notes:_tplNotes,concentrationTime:'',concentrationPlace:'',..._convRaw};
   const mr=ev.matchReport||{events:[]};
   const clock=mr.matchClock||{phase:'pre'};
   const gameFinished=(clock.phase==='finished');
@@ -14583,7 +14584,11 @@ function generateConvocatoriaPDF(evId){
   const convExtraPdf=conv.staffExtra||[];
   const goingStaffPdf=getAppUsers()
     .filter(u=>u.role!=='admin')
-    .filter(u=>!gmSqPdf||u.squad===gmSqPdf)
+    .filter(u=>{
+      if(!gmSqPdf) return true;
+      const uSqs=u.squads&&Array.isArray(u.squads)?u.squads:(u.squad?[u.squad]:[]);
+      return uSqs.includes(gmSqPdf);
+    })
     .filter(u=>!!convStaffPdf[u.user]?.going)
     .map(u=>{
       const p=DB.getStaffProfile(u.user)||{};
@@ -17717,11 +17722,22 @@ function renderTMSched(){
         <div>${staffRows}</div>
       </div>`:'';
 
+    const defaultNotes=tpl.defaultNotes||'';
+    const notesSection=`
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">📝 Observações padrão da convocatória</div>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 6px">Texto pré-preenchido nas observações de cada jogo. Apenas aplicado quando as observações estão em branco.</p>
+        <textarea data-sq="${sq}" data-tpl-key="defaultNotes" rows="3"
+          placeholder="Ex: Apresentação obrigatória com equipamento completo. Refeição ligeira antes do jogo."
+          style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text);resize:vertical;box-sizing:border-box">${defaultNotes}</textarea>
+      </div>`;
+
     return `<div class="card" style="margin-bottom:14px">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">${SQUADS[sq]||sq}</h3>
       <p style="font-size:11px;color:var(--muted);margin:0 0 10px">Minutos em relação ao início do jogo (negativo = antes, positivo = depois).</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px">${rows}</div>
       ${staffSection}
+      ${notesSection}
       <button class="btn btn-p btn-sm" data-save-sq="${sq}" style="width:100%;margin-top:14px">💾 Guardar e aplicar aos jogos futuros</button>
       <div id="sched-result-${sq}" style="font-size:12px;color:var(--ok);margin-top:6px;display:none"></div>
     </div>`;
@@ -17738,10 +17754,11 @@ function renderTMSched(){
       const sq=btn.dataset.saveSq;
       const newTpl={};
 
-      // Collect schedule offsets
+      // Collect schedule offsets + defaultNotes
       el.querySelectorAll(`[data-tpl-key][data-sq="${sq}"]`).forEach(inp=>{
         const v=inp.value.trim();
-        newTpl[inp.dataset.tplKey]=v===''?'':parseInt(v);
+        if(inp.dataset.tplKey==='defaultNotes'){ newTpl.defaultNotes=v; }
+        else{ newTpl[inp.dataset.tplKey]=v===''?'':parseInt(v); }
       });
 
       // Collect staff defaults
@@ -17775,6 +17792,9 @@ function renderTMSched(){
         if(newTpl.gkWarmupOffset!==undefined&&newTpl.gkWarmupOffset!=='') c.scheduleGkWarmup=calcTime(gameMins,newTpl.gkWarmupOffset);
         if(newTpl.warmupOffset!==undefined&&newTpl.warmupOffset!=='') c.scheduleWarmup=calcTime(gameMins,newTpl.warmupOffset);
         if(newTpl.dressingOffset!==undefined&&newTpl.dressingOffset!=='') c.scheduleDressing=calcTime(gameMins,newTpl.dressingOffset);
+
+        // Apply default notes — only if the game's notes are still empty
+        if(newTpl.defaultNotes&&!c.notes) c.notes=newTpl.defaultNotes;
 
         // Apply staff defaults — only update/add staff with a configured role; don't remove others
         if(Object.keys(staffDefaults).length){
