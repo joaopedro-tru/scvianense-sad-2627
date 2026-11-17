@@ -3012,6 +3012,12 @@ const DB = {
     if(c) c.startFixtureId=startFixtureId||null;
     this._sComps(arr);
   },
+  renameCompetition(id,newLabel){
+    const arr=this._comps();
+    const c=arr.find(x=>x.id===id);
+    if(c) c.label=newLabel.trim();
+    this._sComps(arr);
+  },
   // shim — mantém compatibilidade com código FPF existente
   fpfComps(squad){ return this.competitions(squad).filter(c=>c.official&&c.startFixtureId); },
 
@@ -19620,7 +19626,15 @@ function renderSettings(){
     return `
       <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px">${badge}<span style="font-size:13px;font-weight:600">${c.label}</span></div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${badge}
+            <span class="stg-comp-name" data-id="${c.id}"
+              style="font-size:13px;font-weight:600;cursor:pointer;border-bottom:1px dashed transparent"
+              title="Clica para renomear">${c.label}</span>
+            <button class="btn btn-sm stg-comp-rename" data-id="${c.id}" data-label="${c.label.replace(/"/g,'&quot;')}"
+              style="background:none;border:none;color:var(--muted);font-size:11px;padding:0 2px;cursor:pointer"
+              title="Renomear">✏️</button>
+          </div>
           ${fpfHint}
         </div>
         <button class="btn btn-sm stg-comp-del" data-id="${c.id}"
@@ -19703,6 +19717,33 @@ function renderSettings(){
       DB.addCompetition(sq,label,official);
       toast(`✅ "${label}" adicionada — ${SQUADS[sq]||sq}`);
       renderSettings();
+    });
+  });
+
+  // Wire: rename competition
+  el.querySelectorAll('.stg-comp-rename').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id=btn.dataset.id;
+      const current=btn.dataset.label;
+      // replace the name span with an inline input
+      const nameSpan=el.querySelector(`.stg-comp-name[data-id="${id}"]`);
+      if(!nameSpan) return;
+      const inp=document.createElement('input');
+      inp.value=current;
+      inp.style.cssText='font-size:13px;font-weight:600;padding:2px 6px;border:1.5px solid var(--primary);border-radius:5px;font-family:inherit;background:var(--bg);color:var(--text);min-width:160px';
+      nameSpan.replaceWith(inp);
+      btn.style.display='none';
+      inp.focus(); inp.select();
+      function commit(){
+        const newLabel=inp.value.trim();
+        if(newLabel&&newLabel!==current){
+          DB.renameCompetition(id,newLabel);
+          toast('✅ Competição renomeada');
+        }
+        renderSettings();
+      }
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') renderSettings(); });
+      inp.addEventListener('blur',commit,{once:true});
     });
   });
 
