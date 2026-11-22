@@ -4446,9 +4446,11 @@ function buildSqStatsHTML(cs, events, players){
   // Aggregate per player
   const pStats={};
   const pidMap={};
-  players.forEach(p=>{ pStats[p.id]={goals:0,assists:0,ball_won:0,shot_on:0,shot_off:0,yellow:0,red:0,ball_lost:0,offside:0}; pidMap[p.id]=p; });
+  players.forEach(p=>{ pStats[p.id]={goals:0,assists:0,ball_won:0,shot_on:0,shot_off:0,yellow:0,red:0,ball_lost:0,offside:0,minutes:0}; pidMap[p.id]=p; });
   pastGames.forEach(g=>{
-    const evs=(g.matchReport||{}).events||[];
+    const mr=g.matchReport||{};
+    const evs=mr.events||[];
+    const lineup=mr.lineup||[];
     evs.forEach(e=>{
       if(e.type==='goal'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].goals++;
       if(e.type==='goal'&&e.assistId&&pStats[e.assistId]) pStats[e.assistId].assists++;
@@ -4461,14 +4463,28 @@ function buildSqStatsHTML(cs, events, players){
       if(e.type==='ball_lost'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].ball_lost++;
       if(e.type==='offside_against'&&e.playerId&&pStats[e.playerId]) pStats[e.playerId].offside++;
     });
+    // Minutos jogados por jogador neste jogo
+    players.forEach(p=>{
+      const pid=p.id; if(!pStats[pid]) return;
+      const isStart=lineup.includes(pid);
+      const subIn=evs.find(ev=>ev.type==='sub'&&ev.playerInId===pid);
+      const subOut=evs.find(ev=>ev.type==='sub'&&ev.playerOutId===pid);
+      if(!isStart&&!subIn) return;
+      const mins=isStart
+        ?(subOut?(subOut.minute||90):90)
+        :(subOut?((subOut.minute||0)-(subIn.minute||0)):(90-(subIn.minute||0)));
+      pStats[pid].minutes+=Math.max(0,mins);
+    });
   });
+  window._sqTopData={pStats,pidMap}; // para expand/sort
 
   function top5Block(key,label,color){
-    const sorted=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]).slice(0,5);
-    if(!sorted.length) return `<div style="color:var(--muted);font-size:12px;padding:4px 0">Sem dados</div>`;
-    return sorted.map(([pid,s],i)=>{
+    const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
+    if(!all.length) return `<div style="color:var(--muted);font-size:12px;padding:4px 0">Sem dados</div>`;
+    const top5=all.slice(0,5); const maxVal=all[0][1][key]; const hasMore=all.length>5;
+    const rows=top5.map(([pid,s],i)=>{
       const p=pidMap[pid]; const name=p?dn(p):'?'; const val=s[key];
-      const max=sorted[0][1][key]; const pct=max>0?Math.round(val/max*100):0;
+      const pct=maxVal>0?Math.round(val/maxVal*100):0;
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
         <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:14px">${i+1}</div>
         <div style="flex:1;min-width:0">
@@ -4480,6 +4496,10 @@ function buildSqStatsHTML(cs, events, players){
         </div>
       </div>`;
     }).join('');
+    const btn=hasMore
+      ?`<button data-topkey="${key}" data-topcolor="${color}" data-expanded="0" data-dir="desc" onclick="toggleTopBlock(this)" style="width:100%;margin-top:6px;padding:4px 0;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit">▼ Ver todos (${all.length})</button>`
+      :'';
+    return `<div id="sqtop-${key}">${rows}</div>${btn}`;
   }
 
   function card(label,key,color){
@@ -4497,6 +4517,7 @@ function buildSqStatsHTML(cs, events, players){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px">
       ${card('⚽ Golos','goals','#2e7d32')}
       ${card('🎯 Assistências','assists','#1565c0')}
+      ${card('⏱ Minutos Jogados','minutes','#0891b2')}
       ${card('💪 Recuperações','ball_won','#00695c')}
       ${card('🎯 Remates à Baliza','shot_on','#6a1b9a')}
       ${card('💨 Remates Fora','shot_off','#4527a0')}
@@ -4509,6 +4530,72 @@ function buildSqStatsHTML(cs, events, players){
       ${card('⛳ Foras de Jogo','offside','#e65100')}
     </div>
   </div>`;
+}
+
+// ── TOP BLOCK EXPAND / SORT (usado pelos cards de stats do escalão) ───────────
+function _rerenderTopBlock(key,color,dir){
+  const {pStats,pidMap}=window._sqTopData||{};
+  if(!pStats) return;
+  const container=document.getElementById('sqtop-'+key);
+  if(!container) return;
+  const all=Object.entries(pStats).filter(([,s])=>s[key]>0)
+    .sort((a,b)=>dir==='desc'?b[1][key]-a[1][key]:a[1][key]-b[1][key]);
+  const globalMax=Math.max(...Object.values(pStats).map(s=>s[key]),1);
+  const otherDir=dir==='desc'?'asc':'desc';
+  const sortLabel=dir==='desc'?'▼ Maior primeiro':'▲ Menor primeiro';
+  container.innerHTML=
+    `<div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button onclick="sortTopBlock('${key}','${color}','${otherDir}')" style="padding:2px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--bg);color:var(--muted);font-family:inherit">${sortLabel}</button>
+    </div>`
+    +all.map(([pid,s],i)=>{
+      const p=pidMap[pid]; const name=p?dn(p):'?'; const val=s[key];
+      const pct=globalMax>0?Math.round(val/globalMax*100):0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:14px">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+            <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+          </div>
+          <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
+        </div>
+      </div>`;
+    }).join('');
+}
+function toggleTopBlock(btn){
+  const key=btn.dataset.topkey, color=btn.dataset.topcolor;
+  const expanded=btn.dataset.expanded==='1';
+  const {pStats}=window._sqTopData||{}; if(!pStats) return;
+  if(!expanded){
+    btn.dataset.expanded='1'; btn.dataset.dir='desc';
+    btn.textContent='▲ Colapsar';
+    _rerenderTopBlock(key,color,'desc');
+  } else {
+    const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
+    const maxVal=all[0]?.[1][key]||1;
+    const container=document.getElementById('sqtop-'+key); if(!container) return;
+    container.innerHTML=all.slice(0,5).map(([pid,s],i)=>{
+      const {pidMap}=window._sqTopData||{}; const p=pidMap?.[pid]; const name=p?dn(p):'?'; const val=s[key];
+      const pct=maxVal>0?Math.round(val/maxVal*100):0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:14px">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+            <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+          </div>
+          <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
+        </div>
+      </div>`;
+    }).join('');
+    btn.dataset.expanded='0'; btn.dataset.dir='desc';
+    btn.textContent=`▼ Ver todos (${all.length})`;
+  }
+}
+function sortTopBlock(key,color,newDir){
+  const btn=document.querySelector(`[data-topkey="${key}"]`);
+  if(btn) btn.dataset.dir=newDir;
+  _rerenderTopBlock(key,color,newDir);
 }
 
 // squads: [{cs, label, color, icon}]  events: all events  today: 'YYYY-MM-DD'
@@ -5452,7 +5539,7 @@ function renderPlayer(){
   // typeFilter: null=todos, 'official'=liga+taça, 'friendly'=preparação
   const todayStr=new Date().toISOString().slice(0,10);
   function computeSquadStats(sq, typeFilter=null){
-    let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0;
+    let trainAttended=0,gamesConv=0,gamesPlayed=0,goals=0,assists=0,yellows=0,reds=0,minutes=0;
     const ratings=[];
     allEvs.filter(ev=>!sq||ev.squad===sq).forEach(ev=>{
       if(ev.type==='training'){
@@ -5474,7 +5561,13 @@ function renderPlayer(){
         const evList=mr.events||[];
         const isStarter=(mr.lineup||[]).includes(pid);
         const subbedIn=evList.some(e=>e.type==='sub'&&e.playerInId===pid);
-        if(isStarter||subbedIn) gamesPlayed++;
+        if(isStarter||subbedIn){
+          gamesPlayed++;
+          const subOut=evList.find(e=>e.type==='sub'&&e.playerOutId===pid);
+          const subInEv=evList.find(e=>e.type==='sub'&&e.playerInId===pid);
+          if(isStarter) minutes+=(subOut?(subOut.minute||90):90);
+          else minutes+=Math.max(0,subOut?((subOut.minute||0)-(subInEv?.minute||0)):(90-(subInEv?.minute||0)));
+        }
         evList.forEach(e=>{
           if(e.type==='goal'&&e.playerId===pid) goals++;
           if(e.type==='goal'&&e.assistId===pid) assists++;
@@ -5489,7 +5582,7 @@ function renderPlayer(){
     });
     const validRatings=ratings.filter(v=>!isNaN(v));
     const avgRating=validRatings.length?(validRatings.reduce((s,v)=>s+v,0)/validRatings.length).toFixed(1):null;
-    return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating};
+    return {trainAttended,gamesConv,gamesPlayed,goals,assists,yellows,reds,avgRating,minutes};
   }
   // Escalão seleccionado para as stats (inicializa com o principal)
   if(!playerStatsSq) playerStatsSq=primarySq;
@@ -5604,10 +5697,10 @@ function renderPlayer(){
       return `<div style="border:1.5px solid ${accent}22;border-radius:10px;padding:10px 4px 4px;position:relative;margin-bottom:10px">
         <div style="position:absolute;top:-9px;left:12px;background:var(--card,#fff);padding:0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accent}">${label}</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);margin-bottom:4px">
-          ${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox('Golos',st.goals,'')}${statBox('Assist.',st.assists,'')}
+          ${statBox('Convocado',st.gamesConv,'jogos')}${statBox('Jogou',st.gamesPlayed,'jogos')}${statBox("Minutos",st.minutes,"'")}${statBox('Golos',st.goals,'')}
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr)">
-          ${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}${statBox('Nota Média',st.avgRating??'—','')}${statBox('','')}
+          ${statBox('Assist.',st.assists,'')}${statBox('Amarelos',st.yellows,'')}${statBox('Vermelhos',st.reds,'')}${statBox('Nota Média',st.avgRating??'—','')}
         </div>
       </div>`;
     }
