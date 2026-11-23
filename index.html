@@ -4488,12 +4488,73 @@ function buildSqStatsHTML(cs, events, players){
       pStats[pid].minutes+=Math.max(0,mins);
     });
   });
-  window._sqTopData={pStats,pidMap}; // para expand/sort
+  // Eficácia individual = golos / (remates baliza + remates fora)
+  Object.values(pStats).forEach(s=>{
+    s.eficacia=(s.shot_on+s.shot_off)>0?Math.round(s.goals/(s.shot_on+s.shot_off)*100):0;
+  });
+
+  window._sqTopData={pStats,pidMap,suffix:{eficacia:'%'}}; // para expand/sort
+
+  // ── Dashboard coletivo da equipa ──────────────────────────────────────────
+  const gamesWithRes=pastGames.filter(g=>{
+    const mr=g.matchReport||{};
+    return (mr.events||[]).length>0||(mr.matchClock?.phase==='finished')||(mr.lineup||[]).length>0;
+  });
+  const teamResults=gamesWithRes.map(g=>{
+    const evs=(g.matchReport||{}).events||[];
+    const gf=evs.filter(e=>e.type==='goal').length;
+    const ga=evs.filter(e=>e.type==='goal_conceded').length;
+    return {gf,ga,r:gf>ga?'W':gf<ga?'L':'D'};
+  });
+  // Streaks
+  let maxWin=0,curW=0,maxUnb=0,curU=0,maxLoss=0,curL=0;
+  teamResults.forEach(({r})=>{
+    if(r==='W'){curW++;curU++;curL=0;}
+    else if(r==='D'){curW=0;curU++;curL=0;}
+    else{curW=0;curU=0;curL++;}
+    maxWin=Math.max(maxWin,curW);maxUnb=Math.max(maxUnb,curU);maxLoss=Math.max(maxLoss,curL);
+  });
+  const n=teamResults.length||1;
+  const totalTeamGoals=teamResults.reduce((s,r)=>s+r.gf,0);
+  const goalsPerGame=(totalTeamGoals/n).toFixed(1);
+  // Team efficiency: total goals / total shots across all players
+  const teamTotalShots=Object.values(pStats).reduce((s,p)=>s+(p.shot_on+p.shot_off),0);
+  const teamTotalGoals=Object.values(pStats).reduce((s,p)=>s+p.goals,0);
+  const teamEficacia=teamTotalShots>0?Math.round(teamTotalGoals/teamTotalShots*100):null;
+  // Cards per game
+  const totalCards=pastGames.reduce((s,g)=>{
+    const evs=(g.matchReport||{}).events||[];
+    return s+evs.filter(e=>e.type==='yellow'||e.type==='yellow2'||e.type==='red').length;
+  },0);
+  const cardsPerGame=(totalCards/n).toFixed(1);
+
+  function teamStatBox(label,val,sub='',color='var(--primary,#1a56db)'){
+    return `<div style="text-align:center;padding:12px 6px">
+      <div style="font-size:28px;font-weight:800;color:${color};line-height:1">${val}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text);margin-top:4px;line-height:1.3">${label}</div>
+      ${sub?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${sub}</div>`:''}
+    </div>`;
+  }
+  const teamDashboard=gamesWithRes.length===0?'':
+    `<div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px">📊 Coletivo — época</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);margin-bottom:0">
+        ${teamStatBox('Vitórias seguidas',maxWin,'máximo','#2e7d32')}
+        ${teamStatBox('Jogos s/ perder',maxUnb,'máximo','#1565c0')}
+        ${teamStatBox('Derrotas seguidas',maxLoss,'máximo','#c0392b')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr)">
+        ${teamStatBox('Golos/jogo',goalsPerGame,'média','#2e7d32')}
+        ${teamStatBox('Eficácia equipa',teamEficacia!==null?teamEficacia+'%':'—','golos/remates','#6a1b9a')}
+        ${teamStatBox('Cartões/jogo',cardsPerGame,'média','#f39c12')}
+      </div>
+    </div>`;
 
   function top5Block(key,label,color){
     const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
     if(!all.length) return `<div style="color:var(--muted);font-size:12px;padding:4px 0">Sem dados</div>`;
     const top5=all.slice(0,5); const maxVal=all[0][1][key]; const hasMore=all.length>5;
+    const _sfx=(window._sqTopData?.suffix)?.[key]||'';
     const rows=top5.map(([pid,s],i)=>{
       const p=pidMap[pid]; const name=p?dn(p):'?'; const val=s[key];
       const pct=maxVal>0?Math.round(val/maxVal*100):0;
@@ -4502,7 +4563,7 @@ function buildSqStatsHTML(cs, events, players){
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
             <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}${_sfx}</span>
           </div>
           <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
         </div>
@@ -4522,14 +4583,16 @@ function buildSqStatsHTML(cs, events, players){
   }
 
   const hasAnyData=Object.values(pStats).some(s=>Object.values(s).some(v=>v>0));
-  if(!hasAnyData) return '';
+  if(!hasAnyData) return teamDashboard;
 
   return `<div>
+    ${teamDashboard}
     <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📈 Top 5 — Positivos</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px">
       ${card('⚽ Golos','goals','#2e7d32')}
       ${card('🎯 Assistências','assists','#1565c0')}
       ${card('⏱ Minutos Jogados','minutes','#0891b2')}
+      ${card('🎯 Eficácia (%)','eficacia','#059669')}
       ${card('💪 Recuperações','ball_won','#00695c')}
       ${card('🎯 Remates à Baliza','shot_on','#6a1b9a')}
       ${card('💨 Remates Fora','shot_off','#4527a0')}
@@ -4555,6 +4618,7 @@ function _rerenderTopBlock(key,color,dir){
   const globalMax=Math.max(...Object.values(pStats).map(s=>s[key]),1);
   const otherDir=dir==='desc'?'asc':'desc';
   const sortLabel=dir==='desc'?'▼ Maior primeiro':'▲ Menor primeiro';
+  const _sfx=(window._sqTopData?.suffix)?.[key]||'';
   container.innerHTML=
     `<div style="display:flex;justify-content:flex-end;margin-bottom:4px">
       <button onclick="sortTopBlock('${key}','${color}','${otherDir}')" style="padding:2px 10px;border:1px solid var(--border);border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--bg);color:var(--muted);font-family:inherit">${sortLabel}</button>
@@ -4567,7 +4631,7 @@ function _rerenderTopBlock(key,color,dir){
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
             <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}${_sfx}</span>
           </div>
           <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
         </div>
@@ -4586,6 +4650,7 @@ function toggleTopBlock(btn){
     const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
     const maxVal=all[0]?.[1][key]||1;
     const container=document.getElementById('sqtop-'+key); if(!container) return;
+    const _sfxC=(window._sqTopData?.suffix)?.[key]||'';
     container.innerHTML=all.slice(0,5).map(([pid,s],i)=>{
       const {pidMap}=window._sqTopData||{}; const p=pidMap?.[pid]; const name=p?dn(p):'?'; const val=s[key];
       const pct=maxVal>0?Math.round(val/maxVal*100):0;
@@ -4594,7 +4659,7 @@ function toggleTopBlock(btn){
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
             <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}</span>
+            <span style="font-size:13px;font-weight:800;color:${color};margin-left:8px">${val}${_sfxC}</span>
           </div>
           <div style="height:3px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
         </div>
@@ -5672,9 +5737,9 @@ function renderPlayer(){
     if(!conv&&!played&&!gls&&!ast&&!ylw&&!red&&!hasRating&&!sOn&&!sOff&&!fouls) return;
     const gf=evList.filter(e=>e.type==='goal').length;
     const ga=evList.filter(e=>e.type==='goal_conceded').length;
-    const hasScore=evList.some(e=>e.type==='goal'||e.type==='goal_conceded');
-    const scoreStr=hasScore?`${gf}–${ga}`:'—';
-    const result=hasScore?(gf>ga?'V':gf<ga?'D':'E'):null;
+    const gameFinished=mr.matchClock?.phase==='finished'||(mr.lineup||[]).length>0||evList.length>0;
+    const scoreStr=gameFinished?`${gf}–${ga}`:'—';
+    const result=gameFinished?(gf>ga?'V':gf<ga?'D':'E'):null;
     const resultColor=result==='V'?'#16a34a':result==='D'?'#dc2626':'#d97706';
     const subInMin=subInEv?.minute; const subOutMin=subOutEv?.minute;
     let minsPlayed=null;
