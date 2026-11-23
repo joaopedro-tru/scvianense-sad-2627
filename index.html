@@ -4441,7 +4441,7 @@ function buildTeamMomentsHTML(squads, events, today){
 function buildSqStatsHTML(cs, events, players){
   const today=new Date().toISOString().split('T')[0];
   const allGames=events.filter(e=>e.type==='game').sort((a,b)=>a.date.localeCompare(b.date));
-  const pastGames=allGames.filter(g=>g.date<today);
+  const pastGames=allGames.filter(g=>g.date<today&&(getGameType(g)==='league'||getGameType(g)==='cup'));
 
   // Aggregate per player (inclui jogadores de outros escalões que participaram em jogos)
   const pStats={};
