@@ -4441,7 +4441,16 @@ function buildTeamMomentsHTML(squads, events, today){
 function buildSqStatsHTML(cs, events, players){
   const today=new Date().toISOString().split('T')[0];
   const allGames=events.filter(e=>e.type==='game').sort((a,b)=>a.date.localeCompare(b.date));
-  const pastGames=allGames.filter(g=>g.date<today&&(getGameType(g)==='league'||getGameType(g)==='cup'));
+  // Mapa label→official a partir das competições registadas (escalão + both)
+  const _compOffMap={};
+  [...DB.competitions(cs),...DB.competitions('both')].forEach(c=>{ _compOffMap[c.label]=c.official; });
+  const _isOfficialGame=g=>{
+    const lbl=g.competition||'';
+    if(lbl in _compOffMap) return _compOffMap[lbl]===true;
+    // fallback para jogos antigos sem competição registada
+    return getGameType(g)==='league'||getGameType(g)==='cup';
+  };
+  const pastGames=allGames.filter(g=>g.date<today&&_isOfficialGame(g));
 
   // Aggregate per player (inclui jogadores de outros escalões que participaram em jogos)
   const pStats={};
@@ -4527,6 +4536,16 @@ function buildSqStatsHTML(cs, events, players){
     return s+evs.filter(e=>e.type==='yellow'||e.type==='yellow2'||e.type==='red').length;
   },0);
   const cardsPerGame=(totalCards/n).toFixed(1);
+  // Golos sofridos/jogo
+  const totalGolsSofridos=teamResults.reduce((s,r)=>s+r.ga,0);
+  const golsSofridosPerGame=(totalGolsSofridos/n).toFixed(1);
+  // Eficácia adversário = golos sofridos / (golos sofridos + remates adv. à baliza + remates adv. fora)
+  const totalOppShots=pastGames.reduce((s,g)=>{
+    const evs=(g.matchReport||{}).events||[];
+    return s+evs.filter(e=>e.type==='opp_shot_on'||e.type==='opp_shot_off').length;
+  },0);
+  const totalOppTotal=totalGolsSofridos+totalOppShots;
+  const oppEficacia=totalOppTotal>0?Math.round(totalGolsSofridos/totalOppTotal*100):null;
 
   function teamStatBox(label,val,sub='',color='var(--primary,#1a56db)'){
     return `<div style="text-align:center;padding:12px 6px">
@@ -4543,10 +4562,14 @@ function buildSqStatsHTML(cs, events, players){
         ${teamStatBox('Jogos s/ perder',maxUnb,'máximo','#1565c0')}
         ${teamStatBox('Derrotas seguidas',maxLoss,'máximo','#c0392b')}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr)">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)">
         ${teamStatBox('Golos/jogo',goalsPerGame,'média','#2e7d32')}
         ${teamStatBox('Eficácia equipa',teamEficacia!==null?teamEficacia+'%':'—','golos/remates','#6a1b9a')}
         ${teamStatBox('Cartões/jogo',cardsPerGame,'média','#f39c12')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr)">
+        ${teamStatBox('Golos sofridos/jogo',golsSofridosPerGame,'média','#c0392b')}
+        ${teamStatBox('Eficácia adversário',oppEficacia!==null?oppEficacia+'%':'—','golos/remates adv.','#e67e22')}
       </div>
     </div>`;
 
