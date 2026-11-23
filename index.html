@@ -4499,7 +4499,7 @@ function buildSqStatsHTML(cs, events, players){
   });
   // Eficácia individual = golos / (remates baliza + remates fora)
   Object.values(pStats).forEach(s=>{
-    s.eficacia=(s.shot_on+s.shot_off)>0?Math.round(s.goals/(s.shot_on+s.shot_off)*100):0;
+    s.eficacia=s.shot_on>0?Math.round(s.goals/s.shot_on*100):0;
   });
 
   window._sqTopData={pStats,pidMap,suffix:{eficacia:'%'}}; // para expand/sort
@@ -5198,15 +5198,19 @@ function renderSquad(){
   const statsEl=document.getElementById('p-stats');
   const sf=document.getElementById('sq-sf');
 
+  const staffSec=document.getElementById('p-staff-section');
   if(sqViewMode==='pitch'){
     grid.style.display='none'; pitchEl.style.display='block'; if(statsEl)statsEl.style.display='none'; sf.style.display='none';
+    if(staffSec) staffSec.style.display='none';
     renderPitch(allPs); return;
   }
   if(sqViewMode==='stats'){
     grid.style.display='none'; pitchEl.style.display='none'; if(statsEl)statsEl.style.display=''; sf.style.display='none';
+    if(staffSec) staffSec.style.display='none';
     renderSqStats(); return;
   }
   grid.style.display=''; pitchEl.style.display='none'; if(statsEl)statsEl.style.display='none'; sf.style.display='';
+  if(staffSec) staffSec.style.display='';
 
   function playerCard(p,inactive=false){
     const allPos=[p.position,p.position2,p.position3].filter(Boolean);
@@ -5243,7 +5247,6 @@ function renderSquad(){
   grid.querySelectorAll('.pc').forEach(c=>c.addEventListener('click',()=>nav('player',{id:c.dataset.pid})));
 
   // ── Equipa Técnica ────────────────────────────────────────────────────────
-  const staffSec=document.getElementById('p-staff-section');
   if(staffSec){
     const staffProfs=DB.staffProfiles(squad);
     if(!staffProfs.length){ staffSec.innerHTML=''; }
