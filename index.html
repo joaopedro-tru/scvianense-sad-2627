@@ -8089,7 +8089,7 @@ function renderClinicalMap(){
         ?`<img src="${p.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
         :`<div style="width:40px;height:40px;border-radius:50%;background:#b71c1c;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
       const badge=`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Sem data regresso</span>`;
-      const editBtn=canEdit&&cr?`<button onclick="cmEditCR('${cr.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar registo clínico">✏️</button>`:'';
+      const editBtn=canEdit&&cr?`<button onclick="openOcrCrEdit('${cr.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar registo clínico">✏️</button>`:'';
       return `<div>
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
           ${avatar}
