@@ -8137,6 +8137,8 @@ function renderClinicalMap(){
         ?`<span style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">⚡ até ${fmtDate(r.endDate)}</span>`
         :daysLeft===0?`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Hoje</span>`
         :`<span style="background:#fff8e1;color:#e65100;border:1px solid #ffcc02;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">⏳ ${daysLeft} dia${daysLeft!==1?'s':''}</span>`;
+      const condBtn=canEdit&&!isPast&&!isCond
+        ?`<button onclick="cmTransitionCond('${r.id}')" style="border:1px solid #e65100;background:#fff3e0;color:#e65100;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;white-space:nowrap" title="Transição para treino condicionado">⚡ → Cond.</button>`:'';
       const editBtn=canEdit?`<button onclick="cmEditUnavail('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar">✏️</button>
         <button onclick="cmDeleteUnavail('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:#c0392b;font-size:13px;padding:4px 6px" title="Eliminar">🗑️</button>`:'';
       return `<div id="cm-ucard-${r.id}">
@@ -8154,7 +8156,7 @@ function renderClinicalMap(){
               ${isPast?`${fmtDate(r.startDate)} → ${fmtDate(r.endDate)}`:`Desde ${fmtDate(r.startDate)} · ${daysIn} dia${daysIn!==1?'s':''} lesionado`}
             </div>
           </div>
-          <div style="display:flex;gap:0;flex-shrink:0">${editBtn}</div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${condBtn}${editBtn}</div>
         </div>
         <div id="cm-uedit-${r.id}" style="display:none"></div>
       </div>`;
@@ -8418,6 +8420,71 @@ async function cmDeleteUnavail(id){
   if(!confirm('Eliminar este período de indisponibilidade?')) return;
   await DB.deleteUnavailability(id);
   toast('🗑️ Eliminado');
+  renderClinicalMap();
+}
+
+function cmTransitionCond(unavailId){
+  const container=document.getElementById('cm-uedit-'+unavailId);
+  if(!container) return;
+  // Toggle
+  if(container.style.display!=='none'){ container.style.display='none'; container.innerHTML=''; return; }
+  const today=new Date().toISOString().slice(0,10);
+  container.style.display='block';
+  container.innerHTML=`
+    <div style="padding:12px;background:#fff8f0;border:1.5px solid #ffcc80;border-radius:8px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:10px">⚡ Transição para Treino Condicionado</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+          Início do condicionado
+          <input type="date" id="tc-start-${unavailId}" value="${today}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        </label>
+        <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+          Fim previsto
+          <input type="date" id="tc-end-${unavailId}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('cm-uedit-${unavailId}').style.display='none'" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">Cancelar</button>
+        <button onclick="cmConfirmTransitionCond('${unavailId}')" style="padding:5px 14px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:12px;font-weight:600;cursor:pointer">⚡ Confirmar</button>
+      </div>
+    </div>`;
+}
+
+async function cmConfirmTransitionCond(unavailId){
+  const startEl=document.getElementById('tc-start-'+unavailId);
+  const endEl=document.getElementById('tc-end-'+unavailId);
+  const start=startEl?.value;
+  const end=endEl?.value;
+  if(!start){ toast('⚠️ Define a data de início'); return; }
+  if(!end){ toast('⚠️ Define o fim previsto do condicionado'); return; }
+  if(end<start){ toast('⚠️ O fim não pode ser anterior ao início'); return; }
+
+  const unavail=DB.getUnavailability().find(r=>r.id===unavailId);
+  if(!unavail) return;
+
+  // 1. Fechar a lesão: endDate = dia anterior ao início do condicionado
+  const closeDate=new Date(start); closeDate.setDate(closeDate.getDate()-1);
+  const closeDateStr=closeDate.toISOString().slice(0,10);
+  await DB.updateUnavailability(unavailId,{ endDate:closeDateStr });
+
+  // 2. Marcar actualRecoveryDate no registo clínico ligado (se existir)
+  const linkedCR=DB.getClinicalRecords().find(r=>r.unavailId===unavailId||
+    (r.athleteId===unavail.personId&&r.type==='injury'&&r.date>=unavail.startDate&&r.date<=unavail.endDate));
+  if(linkedCR) await DB.updateClinicalRecord(linkedCR.id,{ actualRecoveryDate:closeDateStr, returnDate:closeDateStr });
+
+  // 3. Criar nova indisponibilidade condicionado
+  const p=DB.getPlayer(unavail.personId);
+  await DB.addUnavailability({
+    personId:unavail.personId, personName:unavail.personName,
+    personType:'athlete', squad:unavail.squad,
+    startDate:start, endDate:end,
+    type:'condicionado', reason:unavail.reason||''
+  });
+
+  // 4. Marcar presenças nos treinos do período condicionado
+  applyUnavailToTrainings(unavail.personId, start, end, 'condicionado');
+
+  toast('✅ Atleta em treino condicionado');
   renderClinicalMap();
 }
 
