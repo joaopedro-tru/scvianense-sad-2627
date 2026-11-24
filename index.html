@@ -5620,7 +5620,7 @@ function buildPlayerClinicalCard(athleteId){
           ${injExtra}
           ${editForm}
         </div>
-        ${canEdit&&isInjury?`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">${!r.actualRecoveryDate&&r.type!=='minor_injury'?`<button style="padding:2px 7px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap" data-pcr-recover="${r.id}">✅ Recuperado</button>`:''}
+        ${canEdit&&isInjury?`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">${!r.actualRecoveryDate&&r.type!=='minor_injury'?`<button style="padding:2px 7px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap" data-pcr-recover="${r.id}">✅ Marcar recuperado</button>`:''}
           <button style="padding:2px 7px;background:#e8f0fe;color:#1a56db;border:none;border-radius:4px;cursor:pointer;font-size:11px" data-pcr-edit="${r.id}">✏️</button></div>`:''}
       </div>
     </div>`;
@@ -6115,7 +6115,13 @@ function renderPlayer(){
 
   document.querySelectorAll('[data-pcr-recover]').forEach(btn=>btn.addEventListener('click',async()=>{
     const id=btn.dataset.pcrRecover;
-    await DB.updateClinicalRecord(id,{actualRecoveryDate:today});
+    await DB.updateClinicalRecord(id,{actualRecoveryDate:today, returnDate:today});
+    // Fechar indisponibilidade de lesão associada (se ainda ativa)
+    const rec=DB.getClinicalRecords().find(r=>r.id===id);
+    if(rec?.unavailId){
+      const unav=DB.getUnavailability().find(r=>r.id===rec.unavailId);
+      if(unav&&unav.endDate>today) await DB.updateUnavailability(rec.unavailId,{endDate:today});
+    }
     toast('✅ Atleta marcado como recuperado!'); renderPlayer();
   }));
 
@@ -8097,8 +8103,9 @@ function renderClinicalMap(){
         ?`<img src="${p.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
         :`<div style="width:40px;height:40px;border-radius:50%;background:#b71c1c;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
       const badge=`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Sem data regresso</span>`;
+      const condBtn=canEdit&&cr?`<button onclick="cmTransitionCondCR('${cr.id}','${p.id}','${p.squad||''}')" style="border:1px solid #e65100;background:#fff3e0;color:#e65100;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;white-space:nowrap" title="Transição para treino condicionado">⚡ → Cond.</button>`:'';
       const editBtn=canEdit&&cr?`<button onclick="openOcrCrEdit('${cr.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar registo clínico">✏️</button>`:'';
-      return `<div>
+      return `<div id="cm-crcard-${p.id}">
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
           ${avatar}
           <div style="flex:1;min-width:0">
@@ -8111,8 +8118,9 @@ function renderClinicalMap(){
             ${treat?`<div style="font-size:11px;color:var(--muted);margin-top:1px">💊 ${treat}</div>`:''}
             ${since?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${since}</div>`:''}
           </div>
-          <div style="display:flex;gap:0;flex-shrink:0">${editBtn}</div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${condBtn}${editBtn}</div>
         </div>
+        <div id="cm-credit-${p.id}" style="display:none"></div>
       </div>`;
     }
 
@@ -8420,6 +8428,59 @@ async function cmDeleteUnavail(id){
   if(!confirm('Eliminar este período de indisponibilidade?')) return;
   await DB.deleteUnavailability(id);
   toast('🗑️ Eliminado');
+  renderClinicalMap();
+}
+
+function cmTransitionCondCR(crId, pid, squad){
+  const container=document.getElementById('cm-credit-'+pid);
+  if(!container) return;
+  if(container.style.display!=='none'){ container.style.display='none'; container.innerHTML=''; return; }
+  const today=new Date().toISOString().slice(0,10);
+  container.style.display='block';
+  container.innerHTML=`
+    <div style="padding:12px;background:#fff8f0;border:1.5px solid #ffcc80;border-radius:8px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:10px">⚡ Transição para Treino Condicionado</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+          Início do condicionado
+          <input type="date" id="tccr-start-${pid}" value="${today}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        </label>
+        <label style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+          Fim previsto
+          <input type="date" id="tccr-end-${pid}" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('cm-credit-${pid}').style.display='none'" style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">Cancelar</button>
+        <button onclick="cmConfirmTransitionCondCR('${crId}','${pid}','${squad}')" style="padding:5px 14px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:12px;font-weight:600;cursor:pointer">⚡ Confirmar</button>
+      </div>
+    </div>`;
+}
+
+async function cmConfirmTransitionCondCR(crId, pid, squad){
+  const start=document.getElementById('tccr-start-'+pid)?.value;
+  const end=document.getElementById('tccr-end-'+pid)?.value;
+  if(!start){ toast('⚠️ Define a data de início'); return; }
+  if(!end){ toast('⚠️ Define o fim previsto do condicionado'); return; }
+  if(end<start){ toast('⚠️ O fim não pode ser anterior ao início'); return; }
+
+  const closeDate=new Date(start); closeDate.setDate(closeDate.getDate()-1);
+  const closeDateStr=closeDate.toISOString().slice(0,10);
+
+  // Fechar o registo clínico
+  await DB.updateClinicalRecord(crId,{ actualRecoveryDate:closeDateStr, returnDate:closeDateStr });
+
+  // Criar indisponibilidade condicionado
+  const p=DB.getPlayer(pid);
+  await DB.addUnavailability({
+    personId:pid, personName:p?dn(p):'',
+    personType:'athlete', squad:squad||p?.squad||'',
+    startDate:start, endDate:end,
+    type:'condicionado', reason:''
+  });
+
+  applyUnavailToTrainings(pid, start, end, 'condicionado');
+  toast('✅ Atleta em treino condicionado');
   renderClinicalMap();
 }
 
