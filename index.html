@@ -9800,7 +9800,13 @@ function getActiveInjury(pid, date){
   if(!recs.length) return null;
   // Sort by date desc — most recent first
   recs.sort((a,b)=>b.date.localeCompare(a.date));
-  return recs.find(r=>!r.actualRecoveryDate||r.actualRecoveryDate>date)||null;
+  return recs.find(r=>{
+    // Resolvida se tiver data de recuperação efectiva passada
+    if(r.actualRecoveryDate && r.actualRecoveryDate<=date) return false;
+    // Resolvida se a data de regresso sem limitações já passou
+    if(r.returnDate && r.returnDate<=date) return false;
+    return true;
+  })||null;
 }
 
 // Returns effective attendance value for a player on a given training date.
