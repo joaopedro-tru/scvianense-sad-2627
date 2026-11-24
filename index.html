@@ -7550,7 +7550,7 @@ document.getElementById('nl-stafflink').addEventListener('click',()=>{
 function applyUnavailToTrainings(pid, from, until, type){
   const p=DB.getPlayer(pid);
   if(!p||p.personType==='staff') return; // só atletas
-  const attState=type==='lesao'?'lesao':'just';
+  const attState=type==='lesao'?'lesao':type==='condicionado'?'condicionado':'just';
   const evs=DB.events(p.squad==='both'?null:p.squad)
     .filter(e=>e.type==='training'&&e.date>=from&&e.date<=until);
   evs.forEach(ev=>{
@@ -7581,6 +7581,8 @@ function buildPlayerUnavailCard(pid){
         ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#0284c7;padding:1px 7px;border-radius:4px;white-space:nowrap">🏖️ Férias</span>`
         :r.type==='escolar'
         ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#7c3aed;padding:1px 7px;border-radius:4px;white-space:nowrap">📚 Escolar</span>`
+        :r.type==='condicionado'
+        ?`<span style="font-size:10px;font-weight:700;color:#fff;background:#e65100;padding:1px 7px;border-radius:4px;white-space:nowrap">⚡ Condicionado</span>`
         :`<span style="font-size:10px;font-weight:700;color:#fff;background:#d97706;padding:1px 7px;border-radius:4px;white-space:nowrap">📋 Outro</span>`;
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;font-size:13px">${badge} <strong>${fmtDate(r.startDate)}</strong> → <strong>${fmtDate(r.endDate)}</strong>${r.reason?` · <span style="color:var(--muted)">${r.reason}</span>`:''}</div>
@@ -7599,6 +7601,7 @@ function buildPlayerUnavailCard(pid){
         </div>
         <select id="addunavail-type" style="margin-top:7px;width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--text)" onchange="document.getElementById('addunavail-reason').placeholder=this.value==='ferias'?'Ex: férias de Natal, férias de verão...':this.value==='escolar'?'Ex: exames, visita de estudo...':'Ex: compromisso familiar, doença...'">
           <option value="">— Motivo —</option>
+          <option value="condicionado">⚡ Treino Condicionado</option>
           <option value="ferias">🏖️ Férias</option>
           <option value="escolar">📚 Atividade Escolar</option>
           <option value="outro">📋 Outro</option>
@@ -8065,14 +8068,19 @@ function renderClinicalMap(){
     const recent=allUnavail.filter(r=>r.endDate>=d14str&&r.endDate<today)
       .sort((a,b)=>b.endDate.localeCompare(a.endDate));
 
+    // Atletas em treino condicionado (indisponibilidade tipo 'condicionado' ativa)
+    const condicionados=allUnavail.filter(r=>r.type==='condicionado'&&r.startDate<=today&&r.endDate>=today)
+      .sort((a,b)=>a.endDate.localeCompare(b.endDate));
+    const condPids=new Set(condicionados.map(r=>r.personId));
+
     // Atletas com lesão clínica ativa mas sem indisponibilidade atual
-    const activeUnavailPids=new Set(active.map(r=>r.personId));
+    const activeUnavailPids=new Set([...active.map(r=>r.personId),...condPids]);
     const injuredNoCR=allPlayers.filter(p=>{
       if(activeUnavailPids.has(p.id)) return false; // já aparece via indisponibilidade
       return !!getActiveInjury(p.id, today);
     });
 
-    if(!active.length&&!recent.length&&!injuredNoCR.length){
+    if(!active.length&&!recent.length&&!injuredNoCR.length&&!condicionados.length){
       el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">✅</div><div style="font-size:15px;font-weight:600">Sem atletas lesionados</div><div style="font-size:13px;margin-top:4px">Todos os atletas estão disponíveis</div></div>`;
       return;
     }
@@ -8108,7 +8116,7 @@ function renderClinicalMap(){
       </div>`;
     }
 
-    function unavailCard(r, isPast){
+    function unavailCard(r, isPast, isCond=false){
       const p=allPlayers.find(x=>x.id===r.personId);
       const name=r.personName||(p?dn(p):'—');
       const sqBadge=SQUADS[r.squad]||r.squad||'';
@@ -8119,11 +8127,14 @@ function renderClinicalMap(){
       const showClinicalDetail=canSeeClinical();
       const diag=showClinicalDetail?(r.reason||relCR?.diagnostico||''):'';
       const treat=showClinicalDetail?(relCR?.treatment||''):'';
+      const avatarBg=isPast?'#aaa':isCond?'#e65100':'#b71c1c';
       const avatar=p?.photoUrl
         ?`<img src="${p.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
-        :`<div style="width:40px;height:40px;border-radius:50%;background:${isPast?'#aaa':'#b71c1c'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
+        :`<div style="width:40px;height:40px;border-radius:50%;background:${avatarBg};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
       const badge=isPast
         ?`<span style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">✅ Recuperado</span>`
+        :isCond
+        ?`<span style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">⚡ até ${fmtDate(r.endDate)}</span>`
         :daysLeft===0?`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Hoje</span>`
         :`<span style="background:#fff8e1;color:#e65100;border:1px solid #ffcc02;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">⏳ ${daysLeft} dia${daysLeft!==1?'s':''}</span>`;
       const editBtn=canEdit?`<button onclick="cmEditUnavail('${r.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar">✏️</button>
@@ -8150,6 +8161,10 @@ function renderClinicalMap(){
     }
 
     let html='';
+    if(condicionados.length){
+      html+=`<div style="font-size:11px;font-weight:700;color:#e65100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⚡ ${condicionados.length} em treino condicionado</div>`;
+      html+=`<div style="background:var(--card);border:1px solid #ffe0b2;border-radius:10px;padding:0 12px;margin-bottom:20px">${condicionados.map(r=>unavailCard(r,false,true)).join('')}</div>`;
+    }
     if(injuredNoCR.length){
       html+=`<div style="font-size:11px;font-weight:700;color:#b71c1c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⚠️ ${injuredNoCR.length} Lesionado${injuredNoCR.length!==1?'s':''} sem data de regresso</div>`;
       html+=`<div style="background:var(--card);border:1px solid #f5c6cb;border-radius:10px;padding:0 12px;margin-bottom:20px">${injuredNoCR.map(p=>clinicalOnlyCard(p)).join('')}</div>`;
@@ -9678,6 +9693,23 @@ function buildClinicalSection(eventId, sqPlayers, onSave){
     <div id="cr-inj-fields" style="display:none;margin-top:8px">
       <input id="cr-diagnostico" type="text" placeholder="Diagnóstico" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
       <input id="cr-treatment" type="text" placeholder="Tratamento" style="width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);box-sizing:border-box;margin-bottom:6px">
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Impacto na disponibilidade</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg)">
+            <input type="radio" name="cr-avail" id="cr-avail-lesao" value="lesao" checked style="accent-color:#b71c1c">
+            <span>🔴 Lesionado</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg)">
+            <input type="radio" name="cr-avail" id="cr-avail-cond" value="condicionado" style="accent-color:#e65100">
+            <span>⚡ Condicionado</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg)">
+            <input type="radio" name="cr-avail" id="cr-avail-none" value="none" style="accent-color:#2e7d32">
+            <span>✅ Disponível</span>
+          </label>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:130px">Prev. recuperação<input id="cr-edate" type="date" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)"></label>
         <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:130px">Recuperação efectiva<input id="cr-adate" type="date" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)"></label>
@@ -9760,7 +9792,15 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
   const crInjFields=document.getElementById('cr-inj-fields');
   if(crType&&crInjFields){
     crType.addEventListener('change',()=>{
-      crInjFields.style.display=CR_HAS_INJURY_FIELDS(crType.value)?'block':'none';
+      const isInj=CR_HAS_INJURY_FIELDS(crType.value);
+      crInjFields.style.display=isInj?'block':'none';
+      // minor_injury → pré-selecionar condicionado; injury → lesionado
+      if(isInj){
+        const condR=document.getElementById('cr-avail-cond');
+        const lesaoR=document.getElementById('cr-avail-lesao');
+        if(crType.value==='minor_injury'&&condR) condR.checked=true;
+        else if(crType.value==='injury'&&lesaoR) lesaoR.checked=true;
+      }
     });
   }
 
@@ -9781,12 +9821,28 @@ function bindClinicalHandlers(eventId, sqPlayers, rerenderFn){
     if(CR_HAS_INJURY_FIELDS(type)){
       rec.diagnostico=document.getElementById('cr-diagnostico')?.value.trim()||'';
       rec.treatment=document.getElementById('cr-treatment')?.value.trim()||'';
-      if(type==='injury'){
-        rec.estimatedRecoveryDate=document.getElementById('cr-edate')?.value||'';
-        rec.actualRecoveryDate=document.getElementById('cr-adate')?.value||'';
+      rec.estimatedRecoveryDate=document.getElementById('cr-edate')?.value||'';
+      rec.actualRecoveryDate=document.getElementById('cr-adate')?.value||'';
+    }
+    const crSaved=await DB.addClinicalRecord(rec);
+    // Criar indisponibilidade automática se selecionado
+    if(CR_HAS_INJURY_FIELDS(type)){
+      const availVal=document.querySelector('input[name="cr-avail"]:checked')?.value||'lesao';
+      const edate=rec.estimatedRecoveryDate||rec.date;
+      if(availVal!=='none'){
+        const p=DB.getPlayer(pid);
+        const unavailRec=await DB.addUnavailability({
+          personId:pid, personName:p?dn(p):'',
+          personType:'athlete', squad:p?.squad||rec.squad||'',
+          startDate:rec.date, endDate:edate,
+          type:availVal, reason:rec.diagnostico||''
+        });
+        // Ligar o registo clínico à indisponibilidade
+        if(crSaved?.id) await DB.updateClinicalRecord(crSaved.id,{unavailId:unavailRec?.id||''});
+        // Marcar presenças nos treinos
+        applyUnavailToTrainings(pid, rec.date, edate, availVal);
       }
     }
-    await DB.addClinicalRecord(rec);
     toast('✅ Registo clínico guardado!'); rerenderFn();
   });
 }
@@ -9817,7 +9873,7 @@ function effectiveAtt(att, pid, date){
   const unavail=DB.getUnavailableOn(date).find(r=>r.personId===pid);
   // Indisponibilidade tem prioridade sobre: sem registo, 'pp', 'true', 'ni'
   const overridable=explicit===undefined||explicit===null||explicit===true||explicit==='pp'||explicit==='ni';
-  if(unavail && overridable){ const t=unavail.type||'lesao'; return (t==='outro'||t==='ferias'||t==='escolar')?'just':t; }
+  if(unavail && overridable){ const t=unavail.type||'lesao'; return (t==='outro'||t==='ferias'||t==='escolar')?'just':(t==='condicionado'?'condicionado':t); }
   // Lesão clínica activa tem prioridade (quando não há indisponibilidade manual e estado é overridable)
   if(!unavail && overridable && getActiveInjury(pid, date)) return 'lesao';
   // Qualquer outro valor explícito mantém-se (condicionado, just, injust, lesao — definidos manualmente)
@@ -12583,7 +12639,9 @@ function renderGamePre(ev,sqPlayers,conv){
       ?`<button class="trav-box${isTrav?' checked':''}" data-gtrav="${p.id}" title="Vai ao local de jogo"${!isConv?' disabled style="opacity:.25;cursor:default"':''}>✕</button>`
       :'';
     const activeInj=getActiveInjury(p.id, ev.date);
-    const injBadge=activeInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`:'';
+    const activeCond=!activeInj&&DB.getUnavailableOn(ev.date).find(r=>r.personId===p.id&&r.type==='condicionado');
+    const injBadge=activeInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`
+      :activeCond?`<span style="font-size:9px;font-weight:700;color:#e65100;background:#fff3e0;padding:1px 5px;border-radius:4px;margin-left:4px">⚡ Condicionado</span>`:'';
     const convBtn=(activeInj&&!isConv)
       ?`<button class="att-btn" data-inj-pid="${p.id}" style="background:#fde8e8;color:#b71c1c;border-color:#f5c6c6;min-width:96px">🤕 Lesionado</button>`
       :`<button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>`;
@@ -12610,7 +12668,9 @@ function renderGamePre(ev,sqPlayers,conv){
     const rows=players.map(p=>{
       const isConv=!!conv.players[p.id];
       const oInj=getActiveInjury(p.id, ev.date);
-      const oInjBadge=oInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`:'';
+      const oCond=!oInj&&DB.getUnavailableOn(ev.date).find(r=>r.personId===p.id&&r.type==='condicionado');
+      const oInjBadge=oInj?`<span style="font-size:9px;font-weight:700;color:#b71c1c;background:#fde8e8;padding:1px 5px;border-radius:4px;margin-left:4px">🤕 Lesão</span>`
+        :oCond?`<span style="font-size:9px;font-weight:700;color:#e65100;background:#fff3e0;padding:1px 5px;border-radius:4px;margin-left:4px">⚡ Condicionado</span>`:'';
       const oConvBtn=(oInj&&!isConv)
         ?`<button class="att-btn" data-inj-pid="${p.id}" style="background:#fde8e8;color:#b71c1c;border-color:#f5c6c6;min-width:96px">🤕 Lesionado</button>`
         :`<button class="att-btn${isConv?' present':''}" data-gconv="${p.id}">${isConv?'✓ Convocado':'+ Convocar'}</button>`;
