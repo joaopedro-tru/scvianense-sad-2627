@@ -4579,9 +4579,11 @@ function buildSqStatsHTML(cs, events, players){
   function top5Block(key,label,color){
     const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
     if(!all.length) return `<div style="color:var(--muted);font-size:12px;padding:4px 0">Sem dados</div>`;
-    const top5=all.slice(0,5); const maxVal=all[0][1][key]; const hasMore=all.length>5;
+    const isExpanded=window._sqTopExpanded?.has(key);
+    const display=isExpanded?all:all.slice(0,5);
+    const maxVal=all[0][1][key]; const hasMore=all.length>5;
     const _sfx=(window._sqTopData?.suffix)?.[key]||'';
-    const rows=top5.map(([pid,s],i)=>{
+    const rows=display.map(([pid,s],i)=>{
       const p=pidMap[pid]; const name=p?dn(p):'?'; const val=s[key];
       const pct=maxVal>0?Math.round(val/maxVal*100):0;
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
@@ -4596,7 +4598,7 @@ function buildSqStatsHTML(cs, events, players){
       </div>`;
     }).join('');
     const btn=hasMore
-      ?`<button data-topkey="${key}" data-topcolor="${color}" data-expanded="0" data-dir="desc" onclick="toggleTopBlock(this)" style="width:100%;margin-top:6px;padding:4px 0;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit">▼ Ver todos (${all.length})</button>`
+      ?`<button data-topkey="${key}" data-topcolor="${color}" data-expanded="${isExpanded?'1':'0'}" data-dir="desc" onclick="toggleTopBlock(this)" style="width:100%;margin-top:6px;padding:4px 0;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit">${isExpanded?'▲ Colapsar':`▼ Ver todos (${all.length})`}</button>`
       :'';
     return `<div id="sqtop-${key}">${rows}</div>${btn}`;
   }
@@ -4668,11 +4670,14 @@ function toggleTopBlock(btn){
   const key=btn.dataset.topkey, color=btn.dataset.topcolor;
   const expanded=btn.dataset.expanded==='1';
   const {pStats}=window._sqTopData||{}; if(!pStats) return;
+  if(!window._sqTopExpanded) window._sqTopExpanded=new Set();
   if(!expanded){
+    window._sqTopExpanded.add(key);
     btn.dataset.expanded='1'; btn.dataset.dir='desc';
     btn.textContent='▲ Colapsar';
     _rerenderTopBlock(key,color,'desc');
   } else {
+    window._sqTopExpanded.delete(key);
     const all=Object.entries(pStats).filter(([,s])=>s[key]>0).sort((a,b)=>b[1][key]-a[1][key]);
     const maxVal=all[0]?.[1][key]||1;
     const container=document.getElementById('sqtop-'+key); if(!container) return;
