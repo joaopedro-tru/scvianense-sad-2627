@@ -2469,11 +2469,13 @@ async function loadAppUsers(){
 
 const AUTH_KEY = 'scv_auth';
 function currentUser(){ try{ return JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null'); }catch{ return null; } }
-function isAdmin(){ return currentUser()?.role==='admin'; }
+function isAdminRole(r){ return r==='admin'||r==='superadmin'; }
+function isAdmin(){ return isAdminRole(currentUser()?.role); }
+function isSuperAdmin(){ return currentUser()?.role==='superadmin'; }
 function coachSquads(){
   const u=currentUser(); if(!u) return [];
   // Admin sem squads definidos → acesso a todos
-  if(u.role==='admin'&&(!u.squads||!u.squads.length)&&!u.squad) return ['eqa','sub23','sub19'];
+  if(isAdminRole(u.role)&&(!u.squads||!u.squads.length)&&!u.squad) return ['eqa','sub23','sub19'];
   // Preferir campo squads (array nativo)
   if(u.squads&&Array.isArray(u.squads)&&u.squads.length) return u.squads;
   // Suporte a squad como array nativo (Firestore array type)
@@ -4203,6 +4205,7 @@ function retroAddShotOnForGoals(){
 }
 
 function clearAllTrainingAnalyses(){
+  if(!isSuperAdmin()){ toast('⛔ Apenas o superadmin pode executar esta ação.'); return; }
   if(!confirm('Tens a certeza? Isto vai apagar objectivePrimary, objectiveSecondary, momentSummary e objectives de TODOS os treinos de todos os escalões. Esta ação não pode ser desfeita.')) return;
   const allEvs=DB.events(); // todos os escalões
   const trainEvs=allEvs.filter(e=>e.type==='training'&&(e.objectivePrimary||e.objectiveSecondary||e.momentSummary||e.objectives||e.objectivesPerMoment));
@@ -4973,7 +4976,7 @@ function renderDash(){
   // ── Staff dashboard picker ────────────────────────────────────────────────
   const pickerEl=document.getElementById('d-admin-staff-picker');
   if(pickerEl){
-    const staffUsers=getAppUsers().filter(u=>u.role!=='admin'&&(u.squad||u.squads?.length));
+    const staffUsers=getAppUsers().filter(u=>!isAdminRole(u.role)&&(u.squad||u.squads?.length));
     const squadMeta={eqa:{icon:'⚫',color:'#444',label:SQUADS.eqa},sub23:{icon:'🔵',color:'var(--blue)',label:SQUADS.sub23},sub19:{icon:'🟡',color:'#b8860b',label:SQUADS.sub19}};
     const roleIcon={coach:'🎯',staff:'👤',medical:'🩺',teammanager:'📋'};
     const roleName={coach:'Treinador',medical:'Clínica',teammanager:'Team Manager'};
@@ -7008,7 +7011,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
   function userRole(u){ return u.staffRole||(u.role==='coach'?'headcoach':u.role==='teammanager'?'teammanager':u.role==='medical'?'medical':null); }
 
   // All non-admin accounts — populated async from Firestore (source of truth)
-  let allFormUsers=getAppUsers().filter(u=>u.role!=='admin');
+  let allFormUsers=getAppUsers().filter(u=>!isAdminRole(u.role));
 
   // Fetch existing profiles and populate dropdown
   async function populateSel(){
@@ -7025,7 +7028,7 @@ document.getElementById('pf-form').addEventListener('submit', async e=>{
           const merged=Object.values(
             [...USERS, ...fsArr].reduce((acc,u)=>{ acc[u.user]={...acc[u.user]||{},...u}; return acc; },{})
           );
-          allFormUsers=merged.filter(u=>u.role!=='admin');
+          allFormUsers=merged.filter(u=>!isAdminRole(u.role));
           _appUsers=merged; localStorage.setItem('scv_au',JSON.stringify(merged));
         }
       }catch(e){}
@@ -7219,7 +7222,7 @@ const STAFF_ROLES_LABEL={headcoach:'Treinador Principal',adjunto:'Adjunto',estag
 const STAFF_LICENSE_ROLES=['headcoach','adjunto','estagiario'];
 // Funções dinâmicas — usam getAppUsers() (Firestore) em vez do USERS estático vazio
 function getStaffAccounts(){ return getAppUsers().filter(u=>u.role==='staff'||u.role==='medical'); }
-function getAllProfileUsers(){ return getAppUsers().filter(u=>u.role!=='admin'); }
+function getAllProfileUsers(){ return getAppUsers().filter(u=>!isAdminRole(u.role)); }
 // Aliases para retrocompatibilidade (não são usados em runtime — funções acima têm precedência)
 const STAFF_ACCOUNTS=[];
 const ALL_PROFILE_USERS=[];
@@ -7292,7 +7295,7 @@ async function renderStaff(){
         <div style="display:flex;gap:6px">
           <button class="btn btn-o btn-sm" onclick="openStaffProfileModal('${u.user}',${profile?`'${profile.id}'`:'null'})">${profile?'✏️ Editar':'+ Criar Perfil'}</button>
           ${!profile&&!isDisabled?`<button class="btn btn-g btn-sm" onclick="copyStaffLink('${u.user}')" title="Copiar link pessoal do formulário">🔗</button>`:''}
-          ${!isDisabled?`<button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>`:''}
+          ${!isDisabled&&isSuperAdmin()?`<button class="btn btn-g btn-sm" onclick="openAccountSetup('${u.user}')" title="Configurar password desta conta">🔑</button>`:''}
         </div>
       </div>`;
     }).join('');
@@ -7411,7 +7414,7 @@ document.getElementById('mo-sp-save').addEventListener('click',async()=>{
 
 // ── MY PROFILE VIEW ───────────────────────────────────────────────────────────
 function renderMyProfile(){
-  const u=currentUser(); if(!u||u.role==='admin') return;
+  const u=currentUser(); if(!u||isAdminRole(u.role)) return;
   const profile=DB.getStaffProfile(u.user);
   const role=userStaffRole(u);
   const roleName=STAFF_ROLES_LABEL[role]||role||'—';
@@ -8062,9 +8065,47 @@ function renderClinicalMap(){
     const recent=allUnavail.filter(r=>r.endDate>=d14str&&r.endDate<today)
       .sort((a,b)=>b.endDate.localeCompare(a.endDate));
 
-    if(!active.length&&!recent.length){
+    // Atletas com lesão clínica ativa mas sem indisponibilidade atual
+    const activeUnavailPids=new Set(active.map(r=>r.personId));
+    const injuredNoCR=allPlayers.filter(p=>{
+      if(activeUnavailPids.has(p.id)) return false; // já aparece via indisponibilidade
+      return !!getActiveInjury(p.id, today);
+    });
+
+    if(!active.length&&!recent.length&&!injuredNoCR.length){
       el.innerHTML=`<div style="text-align:center;padding:48px 0;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">✅</div><div style="font-size:15px;font-weight:600">Sem atletas lesionados</div><div style="font-size:13px;margin-top:4px">Todos os atletas estão disponíveis</div></div>`;
       return;
+    }
+
+    function clinicalOnlyCard(p){
+      const cr=getActiveInjury(p.id, today);
+      const name=dn(p);
+      const sqBadge=SQUADS[p.squad]||p.squad||'';
+      const showClinicalDetail=canSeeClinical();
+      const diag=showClinicalDetail?(cr?.diagnostico||cr?.reason||''):'';
+      const treat=showClinicalDetail?(cr?.treatment||''):'';
+      const since=cr?.date?`Desde ${fmtDate(cr.date)}`:'';
+      const avatar=p.photoUrl
+        ?`<img src="${p.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+        :`<div style="width:40px;height:40px;border-radius:50%;background:#b71c1c;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:14px;font-weight:700;color:#fff">${name.slice(0,2).toUpperCase()}</span></div>`;
+      const badge=`<span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">🔴 Sem data regresso</span>`;
+      const editBtn=canEdit&&cr?`<button onclick="cmEditCR('${cr.id}')" style="border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px" title="Editar registo clínico">✏️</button>`:'';
+      return `<div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          ${avatar}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-weight:700;font-size:14px">${name}</span>
+              <span style="font-size:10px;background:#e8eef7;color:#1a3d6e;padding:1px 7px;border-radius:8px;font-weight:600">${sqBadge}</span>
+              ${badge}
+            </div>
+            ${diag?`<div style="font-size:12px;color:var(--text);margin-top:3px">🩹 ${diag}</div>`:''}
+            ${treat?`<div style="font-size:11px;color:var(--muted);margin-top:1px">💊 ${treat}</div>`:''}
+            ${since?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${since}</div>`:''}
+          </div>
+          <div style="display:flex;gap:0;flex-shrink:0">${editBtn}</div>
+        </div>
+      </div>`;
     }
 
     function unavailCard(r, isPast){
@@ -8109,8 +8150,12 @@ function renderClinicalMap(){
     }
 
     let html='';
+    if(injuredNoCR.length){
+      html+=`<div style="font-size:11px;font-weight:700;color:#b71c1c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⚠️ ${injuredNoCR.length} Lesionado${injuredNoCR.length!==1?'s':''} sem data de regresso</div>`;
+      html+=`<div style="background:var(--card);border:1px solid #f5c6cb;border-radius:10px;padding:0 12px;margin-bottom:20px">${injuredNoCR.map(p=>clinicalOnlyCard(p)).join('')}</div>`;
+    }
     if(active.length){
-      html+=`<div style="font-size:11px;font-weight:700;color:#b71c1c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🚨 ${active.length} Lesionado${active.length!==1?'s':''} Agora</div>`;
+      html+=`<div style="font-size:11px;font-weight:700;color:#b71c1c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🚨 ${active.length} com indisponibilidade registada</div>`;
       html+=`<div style="background:var(--card);border:1px solid #f5c6cb;border-radius:10px;padding:0 12px;margin-bottom:20px">${active.map(r=>unavailCard(r,false)).join('')}</div>`;
     }
     if(recent.length){
@@ -9266,6 +9311,7 @@ document.getElementById('mo-del-series-cancel').addEventListener('click',()=>doc
 document.getElementById('btn-confirm-del-series').addEventListener('click',function(){
   const ev=this._ev; if(!ev) return;
   const until=document.getElementById('del-series-until').value;
+  if(!isSuperAdmin()){ toast('⛔ Apenas o superadmin pode eliminar séries de treinos.'); return; }
   if(!until){ toast('⚠️ Indica uma data de fim'); return; }
   const weekday=new Date(ev.date+'T00:00:00').getDay();
   const toDelete=DB.events().filter(e=>
@@ -14786,7 +14832,7 @@ function generateConvocatoriaPDF(evId){
   const convStaffPdf=conv.staff||{};
   const convExtraPdf=conv.staffExtra||[];
   const goingStaffPdf=getAppUsers()
-    .filter(u=>u.role!=='admin')
+    .filter(u=>!isAdminRole(u.role))
     .filter(u=>{
       if(!gmSqPdf) return true;
       const uSqs=u.squads&&Array.isArray(u.squads)?u.squads:(u.squad?[u.squad]:[]);
@@ -17383,11 +17429,11 @@ function renderTM(){
   if(condMonSel && !condMonSel.value) condMonSel.value=new Date().toISOString().slice(0,7);
   // Squad filter default to user's squad
   const condSqSel=document.getElementById('conduct-squad-sel');
-  if(condSqSel && u?.squad && u.role!=='admin') condSqSel.value=u.squad;
+  if(condSqSel && u?.squad && !isAdminRole(u.role)) condSqSel.value=u.squad;
 
   // Kit squad selector
   const kitSquadSel=document.getElementById('tm-kit-squad');
-  if(u?.squad && u.role!=='admin'){
+  if(u?.squad && !isAdminRole(u.role)){
     kitSquadSel.value=u.squad;
     kitSquadSel.style.display='none';
   } else {
@@ -17398,7 +17444,7 @@ function renderTM(){
   DB.syncAthleteDocsFromFirestore().then(()=>renderKitTab()).catch(()=>renderKitTab());
 
   // Transport tab: se o user tem escalão fixo, forçar só esse escalão
-  if(u?.squad && u.role!=='admin'){
+  if(u?.squad && !isAdminRole(u.role)){
     _transpSquads=[u.squad];
     document.getElementById('tm-transp-sq-pills').style.display='none';
   }
@@ -18043,7 +18089,7 @@ function renderTMFines(){
   };
 
   const u=currentUser();
-  const squads=u?.role==='admin'?Object.keys(SQUADS):[u?.squad].filter(Boolean);
+  const squads=isAdminRole(u?.role)?Object.keys(SQUADS):[u?.squad].filter(Boolean);
 
   let html=`<div style="padding:16px 0">`;
 
@@ -18571,7 +18617,7 @@ function renderKitTab(){
     };
   });
   // Show clear column for admin
-  const isAdmin=currentUser()?.role==='admin';
+  const isAdmin=isAdminRole(currentUser()?.role);
   document.getElementById('tm-kit-clear-th').style.display=isAdmin?'':'none';
   body.querySelectorAll('.kit-clear-col').forEach(td=>td.style.display=isAdmin?'':'none');
 }
@@ -19791,7 +19837,7 @@ function renderHelp(){
   }
 
   // Perfil próprio — non-admin
-  if(role!=='admin'){
+  if(!isAdminRole(role)){
     sections.push(section('O Meu Espaço',[
       card('👤','O Meu Perfil','Edita os teus dados pessoais, foto e informações de contacto. Também podes alterar a tua password aqui.'),
       ...(role==='teammanager'?[card('📋','Team Manager','Controla os documentos de inscrição de cada atleta: CC, Modelo 2 FPF, Exame Médico e Foto. Atletas menores requerem também o CC do Encarregado de Educação.')]:[]),
@@ -19799,7 +19845,7 @@ function renderHelp(){
   }
 
   // Admin
-  if(role==='admin'){
+  if(isAdminRole(role)){
     sections.push(section('Administração',[
       card('👥','Gestão de Staff','Gere os perfis da equipa técnica de todos os escalões. Podes criar perfis, editar dados e criar/repor contas de acesso.'),
       card('📋','Team Manager','Supervisiona os documentos de inscrição dos atletas de todos os escalões.'),
@@ -19812,7 +19858,7 @@ function renderHelp(){
   sections.push(section('Formulários (acesso público)',[
     card('📝','Registo de Atleta','Formulário para inscrição de novos atletas. Partilha o link via "Link do Formulário" na sidebar.'),
     card('📆','Indisponibilidade','Formulário para declarar períodos de indisponibilidade. Partilha via "Link de Disponibilidade".'),
-    ...(role==='admin'||role==='coach'?[card('🧑‍💼','Registo de Staff','Formulário para membros da equipa técnica criarem o seu perfil e conta de acesso. Disponível via "Link do Staff".')]:[]),
+    ...(isAdminRole(role)||role==='coach'?[card('🧑‍💼','Registo de Staff','Formulário para membros da equipa técnica criarem o seu perfil e conta de acesso. Disponível via "Link do Staff".')]:[]),
   ]));
 
   document.getElementById('help-content').innerHTML=`
@@ -19995,7 +20041,7 @@ function renderUnavailabilities(){
   const statusSel=document.getElementById('uv-status');
 
   // Non-admin roles: lock to their squad
-  if(u?.squad && u.role!=='admin'){
+  if(u?.squad && !isAdminRole(u.role)){
     squadSel.value=u.squad;
     squadSel.style.display='none';
   } else {
@@ -20030,7 +20076,7 @@ function renderUnavailabilities(){
     const SQUAD_ORDER=['eqa','sub19','sub23'];
     const squadKeys=sq?[sq]:SQUAD_ORDER.filter(k=>grouped[k]);
 
-    const canDelete=u?.role==='admin'||u?.role==='coach';
+    const canDelete=isAdminRole(u?.role)||u?.role==='coach';
 
     body.innerHTML=squadKeys.map(sqKey=>{
       const list=grouped[sqKey]||[];
@@ -20177,14 +20223,14 @@ function applyRoleUI(){
     const profile=DB.getStaffProfile(u.user);
     const sbUser=document.getElementById('sb-user');
     if(sbUser) sbUser.textContent=`${profile?.name||'Team Manager'} · ${SQUADS[u.squad]||''}`;
-  } else if(u.role==='admin'){
+  } else if(isAdminRole(u.role)){
     staffSection.forEach(el=>el&&(el.style.display=''));
     tmSection.forEach(el=>el&&(el.style.display=''));
     if(nlWeeklyPlan) nlWeeklyPlan.style.display='';
     showScouting(true);
     myProfileSection.forEach(el=>el&&(el.style.display='none'));
     const accountsEl=document.getElementById('nl-accounts');
-    if(accountsEl) accountsEl.style.display='';
+    if(accountsEl) accountsEl.style.display=isSuperAdmin()?'':'none';
     // Admin vê monitorização, links PSE/Bem-Estar, bilhetes e mapa clínico
     monSection.forEach(el=>el&&(el.style.display=''));
     if(nlBilhetes) nlBilhetes.style.display='';
@@ -20415,7 +20461,7 @@ async function openAccountsModal(){
         style="padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0">
         ${u.disabled?'Re-ativar':'Guardar'}
       </button>
-      ${u.role!=='admin'&&!u.disabled?`<button onclick="removeAccount('${u.user}',this)"
+      ${!isAdminRole(u.role)&&!u.disabled&&isSuperAdmin()?`<button onclick="removeAccount('${u.user}',this)"
         style="padding:5px 10px;background:#fde8e8;color:#b02020;border:1px solid #f5c6c6;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0"
         title="Revogar acesso">🗑️</button>`:''}
     </div>`).join('');
@@ -20538,8 +20584,8 @@ async function createAccount(btn){
   const userId=(document.getElementById('nc-user')?.value||'').trim().toLowerCase().replace(/\s+/g,'');
   const email=(document.getElementById('nc-email')?.value||'').trim().toLowerCase();
   const role=document.getElementById('nc-role')?.value||'staff';
-  const squads=role==='admin'?['eqa','sub23','sub19']:[...document.querySelectorAll('[name="nc-squad"]:checked')].map(c=>c.value);
-  if(role!=='admin'&&!squads.length){ toast('❌ Seleciona pelo menos um escalão'); return; }
+  const squads=isAdminRole(role)?['eqa','sub23','sub19']:[...document.querySelectorAll('[name="nc-squad"]:checked')].map(c=>c.value);
+  if(!isAdminRole(role)&&!squads.length){ toast('❌ Seleciona pelo menos um escalão'); return; }
   const squad=squads[0]; // escalão primário (retrocompatibilidade)
   const staffRole=document.getElementById('nc-staffrole')?.value||'';
   if(!userId){ toast('❌ Username obrigatório'); return; }
@@ -20705,7 +20751,7 @@ document.addEventListener('DOMContentLoaded',()=>{
             // Conta desativada pelo admin — bloquear acesso
             if(data.disabled===true) return null;
             // Admin sem squads → corrigir automaticamente
-            if(data.role==='admin'&&(!data.squads||!data.squads.length)){
+            if(isAdminRole(data.role)&&(!data.squads||!data.squads.length)){
               data.squads=['eqa','sub23','sub19'];
               data.squad=data.squad||'eqa';
               firestoreDb.collection('userProfiles').doc(fbUser.uid).set(data).catch(()=>{});
@@ -20734,8 +20780,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       }
       if(!u||u.disabled===true) return null;
       // Admin sem squad definido → acesso a todos (squad primário = eqa)
-      const isAdminRole=u.role==='admin';
-      const profile={user:u.user, role:u.role, squad:u.squad||(isAdminRole?'eqa':null), squads:u.squads||(isAdminRole?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
+      const _isAdminR=isAdminRole(u.role);
+      const profile={user:u.user, role:u.role, squad:u.squad||(_isAdminR?'eqa':null), squads:u.squads||(_isAdminR?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
       // Guardar no Firestore para que o próximo login já não precise do email.
       // A Cloud Function setUserClaims dispara após este set() e define
       // role+squad como custom claims no JWT. O getIdToken(true) a seguir
@@ -20866,8 +20912,8 @@ document.addEventListener('DOMContentLoaded',()=>{
           // para que resolveProfile encontre o utilizador imediatamente no login
           const newUid=data.localId;
           if(newUid && firestoreDb){
-            const isAdminRole2=u.role==='admin';
-            const profile={user:u.user, role:u.role, squad:u.squad||(isAdminRole2?'eqa':null), squads:u.squads||(isAdminRole2?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
+            const _isAdminR2=isAdminRole(u.role);
+            const profile={user:u.user, role:u.role, squad:u.squad||(_isAdminR2?'eqa':null), squads:u.squads||(_isAdminR2?['eqa','sub23','sub19']:null), staffRole:u.staffRole||null};
             await firestoreDb.collection('userProfiles').doc(newUid).set(profile).catch(()=>{});
           }
           setupWrap.style.display='none';
