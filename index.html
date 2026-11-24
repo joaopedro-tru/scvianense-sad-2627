@@ -8067,7 +8067,7 @@ function renderClinicalMap(){
   const canEdit=canSeeClinical();
 
   if(_cmTab==='active'){
-    const active=allUnavail.filter(r=>r.startDate<=today&&r.endDate>=today)
+    const active=allUnavail.filter(r=>r.type!=='condicionado'&&r.startDate<=today&&r.endDate>=today)
       .sort((a,b)=>a.endDate.localeCompare(b.endDate));
     const d14=new Date(); d14.setDate(d14.getDate()-14);
     const d14str=d14.toISOString().slice(0,10);
