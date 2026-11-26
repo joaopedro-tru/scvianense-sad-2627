@@ -155,6 +155,7 @@ select.si{cursor:pointer}
 .ce.tr{background:#d4edda;color:#155724}
 .ce.gym{background:#f3e8ff;color:#5b21b6}
 .ce.gm{background:#cce5ff;color:#004085}
+.ce.ev{background:#fff3cd;color:#7c5500}
 /* GYM PLAN BUILDER */
 .gym-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:3px}
 .gym-field{width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit;background:var(--bg);color:var(--text);transition:border-color .15s}
@@ -610,6 +611,7 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
   body.printing-cal .ce.tr{ background:#d4edda!important; color:#155724!important }
   body.printing-cal .ce.gym{ background:#f3e8ff!important; color:#5b21b6!important }
   body.printing-cal .ce.gm{ background:#cce5ff!important; color:#004085!important }
+  body.printing-cal .ce.ev{ background:#fff3cd!important; color:#7c5500!important }
   body.printing-cal .ce-title{ font-size:7pt!important; font-weight:600!important }
   body.printing-cal .ce-meta{ display:block!important; font-size:6.5pt!important; opacity:.85; margin-top:1px }
 
@@ -2000,13 +2002,16 @@ body.pm #v-pse-form,body.pm #v-wellness-form{padding:30px}
       <input type="hidden" id="e-id">
       <div class="fr">
         <div class="fg"><label>Tipo *</label>
-          <select id="e-type" required><option value="training">Treino</option><option value="game">Jogo</option></select>
+          <select id="e-type" required><option value="training">Treino</option><option value="game">Jogo</option><option value="event">📅 Evento</option></select>
         </div>
         <div class="fg"><label>Escalão *</label>
           <select id="e-squad" required>
             <option value="eqa">Equipa A</option><option value="sub19">Sub-19</option><option value="sub23">Sub-23</option><option value="both">Ambos</option>
           </select>
         </div>
+      </div>
+      <div class="fg" id="ev-title-grp" style="display:none">
+        <label>Nome do Evento *</label><input type="text" id="e-ev-title" placeholder="Ex: Jantar de equipa, Atividade de grupo...">
       </div>
       <div class="fg" id="opp-grp" style="display:none">
         <label>Adversário</label><input type="text" id="e-opp" placeholder="Nome do clube adversário">
@@ -3428,6 +3433,7 @@ function evLabel(ev){
     return `${icon} ${SQUADS[ev.squad]||'Jogo'}${opp}${jorn}${comp}`;
   }
   if(ev.type==='gym') return ev.squad==='both'?'🏋️ Ginásio':`🏋️ Ginásio ${SQUADS[ev.squad]}`;
+  if(ev.type==='event') return `📅 ${ev.eventTitle||'Evento'}`;
   return ev.squad==='both'?'🏃 Treino':`🏃 Treino ${SQUADS[ev.squad]}`;
 }
 
@@ -4843,7 +4849,7 @@ function renderDash(){
     const upcoming=es.filter(e=>e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'99:99').localeCompare(b.time||'99:99')));
     const uEl=document.getElementById('d-coach-upcoming');
     uEl.innerHTML=upcoming.length===0?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>':
-      upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
+      upcoming.slice(0,6).map(e=>{const d=new Date(e.date+'T00:00:00');const _navTarget=e.type==='training'?'training':e.type==='event'?'calendar':'game';return `<div class="ui" style="cursor:pointer" onclick="nav('${_navTarget}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`}).join('');
     bdayCards(ps,document.getElementById('d-coach-birthdays'),DB.staffProfiles(cs));
     renderStaffLoadCharts(cs);
     const sqIcon=cs==='eqa'?'⚫':cs==='sub23'?'🔵':'🟡';
@@ -5121,7 +5127,7 @@ function renderAdminStaffView(userKey){
 
   const upcomingHtml=upcoming.length===0
     ?'<p style="color:var(--muted);font-size:13px">Sem eventos próximos.</p>'
-    :upcoming.map(e=>{const d=new Date(e.date+'T00:00:00');return `<div class="ui" style="cursor:pointer" onclick="nav('${e.type==='training'?'training':'game'}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`;}).join('');
+    :upcoming.map(e=>{const d=new Date(e.date+'T00:00:00');const _navTarget=e.type==='training'?'training':e.type==='event'?'calendar':'game';return `<div class="ui" style="cursor:pointer" onclick="nav('${_navTarget}',{id:'${e.id}'})"><div class="ud"><div class="day">${d.getDate()}</div><div class="mon">${MONTHS_S[d.getMonth()]}</div></div><div><div style="font-size:13px;font-weight:600">${e.type==='training'?trainingLabel(e):evLabel(e)}</div><div style="font-size:12px;color:var(--muted)">${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div></div></div>`;}).join('');
 
   viewEl.innerHTML=`<div class="card" style="margin:0;border-left:3px solid ${m.color}">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
@@ -9157,11 +9163,14 @@ function renderCal(){
       } else if(ev.type==='gym'){
         chipTitle=`🏋️ ${SQUADS[ev.squad]||'Ginásio'}`;
         meta=[ev.time,ev.location].filter(Boolean).join(' · ');
+      } else if(ev.type==='event'){
+        chipTitle=`📅 ${ev.eventTitle||'Evento'}`;
+        meta=[ev.time,ev.location].filter(Boolean).join(' · ');
       } else {
         chipTitle=`🏃 ${SQUADS[ev.squad]||'Treino'}`;
         meta=[ev.time,ev.location].filter(Boolean).join(' · ');
       }
-      const chipClass=ev.type==='game'?'gm':ev.type==='gym'?'gym':'tr';
+      const chipClass=ev.type==='game'?'gm':ev.type==='gym'?'gym':ev.type==='event'?'ev':'tr';
       return `<div class="ce ${chipClass}" data-eid="${ev.id}"><div class="ce-title">${chipTitle}</div>${meta?`<div class="ce-meta">${meta}</div>`:''}</div>`;
     }).join('')}</div>`;
   }
@@ -9237,7 +9246,7 @@ function showEventDetail(id){
     }
     return ev.objectives?`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--muted)">🎯 OBJETIVOS TÁTICOS</div><div style="font-size:12px">${ev.objectives}</div>`:'';
   })();
-  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${row('Escalão',SQUADS[ev.squad])}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${_edetObjHTML}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='gym'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-gym" style="width:100%">🏋️ Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
+  document.getElementById('edet-content').innerHTML=`<div style="font-size:13px">${ev.type==='event'?row('Nome',ev.eventTitle||'Evento'):''}${row('Data',fmtDate(ev.date))}${row('Hora',ev.time)}${ev.type!=='event'?row('Escalão',SQUADS[ev.squad]):''}${row('Local',ev.location)}${ev.type==='game'?row('Adversário',ev.opponent):''}${_edetObjHTML}${row('Notas',ev.notes)}</div>${ev.type==='training'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-training" style="width:100%">📋 Ficha e Presenças</button></div>`:''}${ev.type==='gym'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-gym" style="width:100%">🏋️ Presenças</button></div>`:''}${ev.type==='game'?`<div style="margin-top:16px"><button class="btn btn-p" id="btn-open-game" style="width:100%">📋 Convocatória</button></div>`:''}`;
   // Show/hide "Eliminar série" button based on event type
   document.getElementById('btn-del-series').style.display=(ev.type==='training'||ev.type==='gym')?'':'none';
   document.getElementById('mo-edet').classList.add('open');
@@ -9502,6 +9511,7 @@ function openEventModal(ev=null,date=null,defaults={}){
   document.getElementById('e-date').value=ev?.date||date||new Date().toISOString().split('T')[0];
   document.getElementById('e-time').value=ev?.time||'';
   document.getElementById('e-notes').value=ev?.notes||'';
+  document.getElementById('e-ev-title').value=ev?.eventTitle||'';
   document.getElementById('e-opp').value=ev?.opponent||'';
   document.getElementById('e-city').value=ev?.city||'';
   document.getElementById('e-address').value=ev?.address||'';
@@ -9634,7 +9644,13 @@ function toggleOpp(){
   const t=document.getElementById('e-type').value;
   const isGame=t==='game';
   const isGym=t==='gym';
+  const isEvent=t==='event';
   const away=isGame&&_isAway();
+  document.getElementById('ev-title-grp').style.display=isEvent?'block':'none';
+  if(isEvent&&!document.getElementById('e-id').value){
+    // Default squad to 'both' for general events
+    document.getElementById('e-squad').value='both';
+  }
   document.getElementById('opp-grp').style.display=isGame?'block':'none';
   document.getElementById('ha-grp').style.display=isGame?'block':'none';
   document.getElementById('comp-grp').style.display=isGame?'block':'none';
@@ -9646,7 +9662,7 @@ function toggleOpp(){
   if(kmGrp) kmGrp.style.display=isGame?'block':'none';
   document.getElementById('e-repeat-grp').style.display=isGame?'none':'block';
   // Objetivos táticos apenas para treino de campo
-  document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym)?'block':'none';
+  document.getElementById('e-objectives-grp').style.display=(!isGame&&!isGym&&!isEvent)?'block':'none';
   if(isGame){ document.getElementById('e-repeat').checked=false; document.getElementById('e-repeat-until-grp').style.display='none'; }
   if(isGame) updateCompetitionOptions(document.getElementById('e-squad').value, document.getElementById('e-comp').value);
 }
@@ -9680,7 +9696,8 @@ document.getElementById('mo-e-form').addEventListener('submit',e=>{
   const _pLabel=(_p||[]).map(k=>TACTICS_TAXONOMY[k]?.full||k).filter(Boolean).join(' + ')||null;
   const _sLabel=(_s||[]).map(k=>SECONDARY_THEMES[k]?.full||k).filter(Boolean).join(', ')||null;
   const _objText=_pLabel?(_pLabel+(_sLabel?' · '+_sLabel:'')):null;
-  const data={type:f('e-type'),squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:f('e-type')==='game'?f('e-comp'):'',city:f('e-type')==='game'?f('e-city'):'',address:f('e-type')==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:f('e-type')==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:f('e-type')==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:f('e-type')==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:f('e-type')==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:f('e-type')==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):'', distanceKmReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-km-ret')?.value)||0):0, travelMinsReturn:f('e-type')==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):0, jornada:f('e-type')==='game'?(parseInt(document.getElementById('e-jornada')?.value)||null):null};
+  const _evType=f('e-type');
+  const data={type:_evType,squad:f('e-squad'),date:f('e-date'),time:f('e-time'),location:f('e-loc'),notes:f('e-notes'),objectives:_objText,objectivePrimary:_p,objectiveSecondary:_s,regimes:_isTraining&&_regimes.length?[..._regimes]:null,trainingExercises:_isTraining&&_fichaExercises.length?[..._fichaExercises]:null,momentSummary:_isTraining&&Object.keys(_momentSummary).length?{..._momentSummary}:null,objectivesPerMoment:_isTraining&&Object.keys(_objectivesPerMoment).length?{..._objectivesPerMoment}:null,eventTitle:_evType==='event'?f('e-ev-title'):'',opponent:f('e-opp'),homeAway:document.querySelector('input[name="e-ha"]:checked')?.value||'home',competition:_evType==='game'?f('e-comp'):'',city:_evType==='game'?f('e-city'):'',address:_evType==='game'&&document.querySelector('input[name="e-ha"]:checked')?.value==='away'?f('e-address'):'',transport:_evType==='game'?[...((document.getElementById('e-transport-van')?.checked)?['van']:[]),...((document.getElementById('e-transport-bus')?.checked)?['bus']:[])]:[], distanceKm:_evType==='game'?(parseFloat(document.getElementById('e-km')?.value)||0):0, travelMins:_evType==='game'?(parseFloat(document.getElementById('e-travel-mins')?.value)||0):0, departureLocation:_evType==='game'?(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos'):'', arrivalLocation:_evType==='game'?(document.getElementById('e-diff-arr-location')?.checked?(document.getElementById('e-arr-location')?.value.trim()||'Estádio Dr José de Matos'):(document.getElementById('e-dep-location')?.value.trim()||'Estádio Dr José de Matos')):'', distanceKmReturn:_evType==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-km-ret')?.value)||0):0, travelMinsReturn:_evType==='game'&&document.getElementById('e-diff-arr-location')?.checked?(parseFloat(document.getElementById('e-travel-mins-ret')?.value)||0):0, jornada:_evType==='game'?(parseInt(document.getElementById('e-jornada')?.value)||null):null};
 
   const isRepeat=!id && document.getElementById('e-repeat').checked;
   const repeatUntil=f('e-repeat-until');
@@ -15635,7 +15652,7 @@ function generateWeeklyPlan(){
 
   const dayEvs=dates.map(d=>{
     const ds=wpLocalStr(d);
-    return allEvs.filter(e=>e.date===ds&&(e.squad===sq||!e.squad));
+    return allEvs.filter(e=>e.date===ds&&(e.squad===sq||e.squad==='both'||!e.squad));
   });
 
   // Determine slot: events before 13:00 = manhã, rest = tarde
@@ -15666,6 +15683,7 @@ function generateWeeklyPlan(){
       if(ev.competition) v+=`\n${ev.competition}`;
       return v;
     }
+    if(ev.type==='event') return ev.eventTitle||'Evento';
     if(ev.type==='training'){
       const p=ev.objectivePrimary, s=ev.objectiveSecondary;
       const pArr=normalizePrimaryArr(p);
@@ -15684,6 +15702,7 @@ function generateWeeklyPlan(){
   const getObsBg=(ev)=>{
     if(!ev) return '#f0f0f0';
     if(ev.type==='game') return '#e6f4ea';
+    if(ev.type==='event') return '#fffbea';
     return 'var(--bg)';
   };
 
@@ -15756,7 +15775,7 @@ function printWeeklyPlan(){
   const colW=`${(100/7).toFixed(2)}%`;
   const wpDefaultLoc=sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2';
 
-  const dayEvs=dates.map(d=>{ const ds=wpLocalStr(d); return allEvs.filter(e=>e.date===ds&&(e.squad===sq||!e.squad)); });
+  const dayEvs=dates.map(d=>{ const ds=wpLocalStr(d); return allEvs.filter(e=>e.date===ds&&(e.squad===sq||e.squad==='both'||!e.squad)); });
   const slots=dayEvs.map(evs=>{
     const am=evs.find(e=>e.time&&e.time<'13:00')||evs.find(e=>!e.time&&e.type==='training');
     const pm=evs.find(e=>e.time&&e.time>='13:00')||evs.find(e=>!am&&e);
@@ -15772,9 +15791,11 @@ function printWeeklyPlan(){
     const local=ev?.location||(ev?wpDefaultLoc:'');
     const obs=ev?.type==='game'
       ?((ev.jornada?`J${ev.jornada} | `:'')+  (ev.homeAway!=='away'?`SC Vianense vs ${ev.opponent||'Adversário'}`:`${ev.opponent||'Adversário'} vs SC Vianense`)+(ev.competition?'\n'+ev.competition:''))
+      :ev?.type==='event'?(ev.eventTitle||'Evento')
       :(ev?.objectives||'');
     const isFolga=!ev;
     const isGame=ev?.type==='game';
+    const isEvent=ev?.type==='event';
 
     // ── FOLGA ──────────────────────────────────────────────────────────────────
     if(isFolga){
@@ -15787,11 +15808,11 @@ function printWeeklyPlan(){
     }
 
     // ── Barra hora + local ──────────────────────────────────────────────────────
-    const barBg  =isGame?'#c8e6c9':'#dce6f4';
-    const barBord=isGame?'#88c98e':'#9ab0d0';
-    const cellBg =isGame?'#f1f8f2':'#ffffff';
-    const horaColor=isGame?'#1b5e20':'#1a3d6e';
-    const localColor=isGame?'#2d6a3f':'#444';
+    const barBg  =isGame?'#c8e6c9':isEvent?'#fde68a':'#dce6f4';
+    const barBord=isGame?'#88c98e':isEvent?'#f59e0b':'#9ab0d0';
+    const cellBg =isGame?'#f1f8f2':isEvent?'#fffbea':'#ffffff';
+    const horaColor=isGame?'#1b5e20':isEvent?'#7c5500':'#1a3d6e';
+    const localColor=isGame?'#2d6a3f':isEvent?'#92400e':'#444';
     const topBar=`<div class="wp-hora-bar" style="padding:5px 8px 5px;background:${barBg};border-bottom:2px solid ${barBord}">
       ${hora?`<div style="font-size:12px;font-weight:800;color:${horaColor};line-height:1.1;letter-spacing:-.3px">${hora}</div>`:''}
       ${local?`<div style="font-size:8.5px;color:${localColor};margin-top:3px;line-height:1.3">${local}</div>`:''}
@@ -15805,6 +15826,12 @@ function printWeeklyPlan(){
         <div style="font-size:8px;font-weight:800;background:#1b5e20;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:5px;letter-spacing:.8px">JOGO</div>
         <div style="font-size:10px;font-weight:700;line-height:1.4;color:#111">${lines[0]||''}</div>
         ${lines.slice(1).map(l=>`<div style="font-size:9px;color:#555;margin-top:3px">${l}</div>`).join('')}
+      </div>`;
+    } else if(isEvent){
+      body=`<div style="padding:5px 7px">
+        <div style="font-size:8px;font-weight:800;background:#92400e;color:#fff;padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:5px;letter-spacing:.8px">EVENTO</div>
+        <div style="font-size:10px;font-weight:700;line-height:1.4;color:#111">${obs}</div>
+        ${ev.notes?`<div style="font-size:9px;color:#555;margin-top:3px">${ev.notes}</div>`:''}
       </div>`;
     } else {
       body=`<div style="padding:5px 7px">
