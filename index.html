@@ -15656,9 +15656,13 @@ function generateWeeklyPlan(){
   });
 
   // Determine slot: events before 13:00 = manhã, rest = tarde
+  // Priority: game > training > gym > event (ensures game/training always gets the slot)
+  const _slotPri=e=>e.type==='game'?0:e.type==='training'?1:e.type==='gym'?2:3;
   const slots=dayEvs.map(evs=>{
-    const am=evs.find(e=>e.time&&e.time<'13:00')||evs.find(e=>!e.time&&e.type==='training');
-    const pm=evs.find(e=>e.time&&e.time>='13:00')||evs.find(e=>!am&&e);
+    const sorted=[...evs].sort((a,b)=>_slotPri(a)-_slotPri(b));
+    const am=sorted.find(e=>e.time&&e.time<'13:00')||sorted.find(e=>!e.time&&(e.type==='training'||e.type==='gym'));
+    const pmCands=sorted.filter(e=>e.id!==am?.id);
+    const pm=pmCands.find(e=>e.time&&e.time>='13:00')||pmCands.find(e=>!am&&e);
     return {am, pm};
   });
 
@@ -15754,6 +15758,7 @@ function generateWeeklyPlan(){
     html+=section('','main');
   }
   // Extras row: events not captured by slots
+  const _extraLabel=e=>e.type==='game'?`⚽ ${e.opponent||'Jogo'}`:e.type==='training'?`🏃 Treino`:e.type==='gym'?`🏋️ Ginásio`:`📅 ${e.eventTitle||'Evento'}`;
   if(extraEvsByDay.some(es=>es.length>0)){
     html+=`<tr><td style="background:#fffbea;font-size:10px;font-weight:700;text-align:center;padding:4px 3px;border:1px solid var(--border);color:#7c5500;white-space:nowrap">EVENTOS</td>`;
     dates.forEach((_,di)=>{
@@ -15761,7 +15766,7 @@ function generateWeeklyPlan(){
       if(!exs.length){ html+=`<td style="border:1px solid var(--border);padding:3px;background:#fffbea"></td>`; return; }
       html+=`<td style="border:1px solid var(--border);padding:3px;background:#fffbea;vertical-align:top">`;
       exs.forEach(e=>{
-        html+=`<div style="background:#fff3cd;border:1px solid #fde68a;border-radius:4px;padding:3px 6px;font-size:10px;color:#7c5500;font-weight:600;margin-bottom:2px">📅 ${e.eventTitle||'Evento'}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div>`;
+        html+=`<div style="background:#fff3cd;border:1px solid #fde68a;border-radius:4px;padding:3px 6px;font-size:10px;color:#7c5500;font-weight:600;margin-bottom:2px">${_extraLabel(e)}${e.time?' · '+e.time:''}${e.location?' · '+e.location:''}</div>`;
       });
       html+=`</td>`;
     });
@@ -15795,9 +15800,12 @@ function printWeeklyPlan(){
   const wpDefaultLoc=sq==='eqa'?'Estádio Dr. José de Matos':'Estádio Dr. José de Matos Nº2';
 
   const dayEvs=dates.map(d=>{ const ds=wpLocalStr(d); return allEvs.filter(e=>e.date===ds&&(e.squad===sq||e.squad==='both'||!e.squad)); });
+  const _slotPri2=e=>e.type==='game'?0:e.type==='training'?1:e.type==='gym'?2:3;
   const slots=dayEvs.map(evs=>{
-    const am=evs.find(e=>e.time&&e.time<'13:00')||evs.find(e=>!e.time&&e.type==='training');
-    const pm=evs.find(e=>e.time&&e.time>='13:00')||evs.find(e=>!am&&e);
+    const sorted=[...evs].sort((a,b)=>_slotPri2(a)-_slotPri2(b));
+    const am=sorted.find(e=>e.time&&e.time<'13:00')||sorted.find(e=>!e.time&&(e.type==='training'||e.type==='gym'));
+    const pmCands=sorted.filter(e=>e.id!==am?.id);
+    const pm=pmCands.find(e=>e.time&&e.time>='13:00')||pmCands.find(e=>!am&&e);
     return {am,pm};
   });
   const hasBiDaily=slots.some(s=>s.am&&s.pm);
@@ -15870,6 +15878,8 @@ function printWeeklyPlan(){
     dates.forEach((_,di)=>{ row+=pCell(period,di); });
     return secHdr+row+`</tr>`;
   };
+  const _pExtraLabel=e=>e.type==='game'?`⚽ ${e.opponent||'Jogo'}`:e.type==='training'?`🏃 Treino`:e.type==='gym'?`🏋️ Ginásio`:`📅 ${e.eventTitle||'Evento'}`;
+  const _pExtraBadge=e=>e.type==='game'?'#1b5e20':e.type==='training'?'#1a3d6e':'#92400e';
   const pExtrasSection=()=>{
     if(!pExtraEvsByDay.some(es=>es.length>0)) return '';
     let row=`<tr>`;
@@ -15879,8 +15889,8 @@ function printWeeklyPlan(){
       row+=`<td style="border:1px solid #ddd;background:#fffbea;vertical-align:top;padding:4px 5px">`;
       exs.forEach(e=>{
         row+=`<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:3px;padding:2px 5px;margin-bottom:2px">
-          <div style="font-size:7px;font-weight:800;background:#92400e;color:#fff;padding:1px 5px;border-radius:2px;display:inline-block;letter-spacing:.6px;margin-bottom:2px">EVENTO</div>
-          <div style="font-size:9px;font-weight:700;color:#111">${e.eventTitle||'Evento'}</div>
+          <div style="font-size:7px;font-weight:800;background:${_pExtraBadge(e)};color:#fff;padding:1px 5px;border-radius:2px;display:inline-block;letter-spacing:.6px;margin-bottom:2px">${e.type==='game'?'JOGO':e.type==='training'?'TREINO':'EVENTO'}</div>
+          <div style="font-size:9px;font-weight:700;color:#111">${_pExtraLabel(e)}</div>
           ${e.time||e.location?`<div style="font-size:8px;color:#555">${[e.time,e.location].filter(Boolean).join(' · ')}</div>`:''}
         </div>`;
       });
